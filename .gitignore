@@ -1,0 +1,15 @@
+.DS_Store
+.idea
+.vscode
+.zed
+__debug_*
+configs/config.toml
+examples/starter/.env
+sportsite
+node_modules
+tmp/
+resources/backend/internal/adminext/public/hot
+.cache/
+.go-cache/
+cover.html
+*.test

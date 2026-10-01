@@ -1,0 +1,12 @@
+<p>Здравствуйте{{if .UserName}}, {{.UserName}}{{end}}!</p>
+<p>Вы запросили сброс пароля. Для продолжения перейдите по ссылке ниже:</p>
+<p>
+  <a href="{{.ResetURL}}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;">
+    Сбросить пароль
+  </a>
+</p>
+<p>
+  Если кнопка не работает, перейдите по ссылке:
+  <a href="{{.ResetURL}}" style="color:#2563eb;text-decoration:underline;word-break:break-all;">{{.ResetURL}}</a>
+</p>
+<p class="hint">Ссылка действительна {{.ExpiresMinutes}} минут. Если вы не запрашивали сброс, просто проигнорируйте это письмо.</p>

@@ -1,0 +1,33 @@
+{
+  "extends": "./tsconfig.paths.json",
+  "include": [
+    "env.d.ts",
+    "src/**/*",
+    "src/**/*.vue",
+    "src/js/empty-ext/**/*",
+    ".admin-extensions/**/*"
+  ],
+  "exclude": [
+    "src/**/__tests__/*"
+  ],
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "src/js/*"
+      ],
+      "~/*": [
+        "src/js/*"
+      ],
+      "@admin-core/*": [
+        "src/js/*"
+      ],
+      "@admin-ext/*": [
+        "src/js/empty-ext/*"
+      ],
+      "@admin-extensions-generated": [
+        ".admin-extensions/generated.ts"
+      ]
+    }
+  }
+}

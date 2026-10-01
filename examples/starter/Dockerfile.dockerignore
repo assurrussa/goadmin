@@ -1,0 +1,13 @@
+.git
+.go-cache
+.cache
+resources/node_modules
+resources/.vite
+resources/dist
+public/dist
+public/hot
+**/.DS_Store
+
+.env
+**/.env
+**/.env.override

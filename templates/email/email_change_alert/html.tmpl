@@ -1,0 +1,6 @@
+<p>Здравствуйте{{if .UserName}}, {{.UserName}}{{end}}!</p>
+<p>Поступил запрос на смену email для вашей учётной записи администратора.</p>
+<p><strong>Текущий email:</strong> {{.OldEmail}}<br/>
+<strong>Новый email:</strong> {{.NewEmail}}</p>
+<p>Если это были не вы, срочно свяжитесь с поддержкой.</p>
+{{if .IP}}<p class="hint">IP запроса: {{.IP}}</p>{{end}}

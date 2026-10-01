@@ -1,0 +1,29 @@
+# Changelog
+
+This file records changes prepared in the checkout. A release is published only
+after a new tag and its clean-consumer checks complete.
+
+## Unreleased
+
+- Require Go 1.27 and replace the all-dependencies installer with typed
+  `host.New` and explicit access/jobs/uploads/queues/notifications/realtime/authmail
+  modules; the default core needs PostgreSQL and security keys.
+- Supervise owned workers through one Runtime lifecycle while preserving host
+  ownership of borrowed infrastructure; add persistent PostgreSQL browser sessions.
+- Execute firstadmin and administrator/profile/preview commands with canonical
+  GoAuth writes and action audit in one transaction. Reject stale preview bindings
+  without overwriting file metadata; preserve previews when uploads is disabled.
+- Gate client controls, WebSockets and upload completion polling by installed
+  capabilities. Preserve authenticated sessions when bootstrap redirects save flash.
+
+- Replace the sample admin home with permission-filtered navigation and clearer
+  access, users, and system sections.
+- Show actionable table loading, empty, and error states, and warn before
+  discarding edited form data.
+- Add a runnable local host starter, an additive outbox lifecycle facade,
+  public usage and security documentation, and a deterministic UI unit-test
+  gate.
+- Make the external consumer probe reject a dependency version silently
+  upgraded by Go's module selection.
+- Refresh compatible locked npm transitive packages so the high-severity
+  advisory gate passes without a frontend major-version upgrade.

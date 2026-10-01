@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      retries: 10
+  redis:
+    profiles: [redis]
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+  mailpit:
+    profiles: [authmail]
+    image: axllent/mailpit:v1.27
+    ports:
+      - "127.0.0.1:${STARTER_MAILPIT_PORT:-8025}:8025"
+  admin:
+    build:
+      context: ../..
+      dockerfile: examples/starter/Dockerfile.published
+      args:
+        GOADMIN_VERSION: ${GOADMIN_VERSION:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
+      ADMIN_MODULES: ${ADMIN_MODULES:-}
+      APP_ADMIN_CANONICAL_SESSION_BACKEND: ${APP_ADMIN_CANONICAL_SESSION_BACKEND:-pgsql}
+      REDIS_DSN: redis://redis:6379/0
+      ADMIN_URL: ${ADMIN_URL:-http://localhost:8080}
+      CSRF_SECRET: ${CSRF_SECRET:?set CSRF_SECRET}
+      FIRST_ADMIN_SETUP_TOKEN: ${FIRST_ADMIN_SETUP_TOKEN:?set FIRST_ADMIN_SETUP_TOKEN}
+      GOAUTH_SIGNING_KEY: ${GOAUTH_SIGNING_KEY:?set GOAUTH_SIGNING_KEY}
+      GOAUTH_TOKEN_KEY: ${GOAUTH_TOKEN_KEY:?set GOAUTH_TOKEN_KEY}
+      GOAUTH_ENVELOPE_KEY: ${GOAUTH_ENVELOPE_KEY:?set GOAUTH_ENVELOPE_KEY}
+      SMTP_ADDR: mailpit:1025
+      SMTP_FROM: ${SMTP_FROM:-}
+      NOTIFYHUB_URL: ${NOTIFYHUB_URL:-}
+      NOTIFYHUB_PROJECT_KEY: ${NOTIFYHUB_PROJECT_KEY:-}
+      STARTER_MIGRATE: "1"
+      UPLOAD_ROOT: /data/uploads
+    ports:
+      - "127.0.0.1:${STARTER_ADMIN_PORT:-8080}:8080"
+    volumes:
+      - uploads:/data/uploads
+volumes:
+  postgres_data:
+  redis_data:
+  uploads:

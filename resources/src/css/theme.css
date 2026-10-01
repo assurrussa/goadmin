@@ -1,0 +1,203 @@
+:root {
+  --font-sans: 'Space Grotesk', 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+
+  --hue-primary: 204;
+  --saturation-primary: 70%;
+  --hue-neutral: 214;
+  --saturation-neutral: 14%;
+  --hue-success: 150;
+  --saturation-success: 60%;
+  --hue-error: 0;
+  --saturation-error: 78%;
+
+  --primary-h: var(--hue-primary);
+  --primary-s: var(--saturation-primary);
+  --primary-l: 46%;
+  --color-primary: hsl(var(--primary-h), var(--primary-s), var(--primary-l));
+  --color-primary-light: hsl(var(--primary-h), var(--primary-s), 58%);
+  --color-primary-lighter: hsl(var(--primary-h), var(--primary-s), 70%);
+  --color-primary-dark: hsl(var(--primary-h), var(--primary-s), 36%);
+  --color-primary-darker: hsl(var(--primary-h), var(--primary-s), 28%);
+  --color-primary-contrast: hsl(var(--primary-h), 30%, 98%);
+
+  --neutral-h: var(--hue-neutral);
+  --neutral-s: var(--saturation-neutral);
+  --color-background: hsl(var(--neutral-h), 28%, 98%);
+  --color-surface: hsl(var(--neutral-h), 24%, 96%);
+  --color-surface-variant: hsl(var(--neutral-h), 20%, 92%);
+  --color-card: hsl(var(--neutral-h), 20%, 100%);
+  --color-card-hover: hsl(var(--neutral-h), 24%, 97%);
+
+  --color-text-primary: hsl(var(--neutral-h), 22%, 12%);
+  --color-text-secondary: hsl(var(--neutral-h), 18%, 32%);
+  --color-text-tertiary: hsl(var(--neutral-h), 12%, 52%);
+  --color-text-disabled: hsl(var(--neutral-h), 12%, 70%);
+  --color-text-white: #ffffff;
+
+  --color-border-primary: hsl(var(--neutral-h), 18%, 86%);
+  --color-border-secondary: hsl(var(--neutral-h), 18%, 92%);
+  --color-border-focus: var(--color-primary);
+
+  --color-success: hsl(var(--hue-success), var(--saturation-success), 38%);
+  --color-warning: hsl(38, 80%, 50%);
+  --color-error: hsl(var(--hue-error), var(--saturation-error), 52%);
+  --color-info: hsl(198, 80%, 48%);
+
+  --color-badge-success-bg: hsl(var(--hue-success) var(--saturation-success) 94% / 0.9);
+  --color-badge-success-border: hsl(var(--hue-success) var(--saturation-success) 42% / 0.35);
+  --color-badge-success-text: hsl(var(--hue-success) var(--saturation-success) 34%);
+  --color-badge-warning-bg: hsl(38 80% 94% / 0.9);
+  --color-badge-warning-border: hsl(38 80% 48% / 0.35);
+  --color-badge-warning-text: hsl(38 80% 38%);
+  --color-badge-error-bg: hsl(var(--hue-error) var(--saturation-error) 94% / 0.9);
+  --color-badge-error-border: hsl(var(--hue-error) var(--saturation-error) 52% / 0.35);
+  --color-badge-error-text: hsl(var(--hue-error) var(--saturation-error) 42%);
+  --color-badge-info-bg: hsl(198 80% 94% / 0.9);
+  --color-badge-info-border: hsl(198 80% 48% / 0.35);
+  --color-badge-info-text: hsl(198 80% 38%);
+  --color-badge-primary-bg: hsl(var(--primary-h) var(--primary-s) 94% / 0.9);
+  --color-badge-primary-border: hsl(var(--primary-h) var(--primary-s) 46% / 0.35);
+  --color-badge-primary-text: hsl(var(--primary-h) var(--primary-s) 38%);
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 10px 20px rgba(15, 23, 42, 0.1);
+  --shadow-lg: 0 18px 40px rgba(15, 23, 42, 0.14);
+
+  --transition-fast: 0.15s ease;
+  --transition-medium: 0.25s ease;
+  --transition-slow: 0.4s ease;
+
+  --color-primary-rgb: 27, 109, 229;
+  --color-background-rgb: 248, 249, 252;
+  --color-overlay: rgba(15, 23, 42, 0.45);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --color-a11y-dark: hsl(var(--neutral-h), 24%, 8%);
+  --color-a11y-dark-secondary: hsl(var(--neutral-h), 20%, 20%);
+  --color-a11y-light: hsl(var(--neutral-h), 24%, 96%);
+  --color-a11y-light-secondary: hsl(var(--neutral-h), 20%, 80%);
+
+  --color-focus-ring: hsl(var(--primary-h), var(--primary-s), 52%);
+  --outline-focus: 2px solid var(--color-focus-ring);
+
+  --color-category-gym-bg: #ffebee;
+  --color-category-gym-text: #c62828;
+  --color-category-outdoor-bg: #e0f7fa;
+  --color-category-outdoor-text: #00796b;
+  --color-category-stretching-bg: #fff3e0;
+  --color-category-stretching-text: #ef6c00;
+  --color-category-cardio-bg: #fce4ec;
+  --color-category-cardio-text: #ad1457;
+  --color-category-yoga-bg: #ede7f6;
+  --color-category-yoga-text: #5e35b1;
+
+  /* shadcn-vue tokens (HSL components) */
+  --background: var(--neutral-h), 28%, 98%;
+  --foreground: var(--neutral-h), 22%, 12%;
+  --card: var(--neutral-h), 20%, 100%;
+  --card-foreground: var(--neutral-h), 22%, 12%;
+  --popover: var(--neutral-h), 20%, 100%;
+  --popover-foreground: var(--neutral-h), 22%, 12%;
+  --primary: var(--primary-h), var(--primary-s), 46%;
+  --primary-foreground: var(--primary-h), 30%, 98%;
+  --secondary: var(--neutral-h), 24%, 96%;
+  --secondary-foreground: var(--neutral-h), 18%, 24%;
+  --muted: var(--neutral-h), 20%, 92%;
+  --muted-foreground: var(--neutral-h), 12%, 52%;
+  --accent: var(--neutral-h), 24%, 96%;
+  --accent-foreground: var(--neutral-h), 18%, 24%;
+  --destructive: var(--hue-error), var(--saturation-error), 52%;
+  --destructive-foreground: 0, 0%, 98%;
+  --border: var(--neutral-h), 18%, 86%;
+  --input: var(--neutral-h), 18%, 86%;
+  --ring: var(--primary-h), var(--primary-s), 52%;
+  --radius: var(--radius-md);
+}
+
+.dark,
+[data-theme-mode='dark'] {
+  --primary-l: 60%;
+  --color-primary: hsl(var(--primary-h), var(--primary-s), var(--primary-l));
+  --color-primary-light: hsl(var(--primary-h), var(--primary-s), 72%);
+  --color-primary-lighter: hsl(var(--primary-h), var(--primary-s), 82%);
+  --color-primary-dark: hsl(var(--primary-h), var(--primary-s), 48%);
+  --color-primary-darker: hsl(var(--primary-h), var(--primary-s), 34%);
+  --color-primary-contrast: hsl(var(--primary-h), 20%, 12%);
+
+  --color-background: hsl(var(--neutral-h), 18%, 10%);
+  --color-surface: hsl(var(--neutral-h), 16%, 14%);
+  --color-surface-variant: hsl(var(--neutral-h), 16%, 18%);
+  --color-card: hsl(var(--neutral-h), 16%, 20%);
+  --color-card-hover: hsl(var(--neutral-h), 16%, 24%);
+
+  --color-text-primary: hsl(var(--neutral-h), 14%, 92%);
+  --color-text-secondary: hsl(var(--neutral-h), 12%, 78%);
+  --color-text-tertiary: hsl(var(--neutral-h), 10%, 66%);
+  --color-text-disabled: hsl(var(--neutral-h), 10%, 54%);
+
+  --color-border-primary: hsl(var(--neutral-h), 12%, 38%);
+  --color-border-secondary: hsl(var(--neutral-h), 12%, 30%);
+
+  --color-primary-rgb: 96, 146, 250;
+  --color-background-rgb: 16, 18, 24;
+  --color-overlay: rgba(0, 0, 0, 0.55);
+
+  --color-a11y-dark: hsl(var(--neutral-h), 16%, 94%);
+  --color-a11y-dark-secondary: hsl(var(--neutral-h), 12%, 80%);
+  --color-a11y-light: hsl(var(--neutral-h), 16%, 8%);
+  --color-a11y-light-secondary: hsl(var(--neutral-h), 12%, 20%);
+
+  --color-focus-ring: hsl(var(--primary-h), var(--primary-s), 72%);
+
+  --color-category-gym-bg: rgba(239, 68, 68, 0.2);
+  --color-category-gym-text: #f87171;
+  --color-category-outdoor-bg: rgba(0, 121, 107, 0.2);
+  --color-category-outdoor-text: #10b981;
+  --color-category-stretching-bg: rgba(239, 108, 0, 0.2);
+  --color-category-stretching-text: #fb923c;
+  --color-category-cardio-bg: rgba(173, 20, 87, 0.2);
+  --color-category-cardio-text: #f472b6;
+  --color-category-yoga-bg: rgba(94, 53, 177, 0.2);
+  --color-category-yoga-text: #a78bfa;
+
+  --color-badge-success-bg: hsl(var(--hue-success) var(--saturation-success) 24% / 0.5);
+  --color-badge-success-border: hsl(var(--hue-success) var(--saturation-success) 48% / 0.4);
+  --color-badge-success-text: hsl(var(--hue-success) var(--saturation-success) 72%);
+  --color-badge-warning-bg: hsl(38 80% 26% / 0.5);
+  --color-badge-warning-border: hsl(38 80% 52% / 0.45);
+  --color-badge-warning-text: hsl(38 80% 72%);
+  --color-badge-error-bg: hsl(var(--hue-error) var(--saturation-error) 26% / 0.5);
+  --color-badge-error-border: hsl(var(--hue-error) var(--saturation-error) 58% / 0.45);
+  --color-badge-error-text: hsl(var(--hue-error) var(--saturation-error) 76%);
+  --color-badge-info-bg: hsl(198 80% 26% / 0.5);
+  --color-badge-info-border: hsl(198 80% 52% / 0.45);
+  --color-badge-info-text: hsl(198 80% 76%);
+  --color-badge-primary-bg: hsl(var(--primary-h) var(--primary-s) 26% / 0.5);
+  --color-badge-primary-border: hsl(var(--primary-h) var(--primary-s) 52% / 0.45);
+  --color-badge-primary-text: hsl(var(--primary-h) var(--primary-s) 76%);
+
+  /* shadcn-vue tokens (HSL components) */
+  --background: var(--neutral-h), 18%, 10%;
+  --foreground: var(--neutral-h), 14%, 92%;
+  --card: var(--neutral-h), 16%, 20%;
+  --card-foreground: var(--neutral-h), 14%, 92%;
+  --popover: var(--neutral-h), 16%, 18%;
+  --popover-foreground: var(--neutral-h), 14%, 92%;
+  --primary: var(--primary-h), var(--primary-s), 60%;
+  --primary-foreground: var(--primary-h), 20%, 12%;
+  --secondary: var(--neutral-h), 16%, 18%;
+  --secondary-foreground: var(--neutral-h), 12%, 72%;
+  --muted: var(--neutral-h), 16%, 18%;
+  --muted-foreground: var(--neutral-h), 10%, 52%;
+  --accent: var(--neutral-h), 16%, 20%;
+  --accent-foreground: var(--neutral-h), 12%, 72%;
+  --destructive: var(--hue-error), var(--saturation-error), 58%;
+  --destructive-foreground: 0, 0%, 98%;
+  --border: var(--neutral-h), 12%, 26%;
+  --input: var(--neutral-h), 12%, 26%;
+  --ring: var(--primary-h), var(--primary-s), 72%;
+  --radius: var(--radius-md);
+}

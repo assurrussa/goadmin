@@ -1,0 +1,10 @@
+# Explicit source-candidate build; never uses a developer module-cache directory.
+services:
+  admin:
+    build:
+      dockerfile: examples/starter/Dockerfile
+      additional_contexts:
+        goauth: ${GOADMIN_CANDIDATE_CONTEXTS:?run scripts/starter-local.sh}/goauth
+        gonotify: ${GOADMIN_CANDIDATE_CONTEXTS:?run scripts/starter-local.sh}/gonotify
+        gouploads: ${GOADMIN_CANDIDATE_CONTEXTS:?run scripts/starter-local.sh}/gouploads
+        gowebsocket: ${GOADMIN_CANDIDATE_CONTEXTS:?run scripts/starter-local.sh}/gowebsocket

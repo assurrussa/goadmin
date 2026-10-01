@@ -1,0 +1,62 @@
+package di
+
+const (
+	KeyBootstrapAdminServer        = "goadmin.bootstrap.admin_server"
+	KeyBootstrapSystemDeps         = "goadmin.bootstrap.system_deps"
+	KeyBootstrapOutboxDeps         = "goadmin.bootstrap.outbox_deps"
+	KeyBootstrapRepoDeps           = "goadmin.bootstrap.repo_deps"
+	KeyBootstrapUploadDeps         = "goadmin.bootstrap.upload_deps"
+	KeyBootstrapDeps               = "goadmin.bootstrap.deps"
+	KeyAdminEventStream            = "goadmin.bootstrap.event_stream"
+	KeyAdminOutboxRegister         = "goadmin.bootstrap.outbox_register"
+	KeyAdminOutboxPutter           = "goadmin.bootstrap.outbox_putter"
+	KeyAdminRolesManager           = "goadmin.bootstrap.roles_manager"
+	KeyAdminRolesUseCaseRepo       = "goadmin.bootstrap.roles_usecase_repo"
+	KeyAdminPasswordResetTokenRepo = "goadmin.bootstrap.password_reset_token_repo"
+	KeyAdminUserRepo               = "goadmin.bootstrap.user_repo"
+	KeyAdminFileLoader             = "goadmin.bootstrap.file_loader"
+	KeyAdminTaskUploader           = "goadmin.bootstrap.task_uploader"
+	KeyAdminFileRepo               = "goadmin.bootstrap.file_repo"
+	KeyAdminRepo                   = "goadmin.bootstrap.admin_repo"
+	KeyAdminNotificationRepo       = "goadmin.bootstrap.notification_repo"
+	KeyAdminJobsRepo               = "goadmin.bootstrap.jobs_repo"
+	KeyAdminJobsFailedRepo         = "goadmin.bootstrap.jobs_failed_repo"
+	KeyAdminAuthService            = "goadmin.bootstrap.auth_service"
+	KeyAdminPreviewAttachJob       = "goadmin.jobs.preview_attach_job"
+	KeyAdminPreviewDetachJob       = "goadmin.jobs.preview_detach_job"
+	KeyAdminNotificationJob        = "goadmin.jobs.notification_job"
+
+	KeyAuthAdminSession            = "goadmin.auth.session"
+	KeyAuthUseCaseConfig           = "goadmin.auth.usecase.config"
+	KeyAuthUseCaseUserAuthMe       = "goadmin.auth.usecase.user_auth_me"
+	KeyAuthUseCaseUserLogin        = "goadmin.auth.usecase.user_login"
+	KeyAuthUseCaseUserLogout       = "goadmin.auth.usecase.user_logout"
+	KeyAuthUseCaseUserLogoutAll    = "goadmin.auth.usecase.user_logout_all"
+	KeyAuthUseCaseUserRegister     = "goadmin.auth.usecase.user_register"
+	KeyAuthUseCaseUserTokenBan     = "goadmin.auth.usecase.user_token_ban"     //nolint:gosec // not a credential
+	KeyAuthUseCaseUserTokenRevoke  = "goadmin.auth.usecase.user_token_revoke"  //nolint:gosec // not a credential
+	KeyAuthUseCaseUserTokenList    = "goadmin.auth.usecase.user_token_list"    //nolint:gosec // not a credential
+	KeyAuthUseCaseUserTokenRefresh = "goadmin.auth.usecase.user_token_refresh" //nolint:gosec // not a credential
+	KeyAuthUseCaseSendConfirmCode  = "goadmin.auth.usecase.send_confirmation_code"
+	KeyAuthUseCaseVerifyConfirm    = "goadmin.auth.usecase.verify_confirmation_code"
+	KeyAuthPasswordResetService    = "goadmin.auth.password_reset_service" //nolint:gosec // not a credential
+	KeyAuthUseCaseRequestReset     = "goadmin.auth.usecase.request_password_reset"
+	KeyAuthUseCasePerformReset     = "goadmin.auth.usecase.perform_password_reset"
+
+	KeyRolesRepo                 = "goadmin.roles.repo"
+	KeyRolesService              = "goadmin.roles.service"
+	KeyRolesUseCaseListAll       = "goadmin.roles.usecase.list_all"
+	KeyRolesUseCaseListSubject   = "goadmin.roles.usecase.list_subject"
+	KeyRolesGuardService         = "goadmin.roles.guard_service"
+	KeyRolesGuardPermissionGuard = "goadmin.roles.guard_permission_guard"
+	KeyRolesGuardRolesService    = "goadmin.roles.guard_roles_service"
+	KeyRolesUseCaseList          = "goadmin.roles.usecase.list"
+	KeyRolesUseCaseGet           = "goadmin.roles.usecase.get"
+	KeyRolesUseCaseCreate        = "goadmin.roles.usecase.create"
+	KeyRolesUseCaseUpdate        = "goadmin.roles.usecase.update"
+	KeyRolesUseCaseDelete        = "goadmin.roles.usecase.delete"
+	KeyRolesUseCaseSetPerms      = "goadmin.roles.usecase.set_permissions"
+	KeyRolesUseCaseAssignSubject = "goadmin.roles.usecase.assign_subject"
+	KeyRolesUseCaseListPerms     = "goadmin.roles.usecase.list_permissions"
+	KeyRolesUseCaseListRolePerms = "goadmin.roles.usecase.list_role_permissions"
+)

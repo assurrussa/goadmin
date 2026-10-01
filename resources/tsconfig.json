@@ -1,0 +1,23 @@
+{
+  "files": [],
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/js/*"],
+      "~/*": ["src/js/*"],
+      "@admin-core/*": ["src/js/*"],
+      "@admin-ext/*": ["src/js/empty-ext/*"]
+    }
+  },
+  "references": [
+    {
+      "path": "./tsconfig.node.json"
+    },
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.vitest.json"
+    }
+  ]
+}
