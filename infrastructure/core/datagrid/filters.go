@@ -1,6 +1,7 @@
 package datagrid
 
 import (
+	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
@@ -115,7 +116,11 @@ func (f Filters) ToQueryParams(config FilterConfig[any]) url.Values {
 	if f.Page > 1 {
 		params.Set("page", strconv.Itoa(f.Page))
 	}
-	if f.Limit != config.PageSize && f.Limit != 10 {
+	defaultPageSize := config.PageSize
+	if defaultPageSize == 0 {
+		defaultPageSize = 10
+	}
+	if f.Limit != config.PageSize && f.Limit != defaultPageSize {
 		params.Set("limit", strconv.Itoa(f.Limit))
 	}
 
@@ -132,25 +137,41 @@ func (f Filters) ToQueryParams(config FilterConfig[any]) url.Values {
 		params.Set("sortOrder", f.SortOrder)
 	}
 
-	// Динамические поля
+	// Use the same scalar representation in URLs and response metadata.
 	for fieldName, value := range f.Fields {
-		if value != nil {
-			switch v := value.(type) {
-			case string:
-				if v != "" {
-					params.Set(fieldName, v)
-				}
-			case int:
-				params.Set(fieldName, strconv.Itoa(v))
-			case bool:
-				params.Set(fieldName, strconv.FormatBool(v))
-			case time.Time:
-				params.Set(fieldName, v.Format("2006-01-02"))
-			}
+		if isReservedFilterKey(fieldName) {
+			continue
+		}
+		if encoded, ok := formatFilterValue(value); ok && encoded != "" {
+			params.Set(fieldName, encoded)
 		}
 	}
 
 	return params
+}
+
+// isReservedFilterKey protects request controls and the metadata search key from field collisions.
+func isReservedFilterKey(key string) bool {
+	switch key {
+	case "page", "limit", "search", "sortBy", "sortOrder", "_search":
+		return true
+	default:
+		return false
+	}
+}
+
+// formatFilterValue serializes the supported filter scalars for the public string-valued contract.
+func formatFilterValue(value any) (string, bool) {
+	switch v := value.(type) {
+	case string:
+		return v, true
+	case time.Time:
+		return v.Format("2006-01-02"), true
+	case bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+		return fmt.Sprint(v), true
+	default:
+		return "", false
+	}
 }
 
 // Validate валидирует фильтры - УПРОЩЕННАЯ валидация.

@@ -1,4 +1,13 @@
-import { computed, onMounted, onUnmounted, ref, type Ref } from 'vue'
+import {
+  computed,
+  onMounted,
+  onUnmounted,
+  ref,
+  toValue,
+  watch,
+  type MaybeRefOrGetter,
+  type Ref,
+} from 'vue'
 
 // Type definitions
 interface DataItem {
@@ -89,8 +98,9 @@ interface Meta {
 }
 
 interface UseDataGridParams {
-  apiUrl: string
+  apiUrl: MaybeRefOrGetter<string>
   initialData?: ApiResponse | null
+  initialParams?: LoadDataParams
 }
 
 interface LoadDataParams {
@@ -108,13 +118,50 @@ declare global {
   }
 }
 
-export function useDataGrid({ apiUrl, initialData }: UseDataGridParams) {
+const reservedQueryKeys = new Set(['page', 'limit', 'sortBy', 'sortOrder', 'search', '_search'])
+
+export const isDataGridFilterKey = (key: string): boolean => !reservedQueryKeys.has(key)
+
+const positiveInteger = (value: unknown, fallback: number): number => {
+  const number = Number(value)
+  return Number.isSafeInteger(number) && number > 0 ? number : fallback
+}
+
+export function parseDataGridQuery(
+  params: URLSearchParams,
+  defaultLimit?: number,
+  preserveMissing = false,
+): LoadDataParams {
+  const parsed: LoadDataParams = {
+    page: positiveInteger(params.get('page'), 1),
+    limit: params.has('limit')
+      ? positiveInteger(params.get('limit'), defaultLimit || 10)
+      : defaultLimit,
+    sortBy: params.get('sortBy') || '',
+    sortOrder: params.get('sortOrder') === 'asc' ? 'asc' : 'desc',
+    search: params.get('search') || '',
+    filters: Object.fromEntries([...params].filter(([key]) => isDataGridFilterKey(key))),
+  }
+  if (preserveMissing) {
+    for (const key of ['page', 'sortBy', 'sortOrder', 'search'] as const) {
+      if (!params.has(key)) delete parsed[key]
+    }
+    if (Object.keys(parsed.filters || {}).length === 0) delete parsed.filters
+  }
+  return parsed
+}
+
+const ordinaryFilters = (values: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(values).filter(([key]) => isDataGridFilterKey(key)))
+
+export function useDataGrid({ apiUrl, initialData, initialParams }: UseDataGridParams) {
   // Reactive state
   const loading: Ref<boolean> = ref(false)
   const loadError = ref<string | null>(null)
   const hasLoaded = ref(false)
   let requestSequence = 0
   let lastRequest: LoadDataParams = {}
+  let lastRequestUsesServerDefaults = false
   const metaInfo: Ref<Meta | null> = ref(null)
   const items: Ref<DataItem[]> = ref([])
   const pagination: Ref<Pagination | null> = ref(null)
@@ -125,9 +172,24 @@ export function useDataGrid({ apiUrl, initialData }: UseDataGridParams) {
   const sortOrder: Ref<'asc' | 'desc'> = ref('desc')
   const selectedItems: Ref<(string | number)[]> = ref([])
 
-  // Refs для debounce
-  let searchTimeout: ReturnType<typeof setTimeout> | null = null
-  let filterTimeout: ReturnType<typeof setTimeout> | null = null
+  // Search and filter edits describe one query, so only the newest timer may run.
+  let queryTimeout: ReturnType<typeof setTimeout> | null = null
+  const cancelPendingQuery = (): void => {
+    if (queryTimeout !== null) clearTimeout(queryTimeout)
+    queryTimeout = null
+  }
+
+  // Changing endpoints affects subsequent requests; old endpoint work must never hydrate the new grid.
+  watch(
+    () => toValue(apiUrl),
+    () => {
+      requestSequence++
+      cancelPendingQuery()
+      loading.value = false
+      loadError.value = null
+    },
+    { flush: 'sync' },
+  )
 
   // Computed values
   const filterableColumns = computed((): Column[] => {
@@ -137,37 +199,94 @@ export function useDataGrid({ apiUrl, initialData }: UseDataGridParams) {
   const hasFilters = computed((): boolean => filterableColumns.value.length > 0)
 
   const allSelected = computed((): boolean => {
-    return selectedItems.value.length === items.value.length && items.value.length > 0
+    const selected = new Set(selectedItems.value)
+    return (
+      items.value.length > 0 &&
+      items.value.every(({ item }) => {
+        const id = item[config.value.ui?.idKey || 'id']
+        return (typeof id === 'string' || typeof id === 'number') && selected.has(id)
+      })
+    )
   })
 
-  // Основная функция загрузки данных
-  const loadData = async (params: LoadDataParams = {}): Promise<void> => {
-    lastRequest = { ...params, filters: params.filters ? { ...params.filters } : undefined }
+  const hydrateResponse = (result: ApiResponse): void => {
+    items.value = result.data || []
+    selectedItems.value = []
+    metaInfo.value = result.meta || null
+    pagination.value = result.meta?.pagination || result.pagination || null
+    config.value = result.config || {}
+    if (result.meta?.sorting) {
+      sortBy.value = result.meta.sorting.sortBy
+      sortOrder.value = result.meta.sorting.sortOrder === 'asc' ? 'asc' : 'desc'
+    }
+    if (result.meta?.filters) {
+      filters.value = ordinaryFilters(result.meta.filters)
+      if (Object.hasOwn(result.meta.filters, '_search')) {
+        searchQuery.value = String(result.meta.filters._search ?? '')
+      }
+    }
+    hasLoaded.value = true
+  }
+
+  // A direct request supersedes every pending debounce and snapshots the full intent for retry.
+  const requestData = async (
+    params: LoadDataParams = {},
+    useServerDefaults = false,
+  ): Promise<void> => {
+    cancelPendingQuery()
     const request = ++requestSequence
     loading.value = true
     loadError.value = null
     if (params.sortBy !== undefined) sortBy.value = params.sortBy
     if (params.sortOrder !== undefined) sortOrder.value = params.sortOrder
     if (params.search !== undefined) searchQuery.value = params.search
-    if (params.filters !== undefined) filters.value = params.filters
+    if (params.filters !== undefined) filters.value = ordinaryFilters(params.filters)
+    const page = positiveInteger(
+      params.page,
+      pagination.value?.currentPage || lastRequest.page || 1,
+    )
+    const limit = positiveInteger(
+      params.limit,
+      pagination.value?.perPage || lastRequest.limit || 10,
+    )
+    lastRequest = {
+      page,
+      limit,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
+      search: searchQuery.value,
+      filters: { ...filters.value },
+    }
+    lastRequestUsesServerDefaults = useServerDefaults
+    // URL navigation must not mistake a previous response's effective settings for host defaults.
+    if (useServerDefaults) {
+      for (const key of ['limit', 'sortBy', 'sortOrder'] as const) {
+        if (params[key] === undefined) delete lastRequest[key]
+      }
+    }
+    if (pagination.value) {
+      pagination.value = { ...pagination.value, currentPage: page, perPage: limit }
+    }
     try {
       const searchParams = new URLSearchParams({
-        page: String(params.page || pagination.value?.currentPage || 1),
-        limit: String(params.limit || pagination.value?.perPage || 10),
-        sortBy: params.sortBy || sortBy.value || '',
-        sortOrder: params.sortOrder || sortOrder.value || 'desc',
-        search: params.search !== undefined ? params.search : searchQuery.value || '',
+        page: String(page),
+        limit: String(limit),
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+        search: searchQuery.value,
       })
-
-      // Добавляем фильтры
-      const currentFilters = params.filters || filters.value
-      Object.entries(currentFilters).forEach(([key, value]) => {
-        if (value !== null && value !== undefined && value !== '') {
+      if (useServerDefaults) {
+        for (const key of ['limit', 'sortBy', 'sortOrder'] as const) {
+          if (params[key] === undefined) searchParams.delete(key)
+        }
+      }
+      Object.entries(filters.value).forEach(([key, value]) => {
+        if (isDataGridFilterKey(key) && value !== null && value !== undefined && value !== '') {
           searchParams.set(key, String(value))
         }
       })
 
-      const response = await fetch(`${apiUrl}/data?${searchParams}`)
+      const response = await fetch(`${toValue(apiUrl)}/data?${searchParams}`)
       if (!response.ok) {
         if (response.status === 401)
           throw new Error('Сеанс истёк. Войдите снова и повторите попытку.')
@@ -178,12 +297,7 @@ export function useDataGrid({ apiUrl, initialData }: UseDataGridParams) {
       const result: ApiResponse = await response.json()
       if (request !== requestSequence) return
 
-      items.value = result.data || []
-      selectedItems.value = []
-      metaInfo.value = result.meta || null
-      pagination.value = result.meta?.pagination || result.pagination || null
-      config.value = result.config || {}
-      hasLoaded.value = true
+      hydrateResponse(result)
     } catch (error) {
       if (request === requestSequence) {
         loadError.value = error instanceof Error ? error.message : 'Не удалось загрузить данные.'
@@ -192,7 +306,24 @@ export function useDataGrid({ apiUrl, initialData }: UseDataGridParams) {
       if (request === requestSequence) loading.value = false
     }
   }
-  const retryLoad = (): Promise<void> => loadData(lastRequest)
+  const loadData = (params: LoadDataParams = {}): Promise<void> => requestData(params)
+  const retryLoad = (): Promise<void> => requestData(lastRequest, lastRequestUsesServerDefaults)
+  const loadDataFromUrl = (url: string): Promise<void> => {
+    const params = parseDataGridQuery(
+      new URL(url, window.location.origin).searchParams,
+      undefined,
+      true,
+    )
+    return requestData(
+      {
+        ...params,
+        page: params.page ?? 1,
+        search: params.search ?? '',
+        filters: params.filters ?? {},
+      },
+      true,
+    )
+  }
 
   // Initialize data
   const initializeData = (): void => {
@@ -201,81 +332,42 @@ export function useDataGrid({ apiUrl, initialData }: UseDataGridParams) {
       data = initialData
     } else if (window.AdminDataGrid) {
       try {
+        const globalData = window.AdminDataGrid
         data =
-          typeof window.AdminDataGrid === 'string'
-            ? JSON.parse(window.AdminDataGrid)
-            : window.AdminDataGrid
+          typeof globalData === 'string'
+            ? JSON.parse(globalData)
+            : 'dataResponse' in globalData
+              ? JSON.parse(globalData.dataResponse)
+              : globalData
       } catch (e) {
         console.error('Error parsing AdminDataGrid:', e)
       }
     }
 
-    if (data && data.data) {
-      items.value = data.data
-      hasLoaded.value = true
-      metaInfo.value = data.meta || null
-      pagination.value = data.meta?.pagination || null
-      config.value = data.config || {}
-      sortBy.value = data.meta?.sorting?.sortBy || ''
-      sortOrder.value = data.meta?.sorting?.sortOrder || 'desc'
-      filters.value = { ...(data.meta?.filters || {}) }
-      searchQuery.value = ''
-    } else {
-      loadData()
-    }
+    if (data && Array.isArray(data.data)) hydrateResponse(data)
+    if (initialParams !== undefined) void requestData(initialParams, true)
+    else if (!hasLoaded.value) void loadData()
   }
 
-  // Search handler с debounce
+  const scheduleQuery = (delay: number): void => {
+    cancelPendingQuery()
+    requestSequence++
+    loading.value = true
+    loadError.value = null
+    queryTimeout = setTimeout(() => {
+      queryTimeout = null
+      void loadData({ page: 1 })
+    }, delay)
+  }
+
   const handleSearch = (query: string): void => {
-    requestSequence++
-    loading.value = true
     searchQuery.value = query
-
-    // Очищаем предыдущий таймер
-    if (searchTimeout) {
-      clearTimeout(searchTimeout)
-    }
-
-    // Устанавливаем новый таймер
-    searchTimeout = setTimeout(() => {
-      loadData({
-        search: query,
-        page: 1,
-        filters: filters.value,
-        sortBy: sortBy.value,
-        sortOrder: sortOrder.value,
-      })
-      if (pagination.value) {
-        pagination.value = { ...pagination.value, currentPage: 1 }
-      }
-    }, 500)
+    scheduleQuery(500)
   }
 
-  // Filter handler с debounce
   const handleFilterChange = (newFilters: Record<string, unknown>): void => {
-    requestSequence++
-    loading.value = true
-    const updatedFilters = { ...filters.value, ...newFilters }
-    filters.value = updatedFilters
-
-    // Очищаем предыдущий таймер
-    if (filterTimeout) {
-      clearTimeout(filterTimeout)
-    }
-
-    // Устанавливаем новый таймер
-    filterTimeout = setTimeout(() => {
-      loadData({
-        filters: updatedFilters,
-        page: 1,
-        search: searchQuery.value,
-        sortBy: sortBy.value,
-        sortOrder: sortOrder.value,
-      })
-      if (pagination.value) {
-        pagination.value = { ...pagination.value, currentPage: 1 }
-      }
-    }, 300)
+    filters.value = ordinaryFilters({ ...filters.value, ...newFilters })
+    scheduleQuery(300)
   }
 
   // Sort handler
@@ -304,7 +396,8 @@ export function useDataGrid({ apiUrl, initialData }: UseDataGridParams) {
 
   // Page handler
   const goToPage = (page: number): void => {
-    if (page < 1 || page > (pagination.value?.totalPages || 1)) return
+    if (!Number.isSafeInteger(page) || page < 1 || page > (pagination.value?.totalPages || 1))
+      return
 
     if (pagination.value) {
       pagination.value = { ...pagination.value, currentPage: page }
@@ -324,28 +417,7 @@ export function useDataGrid({ apiUrl, initialData }: UseDataGridParams) {
 
     try {
       const urlObj = new URL(url, window.location.origin)
-      const page = parseInt(urlObj.searchParams.get('page') || '1', 10)
-      const limit = parseInt(urlObj.searchParams.get('limit') || '10', 10)
-
-      // Извлекаем все параметры из URL
-      const params: LoadDataParams = {
-        page,
-        limit,
-        sortBy: urlObj.searchParams.get('sortBy') || '',
-        sortOrder: (urlObj.searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc',
-        search: urlObj.searchParams.get('search') || '',
-      }
-
-      // Извлекаем фильтры
-      const currentFilters: Record<string, unknown> = {}
-      urlObj.searchParams.forEach((value, key) => {
-        if (!['page', 'limit', 'sortBy', 'sortOrder', 'search'].includes(key)) {
-          currentFilters[key] = value
-        }
-      })
-      params.filters = currentFilters
-
-      loadData(params)
+      void loadData(parseDataGridQuery(urlObj.searchParams, pagination.value?.perPage || 10))
     } catch (error) {
       console.error('Error parsing pagination URL:', error)
     }
@@ -356,9 +428,15 @@ export function useDataGrid({ apiUrl, initialData }: UseDataGridParams) {
     if (allSelected.value) {
       selectedItems.value = []
     } else {
-      selectedItems.value = items.value
-        .map((item) => item.item[config.value.ui?.idKey || 'id'])
-        .filter((id): id is string | number => typeof id === 'string' || typeof id === 'number')
+      selectedItems.value = [
+        ...new Set(
+          items.value
+            .map((item) => item.item[config.value.ui?.idKey || 'id'])
+            .filter(
+              (id): id is string | number => typeof id === 'string' || typeof id === 'number',
+            ),
+        ),
+      ]
     }
   }
 
@@ -378,12 +456,7 @@ export function useDataGrid({ apiUrl, initialData }: UseDataGridParams) {
 
   onUnmounted(() => {
     requestSequence++
-    if (searchTimeout) {
-      clearTimeout(searchTimeout)
-    }
-    if (filterTimeout) {
-      clearTimeout(filterTimeout)
-    }
+    cancelPendingQuery()
   })
 
   return {
@@ -408,6 +481,7 @@ export function useDataGrid({ apiUrl, initialData }: UseDataGridParams) {
 
     // Actions
     loadData,
+    loadDataFromUrl,
     retryLoad,
     handleSearch,
     handleFilterChange,

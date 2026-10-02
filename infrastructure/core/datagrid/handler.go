@@ -49,8 +49,8 @@ func NewHandler[T any](
 		config.IDKey = "id"
 	}
 	if config.ErrorComponent == nil {
-		config.ErrorComponent = func(_ fiber.Ctx, _ ErrorData, err error) error {
-			return fmt.Errorf("datagrid handler error: %w", err)
+		config.ErrorComponent = func(_ fiber.Ctx, _ ErrorData, _ error) error {
+			return fiber.NewError(fiber.StatusInternalServerError)
 		}
 	}
 	if config.PageComponent == nil {
@@ -179,17 +179,6 @@ func (h *Handler[T]) HandleData(c fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusInternalServerError)
 	}
 
-	// Собираем примененные фильтры для меты
-	appliedFilters := make(map[string]string)
-	for k, v := range filters.Fields {
-		if vs, ok := v.(string); ok {
-			appliedFilters[k] = vs
-		}
-	}
-	if filters.Search != "" {
-		appliedFilters["_search"] = filters.Search // Добавляем глобальный поиск в примененные фильтры
-	}
-
 	// Создаем API ответ используя новую структуру и конструктор
 	apiResp := NewAPIResponse(internalResponse, filters.SortBy, filters.SortOrder)
 
@@ -210,6 +199,9 @@ func (h *Handler[T]) loadDataInternal(c fiber.Ctx, filters Filters) (Response[T]
 
 	pagi := h.buildPagination(filters, total)
 	filterValues := extractFilterValues(filters.Fields)
+	if filters.Search != "" {
+		filterValues["_search"] = filters.Search
+	}
 	items, err := h.buildItems(c, data)
 	if err != nil {
 		return Response[T]{}, err
@@ -324,8 +316,11 @@ func extractFilterValues(fields map[string]any) map[string]string {
 
 	result := make(map[string]string, len(fields))
 	for key, value := range fields {
-		if str, ok := value.(string); ok {
-			result[key] = str
+		if isReservedFilterKey(key) {
+			continue
+		}
+		if encoded, ok := formatFilterValue(value); ok {
+			result[key] = encoded
 		}
 	}
 

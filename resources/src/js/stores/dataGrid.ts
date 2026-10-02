@@ -54,11 +54,22 @@ export const useDataGridStore = defineStore('dataGrid', () => {
     }
 
     if (format === 'csv') {
-      const headers = data.config?.columns?.map((col) => col.title).join(',') || ''
+      const quote = (value: string): string => `"${value.replaceAll('"', '""')}"`
+      const cell = (value: unknown): string => {
+        if (value === null || value === undefined) return quote('')
+        if (typeof value === 'string') return quote(value)
+        if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+        return quote(JSON.stringify(value) ?? '')
+      }
+      const headers =
+        data.config?.columns
+          ?.map((col) => {
+            const title = col.title ?? ''
+            return /[",\r\n]/.test(title) ? quote(title) : title
+          })
+          .join(',') || ''
       const rows = data.data
-        .map((item) =>
-          data.config?.columns?.map((col) => JSON.stringify(item.item[col.key] || '')).join(','),
-        )
+        .map((item) => data.config?.columns?.map((col) => cell(item.item[col.key])).join(','))
         .join('\n')
 
       return `${headers}\n${rows}`

@@ -783,6 +783,8 @@ func (m mockFilteredFixed) GetFields() map[string]any { return m.fields }
 
 // Тесты для JSONB операторов.
 func TestSQLWherexJSONBOperators(t *testing.T) {
+	const sampleEmail = "john@example.com"
+
 	t.Run("jsonb contains operator (@>)", func(t *testing.T) {
 		builder := testBuilderDollar().
 			Select("id", "name").
@@ -853,9 +855,8 @@ func TestSQLWherexJSONBOperators(t *testing.T) {
 		t.Logf("Generated SQL: %s", sql)
 		t.Logf("Args: %v", args)
 
-		// Squirrel интерпретирует ? как placeholder, поэтому проверяем фактический результат
-		assert.Contains(t, sql, "user_data")
-		assert.Contains(t, sql, "'email'")
+		assert.Equal(t, "SELECT id, name FROM users WHERE user_data ? $1", sql)
+		assert.Equal(t, []any{"email"}, args)
 	})
 
 	t.Run("jsonb has any key operator (?|)", func(t *testing.T) {
@@ -875,10 +876,11 @@ func TestSQLWherexJSONBOperators(t *testing.T) {
 
 		result := datagrid.SQLWherex(builder, filters, adoptedFields)
 
-		sql, _, err := result.ToSql()
+		sql, args, err := result.ToSql()
 		require.NoError(t, err)
 		assert.Contains(t, sql, "user_data")
-		assert.Contains(t, sql, "| ARRAY['email','phone']")
+		assert.Contains(t, sql, "?| ARRAY[$1,$2]::text[]")
+		assert.Equal(t, []any{"email", "phone"}, args)
 	})
 
 	t.Run("jsonb has all keys operator (?&)", func(t *testing.T) {
@@ -898,10 +900,11 @@ func TestSQLWherexJSONBOperators(t *testing.T) {
 
 		result := datagrid.SQLWherex(builder, filters, adoptedFields)
 
-		sql, _, err := result.ToSql()
+		sql, args, err := result.ToSql()
 		require.NoError(t, err)
 		assert.Contains(t, sql, "user_data")
-		assert.Contains(t, sql, "& ARRAY['email','phone']")
+		assert.Contains(t, sql, "?& ARRAY[$1,$2]::text[]")
+		assert.Equal(t, []any{"email", "phone"}, args)
 	})
 
 	t.Run("jsonb extract path operator (#>)", func(t *testing.T) {
@@ -923,8 +926,8 @@ func TestSQLWherexJSONBOperators(t *testing.T) {
 
 		sql, args, err := result.ToSql()
 		require.NoError(t, err)
-		assert.Contains(t, sql, "user_data #> '{address,city}' = $")
-		assert.Contains(t, args, "New York")
+		assert.Contains(t, sql, "user_data #> $1::text[] = $2")
+		assert.Equal(t, []any{"{address,city}", "New York"}, args)
 	})
 
 	t.Run("jsonb extract path text operator (#>>)", func(t *testing.T) {
@@ -946,8 +949,8 @@ func TestSQLWherexJSONBOperators(t *testing.T) {
 
 		sql, args, err := result.ToSql()
 		require.NoError(t, err)
-		assert.Contains(t, sql, "user_data #>> '{profile,name}' = $")
-		assert.Contains(t, args, "John Doe")
+		assert.Contains(t, sql, "user_data #>> $1::text[] = $2")
+		assert.Equal(t, []any{"{profile,name}", "John Doe"}, args)
 	})
 
 	t.Run("jsonb extract field operator (->)", func(t *testing.T) {
@@ -969,8 +972,8 @@ func TestSQLWherexJSONBOperators(t *testing.T) {
 
 		sql, args, err := result.ToSql()
 		require.NoError(t, err)
-		assert.Contains(t, sql, "user_data -> 'status' = $")
-		assert.Contains(t, args, `"active"`)
+		assert.Contains(t, sql, "user_data -> $1::text = $2")
+		assert.Equal(t, []any{"status", `"active"`}, args)
 	})
 
 	t.Run("jsonb extract field text operator (->>)", func(t *testing.T) {
@@ -980,7 +983,7 @@ func TestSQLWherexJSONBOperators(t *testing.T) {
 
 		filters := mockFilteredFixed{
 			fields: map[string]any{
-				"email": "john@example.com",
+				"email": sampleEmail,
 			},
 		}
 
@@ -992,8 +995,8 @@ func TestSQLWherexJSONBOperators(t *testing.T) {
 
 		sql, args, err := result.ToSql()
 		require.NoError(t, err)
-		assert.Contains(t, sql, "user_data ->> 'email' = $")
-		assert.Contains(t, args, "john@example.com")
+		assert.Contains(t, sql, "user_data ->> $1::text = $2")
+		assert.Equal(t, []any{"email", sampleEmail}, args)
 	})
 
 	t.Run("jsonb path exists operator (@?)", func(t *testing.T) {
@@ -1015,7 +1018,7 @@ func TestSQLWherexJSONBOperators(t *testing.T) {
 
 		sql, args, err := result.ToSql()
 		require.NoError(t, err)
-		assert.Contains(t, sql, "user_data @")
+		assert.Contains(t, sql, "user_data @? $1")
 		assert.Contains(t, args, `$.status ? (@ == "active")`)
 	})
 
@@ -1067,8 +1070,9 @@ func TestSQLWherexJSONBOperators(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, sql, "user_data")
 		assert.Contains(t, sql, "user_data @> $")
-		assert.Contains(t, sql, "user_data #>> '{profile,name}' = $")
-		assert.Len(t, args, 2) // Только 2 аргумента: для @> и #>>
+		assert.Contains(t, sql, "user_data #>> $")
+		assert.Len(t, args, 4)
+		assert.ElementsMatch(t, []any{"email", `{"address": {"country": "USA"}}`, "{profile,name}", "John"}, args)
 	})
 }
 
@@ -1110,7 +1114,7 @@ func TestJSONBHelperFunctions(t *testing.T) {
 	})
 }
 
-// Тесты для полного покрытия formatPostgreSQLArray через JSONB операторы.
+// Array binding coverage through the public SQL helper.
 func TestFormatPostgreSQLArrayCoverage(t *testing.T) {
 	t.Run("string array through JSONB operator", func(t *testing.T) {
 		builder := testBuilderDollar().
@@ -1129,9 +1133,10 @@ func TestFormatPostgreSQLArrayCoverage(t *testing.T) {
 
 		result := datagrid.SQLWherex(builder, filters, adoptedFields)
 
-		sql, _, err := result.ToSql()
+		sql, args, err := result.ToSql()
 		require.NoError(t, err)
-		assert.Contains(t, sql, "ARRAY['email','phone','address']")
+		assert.Contains(t, sql, "ARRAY[$1,$2,$3]::text[]")
+		assert.Equal(t, []any{"email", "phone", "address"}, args)
 	})
 
 	t.Run("string array with quotes through JSONB operator", func(t *testing.T) {
@@ -1151,10 +1156,10 @@ func TestFormatPostgreSQLArrayCoverage(t *testing.T) {
 
 		result := datagrid.SQLWherex(builder, filters, adoptedFields)
 
-		sql, _, err := result.ToSql()
+		sql, args, err := result.ToSql()
 		require.NoError(t, err)
-		// Проверяем что одинарные кавычки экранированы
-		assert.Contains(t, sql, "ARRAY['user''s email','john''s phone']")
+		assert.Contains(t, sql, "ARRAY[$1,$2]::text[]")
+		assert.Equal(t, []any{"user's email", "john's phone"}, args)
 	})
 
 	t.Run("int array through JSONB operator", func(t *testing.T) {
@@ -1174,9 +1179,10 @@ func TestFormatPostgreSQLArrayCoverage(t *testing.T) {
 
 		result := datagrid.SQLWherex(builder, filters, adoptedFields)
 
-		sql, _, err := result.ToSql()
+		sql, args, err := result.ToSql()
 		require.NoError(t, err)
-		assert.Contains(t, sql, "ARRAY[1,2,3,42]")
+		assert.Contains(t, sql, "ARRAY[$1,$2,$3,$4]::text[]")
+		assert.Equal(t, []any{"1", "2", "3", "42"}, args)
 	})
 
 	t.Run("any array through JSONB operator", func(t *testing.T) {
@@ -1196,9 +1202,10 @@ func TestFormatPostgreSQLArrayCoverage(t *testing.T) {
 
 		result := datagrid.SQLWherex(builder, filters, adoptedFields)
 
-		sql, _, err := result.ToSql()
+		sql, args, err := result.ToSql()
 		require.NoError(t, err)
-		assert.Contains(t, sql, "ARRAY['test','123','another']")
+		assert.Contains(t, sql, "ARRAY[$1,$2,$3]::text[]")
+		assert.Equal(t, []any{"test", "123", "another"}, args)
 	})
 
 	t.Run("non-slice fallback through JSONB operator", func(t *testing.T) {
@@ -1218,9 +1225,10 @@ func TestFormatPostgreSQLArrayCoverage(t *testing.T) {
 
 		result := datagrid.SQLWherex(builder, filters, adoptedFields)
 
-		sql, _, err := result.ToSql()
+		sql, args, err := result.ToSql()
 		require.NoError(t, err)
-		assert.Contains(t, sql, "'single_value'")
+		assert.Contains(t, sql, "?| $1::text[]")
+		assert.Equal(t, []any{"single_value"}, args)
 	})
 
 	t.Run("empty string array through JSONB operator", func(t *testing.T) {
@@ -1240,9 +1248,10 @@ func TestFormatPostgreSQLArrayCoverage(t *testing.T) {
 
 		result := datagrid.SQLWherex(builder, filters, adoptedFields)
 
-		sql, _, err := result.ToSql()
+		sql, args, err := result.ToSql()
 		require.NoError(t, err)
-		assert.Contains(t, sql, "ARRAY[]")
+		assert.Contains(t, sql, "ARRAY[]::text[]")
+		assert.Empty(t, args)
 	})
 
 	t.Run("empty int array through JSONB operator", func(t *testing.T) {
@@ -1262,9 +1271,10 @@ func TestFormatPostgreSQLArrayCoverage(t *testing.T) {
 
 		result := datagrid.SQLWherex(builder, filters, adoptedFields)
 
-		sql, _, err := result.ToSql()
+		sql, args, err := result.ToSql()
 		require.NoError(t, err)
-		assert.Contains(t, sql, "ARRAY[]")
+		assert.Contains(t, sql, "ARRAY[]::text[]")
+		assert.Empty(t, args)
 	})
 
 	t.Run("empty any array through JSONB operator", func(t *testing.T) {
@@ -1284,8 +1294,9 @@ func TestFormatPostgreSQLArrayCoverage(t *testing.T) {
 
 		result := datagrid.SQLWherex(builder, filters, adoptedFields)
 
-		sql, _, err := result.ToSql()
+		sql, args, err := result.ToSql()
 		require.NoError(t, err)
-		assert.Contains(t, sql, "ARRAY[]")
+		assert.Contains(t, sql, "ARRAY[]::text[]")
+		assert.Empty(t, args)
 	})
 }

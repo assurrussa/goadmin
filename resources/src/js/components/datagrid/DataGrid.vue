@@ -60,19 +60,17 @@
         <Inbox class="h-24 w-24" />
       </div>
       <h3 class="text-lg font-medium text-text-primary mb-2">
-        {{
-          searchQuery || Object.values(filters).some(Boolean) ? 'Ничего не найдено' : 'Нет данных'
-        }}
+        {{ searchQuery || hasActiveFilters ? 'Ничего не найдено' : 'Нет данных' }}
       </h3>
       <p class="text-text-secondary mb-6">
         {{
-          searchQuery || Object.values(filters).some(Boolean)
+          searchQuery || hasActiveFilters
             ? 'Измените поиск или фильтры и попробуйте снова.'
             : config.ui?.emptyMessage || 'Нет данных для отображения'
         }}
       </p>
       <AppButton
-        v-if="config.behaviour?.creatable && !searchQuery && !Object.values(filters).some(Boolean)"
+        v-if="config.behaviour?.creatable && !searchQuery && !hasActiveFilters"
         @click="handleCreate"
       >
         <Plus class="-ml-1 mr-2 h-4 w-4" />
@@ -91,8 +89,14 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, watch } from 'vue'
-import { type ApiResponse, type DataItemValue, useDataGrid } from '~/composables/useDataGrid.ts'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
+import {
+  type ApiResponse,
+  type DataItemValue,
+  isDataGridFilterKey,
+  parseDataGridQuery,
+  useDataGrid,
+} from '~/composables/useDataGrid.ts'
 import { Inbox, Plus } from 'lucide-vue-next'
 import AppButton from '@/components/ui/AppButton.vue'
 import DataGridHeader from './DataGridHeader.vue'
@@ -151,107 +155,54 @@ const {
   toggleSelectAll,
   toggleSelectItem,
   loadData,
+  loadDataFromUrl,
   retryLoad,
 } = useDataGrid({
-  apiUrl: props.apiUrl,
+  apiUrl: () => props.apiUrl,
   initialData: props.initialData,
+  initialParams:
+    props.syncWithUrl && typeof window !== 'undefined' && window.location.search
+      ? parseDataGridQuery(new URLSearchParams(window.location.search), undefined, true)
+      : undefined,
 })
 
-// Флаг для предотвращения циклической синхронизации
-let isUpdatingFromURL = false
+const hasActiveFilters = computed(() =>
+  Object.values(filters.value).some(
+    (value) => value !== '' && value !== null && value !== undefined,
+  ),
+)
 
-// Функция для обновления URL
 const updateURL = (): void => {
-  if (!props.syncWithUrl) return
-  if (isUpdatingFromURL) return
-  if (typeof window === 'undefined') return
+  if (!props.syncWithUrl || loading.value || loadError.value || typeof window === 'undefined')
+    return
 
   const params = new URLSearchParams()
-
-  // Добавляем параметры только если они отличаются от значений по умолчанию
   if (pagination.value?.currentPage && pagination.value.currentPage > 1) {
     params.set('page', String(pagination.value.currentPage))
   }
-
-  if (sortBy.value && sortBy.value !== 'createdAt') {
-    params.set('sortBy', sortBy.value)
+  if (pagination.value?.perPage) {
+    params.set('limit', String(pagination.value.perPage))
   }
-
-  if (sortOrder.value && sortOrder.value !== 'desc') {
-    params.set('sortOrder', sortOrder.value)
-  }
-
-  if (searchQuery.value) {
-    params.set('search', searchQuery.value)
-  }
-
-  // Добавляем фильтры
+  if (sortBy.value) params.set('sortBy', sortBy.value)
+  params.set('sortOrder', sortOrder.value)
+  if (searchQuery.value) params.set('search', searchQuery.value)
   Object.entries(filters.value).forEach(([key, value]) => {
-    if (value !== null && value !== undefined && value !== '') {
+    if (isDataGridFilterKey(key) && value !== null && value !== undefined && value !== '') {
       params.set(key, String(value))
     }
   })
 
-  // Обновляем URL без перезагрузки страницы
-  const newUrl = params.toString()
-    ? `${window.location.pathname}?${params}`
-    : window.location.pathname
-  window.history.replaceState({}, '', newUrl)
+  const query = params.toString()
+  const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`
+  window.history.replaceState(window.history.state, '', newUrl)
 }
 
-// Функция для инициализации состояния из URL
-const initFromURL = (): void => {
+const handlePopState = (): void => {
   if (!props.syncWithUrl) return
-  if (typeof window === 'undefined') return
-
-  const urlParams = new URLSearchParams(window.location.search)
-
-  // Извлекаем параметры из URL и загружаем данные если они есть
-  const page = urlParams.get('page')
-  const search = urlParams.get('search')
-  const sortByParam = urlParams.get('sortBy')
-  const sortOrderParam = urlParams.get('sortOrder')
-
-  // Извлекаем фильтры (все параметры кроме стандартных)
-  const urlFilters: Record<string, unknown> = {}
-  urlParams.forEach((value, key) => {
-    if (!['page', 'limit', 'sortBy', 'sortOrder', 'search'].includes(key)) {
-      urlFilters[key] = value
-    }
-  })
-
-  // Если есть параметры в URL, загружаем данные с ними
-  if (page || search || sortByParam || sortOrderParam || Object.keys(urlFilters).length > 0) {
-    const loadParams: {
-      page?: number
-      search?: string
-      sortBy?: string
-      sortOrder?: 'asc' | 'desc'
-      filters?: Record<string, unknown>
-    } = {}
-
-    if (page) loadParams.page = parseInt(page, 10)
-    if (search) loadParams.search = search
-    if (sortByParam) loadParams.sortBy = sortByParam
-    if (sortOrderParam) loadParams.sortOrder = sortOrderParam as 'asc' | 'desc'
-    if (Object.keys(urlFilters).length > 0) loadParams.filters = urlFilters
-
-    isUpdatingFromURL = true
-    // Используем loadData из текущего экземпляра useDataGrid
-    loadData(loadParams).finally(() => {
-      isUpdatingFromURL = false
-    })
-  }
+  void loadDataFromUrl(window.location.href)
 }
 
-// Watchers для синхронизации с URL
-watch(
-  [pagination, sortBy, sortOrder, searchQuery, filters],
-  () => {
-    nextTick(() => updateURL())
-  },
-  { deep: true },
-)
+watch([pagination, sortBy, sortOrder, searchQuery, filters, loading], updateURL, { deep: true })
 
 const handleCreate = (): void => {
   emit('action-create')
@@ -291,8 +242,6 @@ defineExpose({
   refreshData,
 })
 
-// Инициализация из URL при монтировании
-onMounted(() => {
-  initFromURL()
-})
+onMounted(() => window.addEventListener('popstate', handlePopState))
+onUnmounted(() => window.removeEventListener('popstate', handlePopState))
 </script>

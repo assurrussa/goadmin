@@ -18,6 +18,7 @@ type (
 	SearchMode                 = core.SearchMode
 	TemplateComponent[T any]   = core.TemplateComponent[T]
 	ErrorTemplateComponent     = core.ErrorTemplateComponent
+	ErrorData                  = core.ErrorData
 	FilterConfig[T any]        = core.FilterConfig[T]
 	RowDecoratorPrepare[T any] = core.RowDecoratorPrepare[T]
 	RowDecoratorResolve[T any] = core.RowDecoratorResolve[T]
