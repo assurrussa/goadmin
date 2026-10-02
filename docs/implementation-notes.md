@@ -1124,3 +1124,26 @@ compiler, vet, lint, race and consumer checks verified the v0.15 declaration.
 The isolated gateway was stopped after checks. No publication, commit, tag,
 hosted CI, deployment or sibling-source changes were made by this task. Published
 consumer readiness was not claimed or tested while compatible tags are pending.
+
+
+## 2026-10-02 users capability and export corrections
+
+User email changes now check the authmail capability before writes and join the
+existing GoAuth command transaction. User projection reads/updates use the same
+`admintx` executor as canonical profile and email enqueue operations. The users
+editor mirrors the admin editor's mail-disabled readonly field. This does not
+introduce a new transaction coordinator or extend the public SDK.
+
+Export always uses the existing 10,000-row bound, independent of page size,
+retains query filters/search/sort, and reports truncation explicitly. The client
+uses a same-origin CSV transfer, rejects non-CSV/auth-error responses, deduplicates
+repeated clicks, and aborts on unmount. The users repository now applies its
+advertised search and sort aliases consistently to list/export queries. Full
+URL-state fidelity is supplied by the separately reviewed DataGrid URL fixes.
+
+Focused evidence includes failing-before/passing-after HTTP tests, canonical
+in-memory transaction rollback tests, a managed SQL-executor boundary test,
+CSV row/cap/filter/quoting tests, and client capability/download/lifecycle tests.
+A PostgreSQL rollback regression is included behind the integration build tag;
+compilation is not execution and live database/browser acceptance remains
+separate. No CSV formula policy or selection policy was changed.

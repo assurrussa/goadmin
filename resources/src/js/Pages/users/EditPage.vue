@@ -33,6 +33,7 @@
             label="E-mail"
             required
             :error="form.errors.email"
+            :readonly="!authmail"
           />
           <FormInput
             v-model="form.username"
@@ -59,6 +60,7 @@
 
 <script setup lang="ts">
 import { useForm, usePage } from '@inertiajs/vue3'
+import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'
 import FormInput from '@/components/form/FormInput.vue'
@@ -66,6 +68,7 @@ import FormButton from '@/components/form/FormButton.vue'
 import AdminForm from '@/components/form/AdminForm.vue'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 
+const { authmail } = useAdminCapabilities()
 const basePath = '/users'
 const props = defineProps({
   title: { type: [String], default: undefined },

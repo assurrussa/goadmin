@@ -135,6 +135,23 @@ The typed SDK exposes canonical Actor, guards, rendering, logger and extensions;
 belong to feature constructors. Declarative CRUD remains a TODO in the current
 implementation notes.
 
+## Optional users feature
+
+The users feature keeps read access as the common route precondition; editing
+requires `users/update`, and deletion/restoration require `users/delete`.
+Existing email is readonly without authmail, and crafted unavailable email
+changes are rejected before canonical or projection writes. Supported user
+profile updates join the existing canonical transaction and projection SQL
+executor; an unknown commit result is not automatically retried.
+
+CSV export includes matching users independently of visible page size, capped
+at 10,000 rows. Search, supported filters and sorting use the same user repository
+query as the list. `X-Goadmin-Export-Truncated: true` reports a larger matching
+set and the client warns after downloading; exports are not cached. The client
+uses a same-origin file download rather than an Inertia page visit, using the
+grid's synchronized URL state. Selection does not change export scope. CSV cell
+values retain the existing literal policy, including formula-like strings.
+
 ## Storage And Migrations
 
 `goauth` owns canonical auth/RBAC storage. `goadmin/migrations.Migrate` invokes

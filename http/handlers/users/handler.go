@@ -15,10 +15,16 @@ import (
 
 	"github.com/assurrussa/goadmin/adminapp"
 	datagrid "github.com/assurrussa/goadmin/infrastructure/core/datagrid"
+	goinertia "github.com/assurrussa/goadmin/infrastructure/inertia"
 	authcore "github.com/assurrussa/goadmin/internal/auth"
 )
 
 //go:generate toolsmocks
+
+const (
+	maxExportRows  = 10000
+	userEmailField = "email"
+)
 
 type userRepo interface {
 	GetList(ctx context.Context, filters datagrid.Filtered) ([]authcore.Profile, int, error)
@@ -125,7 +131,7 @@ func NewHandler(
 				Filterable: false,
 			},
 			{
-				Key:               "email",
+				Key:               userEmailField,
 				Label:             "Email",
 				Type:              "text", //nolint:goconst // required
 				Sortable:          true,
@@ -273,10 +279,10 @@ func (h *Handler) RegisterGroupRoutes(route fiber.Router, _ ...fiber.Handler) {
 	groupGuard.Get("export", h.Export)
 	groupGuard.Post("refresh", h.Refresh)
 	groupGuard.Get(":id", h.View)
-	groupGuard.Get(":id/edit", h.Edit)
-	groupGuard.Put(":id", h.Update)
-	groupGuard.Delete(":id", h.Delete)
-	groupGuard.Post(":id/restore", h.Restore)
+	groupGuard.Get(":id/edit", h.adminApp.Guard(authcore.PermissionDomainUsers, authcore.PermissionActionUpdate), h.Edit)        //nolint:lll // required
+	groupGuard.Put(":id", h.adminApp.Guard(authcore.PermissionDomainUsers, authcore.PermissionActionUpdate), h.Update)           //nolint:lll // required
+	groupGuard.Delete(":id", h.adminApp.Guard(authcore.PermissionDomainUsers, authcore.PermissionActionDelete), h.Delete)        //nolint:lll // required
+	groupGuard.Post(":id/restore", h.adminApp.Guard(authcore.PermissionDomainUsers, authcore.PermissionActionDelete), h.Restore) //nolint:lll // required
 }
 
 // View показывает страницу пользователя.
@@ -315,6 +321,13 @@ func (h *Handler) Edit(c fiber.Ctx) error {
 	})
 }
 
+type updateUserInput struct {
+	Name     string  `json:"name"`
+	LastName *string `json:"lastName"`
+	Username *string `json:"username"`
+	Email    string  `json:"email"`
+}
+
 // Update обновляет пользователя.
 func (h *Handler) Update(c fiber.Ctx) error {
 	id, err := h.getID(c)
@@ -322,50 +335,70 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		return fmt.Errorf("user handler update: %w", err)
 	}
 
-	type input struct {
-		Name     string  `json:"name"`
-		LastName *string `json:"lastName"`
-		Username *string `json:"username"`
-		Email    string  `json:"email"`
-	}
-
-	var form input
+	var form updateUserInput
 	if err := c.Bind().Body(&form); err != nil {
 		return fmt.Errorf("user handler update parse: %w", err)
 	}
 
-	current, err := h.userRepo.GetByID(c, id)
+	h.adminApp.HTTPManager().WithFlashOld(c, map[string]any{
+		"name": form.Name, "lastName": form.LastName, "username": form.Username, userEmailField: form.Email,
+	})
+	err = h.adminApp.InTransaction(c, func(ctx context.Context) error {
+		return h.updateUser(ctx, id, form)
+	})
 	if err != nil {
-		return fmt.Errorf("user handler update get current: %w", err)
+		if errors.Is(err, goauth.ErrNotificationDeliveryDisabled) {
+			return h.adminApp.HTTPManager().RedirectBackWithValidationErrors(c, goinertia.ValidationErrors{
+				userEmailField: {"Изменение электронной почты отключено"},
+			})
+		}
+		var httpErr *fiber.Error
+		if errors.As(err, &httpErr) && httpErr.Code == fiber.StatusNotFound {
+			return httpErr
+		}
+		if errors.Is(err, goauth.ErrOperationOutcomeUnknown) {
+			h.adminApp.HTTPManager().WithFlashError(c, "Результат операции неизвестен. Обновите страницу перед повтором.")
+			return h.adminApp.HTTPManager().RedirectBack(c)
+		}
+		return fmt.Errorf("user handler update: %w", err)
 	}
+	return h.adminApp.HTTPManager().RedirectBack(c)
+}
 
+func (h *Handler) updateUser(ctx context.Context, id int64, form updateUserInput) error {
+	current, err := h.userRepo.GetByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("get current user: %w", err)
+	}
+	if current.ID <= 0 {
+		return fiber.NewError(fiber.StatusNotFound, "Пользователь не найден")
+	}
+	emailChanged := form.Email != "" && form.Email != current.Email
+	if emailChanged && !h.adminApp.Enabled("authmail") {
+		return goauth.ErrNotificationDeliveryDisabled
+	}
+	if h.subjects == nil {
+		return errors.New("canonical profile Runtime is required")
+	}
 	current.Name = form.Name
 	current.LastName = form.LastName
 	current.Username = form.Username
-
 	subjectID := userSubjectID(current)
-	if h.subjects == nil {
-		return errors.New("user handler update canonical profile: Runtime is required")
-	}
-	if _, err := h.subjects.UpdateBasicProfile(c, subjectID, goauth.BasicProfile{
-		Username:    valueOrEmpty(form.Username),
-		DisplayName: displayName(current.Name, form.LastName),
-		GivenName:   current.Name, FamilyName: valueOrEmpty(form.LastName),
+	if _, err := h.subjects.UpdateBasicProfile(ctx, subjectID, goauth.BasicProfile{
+		Username: valueOrEmpty(form.Username), DisplayName: displayName(current.Name, form.LastName),
+		GivenName: current.Name, FamilyName: valueOrEmpty(form.LastName),
 	}); err != nil {
-		return fmt.Errorf("user handler update canonical profile: %w", err)
+		return fmt.Errorf("update canonical profile: %w", err)
 	}
-
-	if err := h.userRepo.Update(c, id, current); err != nil {
-		return fmt.Errorf("user handler update save: %w", err)
+	if err := h.userRepo.Update(ctx, id, current); err != nil {
+		return fmt.Errorf("update user projection: %w", err)
 	}
-
-	if form.Email != "" && form.Email != current.Email {
-		if err := h.subjects.RequestEmailChange(c, subjectID, form.Email); err != nil {
-			return fmt.Errorf("user handler request canonical email change: %w", err)
+	if emailChanged {
+		if err := h.subjects.RequestEmailChange(ctx, subjectID, form.Email); err != nil {
+			return fmt.Errorf("request canonical email change: %w", err)
 		}
 	}
-
-	return h.adminApp.HTTPManager().RedirectBack(c)
+	return nil
 }
 
 func userSubjectID(profile authcore.Profile) authcore.SubjectID {
@@ -455,11 +488,9 @@ func (h *Handler) Export(c fiber.Ctx) error {
 		PageSize:     cfg.PageSize,
 	})
 	f.Page = 1
-	if f.Limit <= 0 || f.Limit > 10000 {
-		f.Limit = 10000
-	}
+	f.Limit = maxExportRows
 
-	list, _, err := h.userRepo.GetList(c, f)
+	list, total, err := h.userRepo.GetList(c, f)
 	if err != nil {
 		return fmt.Errorf("users export get list: %w", err)
 	}
@@ -469,7 +500,7 @@ func (h *Handler) Export(c fiber.Ctx) error {
 	// Заголовки
 	_ = w.Write([]string{
 		"id",
-		"email",
+		userEmailField,
 		"username",
 		"name",
 		"lastName",
@@ -520,6 +551,8 @@ func (h *Handler) Export(c fiber.Ctx) error {
 	}
 	w.Flush()
 
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	c.Set("X-Goadmin-Export-Truncated", strconv.FormatBool(total > maxExportRows))
 	filename := fmt.Sprintf("users-%s.csv", time.Now().Format("20060102"))
 	c.Set(fiber.HeaderContentType, "text/csv; charset=utf-8")
 	c.Set(fiber.HeaderContentDisposition, fmt.Sprintf("attachment; filename=\"%s\"", filename))
