@@ -273,10 +273,10 @@ func (h *Handler) RegisterGroupRoutes(route fiber.Router, _ ...fiber.Handler) {
 	groupGuard.Get("export", h.Export)
 	groupGuard.Post("refresh", h.Refresh)
 	groupGuard.Get(":id", h.View)
-	groupGuard.Get(":id/edit", h.Edit)
-	groupGuard.Put(":id", h.Update)
-	groupGuard.Delete(":id", h.Delete)
-	groupGuard.Post(":id/restore", h.Restore)
+	groupGuard.Get(":id/edit", h.adminApp.Guard(authcore.PermissionDomainUsers, authcore.PermissionActionUpdate), h.Edit)        //nolint:lll // required
+	groupGuard.Put(":id", h.adminApp.Guard(authcore.PermissionDomainUsers, authcore.PermissionActionUpdate), h.Update)           //nolint:lll // required
+	groupGuard.Delete(":id", h.adminApp.Guard(authcore.PermissionDomainUsers, authcore.PermissionActionDelete), h.Delete)        //nolint:lll // required
+	groupGuard.Post(":id/restore", h.adminApp.Guard(authcore.PermissionDomainUsers, authcore.PermissionActionDelete), h.Restore) //nolint:lll // required
 }
 
 // View показывает страницу пользователя.

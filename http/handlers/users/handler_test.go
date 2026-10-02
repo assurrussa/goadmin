@@ -84,6 +84,8 @@ func TestUpdateUserEmailUsesCanonicalSubjectStoreOnly(t *testing.T) {
 
 	adminAppTest := adminappt.NewAppTest(t)
 	adminAppTest.ExpertGuard(authcore.PermissionDomainUsers, authcore.PermissionActionRead).AnyTimes()
+	adminAppTest.ExpertGuard(authcore.PermissionDomainUsers, authcore.PermissionActionUpdate).AnyTimes()
+	adminAppTest.ExpertGuard(authcore.PermissionDomainUsers, authcore.PermissionActionDelete).AnyTimes()
 
 	username := "user"
 	lastName := "Tester"
@@ -134,6 +136,8 @@ func TestHandleData_ProvidesReadableStatusAndProfileValues(t *testing.T) {
 
 	adminAppTest := adminappt.NewAppTest(t)
 	adminAppTest.ExpertGuard(authcore.PermissionDomainUsers, authcore.PermissionActionRead).AnyTimes()
+	adminAppTest.ExpertGuard(authcore.PermissionDomainUsers, authcore.PermissionActionUpdate).AnyTimes()
+	adminAppTest.ExpertGuard(authcore.PermissionDomainUsers, authcore.PermissionActionDelete).AnyTimes()
 
 	repo := &userRepoStub{
 		list: []authcore.Profile{
