@@ -340,18 +340,18 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		return fmt.Errorf("user handler update parse: %w", err)
 	}
 
-	old := map[string]any{
-		"name": form.Name, "lastName": form.LastName, "username": form.Username,
-	}
-	// A readonly email must recover from canonical edit-page data, not rejected input.
-	if h.adminApp.Enabled("authmail") {
-		old[userEmailField] = form.Email
-	}
-	h.adminApp.HTTPManager().WithFlashOld(c, old)
 	err = h.adminApp.InTransaction(c, func(ctx context.Context) error {
 		return h.updateUser(ctx, id, form)
 	})
 	if err != nil {
+		old := map[string]any{
+			"name": form.Name, "lastName": form.LastName, "username": form.Username,
+		}
+		// A readonly email must recover from canonical edit-page data, not rejected input.
+		if h.adminApp.Enabled("authmail") {
+			old[userEmailField] = form.Email
+		}
+		h.adminApp.HTTPManager().WithFlashOld(c, old)
 		if errors.Is(err, goauth.ErrNotificationDeliveryDisabled) {
 			return h.adminApp.HTTPManager().RedirectBackWithValidationErrors(c, goinertia.ValidationErrors{
 				userEmailField: {"Изменение электронной почты отключено"},

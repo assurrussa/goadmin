@@ -146,6 +146,17 @@ func TestUserUpdateCapabilityAndTransactionContract(t *testing.T) {
 				require.Zero(t, subjects.emailCalls)
 			}
 			if tc.wantUpdated && tc.changeEmail {
+				require.Empty(t, flashedOld, "successful updates must reload canonical fields")
+				followup := httptest.NewRequestWithContext(t.Context(), http.MethodPut, "/users/42",
+					strings.NewReader(`{"name":"Next edit","email":"original@example.test"}`))
+				followup.Header.Set("Content-Type", "application/json")
+				followup.Header.Set("Referer", "/users/42/edit")
+				next, err := app.Test(followup)
+				require.NoError(t, err)
+				require.NoError(t, next.Body.Close())
+				require.Equal(t, http.StatusFound, next.StatusCode)
+				require.Equal(t, "Next edit", repo.updated.Name)
+				require.Equal(t, 1, subjects.emailCalls)
 				require.Len(t, fixture.Events.Events(), 1)
 			} else {
 				require.Empty(t, fixture.Events.Events())

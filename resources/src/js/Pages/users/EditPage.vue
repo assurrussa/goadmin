@@ -93,6 +93,11 @@ watch([authmail, () => props.data.email], ([enabled, email]) => {
 })
 
 function handleForm() {
-  form.put(`${basePath}/${props.data.id}`)
+  form.put(`${basePath}/${props.data.id}`, {
+    // Email changes stay pending until confirmation; a later save must not resend them.
+    onSuccess: () => {
+      form.email = props.data.email
+    },
+  })
 }
 </script>
