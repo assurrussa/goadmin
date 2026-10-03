@@ -288,7 +288,9 @@ func (h *Handler) PostForgotPassword(c fiber.Ctx) error {
 		return h.adminApp.HTTPManager().RedirectBack(c)
 	}
 
-	h.adminApp.HTTPManager().WithFlashSuccess(c, "Письмо с кодом подтверждения отправлено!")
+	// The anti-enumeration API acknowledges the request without a delivery receipt.
+	h.adminApp.HTTPManager().WithFlashSuccess(c,
+		"Запрос принят. Отправка письма ещё не подтверждена. Проверьте почту перед повторной попыткой.")
 
 	return h.adminApp.HTTPManager().RedirectBack(c)
 }
