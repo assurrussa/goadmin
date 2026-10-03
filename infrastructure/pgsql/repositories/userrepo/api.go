@@ -3,6 +3,7 @@ package userrepo
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Masterminds/squirrel"
@@ -11,39 +12,46 @@ import (
 
 	datagrid "github.com/assurrussa/goadmin/infrastructure/core/datagrid"
 	outbox "github.com/assurrussa/goadmin/infrastructure/outbox"
+	"github.com/assurrussa/goadmin/internal/admintx"
 	authcore "github.com/assurrussa/goadmin/internal/auth"
 	identity "github.com/assurrussa/goadmin/internal/identity"
 )
 
-const tableName = "users"
+const (
+	tableName                = "users"
+	userCreatedAtColumn      = "u.created_at"
+	userIDColumn             = "u.id"
+	userUsernameColumn       = "bp.username"
+	userPhoneConfirmedColumn = "u.confirmed_phone_at"
+)
 
 var (
 	columns = []string{
-		"u.id", "u.subject_id", "u.uuid",
-		"i.display_value AS email", "bp.username", "bp.given_name AS name", "bp.family_name AS last_name",
+		userIDColumn, "u.subject_id", "u.uuid",
+		"i.display_value AS email", userUsernameColumn, "bp.given_name AS name", "bp.family_name AS last_name",
 		"u.phone", "u.bio", "u.version", "u.data",
 		"u.telegram_chat_id", "u.telegram_username",
-		"i.verified_at AS confirmed_email_at", "u.confirmed_phone_at", "u.created_at", "u.updated_at", "u.deleted_at",
+		"i.verified_at AS confirmed_email_at", userPhoneConfirmedColumn, userCreatedAtColumn, "u.updated_at", "u.deleted_at",
 	}
-	allowedSortFields = map[string]bool{
-		"id":                 true,
-		"email":              true,
-		"created_at":         true,
-		"confirmed_email_at": true,
-		"confirmed_phone_at": true,
+	sortColumns = map[string]string{
+		"id": userIDColumn, "email": "i.normalized_value", "username": userUsernameColumn, "name": "bp.given_name",
+		"lastName": "bp.family_name", "createdAt": userCreatedAtColumn, "created_at": userCreatedAtColumn,
+		"confirmedEmailAt": "i.verified_at", "confirmed_email_at": "i.verified_at",
+		"confirmedPhoneAt": userPhoneConfirmedColumn, "confirmed_phone_at": userPhoneConfirmedColumn,
 	}
 	adoptedFields = map[string]datagrid.FieldMapping{
-		"id":                datagrid.NewFieldMapping("u.id"),
+		"id":                datagrid.NewFieldMapping(userIDColumn),
 		"uuid":              datagrid.NewFieldMapping("u.uuid"),
 		"telegram_chat_id":  datagrid.NewFieldMapping("u.telegram_chat_id"),
 		"telegram_username": datagrid.NewFieldMappingWithOp("u.telegram_username", datagrid.OpLike),
 		"email":             datagrid.NewFieldMappingWithOp("i.normalized_value", datagrid.OpLike),
 		"name":              datagrid.NewFieldMappingWithOp("bp.given_name", datagrid.OpLike),
+		"username":          datagrid.NewFieldMappingWithOp(userUsernameColumn, datagrid.OpLike),
 		"lastName":          datagrid.NewFieldMappingWithOp("bp.family_name", datagrid.OpLike),
-		"createdAt":         datagrid.NewFieldMapping("u.created_at"),
+		"createdAt":         datagrid.NewFieldMapping(userCreatedAtColumn),
 		"deletedAt":         datagrid.NewFieldMapping("u.deleted_at"),
-		"createdAtFrom":     datagrid.NewFieldMappingWithOp("u.created_at", datagrid.OpGreaterEqual),
-		"createdAtTo":       datagrid.NewFieldMappingWithOp("u.created_at", datagrid.OpLessEqual),
+		"createdAtFrom":     datagrid.NewFieldMappingWithOp(userCreatedAtColumn, datagrid.OpGreaterEqual),
+		"createdAtTo":       datagrid.NewFieldMappingWithOp(userCreatedAtColumn, datagrid.OpLessEqual),
 	}
 )
 
@@ -58,6 +66,7 @@ func (r *Repo) GetList(ctx context.Context, filters datagrid.Filtered) ([]authco
 		LeftJoin("auth_basic_profiles bp ON bp.subject_id = u.subject_id")
 
 	sqlBuilderCount = datagrid.SQLWherex(sqlBuilderCount, filters, adoptedFields)
+	sqlBuilderCount = applyUserSearch(sqlBuilderCount, filters.GetSearch())
 
 	const (
 		filterActive      = "active"
@@ -103,8 +112,10 @@ func (r *Repo) GetList(ctx context.Context, filters datagrid.Filtered) ([]authco
 		Join("auth_identifiers i ON i.subject_id = u.subject_id AND i.scheme = 'email' AND i.is_primary").
 		LeftJoin("auth_basic_profiles bp ON bp.subject_id = u.subject_id")
 
-	sqlBuilderList = datagrid.SQLBuilderx(sqlBuilderList, filters, allowedSortFields)
+	sqlBuilderList = datagrid.SQLBuilderx(sqlBuilderList, filters, nil)
+	sqlBuilderList = applyUserSort(sqlBuilderList, filters)
 	sqlBuilderList = datagrid.SQLWherex(sqlBuilderList, filters, adoptedFields)
+	sqlBuilderList = applyUserSearch(sqlBuilderList, filters.GetSearch())
 
 	if v, ok := filters.GetFields()["status"].(string); ok {
 		switch v {
@@ -145,7 +156,7 @@ func (r *Repo) GetByID(ctx context.Context, id int64) (authcore.Profile, error) 
 		return authcore.Profile{}, fmt.Errorf("%s: invalid id", op)
 	}
 
-	return r.getUserByCondition(ctx, op, squirrel.Eq{"u.id": id})
+	return r.getUserByCondition(ctx, op, squirrel.Eq{userIDColumn: id})
 }
 
 func (r *Repo) GetByUUID(ctx context.Context, id identity.UserID) (authcore.Profile, error) {
@@ -169,7 +180,7 @@ func (r *Repo) getUserByCondition(ctx context.Context, op string, eq squirrel.Eq
 		Limit(1)
 
 	var user authcore.Profile
-	if err := r.pgsql.DB().ScanOnex(ctx, op, &user, sqlBuilder); err != nil {
+	if err := admintx.Wrap(r.pgsql.DB()).ScanOnex(ctx, op, &user, sqlBuilder); err != nil {
 		if pgxscan.NotFound(err) {
 			return authcore.Profile{}, nil
 		}
@@ -259,7 +270,7 @@ func (r *Repo) Update(ctx context.Context, id int64, user authcore.Profile) erro
 			"updated_at": time.Now(),
 		}).Where(squirrel.Eq{"id": id})
 
-	if _, err := r.pgsql.DB().Execx(ctx, op, builder); err != nil {
+	if _, err := admintx.Wrap(r.pgsql.DB()).Execx(ctx, op, builder); err != nil {
 		return fmt.Errorf("error update: %w", outbox.ErrorTransform(err))
 	}
 
@@ -282,4 +293,31 @@ func (r *Repo) UpdatePhone(ctx context.Context, id int64, phone *int64) error {
 	}
 
 	return nil
+}
+
+// Both list and export use the same bound search over canonical identity fields.
+func applyUserSearch(builder squirrel.SelectBuilder, search string) squirrel.SelectBuilder {
+	search = strings.TrimSpace(search)
+	if search == "" {
+		return builder
+	}
+	value := "%" + search + "%"
+	return builder.Where(squirrel.Or{
+		squirrel.ILike{"i.normalized_value": value},
+		squirrel.ILike{userUsernameColumn: value},
+		squirrel.ILike{"bp.given_name": value},
+		squirrel.ILike{"bp.family_name": value},
+	})
+}
+
+func applyUserSort(builder squirrel.SelectBuilder, filters datagrid.Filtered) squirrel.SelectBuilder {
+	column, ok := sortColumns[filters.GetSortBy()]
+	if !ok {
+		return builder
+	}
+	order := "asc"
+	if filters.GetSortOrder() == "desc" {
+		order = "desc"
+	}
+	return builder.OrderBy(column + " " + order)
 }

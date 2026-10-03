@@ -39,6 +39,7 @@
         <!-- Кнопка экспорта -->
         <AppButton
           v-if="config.behaviour?.exportable"
+          :disabled="exportDisabled"
           variant="outline"
           size="sm"
           @click="$emit('export')"
@@ -69,12 +70,14 @@ interface Props {
   meta: Meta | null
   config: Config
   searchQuery: string
+  exportDisabled?: boolean
 }
 
 // Define props with defaults
 const props = withDefaults(defineProps<Props>(), {
   config: () => ({}),
   searchQuery: '',
+  exportDisabled: false,
   title: '',
   description: '',
 })

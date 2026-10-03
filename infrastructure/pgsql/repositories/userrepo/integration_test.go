@@ -4,6 +4,7 @@ package userrepo_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -14,6 +15,8 @@ import (
 	"github.com/assurrussa/goadmin/infrastructure/core/datagrid"
 	outbox "github.com/assurrussa/goadmin/infrastructure/outbox"
 	userrepo "github.com/assurrussa/goadmin/infrastructure/pgsql/repositories/userrepo"
+	"github.com/assurrussa/goadmin/internal/admintx"
+	authcore "github.com/assurrussa/goadmin/internal/auth"
 	identity "github.com/assurrussa/goadmin/internal/identity"
 	"github.com/assurrussa/goadmin/tests"
 )
@@ -93,3 +96,68 @@ func value(value *string) string {
 }
 
 func stringPtr(value string) *string { return &value }
+
+// This requires the real PostgreSQL release fixture. The unit executor test is
+// deliberately not a substitute for rollback across canonical and projection SQL.
+func TestUserProjectionJoinsCanonicalCommandRollback(t *testing.T) {
+	ctx := t.Context()
+	db, _, cleanup := tests.PrepareDB(ctx, t, "UserCommandRollback")
+	tx := adminhost.NewTxManager(db)
+	auth, err := adminhost.NewAuthAdapter(adminhost.AuthAdapterConfig{
+		Database: db, TxManager: tx, Runtime: tests.AuthRuntimeConfig(t), NotificationSender: tests.AuthNotificationSender(),
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, auth.Close()); cleanup(context.Background()) })
+	repo := userrepo.Must(userrepo.NewOptions(db, tx))
+	account, err := auth.Runtime().ProvisionTrustedLocalAccount(ctx, goauth.RegisterRequest{
+		Email: "user-command-rollback@example.test", Password: "Unique-User-Rollback-2026!",
+		Profile: goauth.BasicProfile{GivenName: "Original"},
+	})
+	require.NoError(t, err)
+	publicID := identity.NewUserID()
+	now := time.Now().UTC()
+	_, err = db.DB().Execx(ctx, "user.insert", outbox.BuilderDollar().Insert("users").
+		Columns("subject_id", "uuid", "bio", "data", "created_at", "updated_at").
+		Values(account.Subject.ID, publicID, "original bio", &authcore.ProfileData{Role: "reader"}, now, now))
+	require.NoError(t, err)
+	before, err := repo.GetByUUID(ctx, publicID)
+	require.NoError(t, err)
+	failure := errors.New("force rollback after email enqueue")
+	err = auth.Runtime().InAuthTransaction(ctx, func(txCtx context.Context) error {
+		executor, err := auth.Runtime().SQLExecutor(txCtx)
+		if err != nil {
+			return err
+		}
+		txCtx = admintx.WithExecutor(txCtx, executor, db.DB().Pool())
+		current, err := repo.GetByID(txCtx, before.ID)
+		if err != nil {
+			return err
+		}
+		if _, err = auth.Runtime().UpdateBasicProfile(txCtx, account.Subject.ID, goauth.BasicProfile{GivenName: "Changed"}); err != nil {
+			return err
+		}
+		require.Equal(t, &authcore.ProfileData{Role: "reader"}, current.Data)
+		current.Data.Role = "changed"
+		current.Bio = stringPtr("changed bio")
+		if err = repo.Update(txCtx, current.ID, current); err != nil {
+			return err
+		}
+		if err = auth.Runtime().RequestEmailChange(txCtx, account.Subject.ID, "user-command-target@example.test"); err != nil {
+			return err
+		}
+		return failure
+	})
+	require.ErrorIs(t, err, failure)
+	after, err := repo.GetByID(ctx, before.ID)
+	require.NoError(t, err)
+	require.Equal(t, before.Version, after.Version)
+	require.Equal(t, "original bio", value(after.Bio))
+	require.Equal(t, &authcore.ProfileData{Role: "reader"}, after.Data)
+	current, err := auth.Runtime().GetAccount(ctx, account.Subject.ID)
+	require.NoError(t, err)
+	require.Equal(t, "Original", current.Profile.GivenName)
+	var changes int
+	err = auth.Runtime().Database().QueryRowContext(ctx, "SELECT count(*) FROM auth_email_change_records WHERE subject_id=$1", account.Subject.ID).Scan(&changes)
+	require.NoError(t, err)
+	require.Zero(t, changes)
+}

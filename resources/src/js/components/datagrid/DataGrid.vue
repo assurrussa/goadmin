@@ -4,6 +4,7 @@
       :meta="metaInfo"
       :config="config"
       :search-query="searchQuery"
+      :export-disabled="loading || !!loadError"
       @search="handleSearch"
       @create="handleCreate"
       @refresh="handleRefresh"
@@ -213,6 +214,8 @@ const handleRefresh = (): void => {
 }
 
 const handleExport = (): void => {
+  // URL state belongs to the last successful response until query synchronization finishes.
+  if (loading.value || loadError.value) return
   emit('action-table', 'export', null)
 }
 

@@ -33,6 +33,7 @@
             label="E-mail"
             required
             :error="form.errors.email"
+            :readonly="!authmail"
           />
           <FormInput
             v-model="form.username"
@@ -59,6 +60,8 @@
 
 <script setup lang="ts">
 import { useForm, usePage } from '@inertiajs/vue3'
+import { watch } from 'vue'
+import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'
 import FormInput from '@/components/form/FormInput.vue'
@@ -66,6 +69,7 @@ import FormButton from '@/components/form/FormButton.vue'
 import AdminForm from '@/components/form/AdminForm.vue'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 
+const { authmail } = useAdminCapabilities()
 const basePath = '/users'
 const props = defineProps({
   title: { type: [String], default: undefined },
@@ -78,12 +82,22 @@ const oldData = (page.props.old as Record<string, string | null>) || {}
 
 const form = useForm({
   name: oldData.name || props.data.name,
-  email: oldData.email || props.data.email,
+  email: (authmail.value && oldData.email) || props.data.email,
   lastName: oldData.lastName || props.data.lastName || null,
   username: oldData.username || props.data.username || null,
 })
 
+// Inertia can preserve this component while capabilities or canonical data change.
+watch([authmail, () => props.data.email], ([enabled, email]) => {
+  if (!enabled) form.email = email
+})
+
 function handleForm() {
-  form.put(`${basePath}/${props.data.id}`)
+  form.put(`${basePath}/${props.data.id}`, {
+    // Email changes stay pending until confirmation; a later save must not resend them.
+    onSuccess: () => {
+      form.email = props.data.email
+    },
+  })
 }
 </script>

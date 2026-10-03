@@ -91,8 +91,8 @@
       "_VisuallyHidden-Jyu0EBME.js"
     ]
   },
-  "_DataGrid.vue_vue_type_script_setup_true_lang-BUAQZ9rH.js": {
-    "file": "js/DataGrid.vue_vue_type_script_setup_true_lang-BUAQZ9rH.js",
+  "_DataGrid.vue_vue_type_script_setup_true_lang-6CkeXmjA.js": {
+    "file": "js/DataGrid.vue_vue_type_script_setup_true_lang-6CkeXmjA.js",
     "name": "DataGrid.vue_vue_type_script_setup_true_lang",
     "imports": [
       "_editor-BLvWQyNR.js",
@@ -260,12 +260,12 @@
     ]
   },
   "src/js/Pages/admin/IndexPage.vue": {
-    "file": "js/IndexPage-BK_sZgrT.js",
+    "file": "js/IndexPage-BmPAOTXH.js",
     "name": "IndexPage",
     "src": "src/js/Pages/admin/IndexPage.vue",
     "isDynamicEntry": true,
     "imports": [
-      "_DataGrid.vue_vue_type_script_setup_true_lang-BUAQZ9rH.js",
+      "_DataGrid.vue_vue_type_script_setup_true_lang-6CkeXmjA.js",
       "_AppHead.vue_vue_type_script_setup_true_lang-DI7Hd3qQ.js",
       "src/js/app.ts",
       "_editor-BLvWQyNR.js",
@@ -430,14 +430,14 @@
     ]
   },
   "src/js/Pages/permissions/IndexPage.vue": {
-    "file": "js/IndexPage-D1vD7R2k.js",
+    "file": "js/IndexPage-CRxJWDxH.js",
     "name": "IndexPage",
     "src": "src/js/Pages/permissions/IndexPage.vue",
     "isDynamicEntry": true,
     "imports": [
       "src/js/app.ts",
       "_AppHead.vue_vue_type_script_setup_true_lang-DI7Hd3qQ.js",
-      "_DataGrid.vue_vue_type_script_setup_true_lang-BUAQZ9rH.js",
+      "_DataGrid.vue_vue_type_script_setup_true_lang-6CkeXmjA.js",
       "_editor-BLvWQyNR.js",
       "_Card.vue_vue_type_script_setup_true_lang-BapGU0Rc.js",
       "_AppInput.vue_vue_type_script_setup_true_lang-C1B05WvD.js",
@@ -513,14 +513,14 @@
     ]
   },
   "src/js/Pages/queues/ActivePage.vue": {
-    "file": "js/ActivePage-7heaP9NX.js",
+    "file": "js/ActivePage-oYZyis7d.js",
     "name": "ActivePage",
     "src": "src/js/Pages/queues/ActivePage.vue",
     "isDynamicEntry": true,
     "imports": [
       "src/js/app.ts",
       "_AppHead.vue_vue_type_script_setup_true_lang-DI7Hd3qQ.js",
-      "_DataGrid.vue_vue_type_script_setup_true_lang-BUAQZ9rH.js",
+      "_DataGrid.vue_vue_type_script_setup_true_lang-6CkeXmjA.js",
       "_Card.vue_vue_type_script_setup_true_lang-BapGU0Rc.js",
       "_editor-BLvWQyNR.js",
       "_AppInput.vue_vue_type_script_setup_true_lang-C1B05WvD.js",
@@ -534,14 +534,14 @@
     ]
   },
   "src/js/Pages/queues/FailedPage.vue": {
-    "file": "js/FailedPage-Ds1CTvXk.js",
+    "file": "js/FailedPage-BXB8WfhG.js",
     "name": "FailedPage",
     "src": "src/js/Pages/queues/FailedPage.vue",
     "isDynamicEntry": true,
     "imports": [
       "src/js/app.ts",
       "_AppHead.vue_vue_type_script_setup_true_lang-DI7Hd3qQ.js",
-      "_DataGrid.vue_vue_type_script_setup_true_lang-BUAQZ9rH.js",
+      "_DataGrid.vue_vue_type_script_setup_true_lang-6CkeXmjA.js",
       "_Card.vue_vue_type_script_setup_true_lang-BapGU0Rc.js",
       "_editor-BLvWQyNR.js",
       "_AppInput.vue_vue_type_script_setup_true_lang-C1B05WvD.js",
@@ -615,14 +615,14 @@
     ]
   },
   "src/js/Pages/roles/IndexPage.vue": {
-    "file": "js/IndexPage-C8hGskRk.js",
+    "file": "js/IndexPage-3t8ZPqDL.js",
     "name": "IndexPage",
     "src": "src/js/Pages/roles/IndexPage.vue",
     "isDynamicEntry": true,
     "imports": [
       "src/js/app.ts",
       "_AppHead.vue_vue_type_script_setup_true_lang-DI7Hd3qQ.js",
-      "_DataGrid.vue_vue_type_script_setup_true_lang-BUAQZ9rH.js",
+      "_DataGrid.vue_vue_type_script_setup_true_lang-6CkeXmjA.js",
       "_editor-BLvWQyNR.js",
       "_Card.vue_vue_type_script_setup_true_lang-BapGU0Rc.js",
       "_AppInput.vue_vue_type_script_setup_true_lang-C1B05WvD.js",
@@ -675,7 +675,7 @@
     ]
   },
   "src/js/Pages/users/EditPage.vue": {
-    "file": "js/EditPage-DIfT6Ur9.js",
+    "file": "js/EditPage-CTZHxJcE.js",
     "name": "EditPage",
     "src": "src/js/Pages/users/EditPage.vue",
     "isDynamicEntry": true,
@@ -694,12 +694,12 @@
     ]
   },
   "src/js/Pages/users/IndexPage.vue": {
-    "file": "js/IndexPage-BjL_mjQn.js",
+    "file": "js/IndexPage-1XBuvZMW.js",
     "name": "IndexPage",
     "src": "src/js/Pages/users/IndexPage.vue",
     "isDynamicEntry": true,
     "imports": [
-      "_DataGrid.vue_vue_type_script_setup_true_lang-BUAQZ9rH.js",
+      "_DataGrid.vue_vue_type_script_setup_true_lang-6CkeXmjA.js",
       "_AppHead.vue_vue_type_script_setup_true_lang-DI7Hd3qQ.js",
       "src/js/app.ts",
       "_editor-BLvWQyNR.js",
