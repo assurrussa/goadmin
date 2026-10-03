@@ -16,8 +16,9 @@ local verification.
 - `make externalconsumer-public-deps-local`: an anonymous isolated consumer
   replacing only this GoAdmin checkout; dependencies resolve from the public
   proxy without workspace overrides or developer credentials.
-- `git diff --exit-code`: generated assets and dependency files must remain
-  committed and current after verification.
+- `git diff --exit-code` and working-tree status (including untracked files):
+  generated assets and dependency files must remain committed and current after
+  verification.
 
 ## Live integration services
 
@@ -33,6 +34,8 @@ The job sets both the `TEST_PSQL_*` fixture configuration and
 `GOAUTH_TEST_POSTGRES_DSN`, plus `TEST_REDIS_ADDR`, `TEST_REDIS_PORT`, and
 `GOAUTH_TEST_REDIS_ADDRESS`. Service health checks precede the tests. Missing
 PostgreSQL or Redis fails the suite instead of silently compiling or skipping it.
+Verbose Go test output preserves each test/subtest PASS and SKIP marker in the
+hosted logs without filtering or rerunning the suite.
 This executes the existing user-update transaction/rollback and ProfileData
 JSONB regression cases as well as migrations, auth/session, and upload tests.
 
