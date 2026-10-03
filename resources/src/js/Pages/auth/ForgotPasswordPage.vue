@@ -2,9 +2,7 @@
   <AuthLayout>
     <template #title>Восстановление пароля</template>
 
-    <template #subtitle>
-      Введите ваш email адрес и мы отправим вам ссылку для восстановления пароля
-    </template>
+    <template #subtitle> Укажите email, чтобы запросить восстановление пароля </template>
 
     <AdminForm :form="form" :fields="['email']" @submit="handleReset" class="space-y-6">
       <!-- Email -->
@@ -18,7 +16,7 @@
         required
         :error="form.errors.email"
         size="md"
-        help-text="Мы отправим ссылку для восстановления на этот адрес"
+        help-text="Принятие запроса не подтверждает отправку письма"
       >
         <template #leftIcon>
           <Mail class="w-4 h-4" />
@@ -31,14 +29,14 @@
         variant="primary"
         size="md"
         :loading="form.processing"
-        loading-text="Отправка..."
+        loading-text="Обрабатываем запрос..."
         full-width
         class="mt-6"
       >
         <template #leftIcon>
           <Mail class="w-5 h-5" />
         </template>
-        Отправить ссылку
+        Запросить восстановление
       </FormButton>
     </AdminForm>
 
