@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GOWORK: 'off'
+  GOTOOLCHAIN: local
+
+jobs:
+  check:
+    name: Canonical checks and public consumer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Read the declared Go toolchain
+        id: go-toolchain
+        run: |
+          version=$(awk '$1 == "toolchain" { sub(/^go/, "", $2); print $2 }' go.mod)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: ${{ steps.go-toolchain.outputs.version }}
+          cache: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.19.0'
+      - name: Install pinned verification tools
+        run: |
+          go install mvdan.cc/gofumpt@v0.12.0
+          go install github.com/daixiang0/gci@v0.14.0
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
+      - name: Canonical Go and frontend gates
+        run: make check
+      - name: Anonymous public-dependency consumer
+        run: make externalconsumer-public-deps-local
+      - name: Verify generated assets and dependency files are current
+        run: git diff --exit-code
+
+  integration:
+    name: PostgreSQL and Redis integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+        env:
+          POSTGRES_USER: tests-service
+          POSTGRES_PASSWORD: tests-service
+          POSTGRES_DB: tests-db-pgsql
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tests-service -d tests-db-pgsql"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+      redis:
+        image: redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      TEST_PSQL_ADDRESS: 127.0.0.1
+      TEST_PSQL_PORT: '5432'
+      TEST_PSQL_USERNAME: tests-service
+      TEST_PSQL_PASSWORD: tests-service
+      TEST_PSQL_DATABASENAME: tests-db-pgsql
+      TEST_PSQL_SSL_MODE: disable
+      TEST_REDIS_ADDR: 127.0.0.1
+      TEST_REDIS_PORT: '6379'
+      GOAUTH_TEST_POSTGRES_DSN: postgres://tests-service:tests-service@127.0.0.1:5432/tests-db-pgsql?sslmode=disable
+      GOAUTH_TEST_REDIS_ADDRESS: 127.0.0.1:6379
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Read the declared Go toolchain
+        id: go-toolchain
+        run: |
+          version=$(awk '$1 == "toolchain" { sub(/^go/, "", $2); print $2 }' go.mod)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: ${{ steps.go-toolchain.outputs.version }}
+          cache: false
+      - name: Run complete integration-tagged suite against disposable services
+        run: make integration-check
