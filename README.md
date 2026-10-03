@@ -79,7 +79,7 @@ stream is local to one process.
 - `github.com/assurrussa/goadmin/features/realtime`
 - `github.com/assurrussa/goadmin/features/authmail`
 - `github.com/assurrussa/goadmin/features/users`
-- `github.com/assurrussa/goadmin/toolkit/datagrid`
+- `github.com/assurrussa/goadmin/toolkit/datagrid` ([guide and runnable example](toolkit/datagrid/README.md))
 - `github.com/assurrussa/goadmin/toolkit/formvalidator`
 
 `reference/externalconsumer` is the machine-readable source of truth for this
