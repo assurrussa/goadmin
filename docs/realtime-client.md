@@ -2,7 +2,7 @@
 
 Enable `features/realtime.New(nil)` in `host.New` for a runtime-owned stream, or
 pass a `host.EventStream` supervised by the host. The dependency is pinned to
-`github.com/assurrussa/gowebsocket v0.2.0`; ordinary consumer checks resolve the
+`github.com/assurrussa/gowebsocket v0.2.1`; ordinary consumer checks resolve the
 published dependency. `GOWEBSOCKET_LOCAL_PATH` is an explicit development override.
 
 ## Connection and authentication

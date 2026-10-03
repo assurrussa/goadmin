@@ -1147,3 +1147,22 @@ CSV row/cap/filter/quoting tests, and client capability/download/lifecycle tests
 A PostgreSQL rollback regression is included behind the integration build tag;
 compilation is not execution and live database/browser acceptance remains
 separate. No CSV formula policy or selection policy was changed.
+
+## Published dependency alignment (2026-10-03)
+
+The root and starter now select the completed public dependency releases:
+GoAuth v0.5.1, GoNotify v0.6.0, GoInertia v0.11.0, GoUploads v0.10.1,
+GoWebSocket v0.2.1, GoCache v0.2.2, and Outbox core/PostgreSQL backend v0.16.0.
+GoDI v0.9.3 and GoLogger v0.1.0 remain unchanged. The public root module has no
+replacements; the starter retains its explicit source-mode overrides.
+
+GoInertia's protocol v2 default matches the embedded v2 client. No protocol
+opt-in, host API, schema or generated asset change accompanies these pins.
+GoNotify's validation still rejects remote plaintext HTTP before any request;
+the host test follows the released error's uppercase `HTTP` spelling.
+
+Validate the natural public dependency graph independently of the starter's
+sibling overrides. Release readiness includes the complete PostgreSQL/Redis
+integration suite, security and frontend advisory gates, and an anonymous
+consumer with no dependency replacements. The first GoAdmin tag containing
+these pins must remain distinct from the immutable v0.7.0 baseline.

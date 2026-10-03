@@ -29,7 +29,7 @@ func TestNewNotificationManagerValidatesTransportWithoutRequests(t *testing.T) {
 		allowInsecure             bool
 	}{
 		{name: "https", url: notificationHTTPSURL, key: notificationProjectKey},
-		{name: "remote HTTP denied", url: notificationHTTPURL, key: notificationProjectKey, wantError: "insecure http"},
+		{name: "remote HTTP denied", url: notificationHTTPURL, key: notificationProjectKey, wantError: "insecure HTTP"},
 		{name: "explicit insecure remote HTTP", url: notificationHTTPURL, key: notificationProjectKey, allowInsecure: true},
 		{name: "loopback IPv4", url: "http://127.0.0.1:8080", key: notificationProjectKey},
 		{name: "loopback IPv6", url: "http://[::1]:8080", key: notificationProjectKey},
