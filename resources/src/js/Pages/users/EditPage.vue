@@ -60,6 +60,7 @@
 
 <script setup lang="ts">
 import { useForm, usePage } from '@inertiajs/vue3'
+import { watch } from 'vue'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'
@@ -81,9 +82,14 @@ const oldData = (page.props.old as Record<string, string | null>) || {}
 
 const form = useForm({
   name: oldData.name || props.data.name,
-  email: oldData.email || props.data.email,
+  email: (authmail.value && oldData.email) || props.data.email,
   lastName: oldData.lastName || props.data.lastName || null,
   username: oldData.username || props.data.username || null,
+})
+
+// Inertia can preserve this component while capabilities or canonical data change.
+watch([authmail, () => props.data.email], ([enabled, email]) => {
+  if (!enabled) form.email = email
 })
 
 function handleForm() {

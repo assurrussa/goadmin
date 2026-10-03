@@ -340,9 +340,14 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		return fmt.Errorf("user handler update parse: %w", err)
 	}
 
-	h.adminApp.HTTPManager().WithFlashOld(c, map[string]any{
-		"name": form.Name, "lastName": form.LastName, "username": form.Username, userEmailField: form.Email,
-	})
+	old := map[string]any{
+		"name": form.Name, "lastName": form.LastName, "username": form.Username,
+	}
+	// A readonly email must recover from canonical edit-page data, not rejected input.
+	if h.adminApp.Enabled("authmail") {
+		old[userEmailField] = form.Email
+	}
+	h.adminApp.HTTPManager().WithFlashOld(c, old)
 	err = h.adminApp.InTransaction(c, func(ctx context.Context) error {
 		return h.updateUser(ctx, id, form)
 	})

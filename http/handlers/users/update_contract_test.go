@@ -10,6 +10,7 @@ import (
 
 	"github.com/assurrussa/goauth"
 	"github.com/assurrussa/goauth/testkit"
+	"github.com/assurrussa/goinertia"
 	"github.com/gofiber/fiber/v3"
 	"github.com/stretchr/testify/require"
 
@@ -103,6 +104,8 @@ func TestUserUpdateCapabilityAndTransactionContract(t *testing.T) {
 				return err
 			})
 			app := fiber.New()
+			var flashedOld map[string]any
+			app.Use(captureFlashedOld(&flashedOld))
 			NewHandler(harness.App, repo, subjects).RegisterGroupRoutes(app)
 			email := "original@example.test"
 			if tc.changeEmail {
@@ -128,6 +131,18 @@ func TestUserUpdateCapabilityAndTransactionContract(t *testing.T) {
 			}
 			if !tc.mail && tc.changeEmail {
 				require.Zero(t, repo.updateCalls)
+				require.Zero(t, subjects.emailCalls)
+				require.NotContains(t, flashedOld, "email", "readonly email must fall back to canonical edit-page data")
+				require.Equal(t, "Changed", flashedOld["name"])
+				followup := httptest.NewRequestWithContext(t.Context(), http.MethodPut, "/users/42",
+					strings.NewReader(`{"name":"Recovered","email":"original@example.test"}`))
+				followup.Header.Set("Content-Type", "application/json")
+				followup.Header.Set("Referer", "/users/42/edit")
+				next, err := app.Test(followup)
+				require.NoError(t, err)
+				require.NoError(t, next.Body.Close())
+				require.Equal(t, http.StatusFound, next.StatusCode)
+				require.Equal(t, "Recovered", repo.updated.Name)
 				require.Zero(t, subjects.emailCalls)
 			}
 			if tc.wantUpdated && tc.changeEmail {
@@ -167,4 +182,14 @@ func TestUserUpdateUnknownCommitIsNotRetried(t *testing.T) {
 	require.Equal(t, 1, attempts)
 	require.Zero(t, repo.updateCalls)
 	require.Zero(t, subjects.profileCalls)
+}
+
+func captureFlashedOld(old *map[string]any) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		err := c.Next()
+		if props, ok := c.Locals(goinertia.ContextKeyProps).(map[string]any); ok {
+			*old, _ = props[goinertia.ContextPropsOld].(map[string]any)
+		}
+		return err
+	}
 }
