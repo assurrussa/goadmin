@@ -30,8 +30,9 @@ The current graph removes these paths rather than suppressing the advisory:
   `favicon.ico` remains available both at the output root and below `images/`.
   Development aliases delegate serving to Vite, retaining its filesystem
   restrictions, MIME handling, conditional requests and HEAD behavior.
-  Symlinks and ambiguous output collisions now fail explicitly instead of
-  allowing out-of-root traversal or order-dependent overwrites. Add new images
+  Symlinks inside the image tree and ambiguous output collisions now fail
+  explicitly instead of allowing out-of-root traversal or order-dependent
+  overwrites. Add new images
   under the same source directory; no per-image configuration is required.
 - Remove unused `ts-loader` and `vue-loader`. This project builds with Vite's
   Vue plugin and checks types with `vue-tsc`; it has no webpack build pipeline.

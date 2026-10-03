@@ -4,7 +4,9 @@ const path = require('node:path')
 // Preserve the old src/images/**/* target, including the flattened aliases
 // produced when the glob matched both a directory and its descendants.
 function collectImageAssets(projectRoot) {
-  const root = path.resolve(projectRoot, 'src/images')
+  // The checkout itself is trusted; platforms may alias its ancestors (for
+  // example /var -> /private/var on macOS). Only in-tree symlinks are rejected.
+  const root = path.resolve(fs.realpathSync(projectRoot), 'src/images')
   if (fs.realpathSync(root) !== root) {
     throw new Error('admin images must not use symlinks')
   }
@@ -46,6 +48,7 @@ function collectImageAssets(projectRoot) {
 }
 
 function adminImageAssets(projectRoot) {
+  const trustedRoot = fs.realpathSync(projectRoot)
   let base = '/'
   return {
     name: 'admin-image-assets',
@@ -53,11 +56,11 @@ function adminImageAssets(projectRoot) {
       base = config.base
     },
     buildStart() {
-      this.addWatchFile(path.resolve(projectRoot, 'src/images'))
-      for (const source of collectImageAssets(projectRoot).values()) this.addWatchFile(source)
+      this.addWatchFile(path.resolve(trustedRoot, 'src/images'))
+      for (const source of collectImageAssets(trustedRoot).values()) this.addWatchFile(source)
     },
     generateBundle(_options, bundle) {
-      for (const [fileName, source] of collectImageAssets(projectRoot)) {
+      for (const [fileName, source] of collectImageAssets(trustedRoot)) {
         if (bundle[fileName]) throw new Error(`ambiguous admin image output: ${fileName}`)
         this.emitFile({ type: 'asset', fileName, source: fs.readFileSync(source) })
       }
@@ -86,10 +89,10 @@ function adminImageAssets(projectRoot) {
           return response.end()
         }
         try {
-          const source = collectImageAssets(projectRoot).get(asset)
+          const source = collectImageAssets(trustedRoot).get(asset)
           if (!source) return next()
           const relative = path
-            .relative(projectRoot, source)
+            .relative(trustedRoot, source)
             .split(path.sep)
             .map(encodeURIComponent)
             .join('/')

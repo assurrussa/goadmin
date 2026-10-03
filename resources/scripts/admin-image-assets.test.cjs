@@ -190,3 +190,56 @@ test('image aliases cannot traverse roots or bypass Vite filesystem deny rules',
   }
   assert.equal((await request(server, '/images/unknown.png')).status, 404)
 })
+
+
+test('trusted symlinked checkout ancestors preserve collection, build and dev aliases', async (t) => {
+  const { build, createServer } = await import('vite')
+  const root = fixture(t)
+  const holder = fs.mkdtempSync(path.join(os.tmpdir(), 'goadmin-image-alias-'))
+  t.after(() => fs.rmSync(holder, { recursive: true, force: true }))
+  const ancestor = path.join(holder, 'ancestor')
+  fs.symlinkSync(path.dirname(root), ancestor, 'dir')
+  const aliasRoot = path.join(ancestor, path.basename(root))
+  assert.deepEqual(collectImageAssets(aliasRoot), collectImageAssets(root))
+  write(path.join(root, 'entry.js'), 'export const marker = 1')
+  const outDir = path.join(root, 'alias-output')
+  await build({
+    configFile: false,
+    root: aliasRoot,
+    logLevel: 'silent',
+    publicDir: false,
+    plugins: [adminImageAssets(aliasRoot)],
+    build: { outDir, rollupOptions: { input: path.join(aliasRoot, 'entry.js') } },
+  })
+  for (const [name, source] of collectImageAssets(aliasRoot)) {
+    assert.deepEqual(fs.readFileSync(path.join(outDir, name)), fs.readFileSync(source))
+  }
+  const server = await createServer({
+    configFile: false,
+    root: aliasRoot,
+    logLevel: 'silent',
+    publicDir: false,
+    plugins: [adminImageAssets(aliasRoot)],
+    server: { host: '127.0.0.1', port: 0, fs: { allow: [aliasRoot] } },
+  })
+  t.after(() => server.close())
+  await server.listen()
+  for (const name of ['/favicon.ico', '/images/favicon.ico']) {
+    const get = await request(server, `${name}?version=alias`)
+    assert.equal(get.status, 200)
+    assert.deepEqual(get.body, fs.readFileSync(image(root, 'favicon.ico')))
+    const head = await request(server, name, 'HEAD')
+    assert.equal(head.status, 200)
+    assert.equal(head.body.length, 0)
+    assert.equal(head.headers['content-length'], get.headers['content-length'])
+  }
+  const privateFile = path.join(root, 'private.txt')
+  write(privateFile, 'never-return-this-secret')
+  fs.symlinkSync(privateFile, image(root, 'in-tree-link.png'))
+  assert.throws(() => collectImageAssets(aliasRoot), /unsupported admin image path/)
+  const denied = await request(server, '/favicon.ico')
+  assert.equal(denied.status, 500)
+  assert(!denied.body.toString().includes('never-return-this-secret'))
+  fs.unlinkSync(image(root, 'in-tree-link.png'))
+  assert.equal((await request(server, '/favicon.ico')).status, 200)
+})
