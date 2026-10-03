@@ -159,6 +159,10 @@ The default full run includes `resources`, so Node manifest tests, Vitest UI
 tests, `vue-tsc`, and the Vite admin UI build must pass. Resource tooling
 requires Node.js 22.13+ on the 22.x line or Node.js 24+.
 
+Verification is local by default. Hosted CI is manual-only, with no automatic
+push or pull-request runs. See [local checks and manual CI](docs/ci.md) for
+tool versions, disposable PostgreSQL/Redis setup, and the proven CI baseline.
+
 This checkout pins published `goauth v0.5.0` and `gonotify v0.5.0`, including
 the shared transaction and optional-delivery API. Uploads resolve
 `gouploads v0.10.0` and WebSockets resolve `gowebsocket v0.2.0`. The root module

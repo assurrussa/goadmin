@@ -1,9 +1,8 @@
 name: CI
 
 on:
-  pull_request:
-  push:
-    branches: [master] # verified remote default branch (not the review sandbox name)
+  # Keep hosted checks opt-in to avoid consuming Actions quota on each change.
+  # The same checks can be run locally; see docs/ci.md.
   workflow_dispatch:
 
 permissions:

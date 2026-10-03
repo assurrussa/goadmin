@@ -126,10 +126,11 @@ runs the full `integration`-tagged suite, focused
 negative secret-handling tests, `govulncheck ./...`, and
 `npm audit --audit-level=high`. The integration suite requires reachable test
 PostgreSQL and Redis services. The vulnerability and npm advisory checks need
-network access. Hosted CI runs the canonical checks, live PostgreSQL/Redis
-integration suite, and anonymous public-dependency consumer; release security
-and published-tag checks remain explicit release gates. See
-[CI coverage](docs/ci.md).
+network access. Local verification is the default. The manual-only hosted
+workflow can run the canonical checks, live PostgreSQL/Redis integration suite,
+and anonymous public-dependency consumer on demand; push and pull-request
+events do not launch it. Release security and published-tag checks remain
+explicit release gates. See [local checks and manual CI](docs/ci.md).
 
 After that exact tag is published and resolves without local replacements, run:
 
