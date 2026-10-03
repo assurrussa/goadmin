@@ -16,6 +16,7 @@ import (
 	outbox "github.com/assurrussa/goadmin/infrastructure/outbox"
 	userrepo "github.com/assurrussa/goadmin/infrastructure/pgsql/repositories/userrepo"
 	"github.com/assurrussa/goadmin/internal/admintx"
+	authcore "github.com/assurrussa/goadmin/internal/auth"
 	identity "github.com/assurrussa/goadmin/internal/identity"
 	"github.com/assurrussa/goadmin/tests"
 )
@@ -116,7 +117,8 @@ func TestUserProjectionJoinsCanonicalCommandRollback(t *testing.T) {
 	publicID := identity.NewUserID()
 	now := time.Now().UTC()
 	_, err = db.DB().Execx(ctx, "user.insert", outbox.BuilderDollar().Insert("users").
-		Columns("subject_id", "uuid", "bio", "created_at", "updated_at").Values(account.Subject.ID, publicID, "original bio", now, now))
+		Columns("subject_id", "uuid", "bio", "data", "created_at", "updated_at").
+		Values(account.Subject.ID, publicID, "original bio", &authcore.ProfileData{Role: "reader"}, now, now))
 	require.NoError(t, err)
 	before, err := repo.GetByUUID(ctx, publicID)
 	require.NoError(t, err)
@@ -134,6 +136,8 @@ func TestUserProjectionJoinsCanonicalCommandRollback(t *testing.T) {
 		if _, err = auth.Runtime().UpdateBasicProfile(txCtx, account.Subject.ID, goauth.BasicProfile{GivenName: "Changed"}); err != nil {
 			return err
 		}
+		require.Equal(t, &authcore.ProfileData{Role: "reader"}, current.Data)
+		current.Data.Role = "changed"
 		current.Bio = stringPtr("changed bio")
 		if err = repo.Update(txCtx, current.ID, current); err != nil {
 			return err
@@ -148,6 +152,7 @@ func TestUserProjectionJoinsCanonicalCommandRollback(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, before.Version, after.Version)
 	require.Equal(t, "original bio", value(after.Bio))
+	require.Equal(t, &authcore.ProfileData{Role: "reader"}, after.Data)
 	current, err := auth.Runtime().GetAccount(ctx, account.Subject.ID)
 	require.NoError(t, err)
 	require.Equal(t, "Original", current.Profile.GivenName)
