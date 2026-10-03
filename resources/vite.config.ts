@@ -2,7 +2,6 @@ import { defineConfig } from 'vite'
 import type { Plugin, ViteDevServer } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
-import { viteStaticCopy } from 'vite-plugin-static-copy'
 import { fileURLToPath, URL } from 'node:url'
 import { createRequire } from 'node:module'
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
@@ -19,6 +18,9 @@ import tailwindcss from '@tailwindcss/vite'
 // }),
 const projectRoot = path.dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
+const { adminImageAssets } = require('./scripts/admin-image-assets.cjs') as {
+  adminImageAssets: (root: string) => Plugin
+}
 const {
   adminExtRoot,
   adminExtRootConfigured,
@@ -128,18 +130,7 @@ export default defineConfig({
         },
       },
     }),
-    viteStaticCopy({
-      targets: [
-        {
-          src: 'src/images/**/*',
-          dest: 'images',
-        },
-        {
-          src: 'src/images/favicon.ico',
-          dest: '.',
-        },
-      ],
-    }),
+    adminImageAssets(projectRoot),
   ],
   css: {
     postcss: './postcss.config.js',
