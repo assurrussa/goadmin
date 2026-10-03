@@ -170,29 +170,15 @@ func run() error {
 	if selected["queues"] {
 		modules = append(modules, host.QueuesModule())
 	}
+	mail, configErr := newMailIntegrations(selected)
+	if configErr != nil {
+		return configErr
+	}
 	if selected["notifications"] {
-		notifyURL, configErr := required("NOTIFYHUB_URL")
-		if configErr != nil {
-			return configErr
-		}
-		projectKey, configErr := required("NOTIFYHUB_PROJECT_KEY")
-		if configErr != nil {
-			return configErr
-		}
-		manager, createErr := host.NewNotificationManager(host.NotificationConfig{
-			BaseURL: notifyURL, ProjectKey: projectKey,
-		})
-		if createErr != nil {
-			return fmt.Errorf("configure notifications: %w", createErr)
-		}
-		modules = append(modules, host.NotificationsModule(manager))
+		modules = append(modules, host.NotificationsModule(mail.client))
 	}
 	if selected["authmail"] {
-		sender, createErr := newSMTPSender()
-		if createErr != nil {
-			return createErr
-		}
-		modules = append(modules, host.AuthMailModule(host.AuthMailConfig{Sender: sender}))
+		modules = append(modules, host.AuthMailModule(host.AuthMailConfig{Sender: mail.auth}))
 	}
 	var runtime *host.Runtime
 	modules = append(modules, host.DefinedFeatureModule(host.ModuleDescriptor{Key: "starter.health", Routes: []string{"GET /healthz"}}, healthFeature{ready: func(ctx context.Context) error {

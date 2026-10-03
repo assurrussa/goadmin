@@ -11,7 +11,8 @@ GoWebSocket v0.2.0 without sibling replacements.
 ## Try the admin locally
 
 The [standalone starter](examples/starter/README.md) runs the embedded admin,
-PostgreSQL with Docker Compose. Redis and mail are explicit optional profiles. Copy
+PostgreSQL with Docker Compose. Redis is an optional profile; mail modules use
+NotifyHub when explicitly enabled. Copy
 `examples/starter/.env.example` to `examples/starter/.env`, fill every required
 value, then run `docker compose up --build` from `examples/starter`. Open
 `http://localhost:8080`; the login page offers first-admin registration until

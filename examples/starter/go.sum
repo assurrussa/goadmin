@@ -2,6 +2,10 @@ github.com/BurntSushi/toml v1.6.0 h1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk
 github.com/BurntSushi/toml v1.6.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/Masterminds/squirrel v1.5.4 h1:uUcX/aBc8O7Fg9kaISIUsHXdKuqehiXAMQTYX8afzqM=
 github.com/Masterminds/squirrel v1.5.4/go.mod h1:NNaOrjSoIDfDA40n7sr2tPNZRfjzjA400rg+riTZj10=
+github.com/assurrussa/goadmin v0.7.0 h1:1xT3+hZxqgXxAUE3HLR1sZLD2XUq9Wb1BiwE0WwBzXk=
+github.com/assurrussa/goadmin v0.7.0/go.mod h1:YlCyjfeTlyH4C1N8VvjSSoAvwjKXOOxtWeavgZHBNf0=
+github.com/assurrussa/goauth v0.5.0 h1:a3tUJM9S+P6Cf0u+Tq/4KBteiW9Sd9h44zAdfMK/pGg=
+github.com/assurrussa/goauth v0.5.0/go.mod h1:b/HbzBG2IackVlpnTklK57jS0Hr4HK/qTdBfpUtE0VY=
 github.com/assurrussa/gocache v0.2.1 h1:5DtDfEooT6WJV7ouUwTWBQ3Cu7N2zBXBeDGCc1jQD5M=
 github.com/assurrussa/gocache v0.2.1/go.mod h1:2phNxsjBMsJ8l9pu04tuhAKEOOVR2ZmU799DLgQZEo8=
 github.com/assurrussa/godi v0.9.3 h1:41DOaW+kAV4387ZERN5GjUzGFjGIaHcCBqUpxuPnVIM=
@@ -10,6 +14,12 @@ github.com/assurrussa/goinertia v0.10.1 h1:zmXuaL3KuzklLFBv116sS3YLM/fLKHv0N8x8u
 github.com/assurrussa/goinertia v0.10.1/go.mod h1:ojviu1cywWnWYezF/fQ6Qn6dwMC2jc5oZVLjMOUvc88=
 github.com/assurrussa/gologger v0.1.0 h1:jo5VXaznPUReNXEruMrNOEfIbRLUctjfeRdElocU4F8=
 github.com/assurrussa/gologger v0.1.0/go.mod h1:/F/8c0qo2pd755T/YJ7A1hkCmbp/abM2747bsMta6ec=
+github.com/assurrussa/gonotify v0.6.0 h1:adYgboqXr1GaR4u7DBuMz5tTJ4sAZcYnoheDdNWWnys=
+github.com/assurrussa/gonotify v0.6.0/go.mod h1:xEXCcixk0q5r4P3HKlqcGFLmFSu36mGNnXqgPIFzA1I=
+github.com/assurrussa/gouploads v0.10.0 h1:mx/c4BCu5opR8yX6x76+XvqssGP3U+nRcLX7/BUO6lM=
+github.com/assurrussa/gouploads v0.10.0/go.mod h1:ArrV+Qd+qOz4F5gDQ02VDpGTbl9nNzp5rTkdxIqXxRI=
+github.com/assurrussa/gowebsocket v0.2.0 h1:s0LibuBwa4clFLlmeirV5oxxszB2KsdG6ZyPIljNdwg=
+github.com/assurrussa/gowebsocket v0.2.0/go.mod h1:lGwTH0KTY59BI3u3pq0wQXrR8RhDVxhuEISjzTtzPRY=
 github.com/assurrussa/outbox v0.15.0 h1:ccuecT2Y0uBdgu9GXw0/UhW2FEocfv3j90DBdFGp6oM=
 github.com/assurrussa/outbox v0.15.0/go.mod h1:fzNmhtaNHltUtnUsj5KMQPNlnEB9tY/Z5MfsxJYvBgg=
 github.com/assurrussa/outbox/backends/pgsql v0.15.0 h1:sQOGzCcBycGO5jakEQMB/3hkVVl1tQo8+q9b8HCWcnk=

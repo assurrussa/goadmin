@@ -7,6 +7,7 @@ toolchain go1.27.1
 require (
 	github.com/assurrussa/goadmin v0.7.0
 	github.com/assurrussa/goauth v0.5.0
+	github.com/assurrussa/gonotify v0.6.0
 	github.com/gofiber/fiber/v3 v3.5.0
 )
 
@@ -16,7 +17,6 @@ require (
 	github.com/assurrussa/godi v0.9.3 // indirect
 	github.com/assurrussa/goinertia v0.10.1 // indirect
 	github.com/assurrussa/gologger v0.1.0 // indirect
-	github.com/assurrussa/gonotify v0.5.0 // indirect
 	github.com/assurrussa/gouploads v0.10.0 // indirect
 	github.com/assurrussa/gowebsocket v0.2.0 // indirect
 	github.com/assurrussa/outbox v0.15.0 // indirect
