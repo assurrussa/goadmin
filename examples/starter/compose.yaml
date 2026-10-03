@@ -16,11 +16,6 @@ services:
     image: redis:7-alpine
     volumes:
       - redis_data:/data
-  mailpit:
-    profiles: [authmail]
-    image: axllent/mailpit:v1.27
-    ports:
-      - "127.0.0.1:${STARTER_MAILPIT_PORT:-8025}:8025"
   admin:
     build:
       context: ../..
@@ -43,8 +38,7 @@ services:
       GOAUTH_SIGNING_KEY: ${GOAUTH_SIGNING_KEY:?set GOAUTH_SIGNING_KEY}
       GOAUTH_TOKEN_KEY: ${GOAUTH_TOKEN_KEY:?set GOAUTH_TOKEN_KEY}
       GOAUTH_ENVELOPE_KEY: ${GOAUTH_ENVELOPE_KEY:?set GOAUTH_ENVELOPE_KEY}
-      SMTP_ADDR: mailpit:1025
-      SMTP_FROM: ${SMTP_FROM:-}
+      AUTH_MAIL_FROM: ${AUTH_MAIL_FROM:-}
       NOTIFYHUB_URL: ${NOTIFYHUB_URL:-}
       NOTIFYHUB_PROJECT_KEY: ${NOTIFYHUB_PROJECT_KEY:-}
       STARTER_MIGRATE: "1"
