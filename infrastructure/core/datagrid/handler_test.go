@@ -609,8 +609,17 @@ func TestHandler_LoadData_ZeroTotal(t *testing.T) {
 }
 
 func TestHandler_LoadData_FilterValues_NonString(t *testing.T) {
-	// Тест что не-строковые значения фильтров не попадают в filterValues
+	const countKey = "count"
+	const numberType = "number"
+
+	// Typed filters must be returned using their canonical query representation.
 	handler, _ := setupTestHandler()
+	config := handler.GetConfig()
+	config.Columns = append(config.Columns,
+		datagrid.Column{Key: countKey, Type: numberType, Filterable: true},
+		datagrid.Column{Key: "active", Type: "boolean", Filterable: true},
+	)
+	handler = datagrid.NewHandler(config, logger.Discard())
 
 	app := fiber.New()
 	handler.RegisterRoutes(app, "/test")
@@ -630,11 +639,8 @@ func TestHandler_LoadData_FilterValues_NonString(t *testing.T) {
 	filters, ok := meta["filters"].(map[string]any)
 	require.True(t, ok, "filters should be map[string]any")
 
-	// Только строковые значения должны попасть в filterValues
-	_, hasCount := filters["count"]
-	_, hasActive := filters["active"]
-	assert.False(t, hasCount, "Non-string values should not be in filterValues")
-	assert.False(t, hasActive, "Non-string values should not be in filterValues")
+	assert.Equal(t, "42", filters[countKey])
+	assert.Equal(t, "true", filters["active"])
 }
 
 // Тесты для новой функциональности

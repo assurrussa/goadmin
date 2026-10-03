@@ -1,1 +1,0 @@
-import{ae as a}from"./app.js";import{d as r,O as o,P as s,Q as l,y as n,N as i}from"./editor-DKd59IIa.js";const c=r({__name:"AppHead",props:{title:String},setup(t){return(e,d)=>(i(),o(n(a),{title:t.title?`${t.title} — Админка`:"Админка"},{default:s(()=>[l(e.$slots,"default")]),_:3},8,["title"]))}});export{c as _};

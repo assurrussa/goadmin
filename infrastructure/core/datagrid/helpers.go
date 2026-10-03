@@ -98,6 +98,8 @@ func SQLBuilderx[T SQLBuilder[T]](sqlBuilder T, filters Filtered, allowedSortFie
 }
 
 // SQLWherex помогает дополнить SQL по where с поддержкой операторов.
+// Mappings are trusted SQL configuration. JSONB question-mark operators use
+// Squirrel escapes; finalize PostgreSQL statements with squirrel.Dollar.
 func SQLWherex[T SQLBuilder[T]](sqlBuilder T, filters Filtered, adoptedFields map[string]FieldMapping) T {
 	if len(filters.GetFields()) == 0 {
 		return sqlBuilder
@@ -134,38 +136,29 @@ func SQLWherex[T SQLBuilder[T]](sqlBuilder T, filters Filtered, adoptedFields ma
 			sqlBuilder = sqlBuilder.Where(fmt.Sprintf("%s %s ?", mapping.Column, mapping.Operator), value)
 
 		case OpJSONBHasKey:
-			// ? - проверка наличия ключа
-			// Значение должно быть строкой (имя ключа)
-			// Используем прямую подстановку значения в SQL
-			sqlBuilder = sqlBuilder.Where(squirrel.Expr(fmt.Sprintf("%s ? '%s'", mapping.Column, value)))
+			// Escape the operator's question mark for Squirrel's placeholder conversion.
+			sqlBuilder = sqlBuilder.Where(mapping.Column+" ?? ?", value)
 
 		case OpJSONBHasAnyKey, OpJSONBHasAllKeys:
-			// ?| и ?& - проверка наличия ключей из массива
-			// Значение должно быть массивом строк
-			operator := string(mapping.Operator)
-			// Преобразуем массив в PostgreSQL формат
-			arrayStr := formatPostgreSQLArray(value)
-			sqlBuilder = sqlBuilder.Where(squirrel.Expr(fmt.Sprintf("%s %s %s", mapping.Column, operator, arrayStr)))
+			arraySQL, args := postgreSQLArrayBindings(value)
+			operator := strings.ReplaceAll(string(mapping.Operator), "?", "??")
+			sqlBuilder = sqlBuilder.Where(fmt.Sprintf("%s %s %s", mapping.Column, operator, arraySQL), args...)
 
 		case OpJSONBExtractPath, OpJSONBExtractPathText:
-			// #> и #>> - извлечение по пути
-			// Синтаксис: column #> '{path,to,field}' = value
 			path := GetJSONBPath(key)
-			operator := string(mapping.Operator)
-			sqlBuilder = sqlBuilder.Where(squirrel.Expr(fmt.Sprintf("%s %s '%s' = ?", mapping.Column, operator, path), value))
+			sqlBuilder = sqlBuilder.Where(
+				fmt.Sprintf("%s %s ?::text[] = ?", mapping.Column, mapping.Operator), path, value,
+			)
 
 		case OpJSONBExtractField, OpJSONBExtractFieldText:
-			// -> и ->> - извлечение поля
-			// Синтаксис: column -> 'field' = value или column ->> 'field' = value
 			fieldName := GetJSONBFieldName(key)
-			operator := string(mapping.Operator)
-			sqlBuilder = sqlBuilder.Where(squirrel.Expr(fmt.Sprintf("%s %s '%s' = ?", mapping.Column, operator, fieldName), value))
+			sqlBuilder = sqlBuilder.Where(
+				fmt.Sprintf("%s %s ?::text = ?", mapping.Column, mapping.Operator), fieldName, value,
+			)
 
 		case OpJSONBPathExists, OpJSONBPathMatch:
-			// @? и @@ - проверка пути с JSONPath
-			// Значение должно быть JSONPath выражением
-			operator := string(mapping.Operator)
-			sqlBuilder = sqlBuilder.Where(squirrel.Expr(fmt.Sprintf("%s %s ?", mapping.Column, operator), value))
+			operator := strings.ReplaceAll(string(mapping.Operator), "?", "??")
+			sqlBuilder = sqlBuilder.Where(fmt.Sprintf("%s %s ?", mapping.Column, operator), value)
 
 		default:
 			// Для остальных операторов (=, <>, >, >=, <, <=)
@@ -214,44 +207,55 @@ func GetJSONBFieldName(fieldKey string) string {
 	return parts[len(parts)-1]
 }
 
-// formatPostgreSQLArray преобразует Go slice в PostgreSQL array формат.
-func formatPostgreSQLArray(value any) string {
-	const defaultEmptyResult = "ARRAY[]"
+// postgreSQLArrayBindings binds array elements instead of placing them in SQL text.
+// A scalar retains the existing PostgreSQL array-literal input convention.
+func postgreSQLArrayBindings(value any) (string, []any) {
+	var args []any
 	switch v := value.(type) {
 	case []string:
-		if len(v) == 0 {
-			return defaultEmptyResult
-		}
-		// Экранируем строки и оборачиваем в кавычки
-		quoted := make([]string, len(v))
-		for i, s := range v {
-			quoted[i] = fmt.Sprintf("'%s'", strings.ReplaceAll(s, "'", "''"))
-		}
-		return fmt.Sprintf("ARRAY[%s]", strings.Join(quoted, ","))
-	case []int:
-		if len(v) == 0 {
-			return defaultEmptyResult
-		}
-		// Для чисел кавычки не нужны
-		strValues := make([]string, len(v))
-		for i, n := range v {
-			strValues[i] = strconv.Itoa(n)
-		}
-		return fmt.Sprintf("ARRAY[%s]", strings.Join(strValues, ","))
-	case []any:
-		if len(v) == 0 {
-			return defaultEmptyResult
-		}
-		// Универсальный случай
-		strValues := make([]string, len(v))
+		args = make([]any, len(v))
 		for i, item := range v {
-			strValues[i] = fmt.Sprintf("'%v'", item)
+			args[i] = item
 		}
-		return fmt.Sprintf("ARRAY[%s]", strings.Join(strValues, ","))
+	case []int:
+		args = make([]any, len(v))
+		for i, item := range v {
+			args[i] = strconv.Itoa(item)
+		}
+	case []any:
+		args = make([]any, len(v))
+		for i, item := range v {
+			args[i] = fmt.Sprint(item)
+		}
 	default:
-		// Fallback - пытаемся преобразовать в строку
-		return fmt.Sprintf("'%v'", value)
+		return "?::text[]", []any{value}
 	}
+
+	return "ARRAY[" + squirrel.Placeholders(len(args)) + "]::text[]", args
+}
+
+// paginationQueryParams retains the effective page size independently of a host's defaults.
+func paginationQueryParams(perPage int, filters Filters) url.Values {
+	params := url.Values{}
+	params.Set("limit", strconv.Itoa(perPage))
+	if filters.Search != "" {
+		params.Set("search", filters.Search)
+	}
+	if filters.SortBy != "" {
+		params.Set("sortBy", filters.SortBy)
+	}
+	if filters.SortOrder != "" {
+		params.Set("sortOrder", filters.SortOrder)
+	}
+	for key, value := range filters.Fields {
+		if isReservedFilterKey(key) {
+			continue
+		}
+		if encoded, ok := formatFilterValue(value); ok && encoded != "" {
+			params.Set(key, encoded)
+		}
+	}
+	return params
 }
 
 // BuildPaginationURLs создает URL'ы для пагинации как в Laravel.
@@ -262,27 +266,7 @@ func BuildPaginationURLs(
 		return "", "", "", ""
 	}
 
-	// Создаем базовые параметры
-	baseParams := url.Values{}
-	if filters.Search != "" {
-		baseParams.Set("search", filters.Search)
-	}
-	if filters.SortBy != "" {
-		baseParams.Set("sortBy", filters.SortBy)
-	}
-	if filters.SortOrder != "" {
-		baseParams.Set("sortOrder", filters.SortOrder)
-	}
-	if perPage != 10 { // default page size
-		baseParams.Set("limit", strconv.Itoa(perPage))
-	}
-
-	// Добавляем динамические фильтры
-	for key, value := range filters.Fields {
-		if value != nil && value != "" {
-			baseParams.Set(key, fmt.Sprintf("%v", value))
-		}
-	}
+	baseParams := paginationQueryParams(perPage, filters)
 
 	// First page
 	if totalPages > 0 {
@@ -340,27 +324,7 @@ func BuildPaginationLinks(
 		return links
 	}
 
-	// Создаем базовые параметры
-	baseParams := url.Values{}
-	if filters.Search != "" {
-		baseParams.Set("search", filters.Search)
-	}
-	if filters.SortBy != "" {
-		baseParams.Set("sortBy", filters.SortBy)
-	}
-	if filters.SortOrder != "" {
-		baseParams.Set("sortOrder", filters.SortOrder)
-	}
-	if perPage != 10 { // default page size
-		baseParams.Set("limit", strconv.Itoa(perPage))
-	}
-
-	// Добавляем динамические фильтры
-	for key, value := range filters.Fields {
-		if value != nil && value != "" {
-			baseParams.Set(key, fmt.Sprintf("%v", value))
-		}
-	}
+	baseParams := paginationQueryParams(perPage, filters)
 
 	// Функция для создания URL
 	makeURL := func(page int) string {

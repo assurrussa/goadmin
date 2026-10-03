@@ -1,0 +1,105 @@
+@import 'tailwindcss';
+@source '../../src/js';
+@theme {
+  --color-primary: #0369a1;
+  --color-primary-foreground: #fff;
+  --color-secondary: #e2e8f0;
+  --color-secondary-foreground: #0f172a;
+  --color-background: #f8fafc;
+  --color-card: #fff;
+  --color-card-foreground: #0f172a;
+  --color-surface: #f1f5f9;
+  --color-surface-variant: #e2e8f0;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #334155;
+  --color-text-tertiary: #64748b;
+  --color-border: #cbd5e1;
+  --color-border-primary: #cbd5e1;
+  --color-input: #94a3b8;
+  --color-popover: #fff;
+  --color-popover-foreground: #0f172a;
+  --color-accent: #e2e8f0;
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b;
+  --color-destructive: #b91c1c;
+  --color-error: #b91c1c;
+  --color-success: #15803d;
+  --color-warning: #a16207;
+  --color-info: #0369a1;
+}
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font:
+    14px system-ui,
+    sans-serif;
+}
+.lab {
+  max-width: 1600px;
+  margin: auto;
+  padding: 24px;
+}
+.lab-panel {
+  border: 1px solid #cbd5e1;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 18px;
+  background: #fff;
+}
+.lab-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+}
+.lab-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.lab-controls button,
+.lab-controls select,
+.lab-controls input,
+.lab-form input,
+.lab-form button {
+  border: 1px solid #94a3b8;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: white;
+}
+.lab-controls button,
+.lab-form button {
+  cursor: pointer;
+}
+.lab-trace {
+  max-height: 280px;
+  overflow: auto;
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 12px;
+  font:
+    12px ui-monospace,
+    monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.lab-form {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+.lab-form label {
+  display: flex;
+  flex-direction: column;
+}
+.lab-warning {
+  color: #92400e;
+  background: #fffbeb;
+}
+@media (max-width: 640px) {
+  .lab {
+    padding: 10px;
+  }
+}

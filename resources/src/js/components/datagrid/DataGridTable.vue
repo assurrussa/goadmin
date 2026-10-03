@@ -9,25 +9,35 @@
               class="w-12 px-6 sm:w-16 sm:px-8 sticky left-0 bg-surface z-20"
             >
               <Checkbox
-                :checked="allSelected"
+                :model-value="allSelected"
                 aria-label="Выбрать все строки"
                 class="absolute left-4 top-1/2 -mt-2 sm:left-6"
-                @update:checked="$emit('toggle-select-all')"
+                @update:model-value="$emit('toggle-select-all')"
               />
             </TableHead>
             <TableHead
               v-for="column in config.columns"
               :key="column.key"
-              class="group px-6 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wider cursor-pointer whitespace-nowrap h-auto"
-              :class="{
-                'cursor-pointer hover:bg-surface-variant transition-colors': column.sortable,
-              }"
-              @click="column.sortable && $emit('sort', column.key)"
+              scope="col"
+              class="group text-left text-xs font-medium text-text-tertiary uppercase tracking-wider whitespace-nowrap h-auto"
+              :class="column.sortable ? 'p-0' : 'px-6 py-3'"
+              :aria-sort="
+                column.sortable && sortBy === column.key
+                  ? sortOrder === 'asc'
+                    ? 'ascending'
+                    : 'descending'
+                  : undefined
+              "
             >
-              <div class="flex items-center space-x-1">
+              <button
+                v-if="column.sortable"
+                type="button"
+                class="flex w-full items-center space-x-1 px-6 py-3 text-left uppercase tracking-wider hover:bg-surface-variant transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                @click="$emit('sort', column.key)"
+              >
                 <span>{{ column.label }}</span>
                 <span
-                  v-if="column.sortable"
+                  aria-hidden="true"
                   class="flex-none rounded text-text-tertiary group-hover:visible"
                   :class="sortBy === column.key ? 'text-primary' : ''"
                 >
@@ -38,7 +48,8 @@
                   />
                   <ArrowUpDown v-else class="h-4 w-4 opacity-60" />
                 </span>
-              </div>
+              </button>
+              <span v-else>{{ column.label }}</span>
             </TableHead>
             <!-- Sticky Actions Column Header -->
             <TableHead
@@ -60,10 +71,10 @@
               class="relative w-12 px-6 sm:w-16 sm:px-8 sticky left-0 bg-card z-10"
             >
               <Checkbox
-                :checked="selectedItems.includes(getItemId(item, config))"
+                :model-value="selectedItems.includes(getItemId(item, config))"
                 :aria-label="`Выбрать строку ${getItemId(item, config)}`"
                 class="absolute left-4 top-1/2 -mt-2 sm:left-6"
-                @update:checked="$emit('toggle-select-item', getItemId(item, config))"
+                @update:model-value="$emit('toggle-select-item', getItemId(item, config))"
               />
             </TableCell>
             <TableCell
@@ -110,10 +121,10 @@
             </TableCell>
             <!-- Sticky Actions Column Cell -->
             <TableCell
-              v-if="item.actions && item.actions.length > 0"
+              v-if="hasAnyActions"
               class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium sticky right-0 bg-card z-10 border-l border-border-primary shadow-[-12px_0_18px_-16px_rgba(15,23,42,0.35)]"
             >
-              <div class="flex items-center justify-end gap-1">
+              <div v-if="item.actions?.length" class="flex items-center justify-end gap-1">
                 <template v-for="action in item.actions" :key="action.key">
                   <AppButton
                     v-if="['edit', 'show', 'view', 'delete'].includes(action.key)"
@@ -187,6 +198,8 @@ import {
 } from 'lucide-vue-next'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppButton from '@/components/ui/AppButton.vue'
+import { Checkbox } from '@/components/ui/checkbox'
+import { isRichTextJSON, renderRichTextPreview } from './richTextPreview'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -279,7 +292,7 @@ const getColumnValue = (item: DataItem, columnKey: string): string | number | bo
 }
 
 const formatValue = (value: unknown, column: Column): string => {
-  if (!value) return ''
+  if (value === null || value === undefined || value === '') return ''
 
   if (column.type === 'date' && column.format) {
     return new Date(value as string).toLocaleDateString('ru-RU', {
@@ -324,102 +337,5 @@ const getBadgeLabel = (
 ): string => {
   const safeValue = typeof value === 'string' || typeof value === 'number' ? value : String(value)
   return badges[safeValue]?.label || String(value)
-}
-
-// Rich Text helper functions
-interface ProsemirrorNode {
-  type: string
-  content?: ProsemirrorNode[]
-  attrs?: Record<string, unknown>
-  text?: string
-  marks?: { type: string; attrs?: Record<string, unknown> }[]
-}
-
-const isRichTextJSON = (value: unknown): boolean => {
-  if (typeof value !== 'string') return false
-
-  try {
-    const parsed = JSON.parse(value) as { type?: string }
-    return !!(parsed && typeof parsed === 'object' && parsed.type === 'doc')
-  } catch {
-    return false
-  }
-}
-
-const renderRichTextPreview = (value: unknown): string => {
-  if (typeof value !== 'string') return ''
-
-  try {
-    const json = JSON.parse(value)
-    // Простой рендеринг JSON в HTML для превью
-    return jsonToHtml(json)
-  } catch {
-    return String(value)
-  }
-}
-
-const jsonToHtml = (json: unknown): string => {
-  if (!json || typeof json !== 'object') return ''
-  const node = json as ProsemirrorNode
-
-  if (node.type === 'doc' && node.content) {
-    return node.content.map((child) => renderNode(child)).join('')
-  }
-
-  return renderNode(node)
-}
-
-const renderNode = (node: ProsemirrorNode): string => {
-  if (!node || typeof node !== 'object') return ''
-
-  switch (node.type) {
-    case 'paragraph':
-      return `<p>${node.content ? node.content.map(renderNode).join('') : ''}</p>`
-    case 'heading':
-      const level = node.attrs?.level || 1
-      return `<h${level}>${node.content ? node.content.map(renderNode).join('') : ''}</h${level}>`
-    case 'text':
-      let html = node.text || ''
-      if (node.marks) {
-        for (const mark of node.marks) {
-          switch (mark.type) {
-            case 'bold':
-              html = `<strong>${html}</strong>`
-              break
-            case 'italic':
-              html = `<em>${html}</em>`
-              break
-            case 'underline':
-              html = `<u>${html}</u>`
-              break
-            case 'strike':
-              html = `<s>${html}</s>`
-              break
-            case 'code':
-              html = `<code>${html}</code>`
-              break
-            case 'link':
-              const href = (mark.attrs?.href as string) || ''
-              html = `<a href="${href}">${html}</a>`
-              break
-          }
-        }
-      }
-      return html
-    case 'bulletList':
-      return `<ul>${node.content ? node.content.map(renderNode).join('') : ''}</ul>`
-    case 'orderedList':
-      return `<ol>${node.content ? node.content.map(renderNode).join('') : ''}</ol>`
-    case 'listItem':
-      return `<li>${node.content ? node.content.map(renderNode).join('') : ''}</li>`
-    case 'blockquote':
-      return `<blockquote>${node.content ? node.content.map(renderNode).join('') : ''}</blockquote>`
-    case 'codeBlock':
-      return `<pre><code>${node.content ? node.content.map(renderNode).join('') : ''}</code></pre>`
-    case 'hardBreak':
-      return '<br>'
-    default:
-      return node.content ? node.content.map(renderNode).join('') : ''
-  }
 }
 </script>

@@ -1,0 +1,8 @@
+package probe
+
+import (
+	"github.com/assurrussa/goadmin/toolkit/datagrid"
+	"github.com/gofiber/fiber/v3"
+)
+
+var _ datagrid.ErrorTemplateComponent = func(_ fiber.Ctx, _ datagrid.ErrorData, _ error) error { return nil }

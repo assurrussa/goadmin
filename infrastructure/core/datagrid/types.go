@@ -212,7 +212,7 @@ type Response[T any] struct {
 	// Конфигурация (автоматически генерируется из Columns)
 	Columns      []Column          `json:"columns"`      // колонки с настройками сортировки/фильтрации
 	Actions      []Action[T]       `json:"-"`            // исходные действия с CanView функциями (не сериализуется)
-	FilterValues map[string]string `json:"filterValues"` // текущие значения фильтров из URL
+	FilterValues map[string]string `json:"filterValues"` // scalar query values and _search
 
 	// Текущее состояние
 	SortBy    string `json:"sortBy"`    // текущая сортировка

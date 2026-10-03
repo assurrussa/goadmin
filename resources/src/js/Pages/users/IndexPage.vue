@@ -11,11 +11,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import DataGrid from '@/components/datagrid/DataGrid.vue'
 import type { ApiResponse } from '@/composables/useDataGrid'
 import AppHead from '@/components/layout/AppHead.vue'
 import { router } from '@inertiajs/vue3'
+import { downloadUserExport } from '@/services/userExport'
+import { useNotifications } from '@/composables/useNotifications'
 
 const props = defineProps({
   title: {
@@ -49,10 +51,40 @@ const apiResponseData = computed(() => {
   return null
 })
 
+const notifications = useNotifications()
+let exportController: AbortController | null = null
+onUnmounted(() => exportController?.abort())
+
+async function exportUsers() {
+  if (exportController) return
+  const controller = new AbortController()
+  exportController = controller
+  try {
+    const truncated = await downloadUserExport(
+      apiUrl.value,
+      window.location.href,
+      controller.signal,
+    )
+    if (truncated && !controller.signal.aborted) {
+      notifications.warning(
+        'Экспорт содержит первые 10 000 пользователей. Уточните фильтры для полного результата.',
+      )
+    }
+  } catch (error) {
+    if (!controller.signal.aborted) {
+      notifications.error(
+        error instanceof Error ? error.message : 'Не удалось экспортировать пользователей.',
+      )
+    }
+  } finally {
+    if (exportController === controller) exportController = null
+  }
+}
+
 function handleActionClick(actionId: string, val: string | number | null) {
   switch (actionId) {
     case 'export':
-      router.get(`${apiUrl.value}/export`)
+      void exportUsers()
       break
     case 'refresh':
       router.visit(`${apiUrl.value}/refresh`, {

@@ -1,0 +1,3 @@
+package probe
+
+type Unsupported interface { With[T any](T) T }
