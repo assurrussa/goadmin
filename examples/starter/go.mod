@@ -6,21 +6,21 @@ toolchain go1.27.1
 
 require (
 	github.com/assurrussa/goadmin v0.7.0
-	github.com/assurrussa/goauth v0.5.0
+	github.com/assurrussa/goauth v0.5.1
 	github.com/assurrussa/gonotify v0.6.0
 	github.com/gofiber/fiber/v3 v3.5.0
 )
 
 require (
 	github.com/Masterminds/squirrel v1.5.4 // indirect
-	github.com/assurrussa/gocache v0.2.1 // indirect
+	github.com/assurrussa/gocache v0.2.2 // indirect
 	github.com/assurrussa/godi v0.9.3 // indirect
-	github.com/assurrussa/goinertia v0.10.1 // indirect
+	github.com/assurrussa/goinertia v0.11.0 // indirect
 	github.com/assurrussa/gologger v0.1.0 // indirect
-	github.com/assurrussa/gouploads v0.10.0 // indirect
-	github.com/assurrussa/gowebsocket v0.2.0 // indirect
-	github.com/assurrussa/outbox v0.15.0 // indirect
-	github.com/assurrussa/outbox/backends/pgsql v0.15.0 // indirect
+	github.com/assurrussa/gouploads v0.10.1 // indirect
+	github.com/assurrussa/gowebsocket v0.2.1 // indirect
+	github.com/assurrussa/outbox v0.16.0 // indirect
+	github.com/assurrussa/outbox/backends/pgsql v0.16.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.41.11 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.12 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.21 // indirect
@@ -36,7 +36,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/fasthttp/websocket v1.5.12 // indirect
 	github.com/fatih/color v1.19.0 // indirect
-	github.com/fxamacker/cbor/v2 v2.9.4 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.15 // indirect
 	github.com/georgysavva/scany/v2 v2.1.4 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
@@ -75,7 +74,6 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.74.0 // indirect
 	github.com/vgarvardt/pgx-google-uuid/v5 v5.6.0 // indirect
-	github.com/x448/float16 v0.8.4 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/dig v1.19.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect

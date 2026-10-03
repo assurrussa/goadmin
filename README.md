@@ -164,10 +164,12 @@ Verification is local by default. Hosted CI is manual-only, with no automatic
 push or pull-request runs. See [local checks and manual CI](docs/ci.md) for
 tool versions, disposable PostgreSQL/Redis setup, and the proven CI baseline.
 
-This checkout pins published `goauth v0.5.0` and `gonotify v0.5.0`, including
+This checkout pins published `goauth v0.5.1` and `gonotify v0.6.0`, including
 the shared transaction and optional-delivery API. Uploads resolve
-`gouploads v0.10.0` and WebSockets resolve `gowebsocket v0.2.0`. The root module
-has no local replacements.
+`gouploads v0.10.1` and WebSockets resolve `gowebsocket v0.2.1`. Outbox core and
+its PostgreSQL backend both resolve `v0.16.0`, and GoCache resolves `v0.2.2`.
+GoInertia `v0.11.0` keeps protocol v2 as the default for the embedded v2 client.
+The root module has no local replacements.
 
 GoNotify v0.5.0 uses durable transports instead of the old direct-delivery
 manager. Configure notifications explicitly:

@@ -6,8 +6,8 @@ mounts four sibling candidates: goauth, gonotify, gouploads and gowebsocket. It 
 or a media resizer. The helper snapshots tracked and non-ignored candidate
 sources (including working changes), excluding ignored caches and Git metadata.
 Source mode requires Git, Python 3 and Docker Compose. Its GoUploads pin is
-`v0.10.0`; the explicit source mode still replaces sibling modules. The root
-explicit candidate consumer resolves GoUploads v0.10.0 without that override
+`v0.10.1`; the explicit source mode still replaces sibling modules. The root
+explicit candidate consumer resolves GoUploads v0.10.1 without that override
 when only GoAuth and GoNotify paths are selected.
 
 For source candidates use `bash ../../scripts/starter-local.sh up --build`. For a released version use `GOADMIN_VERSION=<exact-tag> docker
