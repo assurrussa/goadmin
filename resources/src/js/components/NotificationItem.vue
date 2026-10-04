@@ -13,19 +13,21 @@
         <component :is="iconComponent" :class="['h-5 w-5', iconClass]" />
       </div>
 
-      <div class="ml-3 flex-1">
+      <div class="ml-3 min-w-0 flex-1 [overflow-wrap:anywhere]">
         <h3 v-if="notification.title" class="text-sm font-semibold mb-1 text-text-primary">
           {{ notification.title }}
         </h3>
         <p class="text-sm text-text-secondary">{{ notification.message }}</p>
       </div>
 
-      <div v-if="notification.closable" class="ml-4 flex-shrink-0">
+      <div v-if="notification.closable" class="ml-1 -my-3 -mr-3 flex-shrink-0">
         <button
+          type="button"
+          aria-label="Закрыть уведомление"
           @click="$emit('close')"
-          class="inline-flex text-text-tertiary hover:text-text-primary focus:outline-none focus:text-text-primary transition ease-in-out duration-150"
+          class="inline-flex h-11 w-11 items-center justify-center rounded-md text-text-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:text-text-primary transition ease-in-out duration-150"
         >
-          <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+          <svg aria-hidden="true" class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
             <path
               fill-rule="evenodd"
               d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"

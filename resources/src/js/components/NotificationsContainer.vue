@@ -2,7 +2,7 @@
   <Teleport to="body">
     <div
       v-if="notifications.length > 0"
-      class="fixed top-4 right-4 z-[9999] max-w-sm w-full space-y-2"
+      class="fixed top-4 right-4 z-[9999] max-w-sm w-[calc(100%-2rem)] space-y-2"
     >
       <TransitionGroup name="notification" tag="div" class="space-y-2">
         <NotificationItem

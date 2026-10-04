@@ -72,7 +72,7 @@ GoAdmin serves its owned `/public` assets with identity content encoding. They
 are no longer application-compressed, avoiding a fasthttp streaming-compression
 reader-lifetime race when clients abandon a response. Decoded asset bytes, MIME
 types, existing routing/authentication boundaries and cache policy are unchanged.
-Complete uncached transfers can be larger (the embedded app.js is 361,477 bytes).
+Complete uncached transfers can be larger (the embedded app.js is 361,733 bytes).
 An independently configured reverse proxy may compress them; none is assumed.
 Dynamic responses outside this namespace and other request methods retain their
 existing compression. GET/HEAD fallthrough within `/public` also uses identity,
