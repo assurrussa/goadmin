@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"slices"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/assurrussa/goauth/postgres"
 
 	"github.com/assurrussa/goadmin/bootstrap"
+	"github.com/assurrussa/goadmin/internal/uploadintegration"
 )
 
 const (
@@ -109,13 +111,24 @@ type UploadsConfig struct {
 	Uploads    Uploads
 	URLs       URLConfigs
 	Jobs       []Job
+
+	// Strategies adds named contexts to the canonical /files upload handler.
+	// Names use 1-64 lowercase ASCII letters, digits, hyphens or underscores,
+	// beginning with a letter. Built-in contexts cannot be replaced.
+	// The map is copied; strategy instances remain host-owned and must be safe
+	// for concurrent requests.
+	Strategies map[string]UploadStrategy
 }
 
 func UploadsModule(cfg UploadsConfig) Module {
+	cfg.Strategies = maps.Clone(cfg.Strategies)
 	return Module{descriptor: ModuleDescriptor{
 		Key: "uploads", Requires: []string{jobsModuleKey},
 		RouteNamespaces: []string{"/files", "/uploads"}, Routes: []string{"DELETE /auth/profile/avatar"},
 	}, configure: func(a *assembly) error {
+		if err := uploadintegration.ValidateStrategies(cfg.Strategies); err != nil {
+			return err
+		}
 		if cfg.Repository == nil || cfg.Loader == nil || cfg.Uploads.Service == nil ||
 			cfg.Uploads.TusStore == nil || cfg.Uploads.AfterProcess == nil {
 			return errors.New("uploads requires repository, loader, uploader, TUS store and after-process service")
@@ -133,6 +146,7 @@ func UploadsModule(cfg UploadsConfig) Module {
 		a.input.Repositories.FileRepo = cfg.Repository
 		a.input.Repositories.FileLoader = cfg.Loader
 		a.input.Uploads = cfg.Uploads
+		a.input.UploadStrategies = maps.Clone(cfg.Strategies)
 		a.input.URLs = cfg.URLs
 		a.input.Options = append(a.input.Options, bootstrap.WithOutboxJobs(cfg.Jobs...))
 		return nil

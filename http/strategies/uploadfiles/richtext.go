@@ -41,7 +41,7 @@ func (s *RichTextStrategy) GetConfig(
 	case uploadhost.FileTypeImage:
 		config.MaxFileSize = 10 * 1024 * 1024 // 10MB
 	case uploadhost.FileTypeUnknown, uploadhost.FileTypePdf, uploadhost.FileTypeDocx,
-		uploadhost.FileTypeLink, uploadhost.FileTypeText:
+		uploadhost.FileTypeLink, uploadhost.FileTypeText, uploadhost.FileTypeAudio:
 		// These types retain the rich-text policy configured above.
 	}
 

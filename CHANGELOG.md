@@ -5,6 +5,12 @@ after a new tag and its clean-consumer checks complete.
 
 ## Unreleased
 
+- Add validated, immutable `UploadsConfig.Strategies` registration on the existing
+  full `/files` upload handler. Custom audio contexts can use canonical MP3/WAV
+  finalization with GoUploads v0.11.0+ original-only processing; built-in policies
+  remain unchanged. Cover the full client's existing audio category and numeric
+  file-type response contract without changing client production logic.
+
 - Serve owned `/public` assets without application compression to avoid the
   upstream compressed-stream reader race on client disconnect. Asset bytes and
   dynamic compression are unchanged; uncached static transfers may be larger.

@@ -51,7 +51,7 @@ func (s *GenericStrategy) GetConfig(
 			extWebP: {mimeImageWebP},
 		}
 	case uploadhost.FileTypeUnknown, uploadhost.FileTypePdf, uploadhost.FileTypeDocx,
-		uploadhost.FileTypeLink, uploadhost.FileTypeText:
+		uploadhost.FileTypeLink, uploadhost.FileTypeText, uploadhost.FileTypeAudio:
 		// These types retain the generic policy configured above.
 	}
 

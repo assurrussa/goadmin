@@ -85,6 +85,7 @@ type assemblyInput struct {
 	Services             Services
 	Repositories         Repositories
 	Uploads              Uploads
+	UploadStrategies     map[string]UploadStrategy
 	URLs                 URLConfigs
 	Options              []Option
 	ClientBundle         *ClientBundleValidation
@@ -228,8 +229,9 @@ func buildDependencies(input assemblyInput) (bootstrap.Dependencies, error) {
 			JobsFailedRepo:  jobsFailedRepo,
 		},
 		Uploads: bootstrap.UploadDependencies{
-			Service:  input.Uploads.Service,
-			TusStore: input.Uploads.TusStore,
+			Service:    input.Uploads.Service,
+			TusStore:   input.Uploads.TusStore,
+			Strategies: input.UploadStrategies,
 		},
 		Outbox: moduleJobs,
 		URLs:   input.URLs,

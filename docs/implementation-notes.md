@@ -1,5 +1,22 @@
 # Implementation Notes
 
+## Opt-in canonical audio consumers (2026-10-04)
+
+Add `host.UploadsConfig.Strategies` through module assembly and bootstrap to the
+existing canonical handler. Validate ASCII names, reserved built-ins and
+nil/typed-nil strategy values; snapshot the caller map and isolate repeated
+assemblies. Strategies remain borrowed concurrency-safe host objects. The full
+client already accepts string categories, so preserve that API and cover audio
+metadata plus `/complete` in regression tests. No production client logic or
+pending-TUS quarantine contract changes are required.
+
+Built-in policies, auth/CSRF, manager scoping, task status, replacement/deletion,
+finalization and upload routes are unchanged. A feature owns its named audio
+strategy and entity authorization; it selects explicit MP3/WAV MIME/size limits.
+Audio requires GoUploads v0.11.0+ original-only processing. Dependency publication
+and final verification are tracked separately; no validation claims are made by
+these source notes.
+
 ## Identity-only public assets (2026-10-04)
 
 The `/public` GET/HEAD namespace bypasses the global compressor when an owned
@@ -1202,3 +1219,19 @@ sibling overrides. Release readiness includes the complete PostgreSQL/Redis
 integration suite, security and frontend advisory gates, and an anonymous
 consumer with no dependency replacements. The first GoAdmin tag containing
 these pins must remain distinct from the immutable v0.7.0 baseline.
+
+The final candidate pins published GoUploads v0.11.0 (verified release commit
+02fced8a67f5b07942764d7635aa08b06db3c5a7) without a root replacement. Built-in
+strategy switches explicitly retain their existing policy for FileTypeAudio.
+Canonical regeneration refreshes only the source/command comments in existing
+mock files; their generated behavior is unchanged.
+
+Cloud verification passed on the actual GoUploads v0.11.0 pin: canonical
+preparation, `make check` (full Go race/coverage plus every resource gate and
+production build), security-negative tests, `govulncheck`, high-severity npm
+audit, and the clean local consumer. There are no reachable Go vulnerabilities;
+three module-only advisories remain outside imported vulnerable packages. The
+37 moderate npm records are the two already-reviewed advisories documented in
+`docs/dependency-advisory-review.md`; no force upgrade or advisory suppression
+was applied. PostgreSQL/Redis integration, isolated public-dependency consumer
+and the eventual published GoAdmin tag are separate required release gates.

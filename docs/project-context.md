@@ -8,7 +8,7 @@ Last updated: 2026-10-03.
 `github.com/assurrussa/goadmin` as its module path. The current checkout pins
 `github.com/assurrussa/goauth v0.5.1` as the canonical auth/RBAC Runtime.
 GoAuth and GoNotify resolve published v0.5.1 and v0.6.0 without replacements;
-GoUploads resolves published v0.10.1.
+GoUploads resolves published v0.11.0.
 GoNotify uses `transport.Transport` and NotifyHub rather than its
 removed direct-delivery manager. Core and PostgreSQL Outbox pins are v0.16.0,
 including the no-attempt `DeferAt` contract required for authorization outages.
@@ -175,6 +175,27 @@ default local uploader soft-deletes the file and enqueues the job in one
 database transaction, then unlinks the physical file after commit. Preview binding rechecks owner, finalization and the observed binding under a
 row lock in the shared transaction. Only linkage fields change; uploader/preset
 metadata is preserved. Self profile edits write canonical profile only.
+
+## Custom canonical upload strategies
+
+`host.UploadsConfig.Strategies` adds named host policies to the existing full
+`/files` handler; `features/uploads.Config` exposes the same field. Assembly
+validates names against `[a-z][a-z0-9_-]{0,63}`, rejects nil/typed-nil strategies
+and reserves `avatar`, `rich-text`, `default`, `image-uploader`. The module
+snapshots the map and makes a fresh map for each assembly; the actual strategy
+instances are borrowed and must support concurrent calls. Bootstrap validates
+again before registering built-ins and the custom contexts.
+
+The full `uploadFiles` client already accepts an open string category; `audio`
+is forwarded without narrowing that contract. HTTP responses retain GoUploads'
+numeric-string `fileType` (`"7"` for audio); the client preserves it. MP3/WAV
+requires a custom context
+with domain authorization and explicit MIME/extension/size constraints, plus
+GoUploads v0.11.0+ in `ProcessingOriginalOnly` mode. Built-in upload policies
+retain their old allowlists. The normal TUS complete, task status, finalization,
+replacement and deletion routes are reused. Isolated `WithUploadTransport` and
+`uploadPendingWithTus` remain quarantine/domain-finalizer tools, not an audio
+pipeline. No media editor/player contract changes are included.
 
 ## Admin client bundle
 
