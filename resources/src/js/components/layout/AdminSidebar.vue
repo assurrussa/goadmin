@@ -6,7 +6,9 @@
         <div
           class="h-9 w-9 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center"
         >
-          <span class="text-primary font-bold text-sm tracking-wide">A</span>
+          <span class="text-primary-dark dark:text-primary-light font-bold text-sm tracking-wide"
+            >A</span
+          >
         </div>
         <div>
           <p class="text-sm font-semibold text-text-primary uppercase tracking-wider">Админка</p>

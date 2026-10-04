@@ -1217,3 +1217,10 @@ Tailwind `dark:` utilities now use the shell's `.dark` or
 host pages follow the manual theme toggle even when the OS preference differs.
 The theme manager retains responsibility for selecting the initial system or
 saved theme. No authentication, persistence, or migration behavior changes.
+
+The consumer browser acceptance additionally exposed low-contrast active sidebar
+text and muted shell labels. Active navigation/logo text now uses the darker
+accent in light mode and lighter accent in dark mode; the light avatar uses the
+darker background. The light tertiary text token is reduced from 52% to 44%
+lightness for readable secondary labels on cards and page backgrounds. The
+primary accent itself and the dark tertiary palette are unchanged.

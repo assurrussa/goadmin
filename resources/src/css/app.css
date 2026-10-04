@@ -41,7 +41,7 @@
   --color-primary-contrast: hsl(204 30% 98%);
   --color-text-primary: hsl(214 22% 12%);
   --color-text-secondary: hsl(214 18% 32%);
-  --color-text-tertiary: hsl(214 12% 52%);
+  --color-text-tertiary: hsl(214 12% 44%);
   --color-text-disabled: hsl(214 12% 70%);
   --color-border-primary: hsl(214 18% 86%);
   --color-border-secondary: hsl(214 18% 92%);
@@ -97,7 +97,7 @@
 
     --color-text-primary: hsl(var(--neutral-h), 22%, 12%);
     --color-text-secondary: hsl(var(--neutral-h), 18%, 32%);
-    --color-text-tertiary: hsl(var(--neutral-h), 12%, 52%);
+    --color-text-tertiary: hsl(var(--neutral-h), 12%, 44%);
     --color-text-disabled: hsl(var(--neutral-h), 12%, 70%);
     --color-text-white: #ffffff;
 
