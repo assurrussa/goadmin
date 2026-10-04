@@ -47,7 +47,7 @@
             class="menu-trigger flex items-center cursor-pointer gap-3 rounded-2xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
           >
             <div
-              class="h-8 w-8 rounded-full bg-primary flex items-center justify-center overflow-hidden"
+              class="h-8 w-8 rounded-full bg-primary-dark dark:bg-primary flex items-center justify-center overflow-hidden"
             >
               <img
                 v-if="avatarUrl"

@@ -2,6 +2,9 @@
 @import '../../.admin-extensions/tailwind-sources.css';
 @import 'nprogress/nprogress.css';
 
+/* Host extensions must follow the same manual theme as the admin shell. */
+@custom-variant dark (&:where(.dark, .dark *, [data-theme-mode='dark'], [data-theme-mode='dark'] *));
+
 @theme {
   --color-primary: hsl(204 70% 46%);
   --color-primary-foreground: hsl(204 30% 98%);
@@ -38,7 +41,7 @@
   --color-primary-contrast: hsl(204 30% 98%);
   --color-text-primary: hsl(214 22% 12%);
   --color-text-secondary: hsl(214 18% 32%);
-  --color-text-tertiary: hsl(214 12% 52%);
+  --color-text-tertiary: hsl(214 12% 44%);
   --color-text-disabled: hsl(214 12% 70%);
   --color-border-primary: hsl(214 18% 86%);
   --color-border-secondary: hsl(214 18% 92%);
@@ -94,7 +97,7 @@
 
     --color-text-primary: hsl(var(--neutral-h), 22%, 12%);
     --color-text-secondary: hsl(var(--neutral-h), 18%, 32%);
-    --color-text-tertiary: hsl(var(--neutral-h), 12%, 52%);
+    --color-text-tertiary: hsl(var(--neutral-h), 12%, 44%);
     --color-text-disabled: hsl(var(--neutral-h), 12%, 70%);
     --color-text-white: #ffffff;
 

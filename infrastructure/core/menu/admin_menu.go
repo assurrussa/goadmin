@@ -9,6 +9,16 @@ import (
 	"github.com/assurrussa/goadmin/models"
 )
 
+const (
+	mainSectionKey          = "main"
+	accessSectionKey        = "access"
+	systemSectionKey        = "system"
+	mainSectionOrder        = 10
+	applicationSectionOrder = 15
+	accessSectionOrder      = 20
+	systemSectionOrder      = 40
+)
+
 // PermissionChecker defines the minimal interface needed to filter menu items.
 type PermissionChecker interface {
 	IsSuperAdmin(ctx context.Context, adminID int64) bool
@@ -31,6 +41,9 @@ type Badge struct {
 	HideIfZero bool   `json:"hideIfZero,omitempty"`
 }
 
+// Section groups navigation items. Zero uses the application default (15), except
+// reserved keys main (10), access (20), and system (40), even without their core
+// module. Nonzero orders override placement; ties retain current relative order.
 type Section struct {
 	Key   string `json:"key"`
 	Title string `json:"title,omitempty"`
@@ -92,18 +105,28 @@ func (m Menu) Merge(other Menu) Menu {
 	}
 
 	sort.SliceStable(sections, func(i, j int) bool {
-		oi := sections[i].Order
-		oj := sections[j].Order
-		if oi == 0 {
-			oi = 1000
-		}
-		if oj == 0 {
-			oj = 1000
-		}
-		return oi < oj
+		return sectionOrder(sections[i]) < sectionOrder(sections[j])
 	})
 
 	return Menu{Sections: sections}
+}
+
+// A feature can be the first contributor to a reserved section when the
+// corresponding core module is disabled. Its placement must not become custom.
+func sectionOrder(section Section) int {
+	if section.Order != 0 {
+		return section.Order
+	}
+	switch section.Key {
+	case mainSectionKey:
+		return mainSectionOrder
+	case accessSectionKey:
+		return accessSectionOrder
+	case systemSectionKey:
+		return systemSectionOrder
+	default:
+		return applicationSectionOrder
+	}
 }
 
 // BuildAdminMenu builds the admin sidebar menu and filters items by permissions.
@@ -137,8 +160,8 @@ func coreMenu() Menu {
 	return Menu{
 		Sections: []Section{
 			{
-				Key:   "main",
-				Order: 10,
+				Key:   mainSectionKey,
+				Order: mainSectionOrder,
 				Items: []Item{
 					{
 						Name:          "Главная",
@@ -149,9 +172,9 @@ func coreMenu() Menu {
 				},
 			},
 			{
-				Key:   "access",
+				Key:   accessSectionKey,
 				Title: "Доступ",
-				Order: 20,
+				Order: accessSectionOrder,
 				Items: []Item{
 					{
 						Name:          "Администраторы",
@@ -174,9 +197,9 @@ func coreMenu() Menu {
 				},
 			},
 			{
-				Key:   "system",
+				Key:   systemSectionKey,
 				Title: "Система",
-				Order: 40,
+				Order: systemSectionOrder,
 				Items: []Item{
 					{
 						Name:          "Очереди",
@@ -235,8 +258,8 @@ func ModuleMenu(capabilities map[string]bool) Menu {
 	m := coreMenu()
 	sections := make([]Section, 0, len(m.Sections))
 	for _, s := range m.Sections {
-		if s.Key == "main" || capabilities == nil ||
-			(s.Key == "access" && capabilities["access"]) || (s.Key == "system" && capabilities["queues"]) {
+		if s.Key == mainSectionKey || capabilities == nil ||
+			(s.Key == accessSectionKey && capabilities[accessSectionKey]) || (s.Key == systemSectionKey && capabilities["queues"]) {
 			sections = append(sections, s)
 		}
 	}

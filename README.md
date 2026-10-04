@@ -29,6 +29,20 @@ The built-in interface is currently Russian-only. Navigation and the home
 screen use the signed-in administrator's permissions; optional host features
 appear only when registered and permitted.
 
+Custom application sections with an omitted/zero `Section.Order` appear after Home and
+before the built-in Access/System sections. Their effective order is 15;
+Home, Access and System use 10, 20 and 40. Set a nonzero order to place a
+section explicitly (including after the system sections). Equal orders retain
+their current relative order, repeated contributions deduplicate links, and adding
+items to a built-in section does not change that section's existing order.
+Reserved keys `main`, `access` and `system` keep their default positions even
+when a feature is their first contributor and the corresponding core module is
+disabled (for example, Operations without Queues). Nonzero overrides still win.
+
+Host UI extensions share the shell's manual light/dark selection. Tailwind
+`dark:` utilities follow `.dark` and `[data-theme-mode='dark']`; they do not
+independently override a saved selection with the OS preference.
+
 ## Runtime profiles
 
 Go 1.27 is the minimum. The default core needs PostgreSQL and security keys;
