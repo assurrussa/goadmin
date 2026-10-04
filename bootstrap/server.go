@@ -14,7 +14,6 @@ import (
 	uploadhost "github.com/assurrussa/gouploads/host"
 	handlers "github.com/assurrussa/gowebsocket/websocketstream/handlers"
 	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/compress"
 	"github.com/gofiber/fiber/v3/middleware/favicon"
 	"github.com/gofiber/fiber/v3/middleware/static"
 
@@ -112,7 +111,7 @@ func initServer(ctx context.Context, deps Dependencies, cfg Config, app *adminap
 	defaultMiddlewares := make([]fiber.Handler, 0, 3+len(extensions.middlewares))
 	defaultMiddlewares = append(defaultMiddlewares,
 		middlewares.NewRequestID(),
-		compress.New(),
+		responseCompression(opts.publicFS != nil),
 		favicon.New(),
 	)
 	defaultMiddlewares = append(defaultMiddlewares, extensions.middlewares...)
@@ -333,6 +332,9 @@ func registerStaticRoutes(
 ) {
 	if publicFS != nil {
 		fiberApp.Use("/public", func(c fiber.Ctx) error {
+			if c.Method() == fiber.MethodGet || c.Method() == fiber.MethodHead {
+				defer c.Vary(fiber.HeaderAcceptEncoding)
+			}
 			switch c.Path() {
 			case "/public/dist/js/app.js", "/public/dist/css/app.css":
 				c.Set(fiber.HeaderCacheControl, "no-cache, must-revalidate")
@@ -343,7 +345,7 @@ func registerStaticRoutes(
 			}
 			return c.Next()
 		})
-		fiberApp.Use("/public", static.New(".", static.Config{FS: publicFS}))
+		fiberApp.Use("/public", static.New(".", static.Config{FS: publicFS, ModifyResponse: publicAssetResponse}))
 	}
 	for _, route := range routes {
 		fiberApp.Use(route.Path, static.New(route.Root))

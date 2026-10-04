@@ -1,5 +1,41 @@
 # Implementation Notes
 
+## Identity-only public assets (2026-10-04)
+
+The `/public` GET/HEAD namespace bypasses the global compressor when an owned
+public filesystem is mounted. Its static handler keeps compression disabled.
+This prevents fasthttp v1.74.0 from asynchronously reading an embedded file while
+client disconnect cleanup resets/seeks/pools that same reader. Dependencies,
+public API, UI source and embedded asset bytes are unchanged. No response body
+materialization, fake encoding, request-header override or compression cache was
+introduced.
+
+Compression selection uses Fiber's effective path and case setting with a full
+segment boundary; `/publicity` stays dynamic. Host middleware rewriting another
+namespace into `/public` after selection is outside this policy. Existing static
+routing (including filename aliases), fixed-entrypoint cache rules and auth/error
+fallthrough remain intact. Existing byte-range-disabled behavior remains full 200.
+`Vary: Accept-Encoding` is added after static processing, including 304, so upstream
+response resets cannot remove it. Existing `Vary: *` remains intact.
+
+Only a successfully found representation (200/206/304) can become an empty 406
+when identity is explicitly refused. Exact identity and wildcard coding tokens
+are recognized across repeated fields, explicit identity overrides the wildcard,
+and any zero-weight duplicate excludes that coding. Parsing is tolerant: media-type parameter syntax and finite numeric weights
+between zero and one are accepted; unparseable/out-of-range entries are ignored. Representation headers are cleared, the original synchronous stream is
+closed and Content-Length is set to zero; unrelated response headers remain.
+Ordinary gzip-only offers implicitly accept identity. Redirects and errors retain
+their existing handling, but GET/HEAD fallthrough within `/public` also uses
+identity. POST and dynamic compression outside this namespace are unaffected.
+
+The real loopback HTTP regression deliberately closes 100 responses after headers
+without draining: default gzip negotiation plus gzip/br/deflate/zstd offers. Each
+batch is followed by an exact complete embedded app.js byte comparison. Tests also
+cover MIME, cache/validators, HEAD, range requests, no-transform, status/error
+handling, path boundaries/aliases, and dynamic compression isolation. This changes
+static wire representation, may increase transfer size, and makes no bandwidth or
+full wire-compatibility claim. Reverse-proxy compression is independently optional.
+
 ## WebSocket v0.2.0 integration (2026-09-30)
 
 Scope: published gowebsocket v0.2.0, trusted pre-handshake admin identity,

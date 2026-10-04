@@ -5,6 +5,12 @@ after a new tag and its clean-consumer checks complete.
 
 ## Unreleased
 
+- Serve owned `/public` assets without application compression to avoid the
+  upstream compressed-stream reader race on client disconnect. Asset bytes and
+  dynamic compression are unchanged; uncached static transfers may be larger.
+  Explicitly identity-refusing requests for existing assets receive an empty
+  HTTP 406 response, without replacing authentication or missing-file errors.
+
 - Require Go 1.27 and replace the all-dependencies installer with typed
   `host.New` and explicit access/jobs/uploads/queues/notifications/realtime/authmail
   modules; the default core needs PostgreSQL and security keys.

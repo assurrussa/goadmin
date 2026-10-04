@@ -66,6 +66,31 @@ storage. The built-in upload delivery is private to the current administrator;
 public-site media needs a separately authorized host route. The default in-memory
 stream is local to one process.
 
+## Public asset transport
+
+GoAdmin serves its owned `/public` assets with identity content encoding. They
+are no longer application-compressed, avoiding a fasthttp streaming-compression
+reader-lifetime race when clients abandon a response. Decoded asset bytes, MIME
+types, existing routing/authentication boundaries and cache policy are unchanged.
+Complete uncached transfers can be larger (the embedded app.js is 361,477 bytes).
+An independently configured reverse proxy may compress them; none is assumed.
+Dynamic responses outside this namespace and other request methods retain their
+existing compression. GET/HEAD fallthrough within `/public` also uses identity,
+including authentication and error responses; their status, body and routing stay
+unchanged.
+
+Ordinary clients offering gzip, Brotli, deflate or zstd also accept identity by
+default. An explicit identity exclusion (`identity;q=0`, or `*;q=0` without an
+accepted identity override) receives an empty, non-cacheable 406 for an existing
+asset, including HEAD/conditional requests. Missing assets and other errors still
+follow the original routes and authentication checks. `Vary: Accept-Encoding`
+is retained, as are request `no-transform` semantics. Byte ranges remain disabled
+on this mount: range requests receive the full identity representation.
+
+This is a policy for the owned `/public` GET/HEAD namespace, not an upstream
+fasthttp repair or a guarantee for host-defined streaming routes. Host middleware
+must not rewrite another namespace into `/public` after compression selection.
+
 ## Stable public API
 
 - `github.com/assurrussa/goadmin/host`
