@@ -1202,25 +1202,3 @@ sibling overrides. Release readiness includes the complete PostgreSQL/Redis
 integration suite, security and frontend advisory gates, and an anonymous
 consumer with no dependency replacements. The first GoAdmin tag containing
 these pins must remain distinct from the immutable v0.7.0 baseline.
-
-## Application navigation and theme consistency
-
-Unspecified section order now sorts at 15: after Home (10), before Access (20)
-and System (40). The public `Section.Order` field remains the sole placement
-control. Nonzero values remain explicit overrides, ties keep their current relative
-order, and contributions to an existing built-in section retain its order.
-Repeated merges deduplicate links without changing this ordering. Permission
-filtering still removes unavailable items and empty sections after composition.
-
-Tailwind `dark:` utilities now use the shell's `.dark` or
-`[data-theme-mode='dark']` selector, including descendants. This makes custom
-host pages follow the manual theme toggle even when the OS preference differs.
-The theme manager retains responsibility for selecting the initial system or
-saved theme. No authentication, persistence, or migration behavior changes.
-
-The consumer browser acceptance additionally exposed low-contrast active sidebar
-text and muted shell labels. Active navigation/logo text now uses the darker
-accent in light mode and lighter accent in dark mode; the light avatar uses the
-darker background. The light tertiary text token is reduced from 52% to 44%
-lightness for readable secondary labels on cards and page backgrounds. The
-primary accent itself and the dark tertiary palette are unchanged.
