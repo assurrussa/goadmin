@@ -46,7 +46,10 @@ func TestLocalPathFileRepoIntegration(t *testing.T) {
 	_, err = repo.Create(ctx, foreign)
 	require.NoError(t, err)
 
-	adminCtx := context.WithValue(ctx, adminsession.AuthAdminKey.String(), &models.SessionAdmin{ID: 1}) //nolint:staticcheck // matches session storage key.
+	//nolint:staticcheck // Matches the existing session storage key.
+	adminCtx := context.WithValue(
+		ctx, adminsession.AuthAdminKey.String(), &models.SessionAdmin{ID: 1},
+	)
 	file, err := local.GetByPath(adminCtx, "upload_file/owned.png")
 	require.NoError(t, err)
 	require.Equal(t, ownedID, file.ID)
@@ -84,7 +87,9 @@ func TestLocalOriginalUploadsAsyncLifecycleIntegration(t *testing.T) {
 	defer cleanup(context.Background())
 	tx := outbox.PgsqlTrxNew(db.DB())
 	queue := &uploadTestQueue{}
-	runtime, err := NewLocalUploads(LocalUploadsConfig{Root: t.TempDir(), BaseURL: "https://admin.test/uploads"}, db, tx, queue, nil, DiscardLogger())
+	runtime, err := NewLocalUploads(
+		LocalUploadsConfig{Root: t.TempDir(), BaseURL: "https://admin.test/uploads"}, db, tx, queue, nil, DiscardLogger(),
+	)
 	require.NoError(t, err)
 	var body bytes.Buffer
 	require.NoError(t, png.Encode(&body, image.NewRGBA(image.Rect(0, 0, 2, 2))))
@@ -117,12 +122,14 @@ func TestLocalOriginalUploadsAsyncLifecycleIntegration(t *testing.T) {
 	callback := false
 	for _, job := range queue.jobs {
 		if job.name == "test_preview" {
-			require.NoError(t, runtime.Uploads.AfterProcess.HandleAfterProcess(ctx, job.payload, func(_ context.Context, data AfterProcessPayload, file File) error {
-				require.Equal(t, user, data.UserID)
-				require.True(t, IsFinalizedUpload(file))
-				callback = true
-				return nil
-			}))
+			require.NoError(t, runtime.Uploads.AfterProcess.HandleAfterProcess(
+				ctx, job.payload, func(_ context.Context, data AfterProcessPayload, file File) error {
+					require.Equal(t, user, data.UserID)
+					require.True(t, IsFinalizedUpload(file))
+					callback = true
+					return nil
+				},
+			))
 		}
 	}
 	require.True(t, callback)

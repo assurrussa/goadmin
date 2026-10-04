@@ -32,9 +32,9 @@ type DatabaseConfig struct {
 	MaxConnLifeTime     time.Duration
 }
 
-// Migrate installs the canonical goauth v0.2 schema first and then the full
-// goadmin host schema. Legacy goauth v0.1 schemas are rejected by the canonical
-// runner and are never reset implicitly.
+// Migrate installs canonical goauth storage, the goadmin host schema, and
+// canonical gouploads lifecycle storage in that order. Legacy goauth v0.1
+// schemas are rejected by the canonical runner and are never reset implicitly.
 func Migrate(ctx context.Context, cfg DatabaseConfig, db *sql.DB) error {
 	return withDatabase(ctx, cfg, db, func(database *sql.DB, storageCfg outbox.StoragePgsqlConfig) error {
 		if err := postgres.Migrate(ctx, database); err != nil {
@@ -43,13 +43,17 @@ func Migrate(ctx context.Context, cfg DatabaseConfig, db *sql.DB) error {
 		if err := run(ctx, storageCfg, database, "up", logger.Discard()); err != nil {
 			return fmt.Errorf("migrate goadmin schema: %w", err)
 		}
+		if err := migrateUploads(ctx, database); err != nil {
+			return fmt.Errorf("migrate canonical gouploads schema: %w", err)
+		}
 
 		return nil
 	})
 }
 
 // Reset removes goadmin auth projections before resetting canonical auth state.
-// The typed confirmation prevents an accidental production-data deletion.
+// Upload data and its migration history are preserved. The typed confirmation
+// prevents an accidental production-data deletion.
 func Reset(
 	ctx context.Context,
 	cfg DatabaseConfig,
