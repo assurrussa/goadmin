@@ -6,17 +6,19 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	hostoperations "github.com/assurrussa/goadmin/features/operations"
 	"github.com/assurrussa/goadmin/infrastructure/core/menu"
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 	"github.com/assurrussa/goadmin/models"
 )
 
 const (
-	testQueuesKey   = "queues"
-	testAccessKey   = "access"
-	testSystemKey   = "system"
-	testStudentsKey = "students"
-	testGroupsKey   = "groups"
+	testStudentsPath = "/students"
+	testQueuesKey    = "queues"
+	testAccessKey    = "access"
+	testSystemKey    = "system"
+	testStudentsKey  = "students"
+	testGroupsKey    = "groups"
 )
 
 func sectionKeys(value menu.Menu) []string {
@@ -32,7 +34,7 @@ func TestMenuDefaultApplicationOrderIsStable(t *testing.T) {
 
 	builtins := menu.ModuleMenu(map[string]bool{testAccessKey: true, testQueuesKey: true})
 	custom := menu.Menu{Sections: []menu.Section{
-		{Key: testStudentsKey, Items: []menu.Item{{Name: "Students", Href: "/students"}}},
+		{Key: testStudentsKey, Items: []menu.Item{{Name: "Students", Href: testStudentsPath}}},
 		{Key: testGroupsKey, Items: []menu.Item{{Name: "Groups", Href: "/groups"}}},
 	}}
 	want := []string{"main", testStudentsKey, testGroupsKey, testAccessKey, testSystemKey}
@@ -79,7 +81,7 @@ func TestApplicationOrderSurvivesPermissionFiltering(t *testing.T) {
 	read := integrationroles.PermissionActionRead
 	custom := menu.Menu{Sections: []menu.Section{
 		{Key: testStudentsKey, Items: []menu.Item{{
-			Href: "/students", PermissionKey: integrationroles.NewPermissionKey(testStudentsKey, read),
+			Href: testStudentsPath, PermissionKey: integrationroles.NewPermissionKey(testStudentsKey, read),
 		}}},
 		{Key: testGroupsKey, Items: []menu.Item{{
 			Href: "/groups", PermissionKey: integrationroles.NewPermissionKey(testGroupsKey, read),
@@ -91,8 +93,50 @@ func TestApplicationOrderSurvivesPermissionFiltering(t *testing.T) {
 	}}
 	got := menu.BuildAdminMenu(context.Background(), &models.SessionAdmin{ID: 7}, checker, extra)
 	require.Equal(t, []string{testStudentsKey, testSystemKey}, sectionKeys(got))
-	require.Equal(t, "/students", got.Sections[0].Items[0].Href)
+	require.Equal(t, testStudentsPath, got.Sections[0].Items[0].Href)
 	require.Equal(t, "/queues", got.Sections[1].Items[0].Href)
 	require.Equal(t, got, menu.BuildAdminMenu(context.Background(), &models.SessionAdmin{ID: 7}, checker, extra))
 	require.Empty(t, menu.BuildAdminMenu(context.Background(), nil, checker, extra).Sections)
+}
+
+func TestReservedSectionDefaultsDoNotDependOnCoreModules(t *testing.T) {
+	t.Parallel()
+
+	extra := menu.Menu{Sections: []menu.Section{
+		{Key: testSystemKey, Items: []menu.Item{{Href: "/system-extension"}}},
+		{Key: testStudentsKey, Items: []menu.Item{{Href: testStudentsPath}}},
+		{Key: testAccessKey, Items: []menu.Item{{Href: "/access-extension"}}},
+		{Key: testMainMenuKey, Items: []menu.Item{{Href: "/"}}},
+	}}
+	merged := (menu.Menu{}).Merge(extra)
+	require.Equal(t, []string{testMainMenuKey, testStudentsKey, testAccessKey, testSystemKey}, sectionKeys(merged))
+	for _, section := range merged.Sections {
+		require.Zero(t, section.Order, "effective defaults must not rewrite explicit metadata")
+	}
+	for range 3 {
+		require.Equal(t, merged, merged.Merge(extra))
+	}
+	// A reserved key still accepts a deliberate nonzero placement override.
+	overridden := merged.Merge(menu.Menu{Sections: []menu.Section{{Key: testSystemKey, Order: 5}}})
+	require.Equal(t, []string{testSystemKey, testMainMenuKey, testStudentsKey, testAccessKey}, sectionKeys(overridden))
+}
+
+func TestOperationsStaysBelowAccessWithoutQueues(t *testing.T) {
+	t.Parallel()
+
+	operations := hostoperations.NewFeature(nil, nil, nil, nil).Descriptor().Menu
+	mounted := menu.ModuleMenu(map[string]bool{testAccessKey: true})
+	custom := menu.Menu{Sections: []menu.Section{{
+		Key: testStudentsKey, Items: []menu.Item{{Href: testStudentsPath}},
+	}}}
+	for _, extra := range []menu.Menu{
+		mounted.Merge(operations).Merge(custom),
+		operations.Merge(custom).Merge(mounted),
+	} {
+		got := menu.BuildAdminMenu(context.Background(), &models.SessionAdmin{ID: 1}, nil, extra)
+		require.Equal(t, []string{testMainMenuKey, testStudentsKey, testAccessKey, testSystemKey}, sectionKeys(got))
+		require.Len(t, got.Sections[3].Items, 1)
+		require.Equal(t, "/operations", got.Sections[3].Items[0].Href, "queues must remain absent")
+		require.Equal(t, extra, extra.Merge(operations))
+	}
 }
