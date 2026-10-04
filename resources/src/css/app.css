@@ -2,6 +2,9 @@
 @import '../../.admin-extensions/tailwind-sources.css';
 @import 'nprogress/nprogress.css';
 
+/* Host extensions must follow the same manual theme as the admin shell. */
+@custom-variant dark (&:where(.dark, .dark *, [data-theme-mode='dark'], [data-theme-mode='dark'] *));
+
 @theme {
   --color-primary: hsl(204 70% 46%);
   --color-primary-foreground: hsl(204 30% 98%);

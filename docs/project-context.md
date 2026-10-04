@@ -388,3 +388,12 @@ cookie middleware: bootstrap owns Origin checks, duplicate-input rejection and
 opaque-session binding. Configure cookies through admin config/SessionStore;
 CSRFConfig no longer accepts IsProd, CookieNameCSRFToken, CookieNameRefreshToken
 or ExcludePaths. These are source contract changes requiring host adaptation.
+
+### Host navigation and theme defaults
+
+Host `Section.Order == 0` sorts at 15, after Home (10) and before Access (20)
+and System (40). Nonzero values retain explicit placement; ties retain their current
+relative order. Contributions to an existing section keep its existing order
+unless a nonzero override is supplied. Permission filtering remains unchanged.
+The client `dark:` variant follows the shell's `.dark`/`data-theme-mode="dark"`
+selectors, so host extension utilities match manual light/dark selection.

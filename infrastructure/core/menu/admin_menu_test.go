@@ -34,16 +34,16 @@ func TestBuildAdminMenuGroupsPermittedPages(t *testing.T) {
 		integrationroles.PermissionDomainQueues: true,
 	}}
 	got := menu.BuildAdminMenu(context.Background(), admin, checker,
-		menu.ModuleMenu(map[string]bool{"access": true, "queues": true}))
+		menu.ModuleMenu(map[string]bool{testAccessKey: true, testQueuesKey: true}))
 
 	require.Len(t, got.Sections, 2)
-	require.Equal(t, "access", got.Sections[0].Key)
+	require.Equal(t, testAccessKey, got.Sections[0].Key)
 	require.Equal(t, "Доступ", got.Sections[0].Title)
 	require.Equal(t, []string{"/admins", "/roles"}, []string{
 		got.Sections[0].Items[0].Href,
 		got.Sections[0].Items[1].Href,
 	})
-	require.Equal(t, "system", got.Sections[1].Key)
+	require.Equal(t, testSystemKey, got.Sections[1].Key)
 	require.Equal(t, "/queues", got.Sections[1].Items[0].Href)
 }
 

@@ -31,6 +31,9 @@ type Badge struct {
 	HideIfZero bool   `json:"hideIfZero,omitempty"`
 }
 
+// Section groups navigation items. Order zero uses the application default (15),
+// after Home (10) and before Access (20) and System (40). Nonzero orders are
+// explicit overrides; equal orders retain their current relative order.
 type Section struct {
 	Key   string `json:"key"`
 	Title string `json:"title,omitempty"`
@@ -95,10 +98,10 @@ func (m Menu) Merge(other Menu) Menu {
 		oi := sections[i].Order
 		oj := sections[j].Order
 		if oi == 0 {
-			oi = 1000
+			oi = 15
 		}
 		if oj == 0 {
-			oj = 1000
+			oj = 15
 		}
 		return oi < oj
 	})

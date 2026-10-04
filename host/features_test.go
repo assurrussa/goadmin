@@ -146,3 +146,27 @@ func TestRegistry_PermissionDefinitionsMergeAndClone(t *testing.T) {
 		t.Fatalf("unexpected merged definition: %+v", again[1])
 	}
 }
+
+func TestRegistry_RepeatedMenuRegistrationKeepsApplicationOrder(t *testing.T) {
+	t.Parallel()
+
+	students := storedDescriptorFeature{descriptor: adminhost.FeatureDescriptor{
+		Key: "students", Menu: adminhost.Menu{Sections: []adminhost.Section{{
+			Key: "learning", Items: []adminhost.Item{{Name: "Students", Href: "/students"}},
+		}}},
+	}}
+	groups := storedDescriptorFeature{descriptor: adminhost.FeatureDescriptor{
+		Key: "groups", Menu: adminhost.Menu{Sections: []adminhost.Section{{
+			Key: "learning", Items: []adminhost.Item{{Name: "Groups", Href: "/groups"}},
+		}}},
+	}}
+	registry := adminhost.NewRegistry(students, groups, students, groups)
+	for range 3 {
+		got := registry.Menu()
+		if len(got.Sections) != 1 || len(got.Sections[0].Items) != 2 ||
+			got.Sections[0].Items[0].Href != "/students" || got.Sections[0].Items[1].Href != "/groups" ||
+			got.Sections[0].Order != 0 {
+			t.Fatalf("repeated registration changed the application menu: %+v", got)
+		}
+	}
+}
