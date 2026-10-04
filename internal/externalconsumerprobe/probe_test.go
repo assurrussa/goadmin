@@ -49,6 +49,8 @@ func TestBuildProbeTestImportsSupportedPackages(t *testing.T) {
 	require.Contains(t, got, "func TestHostAuthAdapterAndMigrationContract")
 	require.Contains(t, got, "adminhost.NewAuthAdapter")
 	require.Contains(t, got, "adminmigrations.Migrate")
+	require.Contains(t, got, "func TestCustomUploadStrategyContract")
+	require.Contains(t, got, "map[string]adminhost.UploadStrategy")
 }
 
 func TestValidateRejectsIncompleteAndAmbiguousInputs(t *testing.T) {

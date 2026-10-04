@@ -4,9 +4,9 @@
 projects integrate it through the stable `github.com/assurrussa/goadmin/host`
 facade instead of copying admin internals.
 
-Install the public release with `go get github.com/assurrussa/goadmin@v0.7.0`.
-Its dependency graph uses GoAuth and GoNotify v0.5.0, GoUploads v0.10.0 and
-GoWebSocket v0.2.0 without sibling replacements.
+Install the public release with `go get github.com/assurrussa/goadmin@v0.9.0`.
+Its dependency graph uses GoAuth v0.5.1, GoNotify v0.6.0, GoUploads v0.11.0 and
+GoWebSocket v0.2.1 without sibling replacements.
 
 ## Try the admin locally
 
@@ -205,7 +205,7 @@ tool versions, disposable PostgreSQL/Redis setup, and the proven CI baseline.
 
 This checkout pins published `goauth v0.5.1` and `gonotify v0.6.0`, including
 the shared transaction and optional-delivery API. Uploads resolve
-`gouploads v0.10.1` and WebSockets resolve `gowebsocket v0.2.1`. Outbox core and
+`gouploads v0.11.0` and WebSockets resolve `gowebsocket v0.2.1`. Outbox core and
 its PostgreSQL backend both resolve `v0.16.0`, and GoCache resolves `v0.2.2`.
 GoInertia `v0.11.0` keeps protocol v2 as the default for the embedded v2 client.
 The root module has no local replacements.
@@ -290,6 +290,38 @@ host root; new modules should publish source manifests.
 
 For a complete host integration, page lifecycle, asset and CSRF build contract,
 see [Embedding and extending the admin client](docs/embedding-client.md).
+
+## Custom upload contexts and audio
+
+`uploads.New(host.UploadsConfig{...})` accepts an optional
+`Strategies map[string]host.UploadStrategy`. Register a host-owned strategy such
+as `meditation-audio` to add a context to the existing `/files` handler:
+
+```go
+uploadConfig.Strategies = map[string]host.UploadStrategy{
+    "meditation-audio": audioStrategy,
+}
+modules = append(modules, uploads.New(uploadConfig))
+```
+
+Names must match `[a-z][a-z0-9_-]{0,63}`. Empty/invalid names, nil (including
+typed-nil) strategies, and the reserved names `avatar`, `rich-text`, `default`
+and `image-uploader` fail assembly. The module snapshots the map; strategy
+instances remain host-owned and must be safe for concurrent requests.
+
+The full client helper `uploadFiles` accepts `fileCategory: 'audio'`, a matching
+`context: 'meditation-audio'`, and the feature's entity type/ID. It uses the normal
+TUS create/chunk/complete flow and `/files/tasks/:id` status endpoint. The host
+strategy must authorize that entity in `CanUpload`, constrain `.mp3`/`.wav` and
+MIME/size policy in `GetConfig`, and use GoUploads v0.11.0 or newer configured
+with `ProcessingOriginalOnly` (`host.NewLocalUploads` already uses this mode).
+Completion/finalization, ownership, replacement
+and deletion retain the canonical upload pipeline. Audio is not transcoded.
+
+Audio remains opt-in: built-in image, video, avatar and generic policies are
+unchanged. `uploadPendingWithTus` remains a separate quarantine-only helper for
+a domain-owned finalizer; it is not part of the full admin audio path. No audio
+editor/player is added by this API.
 
 ## Public rich text and isolated upload transports
 

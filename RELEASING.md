@@ -36,11 +36,22 @@ This module is published as `github.com/assurrussa/goadmin`.
   `golang.org/x/vuln/cmd/govulncheck` separately before running the gate.
 - Keep module path unchanged: `module github.com/assurrussa/goadmin`.
 - The root dependency graph has no local replacements. GoUploads is pinned to
-  published v0.10.1 and GoWebSocket to v0.2.1. The nested starter keeps explicit
+  published v0.11.0 and GoWebSocket to v0.2.1. The nested starter keeps explicit
   source-mode overrides; its published Docker build removes them all.
   Published verification rejects every replacement and legacy shared/Redis module.
 - The frontend advisory gate and its remaining moderate findings are reviewed
   in [docs/dependency-advisory-review.md](docs/dependency-advisory-review.md).
+
+## Custom upload strategy acceptance
+
+The additive `host.UploadsConfig.Strategies` map and its
+`features/uploads.Config` alias must compile in the clean consumer probe.
+Verify reserved/invalid names and nil/typed-nil strategies fail assembly, map
+mutation cannot alter the module, and bootstrap retains all four built-in
+strategies. Client tests must prove audio metadata uses canonical TUS completion
+and task status. Built-in policies remain unchanged; full MP3/WAV acceptance
+requires the published GoUploads v0.11.0+ dependency and `original_only` mode.
+Do not use a candidate replacement as published-release evidence.
 
 ## Supported External Surface
 

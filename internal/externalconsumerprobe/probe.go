@@ -131,7 +131,7 @@ import (
 	_ "github.com/assurrussa/goadmin/features/access"
 	_ "github.com/assurrussa/goadmin/features/authmail"
 	_ "github.com/assurrussa/goadmin/features/jobs"
-	_ "github.com/assurrussa/goadmin/features/uploads"
+	adminuploads "github.com/assurrussa/goadmin/features/uploads"
 	_ "github.com/assurrussa/goadmin/features/queues"
 	_ "github.com/assurrussa/goadmin/features/notifications"
 	_ "github.com/assurrussa/goadmin/features/realtime"
@@ -168,6 +168,38 @@ func TestHostAuthAdapterAndMigrationContract(t *testing.T) {
 	}
 	_ = (*adminhost.Runtime).App
 	_ = adminmigrations.Migrate
+}
+
+type audioStrategy struct{}
+
+func (audioStrategy) CanUpload(context.Context, adminhost.UploadContext) error {
+	return errors.New("compile-only strategy refuses runtime uploads")
+}
+
+func (audioStrategy) GetConfig(context.Context, adminhost.UploadContext) *adminhost.FileUploadConfig {
+	return &adminhost.FileUploadConfig{
+		MaxFileSize: 50 * 1024 * 1024,
+		AllowedExtensions: []string{".mp3", ".wav"},
+		AllowedMimeTypes: map[string][]string{
+			".mp3": {"audio/mpeg"},
+			".wav": {"audio/wav", "audio/x-wav", "audio/vnd.wave"},
+		},
+		UploadDir: "audio",
+	}
+}
+
+func (audioStrategy) GetAfterJobs(context.Context, adminhost.UploadContext) ([]adminhost.FileEventAfterJob, error) {
+	return nil, nil
+}
+
+func TestCustomUploadStrategyContract(t *testing.T) {
+	var strategy adminhost.UploadStrategy = audioStrategy{}
+	module := adminuploads.New(adminuploads.Config{
+		Strategies: map[string]adminhost.UploadStrategy{"meditation-audio": strategy},
+	})
+	if module.Descriptor().Key != "uploads" {
+		t.Fatal("custom strategies must use the canonical uploads module")
+	}
 }
 `
 

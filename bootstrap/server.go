@@ -27,7 +27,6 @@ import (
 	adminprofileavatar "github.com/assurrussa/goadmin/http/handlers/profileavatar"
 	adminqueues "github.com/assurrussa/goadmin/http/handlers/queues"
 	adminroleshandler "github.com/assurrussa/goadmin/http/handlers/roles"
-	uploadfiles "github.com/assurrussa/goadmin/http/strategies/uploadfiles"
 	adminmiddleware "github.com/assurrussa/goadmin/infrastructure/core/middlewares"
 	middlewares "github.com/assurrussa/goadmin/infrastructure/fiber/middlewares"
 	server "github.com/assurrussa/goadmin/infrastructure/fiber/server"
@@ -93,10 +92,9 @@ func initServer(ctx context.Context, deps Dependencies, cfg Config, app *adminap
 			app.ComposeFileURL,
 		))
 
-		uploadsHandler.RegisterStrategy("avatar", uploadfiles.NewAvatarStrategy(deps.System.AdminRepo))
-		uploadsHandler.RegisterStrategy("rich-text", uploadfiles.NewRichTextStrategy())
-		uploadsHandler.RegisterStrategy("default", uploadfiles.NewGenericStrategy())
-		uploadsHandler.RegisterStrategy("image-uploader", uploadfiles.NewGenericStrategy())
+		if err := registerUploadStrategies(uploadsHandler, deps.System.AdminRepo, deps.Uploads.Strategies); err != nil {
+			return nil, err
+		}
 		if err := validateUploadTransports(opts.uploadTransports); err != nil {
 			return nil, err
 		}

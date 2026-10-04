@@ -165,8 +165,9 @@ type AppRepositories struct {
 
 // UploadDependencies - зависимости для загрузки файлов.
 type UploadDependencies struct {
-	Service  uploadhost.TaskUploader
-	TusStore uploadhost.TusStore
+	Service    uploadhost.TaskUploader
+	TusStore   uploadhost.TusStore
+	Strategies map[string]uploadhost.UploadStrategy
 }
 
 // OutboxDependencies - зависимости для job.

@@ -15,8 +15,8 @@ github.com/assurrussa/gologger v0.1.0 h1:jo5VXaznPUReNXEruMrNOEfIbRLUctjfeRdEloc
 github.com/assurrussa/gologger v0.1.0/go.mod h1:/F/8c0qo2pd755T/YJ7A1hkCmbp/abM2747bsMta6ec=
 github.com/assurrussa/gonotify v0.6.0 h1:adYgboqXr1GaR4u7DBuMz5tTJ4sAZcYnoheDdNWWnys=
 github.com/assurrussa/gonotify v0.6.0/go.mod h1:xEXCcixk0q5r4P3HKlqcGFLmFSu36mGNnXqgPIFzA1I=
-github.com/assurrussa/gouploads v0.10.1 h1:M9FVdPBoqRcRnQ1PEYUCWIwPE9wWP6SOC7tiJBZV3OM=
-github.com/assurrussa/gouploads v0.10.1/go.mod h1:ArrV+Qd+qOz4F5gDQ02VDpGTbl9nNzp5rTkdxIqXxRI=
+github.com/assurrussa/gouploads v0.11.0 h1:zRpOZkgZUhf8PKXCBKQr+GFRlaRhdkZELSc5bydabCk=
+github.com/assurrussa/gouploads v0.11.0/go.mod h1:ArrV+Qd+qOz4F5gDQ02VDpGTbl9nNzp5rTkdxIqXxRI=
 github.com/assurrussa/gowebsocket v0.2.1 h1:+y484c9DrFaKeJLlEDiF1EgUsHvo2jrSN7pcb83akt4=
 github.com/assurrussa/gowebsocket v0.2.1/go.mod h1:lGwTH0KTY59BI3u3pq0wQXrR8RhDVxhuEISjzTtzPRY=
 github.com/assurrussa/outbox v0.16.0 h1:nlos+Ki6slrYMTMulAak7oCr6+xAM2LoU0VvPwGs39g=
