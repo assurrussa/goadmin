@@ -251,6 +251,42 @@ afterEach(() => {
 })
 
 describe('DataGridTable actual primitives, native semantics and lifecycle', () => {
+  it.each([
+    ['2026-01-15T12:30:00Z', true],
+    [{ Time: '2026-01-15T12:30:00Z', Valid: true }, true],
+    [{ Time: '0001-01-01T00:00:00Z', Valid: false }, false],
+    [{ Time: '2026-01-15T12:30:00Z', Valid: false }, false],
+    [{ Time: 'malformed', Valid: true }, false],
+    [{ Time: null, Valid: true }, false],
+    [{ Time: '', Valid: true }, false],
+    [null, false],
+    [undefined, false],
+    ['', false],
+    ['malformed', false],
+    [true, false],
+    [{ unexpected: 'shape' }, false],
+  ])('renders nullable and malformed date values safely: %j', (value, valid) => {
+    const { element } = mountTable({
+      config: {
+        columns: [
+          { key: 'date', label: 'Date', title: 'Date', type: 'date', format: '2006-01-02 15:04' },
+        ],
+      },
+      items: [{ item: { id: 1, date: value }, actions: [] }],
+    })
+    const expected = valid
+      ? new Date('2026-01-15T12:30:00Z').toLocaleDateString('ru-RU', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : ''
+    expect(element.querySelector('tbody td')?.textContent?.trim()).toBe(expected)
+    expect(element.textContent).not.toContain('Invalid Date')
+  })
+
   it('emits one row/select-all callback with custom IDs including zero and reflects controlled updates', async () => {
     const onToggleSelectAll = vi.fn()
     const onToggleSelectItem = vi.fn()

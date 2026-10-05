@@ -1,8 +1,10 @@
 package datagrid
 
 import (
+	"database/sql/driver"
 	"fmt"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -126,8 +128,16 @@ func SQLWherex[T SQLBuilder[T]](sqlBuilder T, filters Filtered, adoptedFields ma
 			sqlBuilder = sqlBuilder.Where(fmt.Sprintf("%s %s ?", mapping.Column, mapping.Operator), likeValue)
 
 		case OpIn, OpNotIn:
-			// Для IN операторов ожидаем slice
-			sqlBuilder = sqlBuilder.Where(fmt.Sprintf("%s %s (?)", mapping.Column, mapping.Operator), value)
+			// Squirrel expands slice elements and handles empty lists. Preserve
+			// scalar NULL's SQL membership semantics (not IS NULL / IS NOT NULL).
+			switch {
+			case !isMembershipList(value):
+				sqlBuilder = sqlBuilder.Where(fmt.Sprintf("%s %s (?)", mapping.Column, mapping.Operator), value)
+			case mapping.Operator == OpIn:
+				sqlBuilder = sqlBuilder.Where(squirrel.Eq{mapping.Column: value})
+			default:
+				sqlBuilder = sqlBuilder.Where(squirrel.NotEq{mapping.Column: value})
+			}
 
 		// JSONB операторы
 		case OpJSONBContains, OpJSONBContainedBy:
@@ -167,6 +177,24 @@ func SQLWherex[T SQLBuilder[T]](sqlBuilder T, filters Filtered, adoptedFields ma
 	}
 
 	return sqlBuilder
+}
+
+// isMembershipList follows Squirrel's list boundary without resolving scalar
+// driver.Valuer values. Resolving a nullable scalar before choosing the operator
+// would turn IN (NULL) into IS NULL and change SQL three-valued logic.
+func isMembershipList(value any) bool {
+	if _, ok := value.(driver.Valuer); ok {
+		return false
+	}
+	reflected := reflect.ValueOf(value)
+	if reflected.Kind() == reflect.Pointer && !reflected.IsNil() {
+		value = reflected.Elem().Interface()
+		reflected = reflect.ValueOf(value)
+	}
+	if driver.IsValue(value) {
+		return false
+	}
+	return reflected.Kind() == reflect.Array || reflected.Kind() == reflect.Slice
 }
 
 // SQLSortx помогает дополнить сортировку для SQL по фильтрам.
