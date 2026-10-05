@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import axios from 'axios'
-import { uploadFiles, uploadPendingWithTus } from '../fileUploadService'
+import { uploadFiles, uploadPendingWithTus, reconcileUploadCompletion } from '../fileUploadService'
 vi.mock('axios', () => ({
   default: { post: vi.fn(), head: vi.fn(), patch: vi.fn(), isAxiosError: vi.fn(() => false) },
 }))
@@ -50,7 +50,9 @@ describe('bounded upload requests', () => {
             ? vi.mocked(axios.patch).mock.calls.at(-1)![2]
             : vi.mocked(axios.post).mock.calls.at(-1)![2]
       await vi.advanceTimersByTimeAsync(1001)
-      expect((await pending).error).toContain('timed out')
+      expect((await pending).error).toContain(
+        stage === 'complete' ? 'completion is unconfirmed' : 'timed out',
+      )
       expect(config!.signal!.aborted).toBe(true)
       expect(axios.post).toHaveBeenCalledTimes(stage === 'complete' ? 2 : 1)
       expect(vi.getTimerCount()).toBe(0)
@@ -113,11 +115,100 @@ describe('bounded upload requests', () => {
     await tick()
     expect(axios.post).toHaveBeenCalledTimes(2)
     controller.abort()
-    expect(await pending).toMatchObject({ tasks: [], error: 'Upload cancelled' })
+    expect(await pending).toMatchObject({
+      status: 'completion_unknown',
+      tasks: [],
+      uncertainCompletion: {
+        location: '/files/tus/session',
+        filename: 'track.mp3',
+        entityType: 'meditation',
+        entityId: '1',
+      },
+    })
     resolve({ data: { tasks: [{ id: 9, status: 'completed' }] } })
     await tick()
     expect(axios.post).toHaveBeenCalledTimes(2)
     expect(vi.getTimerCount()).toBe(0)
+  })
+  it('reconciles a lost response after server commit using only the original completion session', async () => {
+    const committed = { tasks: [{ id: 9, status: 'queued' }] }
+    vi.mocked(axios.post)
+      .mockReset()
+      .mockResolvedValueOnce({ headers: { location: '/files/tus/session' } })
+      .mockImplementationOnce(() => new Promise(() => {})) // Server committed; response lost.
+      .mockResolvedValue({ data: committed })
+    const onCompletionSession = vi.fn()
+    const pending = uploadFiles({ ...request(), onCompletionSession })
+    await tick()
+    expect(onCompletionSession).toHaveBeenCalledWith(
+      expect.objectContaining({ location: '/files/tus/session', entityId: '1' }),
+    )
+    await vi.advanceTimersByTimeAsync(1001)
+    const uncertain = await pending
+    expect(uncertain.status).toBe('completion_unknown')
+    expect(uncertain.error).not.toContain('try again')
+    const recovered = await reconcileUploadCompletion(uncertain.uncertainCompletion!)
+    expect(recovered.tasks).toMatchObject([{ id: 9, status: 'queued' }])
+    expect(recovered.uncertainCompletion).toBeUndefined()
+    expect(vi.mocked(axios.post).mock.calls.map((call) => call[0])).toEqual([
+      '/files/tus',
+      '/files/tus/session/complete',
+      '/files/tus/session/complete',
+    ])
+    expect(axios.head).toHaveBeenCalledTimes(1)
+    expect(axios.patch).toHaveBeenCalledTimes(1)
+  })
+  it('retains the session when explicit completion reconciliation times out again', async () => {
+    vi.mocked(axios.post)
+      .mockReset()
+      .mockImplementation(() => new Promise(() => {}))
+    const completion = {
+      location: '/files/tus/original',
+      filename: 'track.mp3',
+      entityType: 'meditation',
+      entityId: 1,
+    }
+    const pending = reconcileUploadCompletion(completion, { requestTimeoutMs: 1000 })
+    await tick()
+    await vi.advanceTimersByTimeAsync(1001)
+    expect(await pending).toMatchObject({
+      status: 'completion_unknown',
+      uncertainCompletion: completion,
+      tasks: [],
+    })
+    expect(axios.post).toHaveBeenCalledTimes(1)
+    expect(axios.head).not.toHaveBeenCalled()
+    expect(axios.patch).not.toHaveBeenCalled()
+  })
+  it.each([
+    {},
+    { tasks: [] },
+    { tasks: [{ id: 0, status: 'queued' }] },
+    { tasks: [{ id: -1, status: 'queued' }] },
+  ])('retains completion uncertainty for malformed successful acknowledgment %j', async (data) => {
+    vi.mocked(axios.post)
+      .mockReset()
+      .mockResolvedValueOnce({ headers: { location: '/files/tus/session' } })
+      .mockResolvedValue({ data })
+    const initial = await uploadFiles(request())
+    expect(initial.status).toBe('completion_unknown')
+    const recovered = await reconcileUploadCompletion(initial.uncertainCompletion!)
+    expect(recovered).toMatchObject({
+      status: 'completion_unknown',
+      uncertainCompletion: initial.uncertainCompletion,
+      tasks: [],
+    })
+    expect(axios.patch).toHaveBeenCalledTimes(1)
+  })
+  it('distinguishes a definite completion rejection from an unknown response', async () => {
+    vi.mocked(axios.post)
+      .mockReset()
+      .mockResolvedValueOnce({ headers: { location: '/files/tus/session' } })
+      .mockRejectedValue({ response: { status: 400, data: { error: 'Invalid media' } } })
+    vi.mocked(axios.isAxiosError).mockReturnValue(true)
+    const result = await uploadFiles(request())
+    expect(result.error).toBe('Invalid media')
+    expect(result.uncertainCompletion).toBeUndefined()
   })
   it('does not start a pre-cancelled upload', async () => {
     const controller = new AbortController()

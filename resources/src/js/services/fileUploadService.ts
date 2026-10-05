@@ -141,10 +141,23 @@ export interface UploadTaskData {
   file?: UploadedFileSummary
 }
 
+export interface UncertainUploadCompletion {
+  location: string
+  filename: string
+  mimeType?: string
+  size?: number
+  context?: string
+  fileCategory?: string
+  entityType: string
+  entityId: EntityID
+  replaceFileId?: number
+}
+
 export interface UploadResponse {
   status: string
   tasks: UploadTaskData[]
   error?: string
+  uncertainCompletion?: UncertainUploadCompletion
 }
 
 export interface UploadTaskStatusResponse {
@@ -172,6 +185,8 @@ export interface UploadTransportOptions {
 }
 
 export interface UploadRequest extends UploadTransportOptions {
+  /** Called before completion dispatch, so cancellation can retain the session. */
+  onCompletionSession?: (completion: UncertainUploadCompletion) => void
   entityType: string
   entityId: EntityID | null | undefined
   file?: File
@@ -641,27 +656,77 @@ const patchTusChunk = async (
   }
 }
 
+const UNCERTAIN_COMPLETION_MESSAGE =
+  'Upload completion is unconfirmed. Check this upload before starting another.'
+
+class UncertainCompletionError extends Error {
+  constructor(readonly completion: UncertainUploadCompletion) {
+    super(UNCERTAIN_COMPLETION_MESSAGE)
+  }
+}
+
 const finalizeTusUpload = async (
-  uploadUrl: string,
+  completion: UncertainUploadCompletion,
   options: UploadTransportOptions = {},
+  onDispatch?: (completion: UncertainUploadCompletion) => void,
 ): Promise<RawUploadResponse> => {
-  const endpoint = uploadUrl.replace(/\/$/, '')
+  const endpoint = completion.location.replace(/\/$/, '')
+  let dispatched = false
   try {
-    const response = await tusRequest(options, (config) =>
-      axios.post<RawUploadResponse>(
+    const response = await tusRequest(options, (config) => {
+      onDispatch?.(completion)
+      dispatched = true
+      return axios.post<RawUploadResponse>(
         `${endpoint}/complete`,
         {},
         {
           ...config,
-          headers: {
-            'Tus-Resumable': TUS_VERSION,
-          },
+          headers: { 'Tus-Resumable': TUS_VERSION },
         },
-      ),
-    )
+      )
+    })
+    if (!response.data.error) {
+      const tasks = normalizeTasks(normalizeUploadResponsePayload(response.data).tasks)
+      if (tasks.length !== 1 || !Number.isSafeInteger(tasks[0].id) || tasks[0].id <= 0) {
+        throw new UncertainCompletionError(completion)
+      }
+    }
     return response.data
   } catch (error) {
+    // A response can be lost after durable finalization. Keep the same session
+    // for explicit reconciliation; creating a fresh upload can duplicate work.
+    if (
+      dispatched &&
+      (!axios.isAxiosError(error) ||
+        !error.response ||
+        error.response.status >= 500 ||
+        [408, 409].includes(error.response.status))
+    ) {
+      throw new UncertainCompletionError(completion)
+    }
     throw new Error(readTusError(error))
+  }
+}
+
+/** Explicitly reconcile an uncertain completion; never creates a new session. */
+export async function reconcileUploadCompletion(
+  completion: UncertainUploadCompletion,
+  options: UploadTransportOptions = {},
+): Promise<UploadResponse> {
+  try {
+    const normalized = normalizeUploadResponsePayload(await finalizeTusUpload(completion, options))
+    return {
+      status: normalized.status,
+      tasks: normalizeTasks(normalized.tasks),
+      error: normalized.error,
+    }
+  } catch {
+    return {
+      status: 'completion_unknown',
+      tasks: [],
+      error: UNCERTAIN_COMPLETION_MESSAGE,
+      uncertainCompletion: completion,
+    }
   }
 }
 
@@ -724,7 +789,21 @@ const uploadFileWithTus = async (
     }
   }
 
-  return finalizeTusUpload(uploadUrl, request)
+  return finalizeTusUpload(
+    {
+      location: uploadUrl,
+      filename: file.name,
+      mimeType: file.type,
+      size: file.size,
+      context: request.context,
+      fileCategory: request.fileCategory,
+      entityType: request.entityType,
+      entityId: ensureEntity(request.entityId),
+      replaceFileId: request.replaceFileId,
+    },
+    request,
+    request.onCompletionSession,
+  )
 }
 
 export interface PendingTusUploadRequest extends UploadTransportOptions {
@@ -810,6 +889,7 @@ export async function uploadFiles(request: UploadRequest): Promise<UploadRespons
     onProgress,
     signal,
     requestTimeoutMs,
+    onCompletionSession,
   } = request
 
   const queue = files?.length ? files : file ? [file] : []
@@ -821,6 +901,7 @@ export async function uploadFiles(request: UploadRequest): Promise<UploadRespons
   const aggregatedTasks: UploadTaskData[] = []
   let status = 'queued'
   let error: string | undefined
+  let uncertainCompletion: UncertainUploadCompletion | undefined
 
   for (const item of queue) {
     try {
@@ -836,6 +917,7 @@ export async function uploadFiles(request: UploadRequest): Promise<UploadRespons
           onProgress,
           signal,
           requestTimeoutMs,
+          onCompletionSession,
         },
         item,
       )
@@ -849,6 +931,7 @@ export async function uploadFiles(request: UploadRequest): Promise<UploadRespons
       const err = e instanceof Error ? e : new Error(String(e))
       console.error('File upload failed (expected):', err)
       error = err.message || 'Upload failed'
+      if (e instanceof UncertainCompletionError) uncertainCompletion = e.completion
       break // Stop on first error for now to avoid multiple error states
     }
   }
@@ -858,9 +941,10 @@ export async function uploadFiles(request: UploadRequest): Promise<UploadRespons
   }
 
   return {
-    status,
+    status: uncertainCompletion ? 'completion_unknown' : status,
     tasks: aggregatedTasks,
     error,
+    ...(uncertainCompletion ? { uncertainCompletion } : {}),
   }
 }
 

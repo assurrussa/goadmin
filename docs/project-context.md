@@ -431,7 +431,15 @@ inactivity for each create, HEAD, PATCH, or completion request; network upload
 and download progress reset that timer. This is not a total-file deadline.
 Timeout or cancellation aborts the underlying transport and fences late results.
 Creation and completion are never automatically retried after uncertain results.
-Cancellation cannot undo a completion already accepted by the server.
+Cancellation cannot undo a completion already accepted by the server. Once a
+completion request is dispatched, an ambiguous timeout/cancellation returns
+`status: completion_unknown` and `uncertainCompletion` with the original session
+and entity/file metadata. `onCompletionSession` lets a host retain that session
+before dispatch even when UI cancellation fences the eventual result. Hosts
+must block new upload sessions while this state is unresolved. The explicit
+`reconcileUploadCompletion` helper replays only the same idempotent completion
+endpoint; another uncertain result retains the session. It never creates an
+upload or resends file bytes.
 
 Acknowledged chunk progress uses validated `Upload-Offset` values. PATCH must
 return 204 and advance by the exact chunk length. Missing, invalid, out-of-range
