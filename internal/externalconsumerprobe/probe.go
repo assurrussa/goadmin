@@ -144,6 +144,14 @@ import (
 	_ "github.com/assurrussa/goadmin/toolkit/formvalidator"
 )
 
+func TestMenuAnyPermissionKeysContract(t *testing.T) {
+	key := adminhost.NewPermissionKey("users", adminhost.PermissionActionUpdate)
+	item := adminhost.Item{Href: "/students", AnyPermissionKeys: []adminhost.PermissionKey{key}}
+	if !item.PermissionKey.IsZero() || item.AnyPermissionKeys[0] != key {
+		t.Fatal("any-of menu visibility must be additive to the legacy key")
+	}
+}
+
 func TestHostAuthAdapterAndMigrationContract(t *testing.T) {
 	_, err := adminhost.NewAuthAdapter(adminhost.AuthAdapterConfig{
 		Runtime: goauth.Config{}, NotificationSender: goauth.NotificationSenderFunc(nil),

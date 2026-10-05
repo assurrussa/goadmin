@@ -181,6 +181,7 @@ func cloneItems(src []Item) []Item {
 	items := make([]Item, len(src))
 	for i := range src {
 		items[i] = src[i]
+		items[i].AnyPermissionKeys = slices.Clone(src[i].AnyPermissionKeys)
 		items[i].Children = cloneItems(src[i].Children)
 		if src[i].Badge != nil {
 			badge := *src[i].Badge

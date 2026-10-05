@@ -318,3 +318,13 @@ GoUploads dependency, including future additions, and serialize its full pack.
 The default `migrations.Migrate` remains unchanged and manages uploads itself.
 Do not switch an existing canonical upload ledger to host management without a
 separate reviewed ownership transition. This API itself moves no data or history.
+
+### Any-of menu visibility acceptance
+
+The additive `host.Item.AnyPermissionKeys` field must compile in the anonymous
+consumer probe. Verify empty/one/multiple keys, each allowed action, denied and
+zero/partial keys, AND composition with `PermissionKey`, nested and hidden items,
+merge/registry isolation, shared breadcrumbs, and menu-based login landing.
+Permission fields must stay absent from JSON. This changes navigation only;
+endpoint authorization, role grants, existing superadmin/nil-checker behavior,
+and explicit deep-link redirects remain unchanged.

@@ -483,3 +483,16 @@ GoUploads dependency, including future additions, and serialize its full pack.
 The default `migrations.Migrate` remains unchanged and manages uploads itself.
 Do not switch an existing canonical upload ledger to host management without a
 separate reviewed ownership transition. This API itself moves no data or history.
+
+## Host menu visibility
+
+`host.Item.AnyPermissionKeys` is an additive, navigation-only OR policy shared by
+sidebar filtering, menu-derived breadcrumbs, and menu-based login landing.
+Nonempty lists require one nonzero key; nil/empty lists preserve legacy behavior.
+When `PermissionKey` is also set, it remains mandatory (AND with the OR list).
+Matching top-level items retain each field's first nonempty policy, without
+unioning OR lists. Matching nested children keep the first entire item, preserving
+legacy child deduplication; declare their complete policy in the first contribution. Registry descriptor/menu snapshots and nonempty menu merges copy the new
+permission slices through nested items. No grants or endpoint guards are changed.
+Explicit breadcrumb overrides remove disallowed links even when no menu routes
+are allowed; plain-text crumbs remain. See the host example in `README.md`.

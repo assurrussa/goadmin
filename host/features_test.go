@@ -9,6 +9,8 @@ import (
 const (
 	mutatedLabel = "Mutated"
 	changedLabel = "Changed"
+	studentsKey  = "students"
+	studentsPath = "/students"
 )
 
 type storedDescriptorFeature struct {
@@ -151,8 +153,8 @@ func TestRegistry_RepeatedMenuRegistrationKeepsApplicationOrder(t *testing.T) {
 	t.Parallel()
 
 	students := storedDescriptorFeature{descriptor: adminhost.FeatureDescriptor{
-		Key: "students", Menu: adminhost.Menu{Sections: []adminhost.Section{{
-			Key: "learning", Items: []adminhost.Item{{Name: "Students", Href: "/students"}},
+		Key: studentsKey, Menu: adminhost.Menu{Sections: []adminhost.Section{{
+			Key: "learning", Items: []adminhost.Item{{Name: "Students", Href: studentsPath}},
 		}}},
 	}}
 	groups := storedDescriptorFeature{descriptor: adminhost.FeatureDescriptor{
@@ -164,9 +166,31 @@ func TestRegistry_RepeatedMenuRegistrationKeepsApplicationOrder(t *testing.T) {
 	for range 3 {
 		got := registry.Menu()
 		if len(got.Sections) != 1 || len(got.Sections[0].Items) != 2 ||
-			got.Sections[0].Items[0].Href != "/students" || got.Sections[0].Items[1].Href != "/groups" ||
+			got.Sections[0].Items[0].Href != studentsPath || got.Sections[0].Items[1].Href != "/groups" ||
 			got.Sections[0].Order != 0 {
 			t.Fatalf("repeated registration changed the application menu: %+v", got)
+		}
+	}
+}
+
+func TestRegistryClonesAnyPermissionKeysAtEveryDepth(t *testing.T) {
+	t.Parallel()
+	key := adminhost.NewPermissionKey("users", "update")
+	source := adminhost.Menu{Sections: []adminhost.Section{{Key: studentsKey, Items: []adminhost.Item{{
+		Href: studentsPath, AnyPermissionKeys: []adminhost.PermissionKey{key},
+		Children: []adminhost.Item{{Href: "/students/nested", AnyPermissionKeys: []adminhost.PermissionKey{key}}},
+	}}}}}
+	registry := adminhost.NewRegistry(storedDescriptorFeature{descriptor: adminhost.FeatureDescriptor{
+		Key: studentsKey, Menu: source,
+	}})
+	for _, get := range []func() adminhost.Menu{registry.Menu, func() adminhost.Menu { return registry.Descriptors()[0].Menu }} {
+		got := get()
+		got.Sections[0].Items[0].AnyPermissionKeys[0] = adminhost.PermissionKey{}
+		got.Sections[0].Items[0].Children[0].AnyPermissionKeys[0] = adminhost.PermissionKey{}
+		again := get()
+		item := again.Sections[0].Items[0]
+		if item.AnyPermissionKeys[0] != key || item.Children[0].AnyPermissionKeys[0] != key {
+			t.Fatal("menu any-of policy aliases the stored feature descriptor")
 		}
 	}
 }
