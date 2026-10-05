@@ -21,6 +21,7 @@
         :max-characters="maxCharacters"
         :entity-type="entityType"
         :entity-id="entityId"
+        :upload-recovery-key="uploadRecoveryKey || name"
         :allow-file-upload="allowFileUpload"
         :max-file-size="maxFileSize"
         :max-video-file-size="maxVideoFileSize"
@@ -90,6 +91,9 @@ export interface RichTextFormFieldProps {
   required?: boolean
   labelClass?: string
 
+  /** Stable form field name used to restore only this editor's upload. */
+  name?: string
+  uploadRecoveryKey?: string
   entityType?: string
   entityId?: string | number | null
 

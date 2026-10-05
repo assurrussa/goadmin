@@ -221,7 +221,7 @@ func TestPublicIdentityEarlyDisconnect(t *testing.T) {
 	t.Cleanup(client.CloseIdleConnections)
 	expected, err := public.Files.ReadFile(publicEntryFile)
 	require.NoError(t, err)
-	require.Len(t, expected, 361841, "preserve the current embedded regression asset")
+	require.Greater(t, len(expected), 256*1024, "exercise early disconnect while streaming the real embedded client")
 	for _, encoding := range []string{"", publicGzip, "br", "deflate", "zstd"} {
 		t.Run(encoding, func(t *testing.T) {
 			for range 20 {

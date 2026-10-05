@@ -12,6 +12,7 @@
       :model-value="modelValue"
       :object-type="objectType"
       :object-id="objectId"
+      :upload-recovery-key="uploadRecoveryKey || name"
       :disabled="disabled || !uploads"
       :readonly="readonly"
       :show-progress="showProgress"
@@ -75,6 +76,8 @@ import ImageUploader, {
 } from './ImageUploader.vue'
 
 export interface FormImageUploaderProps {
+  name?: string
+  uploadRecoveryKey?: string
   modelValue?: UploadedFile | null
   label?: string
   labelAlt?: string

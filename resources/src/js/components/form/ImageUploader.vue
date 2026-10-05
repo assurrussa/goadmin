@@ -115,11 +115,11 @@
       <p>{{ error }}</p>
     </div>
   </div>
-  <p v-if="uncertainUpload" class="mt-2 text-xs text-error" role="status">
+  <p v-if="uncertainUpload && !recoveredImage" class="mt-2 text-xs text-error" role="status">
     Upload completion is unconfirmed. Check this upload before starting another.
   </p>
   <button
-    v-if="uncertainUpload"
+    v-if="uncertainUpload && !recoveredImage"
     type="button"
     class="mt-7 text-sm underline"
     :disabled="!canCheckUpload"
@@ -127,6 +127,15 @@
   >
     Check upload
   </button>
+  <div v-if="recoveredImage" role="status">
+    Upload confirmed. The original field is unknown.
+    <button type="button" :disabled="!canAssignRecovered" @click="assignRecovered">
+      Use image in this field
+    </button>
+    <button type="button" :disabled="!canAssignRecovered" @click="dismissRecovered">
+      Dismiss confirmed upload
+    </button>
+  </div>
   <div
     v-if="shouldShowCropToggle"
     class="mt-2 flex items-center justify-between rounded-lg border border-border-secondary bg-card px-3 py-2 text-xs text-text-secondary"
@@ -157,10 +166,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, useId, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue'
 import axios from 'axios'
 import { useNotifications } from '@/composables/useNotifications'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
+import { useUploadCompletion } from '@/composables/useUploadCompletion'
 import { pollUploadTask } from '@/services/pollUploadTask'
 import { useUploadQueueStore } from '@/stores/uploadQueue'
 import {
@@ -173,7 +183,6 @@ import {
   uploadFiles,
   reconcileUploadCompletion,
   type UncertainUploadCompletion,
-  type UploadedFileSummary,
 } from '@/services/fileUploadService'
 import AppButton from '@/components/ui/AppButton.vue'
 import { ImageCropper } from '../imageCropper'
@@ -211,6 +220,8 @@ interface ImageUploaderProps {
   maxFileSize?: number // in MB
   acceptedFileTypes?: string[]
   uploadUrl?: string
+  /** Stable field identity within this entity for automatic remount recovery. */
+  uploadRecoveryKey?: string
   deleteUrl?: string
   context?: string
   enableCropper?: boolean
@@ -311,10 +322,34 @@ watch(
   },
 )
 
-const uncertainUpload = ref<{ file: File; completion: UncertainUploadCompletion } | null>(null)
+const {
+  pending: uncertainUpload,
+  retain: retainCompletion,
+  release: releaseCompletion,
+  isCurrentScope,
+} = useUploadCompletion(
+  () => props.objectType,
+  () => props.objectId,
+  () => props.context,
+  () => props.uploadUrl,
+  () => props.uploadRecoveryKey,
+)
+const ownedCompletionLocation = ref<string | null>(null)
+const recoveredImage = ref<{
+  file: UploadedFile
+  completion?: UncertainUploadCompletion
+  entityType: string
+  entityId: string
+} | null>(null)
+let requireAssignmentConfirmation = false
+let assignmentCompletion: UncertainUploadCompletion | undefined
+let uploadController: AbortController | null = null
+let unmounted = false
+let taskEntity: { type: string; id: string } | null = null
 const canCheckUpload = computed(
   () =>
     uploads.value &&
+    isCurrentScope.value &&
     !props.disabled &&
     !props.readonly &&
     !isLoading.value &&
@@ -342,6 +377,36 @@ const progressPercent = computed(() => {
   }
   return Math.min(100, Math.max(0, Math.round(uploadProgress.value)))
 })
+const canAssignRecovered = computed(() => {
+  const result = recoveredImage.value
+  return (
+    !!result &&
+    isCurrentScope.value &&
+    uploads.value &&
+    !isLoading.value &&
+    !props.disabled &&
+    !props.readonly &&
+    result.entityType === props.objectType &&
+    result.entityId === String(props.objectId)
+  )
+})
+const assignRecovered = () => {
+  const result = recoveredImage.value
+  if (!result || !canAssignRecovered.value) return
+  currentFile.value = result.file
+  previewUrl.value = result.file.url
+  latestTempPreview.value = null
+  emit('update:modelValue', result.file)
+  emit('success', result.file)
+  if (result.completion) releaseCompletion(result.completion)
+  recoveredImage.value = null
+}
+const dismissRecovered = () => {
+  const result = recoveredImage.value
+  if (!result || !canAssignRecovered.value) return
+  if (result.completion) releaseCompletion(result.completion)
+  recoveredImage.value = null
+}
 const canDelete = computed(() => {
   if (!canInteract.value) {
     return false
@@ -363,15 +428,6 @@ const mapEventFile = (file: FileUploadEventFile): UploadedFile => ({
   fileType: file.mimeType?.startsWith('image/') ? 'image' : undefined,
 })
 
-const mapSummaryFile = (file: UploadedFileSummary): UploadedFile => ({
-  id: file.id,
-  url: file.url,
-  filename: file.filename,
-  originalName: file.originalName,
-  fileName: file.filename,
-  fileType: file.fileType,
-})
-
 const detachListener = () => {
   pollController?.abort()
   pollController = null
@@ -381,18 +437,35 @@ const detachListener = () => {
   }
 }
 
-const handleFileStatusEvent = (event: FileUploadStatusEvent) => {
+const handleFileStatusEvent = (event: FileUploadStatusEvent, confirmedTerminal = true) => {
+  if (
+    unmounted ||
+    !isCurrentScope.value ||
+    taskEntity?.type !== props.objectType ||
+    taskEntity?.id !== String(props.objectId)
+  )
+    return
   if (event.eventType !== FILE_UPLOAD_STATUS_EVENT || event.taskId !== currentTaskId.value) {
     return
   }
 
   if (event.status === 'completed' && event.file?.url) {
     const uploaded = mapEventFile(event.file)
-    currentFile.value = uploaded
-    previewUrl.value = uploaded.url
-    latestTempPreview.value = null
-    emit('update:modelValue', uploaded)
-    emit('success', event)
+    if (requireAssignmentConfirmation) {
+      recoveredImage.value = {
+        file: uploaded,
+        completion: assignmentCompletion,
+        entityType: props.objectType,
+        entityId: String(props.objectId),
+      }
+    } else {
+      currentFile.value = uploaded
+      previewUrl.value = uploaded.url
+      latestTempPreview.value = null
+      emit('update:modelValue', uploaded)
+      emit('success', event)
+      if (assignmentCompletion) releaseCompletion(assignmentCompletion)
+    }
     currentTaskId.value = null
     detachListener()
     if (currentUploadId.value) {
@@ -405,6 +478,7 @@ const handleFileStatusEvent = (event: FileUploadStatusEvent) => {
       showSuccessIndicator.value = false
     }, 3000)
   } else if (event.status === 'failed') {
+    if (confirmedTerminal && assignmentCompletion) releaseCompletion(assignmentCompletion)
     error.value = event.error || 'File processing failed after upload.'
     emit('error', error.value)
     currentTaskId.value = null
@@ -514,8 +588,19 @@ const setPreviewFromFile = (file: File) => {
   reader.readAsDataURL(file)
 }
 
-const uploadFile = async (file: File, reconcile = false) => {
+const uploadFile = async (file: File | undefined, reconcile = false) => {
   if (reconcile ? !canCheckUpload.value || !uncertainUpload.value : !canInteract.value) return
+  const originalEntityType = props.objectType
+  const originalEntityId = props.objectId
+  let completion = reconcile ? uncertainUpload.value?.completion : undefined
+  requireAssignmentConfirmation = !!(
+    reconcile &&
+    !props.uploadRecoveryKey &&
+    ownedCompletionLocation.value !== completion?.location
+  )
+  if (!reconcile) recoveredImage.value = null
+  const controller = new AbortController()
+  uploadController = controller
   detachListener()
   if (!props.objectId) {
     error.value = 'Cannot upload file without a valid objectId.'
@@ -536,9 +621,19 @@ const uploadFile = async (file: File, reconcile = false) => {
   try {
     const response =
       reconcile && uncertainUpload.value
-        ? await reconcileUploadCompletion(uncertainUpload.value.completion)
+        ? await reconcileUploadCompletion(uncertainUpload.value.completion, {
+            signal: controller.signal,
+          })
         : await uploadFiles({
             file,
+            signal: controller.signal,
+            onCompletionSession: (session: UncertainUploadCompletion) => {
+              if (!retainCompletion(session, file)) {
+                throw new Error('Check the unconfirmed upload before starting another.')
+              }
+              ownedCompletionLocation.value = session.location
+              completion = session
+            },
             entityType: props.objectType,
             entityId: props.objectId,
             replaceFileId: currentFile.value?.id,
@@ -563,23 +658,35 @@ const uploadFile = async (file: File, reconcile = false) => {
       if (currentUploadId.value) {
         uploadQueue.update(currentUploadId.value, 100)
       }
+      // A host progress callback can rebind or unmount this field. Let Vue
+      // apply that change before deciding whether the result may be assigned.
+      await nextTick()
     }
 
     if (response.uncertainCompletion) {
-      uncertainUpload.value = { file, completion: response.uncertainCompletion }
+      completion = response.uncertainCompletion
+      if (!reconcile) ownedCompletionLocation.value = completion.location
+      retainCompletion(completion, file)
     }
+    if (!response.uncertainCompletion && response.error && completion) releaseCompletion(completion)
+    if (
+      unmounted ||
+      !isCurrentScope.value ||
+      originalEntityType !== props.objectType ||
+      String(originalEntityId) !== String(props.objectId)
+    )
+      return
     const terminalTask = response.tasks[0]
     if (
-      reconcile &&
       terminalTask?.id &&
       ['failed', 'error'].includes((terminalTask.status || response.status).toLowerCase()) &&
       uncertainUpload.value?.completion.entityType === props.objectType &&
       String(uncertainUpload.value?.completion.entityId) === String(props.objectId)
     ) {
-      uncertainUpload.value = null
+      if (completion) releaseCompletion(completion)
       throw new Error(terminalTask.error || response.error || 'Upload processing failed')
     }
-    if (response.status !== 'queued' && !(reconcile && response.status === 'completed')) {
+    if (!['queued', 'processing', 'completed'].includes(response.status)) {
       throw new Error(response.error || 'Failed to enqueue upload task')
     }
 
@@ -595,24 +702,17 @@ const uploadFile = async (file: File, reconcile = false) => {
         String(uncertainUpload.value.completion.entityId) !== String(props.objectId))
     )
       throw new Error('Return to the original entity to check this upload.')
-    uncertainUpload.value = null
+    assignmentCompletion = completion
 
-    if (task.tempUrl) {
+    if (task.tempUrl && !requireAssignmentConfirmation) {
       previewUrl.value = task.tempUrl
       latestTempPreview.value = task.tempUrl
     }
 
-    if (task.file) {
-      const uploaded = mapSummaryFile(task.file)
-      currentFile.value = uploaded
-      previewUrl.value = uploaded.url
-      latestTempPreview.value = null
-      emit('update:modelValue', uploaded)
-    }
-
     detachListener()
+    taskEntity = { type: originalEntityType, id: String(originalEntityId) }
     currentTaskId.value = task.id
-    if (reconcile && response.status === 'completed' && task.file?.url) {
+    if ((task.status === 'completed' || response.status === 'completed') && task.file?.url) {
       handleFileStatusEvent({
         eventId: `reconcile-${task.id}`,
         eventType: FILE_UPLOAD_STATUS_EVENT,
@@ -662,17 +762,21 @@ const uploadFile = async (file: File, reconcile = false) => {
         })
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return
-          handleFileStatusEvent({
-            eventId: `poll-${task.id}`,
-            eventType: FILE_UPLOAD_STATUS_EVENT,
-            taskId: task.id,
-            status: 'failed',
-            error: reason instanceof Error ? reason.message : 'Не удалось проверить статус файла.',
-          })
+          handleFileStatusEvent(
+            {
+              eventId: `poll-${task.id}`,
+              eventType: FILE_UPLOAD_STATUS_EVENT,
+              taskId: task.id,
+              status: 'failed',
+              error:
+                reason instanceof Error ? reason.message : 'Не удалось проверить статус файла.',
+            },
+            false,
+          )
         })
     }
 
-    emit('success', response)
+    if (!requireAssignmentConfirmation) emit('success', response)
     if (currentUploadId.value) {
       uploadQueue.setStatus(currentUploadId.value, 'processing')
     }
@@ -748,6 +852,8 @@ const removeImage = async () => {
 }
 
 onUnmounted(() => {
+  unmounted = true
+  uploadController?.abort()
   detachListener()
 })
 

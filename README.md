@@ -336,6 +336,16 @@ nodes/marks/features, provide an async typed media picker and receive structured
 invalid-content callbacks. CMS media is represented by canonical typed nodes;
 the editor does not accept arbitrary HTML as a portable contract.
 
+Set a stable, unique `uploadRecoveryKey` on each `RichTextEditor` or
+`ImageUploader` field within an entity, and keep it unchanged across navigation.
+`FormRichTextField` and `FormImageUploader` forward `uploadRecoveryKey` or `name`. This key is local
+recovery identity, not a server upload strategy/context. Without a key, legacy
+widgets retain a shared duplicate-prevention fence, but a remounted or neighboring
+widget requires an explicit “Insert into this field” / “Use image in this field”
+action after reconciliation instead of guessing the original destination. The
+recovery fence remains until explicit insertion/assignment or dismissal; navigating
+before that choice restores the same session for another safe check.
+
 `host.WithUploadTransport` mounts an additional permission-guarded TUS surface.
 `UploadTransport.TusStore` is optional: nil reuses the canonical admin upload
 store, while a supplied store creates an isolated protocol surface for a CMS or

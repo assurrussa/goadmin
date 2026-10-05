@@ -5,6 +5,12 @@ after a new tag and its clean-consumer checks complete.
 
 ## Unreleased
 
+- Preserve uncertain upload completion across navigation/remounts in both
+  built-in upload widgets, with same-tab metadata recovery scoped by admin,
+  endpoint, entity and context. Cancel torn-down transports without allowing a
+  duplicate session. Reconciliation now unlocks definite server rejections while
+  preserving ambiguous transport outcomes and pre-dispatch cancellation fences.
+
 - Add validated, immutable `UploadsConfig.Strategies` registration on the existing
   full `/files` upload handler. Custom audio contexts can use canonical MP3/WAV
   finalization with GoUploads v0.11.0+ original-only processing; built-in policies
