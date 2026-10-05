@@ -117,3 +117,32 @@ saved path or filename could be established. HTTP CSV status, content, scope,
 quoting, and authorization evidence above does not prove native download
 filename or saved bytes. No alternate browser route was used to bypass a
 restriction, and no speculative export implementation change was made.
+
+## Final native acceptance and review correction
+
+The frozen renderer candidate `bcb2561ed559ec939da34897beb581637ef7acf0`
+(tree `0705b22e28e52b1deeb73ef3e08e0d2eb3c761f4`) passed the supported local
+Chrome 154 pass at 1440/390px: three valid email and creation timestamps,
+three blank nullable phone timestamps, zero `Invalid Date`, contained horizontal
+scrolling, visible focus and keyboard sorting. Native saved CSV was
+`users-20261005.csv`: 349 bytes/three users despite limit=1, and 188 bytes/one
+filtered user. A double click produced one request and one download. The actual
+edit UI accepted a synthetic Cyrillic/Japanese name; its 364-byte UTF-8 export
+preserved those characters, and the original synthetic name was restored.
+CSV comma, quote and embedded-newline fields were verified. This supersedes the
+baseline download limitation above. In-flight cancellation remains unverified
+with the tiny fixture. The serving harness was intentionally interrupted after
+browser QA; that process exit is not a completed Go test PASS.
+
+Codex review then found a nullable-scalar membership edge case: Squirrel resolves
+`driver.Valuer` values such as invalid `sql.NullString` to nil and rewrites
+`IN`/`NOT IN` to `IS NULL`/`IS NOT NULL`. Only actual lists should use Squirrel's
+expansion. Scalar values, including nil pointers, nullable values and byte
+strings, retain the literal membership operator and bound argument. Regression
+SQL-shape tests failed on the pre-fix source and pass after correction. The
+expanded real PostgreSQL operator matrix now has 40 passing cases, including
+nullable strings, nullable integers, nil pointers and valid nullable values;
+the authenticated host test also passes. Array/slice/pointer-to-slice expansion
+is covered separately. No frontend assets changed in this review correction.
+The review-corrected tree also passes the complete `make check`; regenerated
+frontend assets are byte-for-byte unchanged from the native-tested candidate.

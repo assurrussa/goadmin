@@ -1,6 +1,7 @@
 package datagrid_test
 
 import (
+	"database/sql"
 	"testing"
 
 	sq "github.com/Masterminds/squirrel"
@@ -1298,4 +1299,52 @@ func TestFormatPostgreSQLArrayCoverage(t *testing.T) {
 		assert.Contains(t, sql, "ARRAY[]::text[]")
 		assert.Empty(t, args)
 	})
+}
+
+func TestSQLWherexMembershipScalarsPreserveOperator(t *testing.T) {
+	t.Parallel()
+	for _, op := range []datagrid.WhereOperator{datagrid.OpIn, datagrid.OpNotIn} {
+		for name, value := range map[string]any{
+			"null":            nil,
+			"nullable-string": sql.NullString{},
+			"nullable-int":    sql.NullInt64{},
+			"null-pointer":    (*string)(nil),
+			"bytes":           []byte("sample"),
+			"valid-string":    sql.NullString{String: "sample", Valid: true},
+		} {
+			t.Run(string(op)+"/"+name, func(t *testing.T) {
+				t.Parallel()
+				query, args, err := datagrid.SQLWherex(testBuilderDollar().Select("id").From("users"),
+					datagrid.Filters{Fields: map[string]any{"x": value}},
+					map[string]datagrid.FieldMapping{"x": datagrid.NewFieldMappingWithOp("scalar_value", op)},
+				).ToSql()
+				require.NoError(t, err)
+				require.Equal(t, "SELECT id FROM users WHERE scalar_value "+string(op)+" ($1)", query)
+				require.Equal(t, []any{value}, args)
+			})
+		}
+	}
+}
+
+func TestSQLWherexMembershipListsStillExpand(t *testing.T) {
+	t.Parallel()
+	values := []int{1, 3}
+	for name, value := range map[string]any{
+		"slice":            values,
+		"array":            [2]int{1, 3},
+		"pointer-to-slice": &values,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			for _, op := range []datagrid.WhereOperator{datagrid.OpIn, datagrid.OpNotIn} {
+				query, args, err := datagrid.SQLWherex(testBuilderDollar().Select("id").From("users"),
+					datagrid.Filters{Fields: map[string]any{"x": value}},
+					map[string]datagrid.FieldMapping{"x": datagrid.NewFieldMappingWithOp("id", op)},
+				).ToSql()
+				require.NoError(t, err)
+				require.Equal(t, "SELECT id FROM users WHERE id "+string(op)+" ($1,$2)", query)
+				require.Equal(t, []any{1, 3}, args)
+			}
+		})
+	}
 }

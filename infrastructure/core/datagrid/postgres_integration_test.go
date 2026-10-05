@@ -4,6 +4,7 @@ package datagrid_test
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 
@@ -61,6 +62,14 @@ func TestDataGridPostgresOperators(t *testing.T) {
 		{"in-scalar", "x", "id", datagrid.OpIn, 2, []int{2}},
 		{"in-null", "x", optionalColumn, datagrid.OpIn, nil, []int{}},
 		{"not-in-null", "x", optionalColumn, datagrid.OpNotIn, nil, []int{}},
+		{"in-null-string", "x", optionalColumn, datagrid.OpIn, sql.NullString{}, []int{}},
+		{"not-in-null-string", "x", optionalColumn, datagrid.OpNotIn, sql.NullString{}, []int{}},
+		{"in-null-int", "x", "id", datagrid.OpIn, sql.NullInt64{}, []int{}},
+		{"not-in-null-int", "x", "id", datagrid.OpNotIn, sql.NullInt64{}, []int{}},
+		{"in-null-pointer", "x", optionalColumn, datagrid.OpIn, (*string)(nil), []int{}},
+		{"not-in-null-pointer", "x", optionalColumn, datagrid.OpNotIn, (*string)(nil), []int{}},
+		{"in-valid-string", "x", labelColumn, datagrid.OpIn, sql.NullString{String: "alpha", Valid: true}, []int{1}},
+		{"not-in-valid-string", "x", labelColumn, datagrid.OpNotIn, sql.NullString{String: "alpha", Valid: true}, []int{2, 3}},
 		{"in-empty", "x", "id", datagrid.OpIn, []int{}, []int{}},
 		{"not-in-empty", "x", "id", datagrid.OpNotIn, []int{}, []int{1, 2, 3}},
 		{"contains", "x", jsonColumn, datagrid.OpJSONBContains, `{"tag":"red"}`, []int{1}},
