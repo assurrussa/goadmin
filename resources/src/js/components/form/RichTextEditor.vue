@@ -434,6 +434,12 @@
       </div>
 
       <div class="status-right">
+        <div v-if="uncertainUpload" role="status">
+          Upload completion is unconfirmed. Check this upload before starting another.
+          <button type="button" :disabled="!canCheckUpload" @click="checkUpload">
+            Check upload
+          </button>
+        </div>
         <!-- Upload Status -->
         <div v-if="isUploading" class="upload-status" role="status" aria-live="polite">
           <span class="loading-spinner" aria-hidden="true">🔄</span>
@@ -457,6 +463,7 @@
       :id="fileInputId"
       type="file"
       name="rich-text-media"
+      :disabled="!!uncertainUpload || isUploading || disabled || readonly"
       aria-label="Добавить изображение или видео"
       :accept="effectiveAcceptedFileTypes.join(',')"
       multiple
@@ -496,7 +503,12 @@ import AppButton from '@/components/ui/AppButton.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ImageCropper } from '../imageCropper'
-import { uploadFiles, fetchUploadTask } from '@/services/fileUploadService'
+import {
+  uploadFiles,
+  fetchUploadTask,
+  reconcileUploadCompletion,
+  type UncertainUploadCompletion,
+} from '@/services/fileUploadService'
 import type { UploadedFileSummary, UploadTaskStatusResponse } from '@/services/fileUploadService'
 import { useAdminWebSocket, type FileUploadStatusEvent } from '@/composables/useAdminWebSocket'
 import { useUploadQueueStore } from '@/stores/uploadQueue'
@@ -602,6 +614,43 @@ const showImageCropper = ref(false)
 const cropperImageUrl = ref('')
 const cropperFileName = ref('')
 const isUploading = ref(false)
+const uncertainUpload = ref<{
+  file: File
+  category: 'image' | 'video'
+  completion: UncertainUploadCompletion
+} | null>(null)
+const canCheckUpload = computed(() => {
+  const pending = uncertainUpload.value
+  return (
+    !!pending &&
+    !isUploading.value &&
+    !props.disabled &&
+    !props.readonly &&
+    pending.completion.entityType === props.entityType &&
+    String(pending.completion.entityId) === String(props.entityId)
+  )
+})
+let checkingCompletion = false
+const checkUpload = async () => {
+  const pending = uncertainUpload.value
+  if (!pending || isUploading.value || checkingCompletion || props.disabled || props.readonly)
+    return
+  if (
+    pending.completion.entityType !== props.entityType ||
+    String(pending.completion.entityId) !== String(props.entityId)
+  )
+    return
+  checkingCompletion = true
+  try {
+    if (pending.category === 'image') {
+      await handleImageUpload(pending.file, { skipCropper: true })
+    } else {
+      await handleVideoUpload(pending.file)
+    }
+  } finally {
+    checkingCompletion = false
+  }
+}
 const uploadProgress = ref(0)
 const uploadedFiles = ref<number[]>([]) // Для отслеживания загруженных файлов
 const currentUploadType = ref<'image' | 'video' | null>(null)
@@ -916,7 +965,7 @@ const waitForTaskCompletion = async (
         resolved = true
         cleanupTaskSubscription()
         resolve(finalFile)
-      } else if (eventStatus === 'failed') {
+      } else if (eventStatus === 'failed' || eventStatus === 'error') {
         resolved = true
         cleanupTaskSubscription()
         reject(new Error(event.error || 'Обработка файла завершилась с ошибкой'))
@@ -942,7 +991,7 @@ const waitForTaskCompletion = async (
           return
         }
 
-        if (effectiveStatus === 'failed') {
+        if (effectiveStatus === 'failed' || effectiveStatus === 'error') {
           throw new Error(task.error || 'Обработка файла завершилась с ошибкой')
         }
 
@@ -1385,9 +1434,11 @@ const insertAttachment = (payload: AttachmentPayload) => {
 }
 
 const handleFiles = async (files: File[], options: FileHandleOptions = {}) => {
+  if (uncertainUpload.value || isUploading.value || checkingCompletion) return
   captureCurrentSelection()
   console.log('📁 handleFiles called with:', files.length, 'files')
   for (const file of files) {
+    if (uncertainUpload.value) break
     console.log('📁 Processing file:', file.name, 'type:', file.type, 'size:', file.size)
 
     const detected = detectFileKind(file)
@@ -1428,6 +1479,13 @@ const uploadMediaToServer = async (
   file: File,
   fileCategory: 'image' | 'video',
 ): Promise<UploadResult> => {
+  const pending = uncertainUpload.value
+  if (
+    pending &&
+    (!checkingCompletion || pending.file !== file || pending.category !== fileCategory)
+  ) {
+    throw new Error('Check the unconfirmed upload before starting another.')
+  }
   const baseLabel = fileCategory === 'video' ? 'Загрузка видео' : 'Загрузка изображения'
   const uploadLabel = file.name ? `${baseLabel}: ${file.name}` : baseLabel
   let uploadQueueId: string | null = null
@@ -1446,25 +1504,42 @@ const uploadMediaToServer = async (
     uploadProgress.value = 10
     uploadStage.value = 'uploading'
 
-    const response = await uploadFiles({
-      file,
-      entityType: props.entityType,
-      entityId: props.entityId,
-      context: 'rich-text',
-      fileCategory,
-      uploadUrl: props.uploadUrl,
-      skipResize: fileCategory === 'video' && uploadVideoWithoutCompression.value,
-      onProgress: (percentage) => {
-        const next = Math.min(100, Math.max(0, Math.round(percentage)))
-        if (next > uploadProgress.value) {
-          uploadProgress.value = next
-        }
-        emit('upload-progress', next)
-        if (uploadQueueId) {
-          uploadQueue.update(uploadQueueId, next)
-        }
-      },
-    })
+    const response =
+      pending && checkingCompletion
+        ? await reconcileUploadCompletion(pending.completion)
+        : await uploadFiles({
+            file,
+            entityType: props.entityType,
+            entityId: props.entityId,
+            context: 'rich-text',
+            fileCategory,
+            uploadUrl: props.uploadUrl,
+            skipResize: fileCategory === 'video' && uploadVideoWithoutCompression.value,
+            onProgress: (percentage) => {
+              const next = Math.min(100, Math.max(0, Math.round(percentage)))
+              if (next > uploadProgress.value) {
+                uploadProgress.value = next
+              }
+              emit('upload-progress', next)
+              if (uploadQueueId) {
+                uploadQueue.update(uploadQueueId, next)
+              }
+            },
+          })
+
+    if (response.uncertainCompletion) {
+      uncertainUpload.value = {
+        file,
+        category: fileCategory,
+        completion: response.uncertainCompletion,
+      }
+    }
+    if (response.status === 'completion_unknown') {
+      throw new Error(
+        response.error ||
+          'Upload completion is unconfirmed. Check this upload before starting another.',
+      )
+    }
 
     if (uploadQueueId) {
       uploadQueue.setStatus(uploadQueueId, 'processing')
@@ -1477,11 +1552,22 @@ const uploadMediaToServer = async (
     }
 
     const task = response.tasks[0]
+    if (!task?.id) throw new Error('Upload task ID is missing in server response')
     console.log('📬 Upload task created:', task)
 
     const taskStatus = (task.status || response.status || '').toLowerCase()
 
-    if (taskStatus === 'failed') {
+    const releaseTerminalUncertainty = () => {
+      if (
+        pending &&
+        pending.completion.entityType === props.entityType &&
+        String(pending.completion.entityId) === String(props.entityId)
+      ) {
+        uncertainUpload.value = null
+      }
+    }
+    if (taskStatus === 'failed' || taskStatus === 'error') {
+      releaseTerminalUncertainty()
       throw new Error(task.error || 'Upload processing failed')
     }
 
@@ -1511,7 +1597,8 @@ const uploadMediaToServer = async (
           } else if (status === 'completed') {
             uploadProgress.value = 98
             uploadStage.value = 'finalizing'
-          } else if (status === 'failed') {
+          } else if (status === 'failed' || status === 'error') {
+            releaseTerminalUncertainty()
             uploadStage.value = 'processing'
           }
           if (payload) {
@@ -1547,6 +1634,13 @@ const uploadMediaToServer = async (
       throw new Error('Upload processing finished without valid file info')
     }
 
+    if (
+      pending &&
+      (pending.completion.entityType !== props.entityType ||
+        String(pending.completion.entityId) !== String(props.entityId))
+    )
+      throw new Error('Return to the original entity to check this upload.')
+    uncertainUpload.value = null
     uploadProgress.value = 100
     emit('upload-progress', 100)
     uploadedFiles.value.push(normalized.id)

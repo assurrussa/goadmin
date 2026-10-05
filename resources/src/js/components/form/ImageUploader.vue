@@ -108,10 +108,25 @@
       ></div>
     </div>
 
-    <div v-if="error" class="error-message absolute -bottom-6 left-0 text-xs text-error">
+    <div
+      v-if="error && !uncertainUpload"
+      class="error-message absolute -bottom-6 left-0 text-xs text-error"
+    >
       <p>{{ error }}</p>
     </div>
   </div>
+  <p v-if="uncertainUpload" class="mt-2 text-xs text-error" role="status">
+    Upload completion is unconfirmed. Check this upload before starting another.
+  </p>
+  <button
+    v-if="uncertainUpload"
+    type="button"
+    class="mt-7 text-sm underline"
+    :disabled="!canCheckUpload"
+    @click="checkUpload"
+  >
+    Check upload
+  </button>
   <div
     v-if="shouldShowCropToggle"
     class="mt-2 flex items-center justify-between rounded-lg border border-border-secondary bg-card px-3 py-2 text-xs text-text-secondary"
@@ -156,6 +171,8 @@ import {
 import {
   deleteUploadedFile,
   uploadFiles,
+  reconcileUploadCompletion,
+  type UncertainUploadCompletion,
   type UploadedFileSummary,
 } from '@/services/fileUploadService'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -294,7 +311,28 @@ watch(
   },
 )
 
-const canInteract = computed(() => uploads.value && !props.disabled && !props.readonly)
+const uncertainUpload = ref<{ file: File; completion: UncertainUploadCompletion } | null>(null)
+const canCheckUpload = computed(
+  () =>
+    uploads.value &&
+    !props.disabled &&
+    !props.readonly &&
+    !isLoading.value &&
+    (!uncertainUpload.value ||
+      (uncertainUpload.value.completion.entityType === props.objectType &&
+        String(uncertainUpload.value.completion.entityId) === String(props.objectId))),
+)
+const canInteract = computed(() => canCheckUpload.value && !uncertainUpload.value)
+const checkUpload = () => {
+  if (
+    canCheckUpload.value &&
+    uncertainUpload.value &&
+    uncertainUpload.value.completion.entityType === props.objectType &&
+    String(uncertainUpload.value.completion.entityId) === String(props.objectId)
+  ) {
+    void uploadFile(uncertainUpload.value.file, true)
+  }
+}
 const shouldShowCropToggle = computed(
   () => props.enableCropper && props.showCropToggle !== false && props.cropEnabled === undefined,
 )
@@ -414,6 +452,7 @@ const handleDrop = (event: DragEvent) => {
 }
 
 const handleFile = (file: File) => {
+  if (!canInteract.value) return
   error.value = null
 
   if (!validateFile(file)) {
@@ -475,8 +514,8 @@ const setPreviewFromFile = (file: File) => {
   reader.readAsDataURL(file)
 }
 
-const uploadFile = async (file: File) => {
-  if (!canInteract.value) return
+const uploadFile = async (file: File, reconcile = false) => {
+  if (reconcile ? !canCheckUpload.value || !uncertainUpload.value : !canInteract.value) return
   detachListener()
   if (!props.objectId) {
     error.value = 'Cannot upload file without a valid objectId.'
@@ -495,26 +534,29 @@ const uploadFile = async (file: File) => {
   currentUploadId.value = uploadQueue.start(props.uploadLabel ?? 'Загрузка файла', 0)
 
   try {
-    const response = await uploadFiles({
-      file,
-      entityType: props.objectType,
-      entityId: props.objectId,
-      replaceFileId: currentFile.value?.id,
-      fileCategory: 'image',
-      context: props.context,
-      uploadUrl: props.uploadUrl,
-      onProgress: (percentage) => {
-        const next = Math.min(100, Math.max(0, Math.round(percentage)))
-        if (uploadProgress.value === next) {
-          return
-        }
-        uploadProgress.value = next
-        emit('progress', next)
-        if (currentUploadId.value) {
-          uploadQueue.update(currentUploadId.value, next)
-        }
-      },
-    })
+    const response =
+      reconcile && uncertainUpload.value
+        ? await reconcileUploadCompletion(uncertainUpload.value.completion)
+        : await uploadFiles({
+            file,
+            entityType: props.objectType,
+            entityId: props.objectId,
+            replaceFileId: currentFile.value?.id,
+            fileCategory: 'image',
+            context: props.context,
+            uploadUrl: props.uploadUrl,
+            onProgress: (percentage) => {
+              const next = Math.min(100, Math.max(0, Math.round(percentage)))
+              if (uploadProgress.value === next) {
+                return
+              }
+              uploadProgress.value = next
+              emit('progress', next)
+              if (currentUploadId.value) {
+                uploadQueue.update(currentUploadId.value, next)
+              }
+            },
+          })
     if (uploadProgress.value !== null && uploadProgress.value < 100) {
       uploadProgress.value = 100
       emit('progress', 100)
@@ -523,7 +565,21 @@ const uploadFile = async (file: File) => {
       }
     }
 
-    if (response.status !== 'queued') {
+    if (response.uncertainCompletion) {
+      uncertainUpload.value = { file, completion: response.uncertainCompletion }
+    }
+    const terminalTask = response.tasks[0]
+    if (
+      reconcile &&
+      terminalTask?.id &&
+      ['failed', 'error'].includes((terminalTask.status || response.status).toLowerCase()) &&
+      uncertainUpload.value?.completion.entityType === props.objectType &&
+      String(uncertainUpload.value?.completion.entityId) === String(props.objectId)
+    ) {
+      uncertainUpload.value = null
+      throw new Error(terminalTask.error || response.error || 'Upload processing failed')
+    }
+    if (response.status !== 'queued' && !(reconcile && response.status === 'completed')) {
       throw new Error(response.error || 'Failed to enqueue upload task')
     }
 
@@ -531,6 +587,15 @@ const uploadFile = async (file: File) => {
     if (!task?.id) {
       throw new Error(response.error || 'Upload task ID is missing in server response')
     }
+
+    if (
+      reconcile &&
+      uncertainUpload.value &&
+      (uncertainUpload.value.completion.entityType !== props.objectType ||
+        String(uncertainUpload.value.completion.entityId) !== String(props.objectId))
+    )
+      throw new Error('Return to the original entity to check this upload.')
+    uncertainUpload.value = null
 
     if (task.tempUrl) {
       previewUrl.value = task.tempUrl
@@ -547,6 +612,23 @@ const uploadFile = async (file: File) => {
 
     detachListener()
     currentTaskId.value = task.id
+    if (reconcile && response.status === 'completed' && task.file?.url) {
+      handleFileStatusEvent({
+        eventId: `reconcile-${task.id}`,
+        eventType: FILE_UPLOAD_STATUS_EVENT,
+        taskId: task.id,
+        status: 'completed',
+        file: {
+          id: task.file.id,
+          fileName: task.file.filename,
+          originalName: task.file.originalName,
+          url: task.file.url,
+          size: task.file.size ?? 0,
+          mimeType: task.file.mimeType ?? '',
+        },
+      })
+      return
+    }
     if (realtime.value) {
       ensureConnected()
       unsubscribe.value = on('files.upload.status', handleFileStatusEvent)
@@ -605,8 +687,10 @@ const uploadFile = async (file: File) => {
       'An unknown error occurred.'
     error.value = errorMessage
     emit('error', errorMessage)
-    previewUrl.value = currentFile.value?.url ?? null
-    latestTempPreview.value = null
+    if (!uncertainUpload.value) {
+      previewUrl.value = currentFile.value?.url ?? null
+      latestTempPreview.value = null
+    }
     if (currentUploadId.value) {
       uploadQueue.fail(currentUploadId.value, errorMessage)
       currentUploadId.value = null
@@ -689,6 +773,7 @@ const handleCropConfirmed = (croppedFile: File) => {
   // Always close the cropper immediately to avoid UI blocking during upload.
   closeCropper()
 
+  if (!canInteract.value) return
   if (!validateFile(croppedFile)) {
     return
   }
