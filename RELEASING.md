@@ -307,3 +307,14 @@ Generic CSRF middleware and its IsProd/CookieNameCSRFToken/
 CookieNameRefreshToken/ExcludePaths config fields are removed; admin cookie
 configuration and Origin policy remain in the installed bootstrap. Adapt host
 source before publishing the corresponding breaking contract change.
+
+### Hosts that already own upload migrations
+
+`migrations.MigrateWithHostManagedUploads(ctx, cfg, db)` is the explicit facade
+for an established host-owned upload schema and ledger. It installs canonical
+auth and GoAdmin core, but does not execute, adopt, or stamp GoUploads migrations.
+Before calling it, the host must verify and apply every migration from its pinned
+GoUploads dependency, including future additions, and serialize its full pack.
+The default `migrations.Migrate` remains unchanged and manages uploads itself.
+Do not switch an existing canonical upload ledger to host management without a
+separate reviewed ownership transition. This API itself moves no data or history.

@@ -472,3 +472,14 @@ or backward offsets fail explicitly; repeated conflicts are bounded. These
 checks also reject redirected HTML error pages instead of counting them as
 uploaded bytes. Domain-owned pending uploads retain their separate finalization
 boundary. Existing `uploadFiles` error-envelope behavior is unchanged.
+
+### Hosts that already own upload migrations
+
+`migrations.MigrateWithHostManagedUploads(ctx, cfg, db)` is the explicit facade
+for an established host-owned upload schema and ledger. It installs canonical
+auth and GoAdmin core, but does not execute, adopt, or stamp GoUploads migrations.
+Before calling it, the host must verify and apply every migration from its pinned
+GoUploads dependency, including future additions, and serialize its full pack.
+The default `migrations.Migrate` remains unchanged and manages uploads itself.
+Do not switch an existing canonical upload ledger to host management without a
+separate reviewed ownership transition. This API itself moves no data or history.

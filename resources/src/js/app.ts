@@ -1,5 +1,5 @@
 import { createApp, h, defineComponent, Fragment, ref } from 'vue'
-import { createInertiaApp, router } from '@inertiajs/vue3'
+import { createInertiaApp, router, usePage } from '@inertiajs/vue3'
 import { createPinia } from 'pinia'
 import type { Component, DefineComponent, VNode } from 'vue'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
@@ -124,6 +124,7 @@ void createInertiaApp({
       const authUserStore = useAuthUserStore()
       const websocket = useAdminWebSocket()
       const { ensureConnected, disconnect } = websocket
+      const currentPage = usePage()
 
       let currentAuthId: string | null = null
       let leavingForLogin = false
@@ -151,9 +152,7 @@ void createInertiaApp({
         currentAuthId = nextId
       }
 
-      const initialAuth =
-        extractAuth((props as { initialPage?: unknown }).initialPage) ??
-        extractAuth((router as { page?: unknown }).page)
+      const initialAuth = extractAuth((props as { initialPage?: unknown }).initialPage)
       syncAuthState(initialAuth)
 
       stopListeners.push(
@@ -185,7 +184,7 @@ void createInertiaApp({
         }),
         router.on('error', () => {
           if (!leavingForLogin) {
-            syncAuthState(extractAuth((router as { page?: unknown }).page))
+            syncAuthState(extractAuth(currentPage))
           }
         }),
       )
