@@ -694,11 +694,13 @@ const checkUpload = async () => {
       }
       return
     }
-    if (category === 'video') insertVideoIntoEditor(uploadedFile, pending.completion.filename)
-    else insertImageIntoEditor(uploadedFile, pending.completion.filename)
+    const inserted =
+      category === 'video'
+        ? insertVideoIntoEditor(uploadedFile, pending.completion.filename)
+        : insertImageIntoEditor(uploadedFile, pending.completion.filename)
+    if (!inserted) return
     if (pending.file) emit('file-upload', pending.file)
     emit('files-uploaded', [uploadedFile.id])
-    releaseCompletion(pending.completion)
   } catch (error) {
     emit('file-error', String(error))
   } finally {
@@ -719,8 +721,11 @@ const canInsertRecovered = computed(() => {
 const insertRecovered = () => {
   const result = recoveredForInsertion.value
   if (!result || !canInsertRecovered.value) return
-  if (result.category === 'video') insertVideoIntoEditor(result.file, result.filename)
-  else insertImageIntoEditor(result.file, result.filename)
+  const inserted =
+    result.category === 'video'
+      ? insertVideoIntoEditor(result.file, result.filename)
+      : insertImageIntoEditor(result.file, result.filename)
+  if (!inserted) return
   emit('files-uploaded', [result.file.id])
   releaseCompletion(result.completion)
   recoveredForInsertion.value = null
@@ -779,6 +784,7 @@ type UploadResult = UploadedFileSummary & {
 }
 
 interface WaitForTaskOptions {
+  signal?: AbortSignal
   attempts?: number
   interval?: number
   onStatusChange?: (status: string, payload?: UploadResult) => void
@@ -900,8 +906,11 @@ const cleanupTaskSubscription = () => {
   currentTaskId.value = null
 }
 
-const fetchTaskStatus = async (taskId: number): Promise<UploadTaskStatusResponse> => {
-  return fetchUploadTask(taskId)
+const fetchTaskStatus = async (
+  taskId: number,
+  signal?: AbortSignal,
+): Promise<UploadTaskStatusResponse> => {
+  return fetchUploadTask(taskId, signal)
 }
 
 interface RawUploadedFile {
@@ -1010,7 +1019,7 @@ const waitForTaskCompletion = async (
   taskId: number,
   options: WaitForTaskOptions = {},
 ): Promise<UploadResult> => {
-  const { attempts = 120, interval = 1000, onStatusChange } = options
+  const { attempts = 120, interval = 1000, onStatusChange, signal } = options
   ensureConnected()
 
   return new Promise<UploadResult>(async (resolve, reject) => {
@@ -1058,7 +1067,10 @@ const waitForTaskCompletion = async (
           return
         }
 
-        const { status, task, file } = await fetchTaskStatus(taskId)
+        signal?.throwIfAborted()
+        const { status, task, file } = await fetchTaskStatus(taskId, signal)
+        signal?.throwIfAborted()
+        if (resolved) return
         const effectiveStatus = (task.status ?? status ?? '').toLowerCase()
         const finalFile = normalizeUploadedFile(file ?? task.file)
 
@@ -1400,12 +1412,35 @@ interface FileHandleOptions {
 
 const resolveAbsoluteUrl = (value?: string): string | undefined => value?.trim() || undefined
 
+const completedUploadTargets = new WeakMap<
+  UploadResult,
+  { entityType: string; entityId: string; completion?: UncertainUploadCompletion }
+>()
+const canInsertUpload = (file: UploadResult): boolean => {
+  const target = completedUploadTargets.get(file)
+  return (
+    !unmounted &&
+    isCurrentScope.value &&
+    !props.disabled &&
+    !props.readonly &&
+    (!target ||
+      (target.entityType === props.entityType && target.entityId === String(props.entityId)))
+  )
+}
+const finishUploadInsertion = (file: UploadResult, inserted: boolean): boolean => {
+  if (!inserted) return false
+  const target = completedUploadTargets.get(file)
+  if (target?.completion) releaseCompletion(target.completion)
+  completedUploadTargets.delete(file)
+  return true
+}
+
 const insertImageIntoEditor = (
   uploadedFile: UploadResult,
   fallbackName?: string,
   explicitSrc?: string,
-) => {
-  if (!editor.value) return
+): boolean => {
+  if (!editor.value || !canInsertUpload(uploadedFile)) return false
 
   const name = fallbackName || uploadedFile.originalName || uploadedFile.filename
   const rawSrc = explicitSrc || uploadedFile.publicUrl || uploadedFile.fullPath || uploadedFile.url
@@ -1413,7 +1448,7 @@ const insertImageIntoEditor = (
 
   if (!src) {
     emit('file-error', 'Не удалось определить URL вложения для вставки')
-    return
+    return false
   }
 
   restoreSelection()
@@ -1426,15 +1461,16 @@ const insertImageIntoEditor = (
     'data-file-id': uploadedFile.id,
   } as Record<string, unknown> & { src: string; alt?: string; title?: string }
 
-  editor.value.chain().focus().setImage(imageAttrs).run()
+  const inserted = editor.value.chain().focus().setImage(imageAttrs).run()
+  return finishUploadInsertion(uploadedFile, inserted)
 }
 
 const insertVideoIntoEditor = (
   uploadedFile: UploadResult,
   fallbackName?: string,
   explicitSrc?: string,
-) => {
-  if (!editor.value) return
+): boolean => {
+  if (!editor.value || !canInsertUpload(uploadedFile)) return false
 
   const name = fallbackName || uploadedFile.originalName || uploadedFile.filename
   const rawSrc = explicitSrc || uploadedFile.publicUrl || uploadedFile.fullPath || uploadedFile.url
@@ -1442,12 +1478,12 @@ const insertVideoIntoEditor = (
 
   if (!src) {
     emit('file-error', 'Не удалось определить URL видео для вставки')
-    return
+    return false
   }
 
   restoreSelection()
 
-  editor.value
+  const inserted = editor.value
     .chain()
     .focus()
     .setVideo({
@@ -1458,6 +1494,7 @@ const insertVideoIntoEditor = (
       'data-type': 'video',
     })
     .run()
+  return finishUploadInsertion(uploadedFile, inserted)
 }
 
 const resolveEntityId = (): number | null => {
@@ -1505,12 +1542,10 @@ const insertAttachment = (payload: AttachmentPayload) => {
   }
 
   const targetUrl = payload.publicUrl || payload.fullPath
-  if (isVideo) {
-    insertVideoIntoEditor(uploadResult, uploadResult.originalName, targetUrl)
-  } else {
-    insertImageIntoEditor(uploadResult, uploadResult.originalName, targetUrl)
-  }
-  emit('files-uploaded', [payload.id])
+  const inserted = isVideo
+    ? insertVideoIntoEditor(uploadResult, uploadResult.originalName, targetUrl)
+    : insertImageIntoEditor(uploadResult, uploadResult.originalName, targetUrl)
+  if (inserted) emit('files-uploaded', [payload.id])
 }
 
 const handleFiles = async (files: File[], options: FileHandleOptions = {}) => {
@@ -1692,6 +1727,7 @@ const uploadMediaToServer = async (
       const attempts = fileCategory === 'video' ? 180 : 120
       const interval = fileCategory === 'video' ? 1500 : 1000
       finalFileSummary = await waitForTaskCompletion(task.id, {
+        signal: controller.signal,
         attempts,
         interval,
         onStatusChange: (status, payload) => {
@@ -1749,7 +1785,11 @@ const uploadMediaToServer = async (
       String(originalEntityId) !== String(props.entityId)
     )
       throw new Error('Return to the original entity to check this upload.')
-    if (completion && !pending) releaseCompletion(completion)
+    completedUploadTargets.set(normalized, {
+      entityType: originalEntityType,
+      entityId: String(originalEntityId),
+      completion,
+    })
     uploadProgress.value = 100
     emit('upload-progress', 100)
     uploadedFiles.value.push(normalized.id)
@@ -1791,7 +1831,7 @@ const handleImageUpload = async (file: File, options: FileHandleOptions = {}) =>
       const uploadedFile = await uploadImageToServer(file)
       uploadedFile.mimeType = uploadedFile.mimeType ?? (file.type || undefined)
       uploadedFile.size = uploadedFile.size ?? file.size
-      insertImageIntoEditor(uploadedFile, file.name)
+      if (!insertImageIntoEditor(uploadedFile, file.name)) return
       emit('file-upload', file)
       emit('files-uploaded', [uploadedFile.id])
       return
@@ -1820,7 +1860,7 @@ const handleVideoUpload = async (file: File) => {
     const uploadedFile = await uploadVideoToServer(file)
     uploadedFile.mimeType = uploadedFile.mimeType ?? (file.type || undefined)
     uploadedFile.size = uploadedFile.size ?? file.size
-    insertVideoIntoEditor(uploadedFile, file.name)
+    if (!insertVideoIntoEditor(uploadedFile, file.name)) return
     emit('file-upload', file)
     emit('files-uploaded', [uploadedFile.id])
   } catch (error) {
@@ -2050,7 +2090,7 @@ const handleCroppedImage = async (croppedFile: File) => {
     uploadedFile.size = uploadedFile.size ?? croppedFile.size
 
     // Вставляем изображение в редактор с URL с сервера
-    insertImageIntoEditor(uploadedFile, croppedFile.name)
+    if (!insertImageIntoEditor(uploadedFile, croppedFile.name)) return
 
     emit('file-upload', croppedFile)
     emit('files-uploaded', [uploadedFile.id])

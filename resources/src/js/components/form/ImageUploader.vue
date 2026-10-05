@@ -166,7 +166,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, useId, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue'
 import axios from 'axios'
 import { useNotifications } from '@/composables/useNotifications'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
@@ -183,7 +183,6 @@ import {
   uploadFiles,
   reconcileUploadCompletion,
   type UncertainUploadCompletion,
-  type UploadedFileSummary,
 } from '@/services/fileUploadService'
 import AppButton from '@/components/ui/AppButton.vue'
 import { ImageCropper } from '../imageCropper'
@@ -429,15 +428,6 @@ const mapEventFile = (file: FileUploadEventFile): UploadedFile => ({
   fileType: file.mimeType?.startsWith('image/') ? 'image' : undefined,
 })
 
-const mapSummaryFile = (file: UploadedFileSummary): UploadedFile => ({
-  id: file.id,
-  url: file.url,
-  filename: file.filename,
-  originalName: file.originalName,
-  fileName: file.filename,
-  fileType: file.fileType,
-})
-
 const detachListener = () => {
   pollController?.abort()
   pollController = null
@@ -474,6 +464,7 @@ const handleFileStatusEvent = (event: FileUploadStatusEvent, confirmedTerminal =
       latestTempPreview.value = null
       emit('update:modelValue', uploaded)
       emit('success', event)
+      if (assignmentCompletion) releaseCompletion(assignmentCompletion)
     }
     currentTaskId.value = null
     detachListener()
@@ -667,6 +658,9 @@ const uploadFile = async (file: File | undefined, reconcile = false) => {
       if (currentUploadId.value) {
         uploadQueue.update(currentUploadId.value, 100)
       }
+      // A host progress callback can rebind or unmount this field. Let Vue
+      // apply that change before deciding whether the result may be assigned.
+      await nextTick()
     }
 
     if (response.uncertainCompletion) {
@@ -692,7 +686,7 @@ const uploadFile = async (file: File | undefined, reconcile = false) => {
       if (completion) releaseCompletion(completion)
       throw new Error(terminalTask.error || response.error || 'Upload processing failed')
     }
-    if (response.status !== 'queued' && !(reconcile && response.status === 'completed')) {
+    if (!['queued', 'processing', 'completed'].includes(response.status)) {
       throw new Error(response.error || 'Failed to enqueue upload task')
     }
 
@@ -709,25 +703,16 @@ const uploadFile = async (file: File | undefined, reconcile = false) => {
     )
       throw new Error('Return to the original entity to check this upload.')
     assignmentCompletion = completion
-    if (completion && !requireAssignmentConfirmation) releaseCompletion(completion)
 
     if (task.tempUrl && !requireAssignmentConfirmation) {
       previewUrl.value = task.tempUrl
       latestTempPreview.value = task.tempUrl
     }
 
-    if (task.file && !requireAssignmentConfirmation) {
-      const uploaded = mapSummaryFile(task.file)
-      currentFile.value = uploaded
-      previewUrl.value = uploaded.url
-      latestTempPreview.value = null
-      emit('update:modelValue', uploaded)
-    }
-
     detachListener()
     taskEntity = { type: originalEntityType, id: String(originalEntityId) }
     currentTaskId.value = task.id
-    if (reconcile && response.status === 'completed' && task.file?.url) {
+    if ((task.status === 'completed' || response.status === 'completed') && task.file?.url) {
       handleFileStatusEvent({
         eventId: `reconcile-${task.id}`,
         eventType: FILE_UPLOAD_STATUS_EVENT,

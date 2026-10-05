@@ -456,6 +456,16 @@ protection. No automatic expiry unlocks an unresolved completion. Custom host
 widgets must explicitly retain/restore their own session and task state, or
 adopt the composable; raw `uploadFiles` does not own UI recovery state.
 
+A widget keeps that fence through dispatched/unknown, accepted queued,
+processing, and completed-but-not-assigned states. Cancellation, teardown,
+scope changes, failed insertion and transient polling errors do not release it.
+Only a successful final image assignment or rich-text command mutation into the
+matching field, a proven terminal rejection/failure, or explicit dismissal of a
+confirmed result releases the exact session. A queued task's file/temporary URL
+is not terminal assignment. Rich-text insertion must return success before
+assignment events are emitted. Saving a host form is a separate host-owned
+commitment: the widget's model update does not claim that the form was saved.
+
 Acknowledged chunk progress uses validated `Upload-Offset` values. PATCH must
 return 204 and advance by the exact chunk length. Missing, invalid, out-of-range
 or backward offsets fail explicitly; repeated conflicts are bounded. These
