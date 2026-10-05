@@ -5,7 +5,6 @@ package migrations_test
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"testing"
 
 	"github.com/assurrussa/goauth/postgres"
@@ -85,7 +84,7 @@ email TEXT NOT NULL
 )`)
 	require.NoError(t, err)
 	err = goadminmigrations.Migrate(ctx, goadminmigrations.DatabaseConfig{}, db)
-	require.True(t, errors.Is(err, postgres.ErrLegacySchemaRequiresReset), err)
+	require.ErrorIs(t, err, postgres.ErrLegacySchemaRequiresReset)
 	requireTableMissing(t, ctx, db, "administrations")
 	requireTableMissing(t, ctx, db, "goadmin_browser_sessions")
 	requireTableMissing(t, ctx, db, "goadmin_browser_auth_state")

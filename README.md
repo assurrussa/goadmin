@@ -4,7 +4,7 @@
 projects integrate it through the stable `github.com/assurrussa/goadmin/host`
 facade instead of copying admin internals.
 
-Install the public release with `go get github.com/assurrussa/goadmin@v0.9.0`.
+Install the public release with `go get github.com/assurrussa/goadmin@v0.9.1`.
 Its dependency graph uses GoAuth v0.5.1, GoNotify v0.6.0, GoUploads v0.11.0 and
 GoWebSocket v0.2.1 without sibling replacements.
 
@@ -172,12 +172,17 @@ Product features mount with `host.FeatureModule(feature, dependencies...)` or
 permission checks, typed body binding and a canonical actor. Keep business
 services in feature constructors; reuse the generic datagrid toolkit for lists.
 
-`migrations.Migrate` installs canonical goauth storage first and then the
-goadmin host schema, including the user projection. A detected v0.1 auth schema
+`migrations.Migrate` installs canonical goauth storage, the goadmin host schema
+(including the user projection), then canonical GoUploads lifecycle storage.
+GoUploads uses its own `goadmin_uploads_goose_db_version` ledger; core retains
+ownership of the shared base `files` table. Apply migrations before accepting
+upload traffic or starting upload workers. See [upload migration upgrades](RELEASING.md#upload-migration-upgrades)
+for existing-host constraints. A detected v0.1 auth schema
 returns `postgres.ErrLegacySchemaRequiresReset` without deleting data. The
 typed `migrations.Reset(..., postgres.ConfirmResetAuthState)` path is only for
 an explicit development/test reset; it removes auth state and admin/user
-projections while preserving unrelated files and queue tables.
+projections while preserving files, upload sessions/finalizations/deletion plans,
+the upload migration ledger, and queue tables.
 
 ## Commands
 

@@ -409,3 +409,16 @@ cookie middleware: bootstrap owns Origin checks, duplicate-input rejection and
 opaque-session binding. Configure cookies through admin config/SessionStore;
 CSRFConfig no longer accepts IsProd, CookieNameCSRFToken, CookieNameRefreshToken
 or ExcludePaths. These are source contract changes requiring host adaptation.
+
+## Canonical upload migrations
+
+The public migration facade installs GoAuth, GoAdmin core, then the pinned
+GoUploads `host.MigrationsFS` using the independent
+`goadmin_uploads_goose_db_version` ledger. Only the already-owned base `files`
+migration is excluded. Upload versions collide with unrelated admin versions,
+so sharing a ledger would silently omit required tables. The Goose provider
+disables host global Go migration registration and uses a PostgreSQL session
+lock. `Reset` preserves upload data and its ledger. Existing independently
+managed lifecycle schemas require reviewed ledger reconciliation; no schema
+adoption is inferred from table existence. See `RELEASING.md` for duplicate
+primary-file handling and migration rollout requirements.

@@ -81,7 +81,8 @@ The default canonical admin session backend is PostgreSQL; Redis is explicit.
 Keep backend config, cookie policy and owner/version fencing aligned.
 
 Use `goadmin/migrations.Migrate`; it installs canonical goauth v0.2 storage
-before the complete goadmin host schema. Legacy v0.1 state requires the typed,
+before the complete goadmin host schema, then canonical GoUploads lifecycle
+storage under its own ledger. Legacy v0.1 state requires the typed,
 explicit development/test reset path.
 
 ## Commands

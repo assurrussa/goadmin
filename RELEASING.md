@@ -53,6 +53,42 @@ and task status. Built-in policies remain unchanged; full MP3/WAV acceptance
 requires the published GoUploads v0.11.0+ dependency and `original_only` mode.
 Do not use a candidate replacement as published-release evidence.
 
+## Upload migration upgrades
+
+Starting with v0.9.1, the public `migrations.Migrate` runner installs the
+published GoUploads canonical migration filesystem after GoAdmin core, using
+`goadmin_uploads_goose_db_version`. It excludes only the base `files` migration
+already owned by GoAdmin. No upstream SQL is copied or rewritten. The separate
+ledger is required because upstream upload migration versions collide with
+unrelated GoAdmin migration versions.
+
+For a normal existing GoAdmin-only installation, pause upload writes/workers,
+run the public migration command, and resume traffic only after success. The
+canonical SQL creates upload sessions, durable finalization tombstones and
+deletion plans, adds lifecycle indexes and a single-active-primary-file index,
+and backfills unclassified legacy image/video/document types. Existing IDs,
+files, queues and explicit file types (including audio) are retained. Plan for
+ordinary PostgreSQL DDL/backfill locks on populated tables.
+
+Duplicate active primary files for one object intentionally fail migration;
+resolve the host's intended primary-file assignment explicitly, then retry.
+The failing lifecycle migration rolls back its own DDL/backfill; a preceding
+session migration may already be committed. Never delete or choose user data
+automatically to satisfy this check.
+
+If a host independently installed lifecycle SQL under a different migration
+ledger, review and reconcile that history explicitly before adopting this
+runner. Object existence is not proof of an equivalent schema, so the runner
+does not guess or mark those migrations applied. Public `Reset` remains a
+confirmed development/test auth reset and preserves all upload state and its
+ledger, allowing a subsequent `Migrate` without replaying lifecycle SQL.
+
+Required regressions cover a fresh public facade, a previous-GoAdmin schema,
+repeat migration, reset preservation, duplicate-primary rollback/retry, and
+native TUS create/PATCH/complete (including retry) through `NewLocalUploads`
+with a custom audio policy. A reader-only upload test cannot establish durable
+TUS schema readiness.
+
 ## Supported External Surface
 
 The supported embedding surface is intentionally narrow:
@@ -180,8 +216,8 @@ task platform:published-check GOAUTH_VERSION=<published-goauth-tag> GOADMIN_VERS
   through `Dependencies.Auth`; no host constructs goauth repositories directly.
 - `host.WithRolePresets` delegates canonical idempotent role policy seeding to
   `goauth`; feature packages keep ownership of their concrete presets.
-- `goadmin/migrations.Migrate` installs canonical goauth storage and the
-  complete goadmin host schema in order. It never resets a v0.1 schema.
+- `goadmin/migrations.Migrate` installs canonical goauth storage, the
+  complete goadmin host schema, and canonical GoUploads lifecycle storage in order. It never resets a v0.1 schema.
 - `goadmin/migrations.Reset` accepts only the typed goauth reset confirmation
   and is restricted to explicit development/test state reset.
 - `goadmin/features/users` is optional and must be registered by the host.

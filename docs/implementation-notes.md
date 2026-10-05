@@ -1235,3 +1235,20 @@ three module-only advisories remain outside imported vulnerable packages. The
 `docs/dependency-advisory-review.md`; no force upgrade or advisory suppression
 was applied. PostgreSQL/Redis integration, isolated public-dependency consumer
 and the eventual published GoAdmin tag are separate required release gates.
+
+## Public upload migration runner correction (v0.9.1)
+
+Real host TUS QA exposed an omitted upstream schema dependency: the public
+GoAdmin facade installed core files but never mounted canonical GoUploads
+lifecycle migrations, causing `upload_finalizations` lookup failure at
+completion. Earlier reader-ingress integration did not exercise the durable
+finalization key path. This patch appends the pinned canonical filesystem,
+excluding only the base files migration, under an independent ledger. It does
+not copy SQL into a host or change the GoUploads pin/API.
+
+Regressions use the public facade and an empty app-migration fixture rather
+than manually creating upload tables. Coverage includes fresh, repeat and
+previous-GoAdmin migrations, auth-reset preservation, transactional conflict
+rollback/retry, and real native TUS audio completion with finalizer execution.
+Published release readiness still requires live PostgreSQL/Redis, clean Codex
+review and the exact published-tag anonymous consumer gate.

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/assurrussa/goauth/postgres"
+	uploadhost "github.com/assurrussa/gouploads/host"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,6 +38,36 @@ func TestCoreMigrationTableNameIsStable(t *testing.T) {
 	t.Parallel()
 
 	require.Equal(t, "goadmin_goose_db_version", TableName)
+}
+
+func TestUploadsProviderUsesCanonicalMigrationsExceptCoreFiles(t *testing.T) {
+	t.Parallel()
+
+	require.Equal(t, "goadmin_uploads_goose_db_version", uploadsTableName)
+	require.NotEqual(t, TableName, uploadsTableName)
+	db, err := sql.Open("pgx", "postgres://localhost/unused")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	provider, err := uploadsProvider(db)
+	require.NoError(t, err)
+	canonical, err := uploadhost.MigrationFiles()
+	require.NoError(t, err)
+	var expected []string
+	for _, name := range canonical {
+		if name != uploadsFilesMigration {
+			expected = append(expected, name)
+		}
+	}
+	sources := provider.ListSources()
+	actual := make([]string, 0, len(sources))
+	for _, source := range sources {
+		actual = append(actual, source.Path)
+	}
+	require.Equal(t, []string{
+		"20260710120000_create_upload_sessions.sql",
+		"20260930120000_upload_lifecycle_safety.sql",
+	}, actual)
+	require.Equal(t, expected, actual)
 }
 
 func TestFirstAdminSetupTokenMigrationStoresOnlyFixedLengthHash(t *testing.T) {
