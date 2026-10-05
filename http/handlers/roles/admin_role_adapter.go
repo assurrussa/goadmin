@@ -105,3 +105,39 @@ func fallbackAdminSubjectID(admin models.Admin) string {
 
 	return subjectID.String()
 }
+
+type subjectRoleTransaction interface {
+	InSubjectRoleTransaction(ctx context.Context, subjects []string, fn func(context.Context) error) error
+}
+
+type adminRoleTransactionAdapter struct {
+	admins  adminRepository
+	service subjectRoleTransaction
+}
+
+func (a *adminRoleTransactionAdapter) InAdminRoleTransaction(
+	ctx context.Context, actorID, adminID int64, fn func(context.Context) error,
+) error {
+	actor, err := resolveAdminSubjectID(ctx, a.admins, actorID)
+	if err != nil {
+		return err
+	}
+	target, err := resolveAdminSubjectID(ctx, a.admins, adminID)
+	if err != nil {
+		return err
+	}
+	return a.service.InSubjectRoleTransaction(ctx, []string{actor, target}, func(txCtx context.Context) error {
+		// Recheck membership-to-subject mappings after acquiring canonical locks.
+		// Never apply the mutation to a different subject if a projection changed.
+		for id, expected := range map[int64]string{actorID: actor, adminID: target} {
+			actual, err := resolveAdminSubjectID(txCtx, a.admins, id)
+			if err != nil {
+				return err
+			}
+			if actual != expected {
+				return errInvalidAdminID
+			}
+		}
+		return fn(txCtx)
+	})
+}

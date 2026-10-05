@@ -15,6 +15,7 @@ var (
 )
 
 type UseCaseService interface {
+	InSubjectRoleTransaction(ctx context.Context, subjects []string, fn func(context.Context) error) error
 	ListRoles(ctx context.Context, filter integrationroles.RoleFilter) ([]integrationroles.Role, error)
 	GetRole(ctx context.Context, id int64) (*integrationroles.Role, error)
 	CreateRole(ctx context.Context, input integrationroles.CreateRoleInput) (*integrationroles.Role, error)
@@ -49,16 +50,17 @@ func BuildUseCases(service UseCaseService, repo UseCaseRepository, adminRepo adm
 	listSubjectRoles := integrationroles.MustListSubjectRolesUseCase(service)
 
 	return UseCases{
-		ListRoles:           integrationroles.MustListRolesUseCase(service),
-		GetRole:             integrationroles.MustGetRoleUseCase(service),
-		CreateRole:          integrationroles.MustCreateRoleUseCase(service),
-		UpdateRole:          integrationroles.MustUpdateRoleUseCase(service),
-		DeleteRole:          integrationroles.MustDeleteRoleUseCase(service),
-		SetPermissions:      integrationroles.MustSetRolePermissionsUseCase(service),
-		AssignAdminRoles:    newAssignAdminRolesAdapter(adminRepo, assignSubjectRoles),
-		ListPermissions:     integrationroles.MustListPermissionsUseCase(service),
-		ListRolePermissions: integrationroles.MustListRolePermissionsUseCase(service),
-		ListAdminRoles:      newListAdminRolesAdapter(adminRepo, listSubjectRoles),
-		ListAllRoles:        integrationroles.MustListAllRolesUseCase(service, repo),
+		ListRoles:            integrationroles.MustListRolesUseCase(service),
+		GetRole:              integrationroles.MustGetRoleUseCase(service),
+		CreateRole:           integrationroles.MustCreateRoleUseCase(service),
+		UpdateRole:           integrationroles.MustUpdateRoleUseCase(service),
+		DeleteRole:           integrationroles.MustDeleteRoleUseCase(service),
+		SetPermissions:       integrationroles.MustSetRolePermissionsUseCase(service),
+		AssignAdminRoles:     newAssignAdminRolesAdapter(adminRepo, assignSubjectRoles),
+		AdminRoleTransaction: &adminRoleTransactionAdapter{admins: adminRepo, service: service},
+		ListPermissions:      integrationroles.MustListPermissionsUseCase(service),
+		ListRolePermissions:  integrationroles.MustListRolePermissionsUseCase(service),
+		ListAdminRoles:       newListAdminRolesAdapter(adminRepo, listSubjectRoles),
+		ListAllRoles:         integrationroles.MustListAllRolesUseCase(service, repo),
 	}, nil
 }

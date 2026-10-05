@@ -1,5 +1,24 @@
 # Implementation Notes
 
+## Atomic admin role mutations (2026-10-05)
+
+Attach, detach and explicit replacement acquire canonical actor/target subject
+locks in sorted order before reading roles or checking protected administrators.
+The existing GoAuth v0.5.1 managed transaction joins projection reads and RBAC
+writes; no new GoAuth API, schema or dependency version is required. Projection
+subject mappings are rechecked after locking. HTTP success and informational
+responses are emitted only after commit; failed or uncertain transactions are
+not retried automatically.
+A host-supplied subject checker remains the route/action authorization guard;
+transactional canonical-state checks use the AuthAdapter database handle rather
+than passing its transaction to a separately opened checker handle.
+
+Attach/detach keep their existing idempotent behavior, response forms and
+self-super-admin restriction. Explicit replacement remains a full replacement,
+while its protected-target checks now share the same transaction. This does not
+introduce a global last-administrator policy, session rotation or new audit
+events. No real account permissions are changed by installing this code.
+
 ## Opt-in canonical audio consumers (2026-10-04)
 
 Add `host.UploadsConfig.Strategies` through module assembly and bootstrap to the

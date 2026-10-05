@@ -446,6 +446,8 @@ func validateRolesUseCases(useCases adminroleshandler.UseCases) error {
 		return errors.New("adminserver: RolesUseCases.DeleteRole is required")
 	case isNil(useCases.SetPermissions):
 		return errors.New("adminserver: RolesUseCases.SetPermissions is required")
+	case isNil(useCases.AdminRoleTransaction):
+		return errors.New("adminserver: RolesUseCases.AdminRoleTransaction is required")
 	case isNil(useCases.AssignAdminRoles):
 		return errors.New("adminserver: RolesUseCases.AssignAdminRoles is required")
 	case isNil(useCases.ListPermissions):
