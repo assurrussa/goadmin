@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -95,6 +96,11 @@ func TestLocalNativeTUSAudioAfterPublicMigrationsIntegration(t *testing.T) {
 	require.Equal(t, uploadhost.FileUploadTaskStatusQueued.String(), completed.Status)
 	require.Empty(t, completed.URL)
 	require.Len(t, queue.jobs, 1)
+	require.Equal(t, "finalize_original_file", queue.jobs[0].name)
+	queuedFile, err := runtime.Repositories.FileRepo.GetByID(ctx, completed.ID)
+	require.NoError(t, err)
+	stagingPath := queuedFile.GetFullPath()
+	require.FileExists(t, filepath.Join(cfg.Root, stagingPath))
 
 	session, err = runtime.Uploads.TusStore.Get(ctx, path.Base(location))
 	require.NoError(t, err)
@@ -126,6 +132,16 @@ func TestLocalNativeTUSAudioAfterPublicMigrationsIntegration(t *testing.T) {
 		}
 	}
 	require.True(t, handled, "the queued job must be the real original-only finalizer")
+	require.Len(t, queue.jobs, 2)
+	require.Equal(t, "deleted_file", queue.jobs[1].name, "successful finalization schedules staging cleanup")
+	var cleanupPayload struct {
+		FileID   int64  `json:"fileId"`
+		FilePath string `json:"filepath"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(queue.jobs[1].payload), &cleanupPayload))
+	require.Zero(t, cleanupPayload.FileID, "staging cleanup must not delete the final file record")
+	require.Equal(t, stagingPath, cleanupPayload.FilePath)
+	expectedJobs := append([]uploadQueuedJob(nil), queue.jobs...)
 	final, err := restarted.Repositories.FileRepo.GetByID(ctx, completed.ID)
 	require.NoError(t, err)
 	require.True(t, IsFinalizedUpload(final))
@@ -147,6 +163,23 @@ func TestLocalNativeTUSAudioAfterPublicMigrationsIntegration(t *testing.T) {
 	require.NoError(t, reader.Close())
 	require.NoError(t, readErr)
 	require.Equal(t, wav, stored, "original-only processing must preserve every uploaded byte")
+	require.NotEqual(t, stagingPath, final.GetFullPath())
+	for _, job := range restarted.Jobs {
+		if job.Name() == queue.jobs[1].name {
+			require.NoError(t, job.Handle(ctx, queue.jobs[1].payload))
+			require.NoError(t, job.Handle(ctx, queue.jobs[1].payload), "staging cleanup is retryable")
+		}
+		if job.Name() == queue.jobs[0].name {
+			require.NoError(t, job.Handle(ctx, queue.jobs[0].payload), "finalizer replay must not enqueue more work")
+		}
+	}
+	require.NoFileExists(t, filepath.Join(cfg.Root, stagingPath))
+	reader, err = restarted.Storage.Open(ctx, final.GetFullPath())
+	require.NoError(t, err)
+	stored, readErr = io.ReadAll(reader)
+	require.NoError(t, reader.Close())
+	require.NoError(t, readErr)
+	require.Equal(t, wav, stored, "staging cleanup must preserve the final artifact")
 
 	repeated = nativeAudioComplete(t, app, location)
 	require.Equal(t, completed.ID, repeated.ID)
@@ -155,7 +188,7 @@ func TestLocalNativeTUSAudioAfterPublicMigrationsIntegration(t *testing.T) {
 	require.Equal(t, int64(len(wav)), repeated.Size)
 	require.Equal(t, uploadhost.FileUploadTaskStatusCompleted.String(), repeated.Status)
 	require.Equal(t, cfg.BaseURL+"/"+final.GetFullPath(), repeated.URL)
-	require.Len(t, queue.jobs, 1)
+	require.Equal(t, expectedJobs, queue.jobs, "completion and job retries must not enqueue duplicate work")
 	var fileCount, finalizationCount int
 	require.NoError(t, sqlDB.QueryRowContext(ctx,
 		"SELECT (SELECT count(*) FROM files), (SELECT count(*) FROM upload_finalizations)").Scan(&fileCount, &finalizationCount))
