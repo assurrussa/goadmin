@@ -98,3 +98,38 @@ func TestPostResetPasswordRejectsMismatchedConfirmation(t *testing.T) {
 	defer func() { require.NoError(t, resp.Body.Close()) }()
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 }
+
+func TestPostLoginRedirectUsesAnyPermissionMenu(t *testing.T) {
+	const studentsPath = "/students"
+	for _, action := range []integrationroles.PermissionAction{"", "read", "create", "update", "delete"} {
+		t.Run(string(action), func(t *testing.T) {
+			appTest := adminappt.NewAppTest(t)
+			appTest.MockRoleService.EXPECT().IsSuperAdmin(gomock.Any(), int64(42)).Return(false).AnyTimes()
+			appTest.MockRoleService.EXPECT().AdminCan(gomock.Any(), int64(42), gomock.Any(), gomock.Any()).DoAndReturn(func(
+				_ context.Context, _ int64, domain integrationroles.PermissionDomain, candidate integrationroles.PermissionAction,
+			) bool {
+				return domain == "users" && candidate == action
+			}).AnyTimes()
+			handler := NewHandler(HandlerOptions{AdminApp: appTest.App, AdminMenu: menu.Menu{Sections: []menu.Section{{
+				Key: "students", Items: []menu.Item{{Name: "Group", Children: []menu.Item{{
+					Href: studentsPath, AnyPermissionKeys: []integrationroles.PermissionKey{
+						integrationroles.NewPermissionKey("users", "read"), integrationroles.NewPermissionKey("users", "create"),
+						integrationroles.NewPermissionKey("users", "update"), integrationroles.NewPermissionKey("users", "delete"),
+					},
+				}}}},
+			}}}})
+			app := fiber.New()
+			app.Get("/auth/login", func(c fiber.Ctx) error { return c.SendString(handler.buildPostLoginRedirect(c, 42)) })
+			resp, err := app.Test(httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/auth/login", nil))
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			want := studentsPath
+			if action == "" {
+				want = "/auth/profile"
+			}
+			require.Equal(t, want, string(body))
+		})
+	}
+}

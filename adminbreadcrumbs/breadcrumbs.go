@@ -20,7 +20,7 @@ func RootBreadcrumb(m menu.Menu) (Breadcrumb, bool) {
 // FilterBreadcrumbs removes breadcrumb items that point to routes not present
 // in the allowed href set. Breadcrumbs without href are always preserved.
 func FilterBreadcrumbs(crumbs []Breadcrumb, allowed map[string]struct{}) []Breadcrumb {
-	if len(crumbs) == 0 || len(allowed) == 0 {
+	if len(crumbs) == 0 {
 		return crumbs
 	}
 

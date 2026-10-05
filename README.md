@@ -449,3 +449,36 @@ GoUploads dependency, including future additions, and serialize its full pack.
 The default `migrations.Migrate` remains unchanged and manages uploads itself.
 Do not switch an existing canonical upload ledger to host management without a
 separate reviewed ownership transition. This API itself moves no data or history.
+
+### Menu visibility with any permission
+
+A host page that supports several separately guarded actions can expose one menu
+item to admins holding any of those permissions:
+
+```go
+host.Item{
+    Name: "Students",
+    Href: "/students",
+    AnyPermissionKeys: []host.PermissionKey{
+        host.NewPermissionKey("users", host.PermissionActionRead),
+        host.NewPermissionKey("users", host.PermissionActionCreate),
+        host.NewPermissionKey("users", host.PermissionActionUpdate),
+        host.NewPermissionKey("users", host.PermissionActionDelete),
+    },
+}
+```
+
+`AnyPermissionKeys` controls sidebar visibility, menu-derived breadcrumbs, and
+menu-based post-login destinations. It does not grant permissions or authorize
+HTTP endpoints: the host page and each action must keep their own matching
+permission guards. Explicit post-login deep links retain their existing behavior
+and remain subject to the destination's route guards.
+
+A nil or empty list preserves existing `PermissionKey` behavior. A nonempty list
+requires at least one nonzero key; empty/partial keys never satisfy it. If both
+fields are set, `PermissionKey` **and** the any-of condition must pass. Existing
+superadmin and nil-checker behavior is unchanged. A denied parent still hides its
+children, and groups without visible children are omitted. Matching top-level menu items
+retain the first nonempty value of each permission field; their OR lists are not
+combined. Existing child deduplication is unchanged: matching nested children
+keep the first entire item. Put their complete policy in that first contribution. Both permission fields stay server-side and are absent from menu JSON.

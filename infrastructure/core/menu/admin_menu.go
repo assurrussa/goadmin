@@ -25,13 +25,18 @@ type PermissionChecker interface {
 	AdminCan(ctx context.Context, adminID int64, domain integrationroles.PermissionDomain, action integrationroles.PermissionAction) bool //nolint:lll // required
 }
 
+// Item controls navigation visibility only; routes must enforce their own permissions.
 type Item struct {
 	Name          string                         `json:"name"`
 	Href          string                         `json:"href"`
 	Icon          string                         `json:"icon,omitempty"`
 	Badge         *Badge                         `json:"badge,omitempty"`
 	PermissionKey integrationroles.PermissionKey `json:"-"`
-	Children      []Item                         `json:"children,omitempty"`
+	// AnyPermissionKeys requires at least one nonzero key when nonempty. If
+	// PermissionKey is also set, both the legacy key and this any-of condition
+	// must pass. Empty lists preserve legacy behavior; zero keys never satisfy OR.
+	AnyPermissionKeys []integrationroles.PermissionKey `json:"-"`
+	Children          []Item                           `json:"children,omitempty"`
 }
 
 type Badge struct {
@@ -78,14 +83,14 @@ func (m Menu) Merge(other Menu) Menu {
 				if idx := findItemIndex(existing.Items, item); idx >= 0 {
 					mergeItem(&existing.Items[idx], item)
 				} else {
-					existing.Items = append(existing.Items, item)
+					existing.Items = append(existing.Items, cloneItem(item))
 				}
 			}
 			return
 		}
 
 		s := sec
-		s.Items = slices.Clone(sec.Items)
+		s.Items = cloneItems(sec.Items)
 		merged[sec.Key] = &s
 		order = append(order, sec.Key)
 	}
@@ -222,7 +227,7 @@ func filterItems(
 ) []Item {
 	filtered := make([]Item, 0, len(items))
 	for _, item := range items {
-		if !allowAll && !canView(ctx, admin, checker, item.PermissionKey) {
+		if !allowAll && !canView(ctx, admin, checker, item) {
 			continue
 		}
 		if len(item.Children) > 0 {
@@ -241,16 +246,24 @@ func canView(
 	ctx context.Context,
 	admin *models.SessionAdmin,
 	checker PermissionChecker,
-	key integrationroles.PermissionKey,
+	item Item,
 ) bool {
-	if key.IsZero() {
-		return true
-	}
 	if checker == nil {
 		return true
 	}
-
-	return checker.AdminCan(ctx, admin.ID, key.Domain, key.Action)
+	key := item.PermissionKey
+	if !key.IsZero() && !checker.AdminCan(ctx, admin.ID, key.Domain, key.Action) {
+		return false
+	}
+	if len(item.AnyPermissionKeys) == 0 {
+		return true
+	}
+	for _, candidate := range item.AnyPermissionKeys {
+		if !candidate.IsZero() && checker.AdminCan(ctx, admin.ID, candidate.Domain, candidate.Action) {
+			return true
+		}
+	}
+	return false
 }
 
 // ModuleMenu returns only explicitly mounted built-in screen contributions.
@@ -288,9 +301,30 @@ func mergeItem(existing *Item, incoming Item) {
 	if existing.PermissionKey.IsZero() && !incoming.PermissionKey.IsZero() {
 		existing.PermissionKey = incoming.PermissionKey
 	}
+	// Like PermissionKey, the first nonempty any-of policy wins. Do not union
+	// duplicate contributions: that could broaden the original visibility rule.
+	if len(existing.AnyPermissionKeys) == 0 && len(incoming.AnyPermissionKeys) > 0 {
+		existing.AnyPermissionKeys = slices.Clone(incoming.AnyPermissionKeys)
+	}
 	for _, child := range incoming.Children {
 		if findItemIndex(existing.Children, child) < 0 {
-			existing.Children = append(existing.Children, child)
+			existing.Children = append(existing.Children, cloneItem(child))
 		}
 	}
+}
+
+// Clone permission slices at every depth so merged policies do not alias inputs.
+func cloneItem(src Item) Item {
+	item := src
+	item.AnyPermissionKeys = slices.Clone(src.AnyPermissionKeys)
+	item.Children = cloneItems(src.Children)
+	return item
+}
+
+func cloneItems(src []Item) []Item {
+	items := slices.Clone(src)
+	for i := range items {
+		items[i] = cloneItem(items[i])
+	}
+	return items
 }
