@@ -422,3 +422,20 @@ lock. `Reset` preserves upload data and its ledger. Existing independently
 managed lifecycle schemas require reviewed ledger reconciliation; no schema
 adoption is inferred from table existence. See `RELEASING.md` for duplicate
 primary-file handling and migration rollout requirements.
+
+## Browser upload request lifecycle
+
+The canonical TUS client accepts optional `signal` and `requestTimeoutMs` in
+`UploadRequest` and `PendingTusUploadRequest`. The default is 120 seconds of
+inactivity for each create, HEAD, PATCH, or completion request; network upload
+and download progress reset that timer. This is not a total-file deadline.
+Timeout or cancellation aborts the underlying transport and fences late results.
+Creation and completion are never automatically retried after uncertain results.
+Cancellation cannot undo a completion already accepted by the server.
+
+Acknowledged chunk progress uses validated `Upload-Offset` values. PATCH must
+return 204 and advance by the exact chunk length. Missing, invalid, out-of-range
+or backward offsets fail explicitly; repeated conflicts are bounded. These
+checks also reject redirected HTML error pages instead of counting them as
+uploaded bytes. Domain-owned pending uploads retain their separate finalization
+boundary. Existing `uploadFiles` error-envelope behavior is unchanged.

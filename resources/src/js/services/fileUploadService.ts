@@ -1,4 +1,4 @@
-import axios, { type AxiosResponse } from 'axios'
+import axios, { type AxiosRequestConfig, type AxiosResponse } from 'axios'
 import { resolveTusEndpoint } from './tusEndpoint'
 
 type EntityID = number | string
@@ -165,7 +165,13 @@ export interface ListFilesResponse {
   entityId: number | null
 }
 
-export interface UploadRequest {
+export interface UploadTransportOptions {
+  signal?: AbortSignal
+  /** Maximum inactivity per HTTP request, reset by network progress. Default: 120s. */
+  requestTimeoutMs?: number
+}
+
+export interface UploadRequest extends UploadTransportOptions {
   entityType: string
   entityId: EntityID | null | undefined
   file?: File
@@ -425,6 +431,81 @@ const TUS_VERSION = '1.0.0'
 const TUS_CONTENT_TYPE = 'application/offset+octet-stream'
 const TUS_CHUNK_SIZE = 5 * 1024 * 1024
 
+// Bound a stalled request, not the duration of the entire upload. Aborting the
+// transport also stops pending XHRs; the local rejection fences late adapters.
+const tusRequest = <T>(
+  options: UploadTransportOptions,
+  send: (config: AxiosRequestConfig) => Promise<T>,
+): Promise<T> =>
+  new Promise((resolve, reject) => {
+    const timeout = options.requestTimeoutMs ?? 120_000
+    if (!Number.isFinite(timeout) || timeout <= 0) {
+      reject(new Error('Upload request timeout must be a positive number'))
+      return
+    }
+    const controller = new AbortController()
+    let settled = false
+    let timer: ReturnType<typeof setTimeout>
+    const cleanup = () => {
+      clearTimeout(timer)
+      options.signal?.removeEventListener('abort', cancel)
+    }
+    const stop = (error: Error) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      controller.abort()
+      reject(error)
+    }
+    const cancel = () => stop(new Error('Upload cancelled'))
+    const progress = () => {
+      if (settled) return
+      clearTimeout(timer)
+      timer = setTimeout(
+        () => stop(new Error('Upload request timed out. Check your connection and try again.')),
+        timeout,
+      )
+    }
+    if (options.signal?.aborted) {
+      cancel()
+      return
+    }
+    options.signal?.addEventListener('abort', cancel, { once: true })
+    progress()
+    Promise.resolve()
+      .then(() => {
+        if (settled) throw new Error('Upload cancelled')
+        return send({
+          signal: controller.signal,
+          onUploadProgress: progress,
+          onDownloadProgress: progress,
+        })
+      })
+      .then(
+        (value) => {
+          if (settled) return
+          settled = true
+          cleanup()
+          resolve(value)
+        },
+        (error) => {
+          if (settled) return
+          settled = true
+          cleanup()
+          reject(error)
+        },
+      )
+  })
+
+const readTusOffset = (response: AxiosResponse): number => {
+  const header = response.headers['upload-offset'] ?? response.headers['Upload-Offset']
+  if (header === undefined || !/^\d+$/.test(String(header)))
+    throw new Error('Invalid upload offset')
+  const offset = Number(header)
+  if (!Number.isSafeInteger(offset)) throw new Error('Invalid upload offset')
+  return offset
+}
+
 const encodeTusValue = (value: string): string => {
   if (typeof btoa === 'function') {
     const bytes = new TextEncoder().encode(value)
@@ -475,19 +556,23 @@ const createTusUpload = async (
   file: File,
   metadata: Record<string, string | number | boolean | null | undefined>,
   uploadUrl?: string,
+  options: UploadTransportOptions = {},
 ): Promise<string> => {
   try {
     const endpoint = resolveTusEndpoint(uploadUrl)
-    const response = await axios.post(
-      endpoint,
-      {},
-      {
-        headers: {
-          'Tus-Resumable': TUS_VERSION,
-          'Upload-Length': String(file.size),
-          'Upload-Metadata': buildTusMetadata(metadata),
+    const response = await tusRequest(options, (config) =>
+      axios.post(
+        endpoint,
+        {},
+        {
+          ...config,
+          headers: {
+            'Tus-Resumable': TUS_VERSION,
+            'Upload-Length': String(file.size),
+            'Upload-Metadata': buildTusMetadata(metadata),
+          },
         },
-      },
+      ),
     )
 
     // Axios headers keys are usually lowercased
@@ -513,18 +598,18 @@ const createTusUpload = async (
   }
 }
 
-const fetchTusOffset = async (uploadUrl: string): Promise<number> => {
+const fetchTusOffset = async (
+  uploadUrl: string,
+  options: UploadTransportOptions = {},
+): Promise<number> => {
   try {
-    const response = await axios.head(uploadUrl, {
-      headers: {
-        'Tus-Resumable': TUS_VERSION,
-      },
-    })
-
-    const offsetHeader =
-      response.headers['upload-offset'] || response.headers['Upload-Offset'] || '0'
-    const offset = Number(offsetHeader)
-    return Number.isFinite(offset) ? offset : 0
+    const response = await tusRequest(options, (config) =>
+      axios.head(uploadUrl, {
+        ...config,
+        headers: { 'Tus-Resumable': TUS_VERSION },
+      }),
+    )
+    return readTusOffset(response)
   } catch (error) {
     throw new Error(readTusError(error))
   }
@@ -534,15 +619,19 @@ const patchTusChunk = async (
   uploadUrl: string,
   offset: number,
   chunk: Blob,
+  options: UploadTransportOptions = {},
 ): Promise<AxiosResponse> => {
   try {
-    return await axios.patch(uploadUrl, chunk, {
-      headers: {
-        'Tus-Resumable': TUS_VERSION,
-        'Upload-Offset': String(offset),
-        'Content-Type': TUS_CONTENT_TYPE,
-      },
-    })
+    return await tusRequest(options, (config) =>
+      axios.patch(uploadUrl, chunk, {
+        ...config,
+        headers: {
+          'Tus-Resumable': TUS_VERSION,
+          'Upload-Offset': String(offset),
+          'Content-Type': TUS_CONTENT_TYPE,
+        },
+      }),
+    )
   } catch (error) {
     if (axios.isAxiosError(error) && error.response) {
       // Return response for 409 handling in loop
@@ -552,17 +641,23 @@ const patchTusChunk = async (
   }
 }
 
-const finalizeTusUpload = async (uploadUrl: string): Promise<RawUploadResponse> => {
+const finalizeTusUpload = async (
+  uploadUrl: string,
+  options: UploadTransportOptions = {},
+): Promise<RawUploadResponse> => {
   const endpoint = uploadUrl.replace(/\/$/, '')
   try {
-    const response = await axios.post<RawUploadResponse>(
-      `${endpoint}/complete`,
-      {},
-      {
-        headers: {
-          'Tus-Resumable': TUS_VERSION,
+    const response = await tusRequest(options, (config) =>
+      axios.post<RawUploadResponse>(
+        `${endpoint}/complete`,
+        {},
+        {
+          ...config,
+          headers: {
+            'Tus-Resumable': TUS_VERSION,
+          },
         },
-      },
+      ),
     )
     return response.data
   } catch (error) {
@@ -588,41 +683,51 @@ const uploadFileWithTus = async (
       skip_resize: request.skipResize ? 'true' : undefined,
     },
     request.uploadUrl,
+    request,
   )
 
-  let offset = await fetchTusOffset(uploadUrl)
+  let offset = await fetchTusOffset(uploadUrl, request)
 
   if (request.onProgress && file.size > 0) {
     request.onProgress(Math.floor((offset / file.size) * 100))
   }
 
+  if (offset > file.size) throw new Error('Upload offset exceeds file size')
+  let conflicts = 0
   while (offset < file.size) {
     const chunk = file.slice(offset, offset + TUS_CHUNK_SIZE)
-    const response = await patchTusChunk(uploadUrl, offset, chunk)
+    const response = await patchTusChunk(uploadUrl, offset, chunk, request)
 
     if (response.status === 409) {
-      offset = await fetchTusOffset(uploadUrl)
+      if (++conflicts > 3) throw new Error('Upload offset conflict. Please try again.')
+      const recoveredOffset = await fetchTusOffset(uploadUrl, request)
+      if (recoveredOffset < offset) throw new Error('Upload offset moved backwards')
+      offset = recoveredOffset
+      if (offset > file.size) throw new Error('Upload offset exceeds file size')
       continue
     }
 
-    if (response.status < 200 || response.status >= 300) {
+    if (response.status !== 204) {
       // Should be handled by catch block in patchTusChunk but for safety
       throw new Error(`Upload failed with status ${response.status}`)
     }
 
-    const offsetHeader = response.headers['upload-offset'] || response.headers['Upload-Offset']
-    const updatedOffset = offsetHeader ? Number(offsetHeader) : Number.NaN
-    offset = Number.isFinite(updatedOffset) ? updatedOffset : offset + chunk.size
+    const updatedOffset = readTusOffset(response)
+    if (updatedOffset !== offset + chunk.size || updatedOffset > file.size) {
+      throw new Error('Upload offset did not advance by the acknowledged chunk')
+    }
+    conflicts = 0
+    offset = updatedOffset
 
     if (request.onProgress && file.size > 0) {
       request.onProgress(Math.min(100, Math.floor((offset / file.size) * 100)))
     }
   }
 
-  return finalizeTusUpload(uploadUrl)
+  return finalizeTusUpload(uploadUrl, request)
 }
 
-export interface PendingTusUploadRequest {
+export interface PendingTusUploadRequest extends UploadTransportOptions {
   file: File
   uploadUrl: string
   fileCategory: 'image' | 'video' | 'file'
@@ -653,24 +758,34 @@ export const uploadPendingWithTus = async (
         file_type: request.fileCategory,
       },
       request.uploadUrl,
+      request,
     ))
   request.onSession?.(location)
 
-  let offset = await fetchTusOffset(location)
+  let offset = await fetchTusOffset(location, request)
   request.onProgress?.(file.size > 0 ? Math.floor((offset / file.size) * 100) : 100)
+  if (offset > file.size) throw new Error('Upload offset exceeds file size')
+  let conflicts = 0
   while (offset < file.size) {
     const chunk = file.slice(offset, offset + TUS_CHUNK_SIZE)
-    const response = await patchTusChunk(location, offset, chunk)
+    const response = await patchTusChunk(location, offset, chunk, request)
     if (response.status === 409) {
-      offset = await fetchTusOffset(location)
+      if (++conflicts > 3) throw new Error('Upload offset conflict. Please try again.')
+      const recoveredOffset = await fetchTusOffset(location, request)
+      if (recoveredOffset < offset) throw new Error('Upload offset moved backwards')
+      offset = recoveredOffset
+      if (offset > file.size) throw new Error('Upload offset exceeds file size')
       continue
     }
-    if (response.status < 200 || response.status >= 300) {
+    if (response.status !== 204) {
       throw new Error(`Upload failed with status ${response.status}`)
     }
-    const offsetHeader = response.headers['upload-offset'] || response.headers['Upload-Offset']
-    const updatedOffset = offsetHeader ? Number(offsetHeader) : Number.NaN
-    offset = Number.isFinite(updatedOffset) ? updatedOffset : offset + chunk.size
+    const updatedOffset = readTusOffset(response)
+    if (updatedOffset !== offset + chunk.size || updatedOffset > file.size) {
+      throw new Error('Upload offset did not advance by the acknowledged chunk')
+    }
+    conflicts = 0
+    offset = updatedOffset
     request.onProgress?.(
       file.size > 0 ? Math.min(100, Math.floor((offset / file.size) * 100)) : 100,
     )
@@ -693,6 +808,8 @@ export async function uploadFiles(request: UploadRequest): Promise<UploadRespons
     uploadUrl,
     skipResize,
     onProgress,
+    signal,
+    requestTimeoutMs,
   } = request
 
   const queue = files?.length ? files : file ? [file] : []
@@ -717,6 +834,8 @@ export async function uploadFiles(request: UploadRequest): Promise<UploadRespons
           uploadUrl,
           skipResize,
           onProgress,
+          signal,
+          requestTimeoutMs,
         },
         item,
       )

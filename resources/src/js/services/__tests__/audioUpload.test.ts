@@ -81,20 +81,24 @@ describe('canonical audio upload transport', () => {
     expect(metadata).toContain(`entity_type ${btoa('meditation')}`)
     expect(metadata).toContain(`entity_id ${btoa('17')}`)
     expect(axios.post).toHaveBeenNthCalledWith(1, '/files/tus', {}, expect.any(Object))
-    expect(axios.patch).toHaveBeenCalledWith(location, expect.any(Blob), {
-      headers: {
-        'Tus-Resumable': '1.0.0',
-        'Upload-Offset': '0',
-        'Content-Type': 'application/offset+octet-stream',
-      },
-    })
+    expect(axios.patch).toHaveBeenCalledWith(
+      location,
+      expect.any(Blob),
+      expect.objectContaining({
+        headers: {
+          'Tus-Resumable': '1.0.0',
+          'Upload-Offset': '0',
+          'Content-Type': 'application/offset+octet-stream',
+        },
+      }),
+    )
     expect(axios.post).toHaveBeenNthCalledWith(
       2,
       `${location}/complete`,
       {},
-      {
+      expect.objectContaining({
         headers: { 'Tus-Resumable': '1.0.0' },
-      },
+      }),
     )
     expect(result.error).toBeUndefined()
     expect(result.tasks[0]).toMatchObject({ id: 42, status: 'queued', fileType: '7', mimeType })
