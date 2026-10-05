@@ -126,8 +126,16 @@ func SQLWherex[T SQLBuilder[T]](sqlBuilder T, filters Filtered, adoptedFields ma
 			sqlBuilder = sqlBuilder.Where(fmt.Sprintf("%s %s ?", mapping.Column, mapping.Operator), likeValue)
 
 		case OpIn, OpNotIn:
-			// Для IN операторов ожидаем slice
-			sqlBuilder = sqlBuilder.Where(fmt.Sprintf("%s %s (?)", mapping.Column, mapping.Operator), value)
+			// Squirrel expands slice elements and handles empty lists. Preserve
+			// scalar NULL's SQL membership semantics (not IS NULL / IS NOT NULL).
+			switch {
+			case value == nil:
+				sqlBuilder = sqlBuilder.Where(fmt.Sprintf("%s %s (?)", mapping.Column, mapping.Operator), nil)
+			case mapping.Operator == OpIn:
+				sqlBuilder = sqlBuilder.Where(squirrel.Eq{mapping.Column: value})
+			default:
+				sqlBuilder = sqlBuilder.Where(squirrel.NotEq{mapping.Column: value})
+			}
 
 		// JSONB операторы
 		case OpJSONBContains, OpJSONBContainedBy:

@@ -636,8 +636,7 @@ func TestSQLWherexOperators(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, sql, "role IN ($")
 		assert.Contains(t, sql, "status NOT IN ($")
-		assert.Contains(t, args, []string{"admin", "moderator"})
-		assert.Contains(t, args, []int{1, 2, 3})
+		assert.ElementsMatch(t, []any{"admin", "moderator", 1, 2, 3}, args)
 	})
 
 	t.Run("ignores unknown fields", func(t *testing.T) {
