@@ -26,12 +26,13 @@ vi.mock('@/services/pollUploadTask', () => ({ pollUploadTask: mocks.poll }))
 
 let nextSession = 0
 const apps: ReturnType<typeof createApp>[] = []
-function mountUploader(onUpdate = vi.fn()) {
+function mountUploader(onUpdate = vi.fn(), extra = {}) {
   const root = document.createElement('div')
   const app = createApp(ImageUploader, {
     objectType: 'admin',
     objectId: 7,
     'onUpdate:modelValue': onUpdate,
+    ...extra,
   }).use(createPinia())
   apps.push(app)
   app.mount(root)
@@ -317,5 +318,61 @@ describe('image upload capabilities', () => {
     })
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(update).not.toHaveBeenCalled()
+  })
+  it('requires explicit assignment after legacy unkeyed image recovery remount', async () => {
+    setAdminCapabilities({ props: { adminCapabilities: { uploads: true } } })
+    const completion = {
+      location: `/files/tus/unkeyed-${++nextSession}`,
+      filename: 'avatar.png',
+      context: 'image-uploader',
+      entityType: 'admin',
+      entityId: 7,
+    }
+    mocks.upload.mockResolvedValue({
+      status: 'completion_unknown',
+      tasks: [],
+      uncertainCompletion: completion,
+    })
+    mocks.reconcile.mockResolvedValue({
+      status: 'completed',
+      tasks: [
+        {
+          id: 42,
+          status: 'completed',
+          tempUrl: '/foreign-temp.png',
+          file: { id: 42, filename: 'avatar.png', originalName: 'avatar.png', url: '/avatar.png' },
+        },
+      ],
+    })
+    const first = mountUploader()
+    const input = first.querySelector<HTMLInputElement>('input[type=file]')!
+    Object.defineProperty(input, 'files', {
+      value: [new File(['image'], 'avatar.png', { type: 'image/png' })],
+    })
+    input.dispatchEvent(new Event('change'))
+    await vi.waitFor(() => expect(first.textContent).toContain('Check upload'))
+    apps.pop()!.unmount()
+    const update = vi.fn()
+    let restored = mountUploader(update, { modelValue: { id: 6, url: '/kept.png' } })
+    Array.from(restored.querySelectorAll('button'))
+      .find((button) => button.textContent?.includes('Check upload'))!
+      .click()
+    await vi.waitFor(() => expect(restored.textContent).toContain('Use image in this field'))
+    expect(update).not.toHaveBeenCalled()
+    expect(restored.querySelector('img')?.getAttribute('src')).toBe('/kept.png')
+    apps.pop()!.unmount()
+    restored = mountUploader(update, { modelValue: { id: 6, url: '/kept.png' } })
+    expect(restored.querySelector<HTMLInputElement>('input[type=file]')!.disabled).toBe(true)
+    Array.from(restored.querySelectorAll('button'))
+      .find((button) => button.textContent?.includes('Check upload'))!
+      .click()
+    await vi.waitFor(() => expect(restored.textContent).toContain('Use image in this field'))
+    expect(update).not.toHaveBeenCalled()
+
+    Array.from(restored.querySelectorAll('button'))
+      .find((button) => button.textContent?.includes('Use image in this field'))!
+      .click()
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }))
+    expect(mocks.upload).toHaveBeenCalledTimes(1)
   })
 })

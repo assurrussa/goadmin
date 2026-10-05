@@ -125,4 +125,34 @@ describe('durable upload completion fence', () => {
     expect(state.isCurrentScope.value).toBe(false)
     expect(state.pending.value).toBeNull()
   })
+  it('persists separate stable fields without changing the server upload context', async () => {
+    let { useUploadCompletion } = await import('./useUploadCompletion')
+    const first = useUploadCompletion(
+      () => 'article',
+      () => 7,
+      () => 'rich-text',
+      undefined,
+      () => 'body',
+    )
+    const second = useUploadCompletion(
+      () => 'article',
+      () => 7,
+      () => 'rich-text',
+      undefined,
+      () => 'summary',
+    )
+    first.retain(completion)
+    expect(second.pending.value).toBeNull()
+    vi.resetModules()
+    ;({ useUploadCompletion } = await import('./useUploadCompletion'))
+    const restored = useUploadCompletion(
+      () => 'article',
+      () => 7,
+      () => 'rich-text',
+      undefined,
+      () => 'body',
+    )
+    expect(restored.pending.value?.completion).toEqual(completion)
+    restored.release(completion)
+  })
 })

@@ -434,10 +434,19 @@
       </div>
 
       <div class="status-right">
-        <div v-if="uncertainUpload" role="status">
+        <div v-if="uncertainUpload && !recoveredForInsertion" role="status">
           Upload completion is unconfirmed. Check this upload before starting another.
           <button type="button" :disabled="!canCheckUpload" @click="checkUpload">
             Check upload
+          </button>
+        </div>
+        <div v-if="recoveredForInsertion" role="status">
+          Upload confirmed: {{ recoveredForInsertion.filename }}. The original field is unknown.
+          <button type="button" :disabled="!canInsertRecovered" @click="insertRecovered">
+            Insert into this field
+          </button>
+          <button type="button" :disabled="!canInsertRecovered" @click="dismissRecovered">
+            Dismiss confirmed upload
           </button>
         </div>
         <!-- Upload Status -->
@@ -553,6 +562,8 @@ interface Props {
   entityId?: number | string | null // ID сущности для привязки файлов
   entityType?: string // Тип сущности (exercise, post, etc.)
   uploadUrl?: string
+  /** Stable, unique field name within this entity; enables automatic recovery after remount. */
+  uploadRecoveryKey?: string
   allowedNodes?: string[] | null
   allowedMarks?: string[] | null
   allowedFeatures?: string[] | null
@@ -625,7 +636,17 @@ const {
   () => props.entityId,
   () => 'rich-text',
   () => props.uploadUrl,
+  () => props.uploadRecoveryKey,
 )
+const ownedCompletionLocation = ref<string | null>(null)
+const recoveredForInsertion = ref<{
+  file: UploadResult
+  completion: UncertainUploadCompletion
+  filename: string
+  category: 'image' | 'video'
+  entityType: string
+  entityId: string
+} | null>(null)
 let uploadController: AbortController | null = null
 let unmounted = false
 const canCheckUpload = computed(() => {
@@ -653,16 +674,62 @@ const checkUpload = async () => {
   try {
     const category = pending.completion.fileCategory === 'video' ? 'video' : 'image'
     const uploadedFile = await uploadMediaToServer(pending.file, category)
-    if (unmounted) return
+    if (
+      unmounted ||
+      !isCurrentScope.value ||
+      pending.completion.entityType !== props.entityType ||
+      String(pending.completion.entityId) !== String(props.entityId)
+    )
+      return
+    if (!props.uploadRecoveryKey && ownedCompletionLocation.value !== pending.completion.location) {
+      // Without a stable field identity, a remounted/neighboring editor cannot
+      // infer where this media belongs. A separate explicit insertion is required.
+      recoveredForInsertion.value = {
+        file: uploadedFile,
+        completion: pending.completion,
+        filename: pending.completion.filename,
+        category,
+        entityType: pending.completion.entityType,
+        entityId: String(pending.completion.entityId),
+      }
+      return
+    }
     if (category === 'video') insertVideoIntoEditor(uploadedFile, pending.completion.filename)
     else insertImageIntoEditor(uploadedFile, pending.completion.filename)
     if (pending.file) emit('file-upload', pending.file)
     emit('files-uploaded', [uploadedFile.id])
+    releaseCompletion(pending.completion)
   } catch (error) {
     emit('file-error', String(error))
   } finally {
     checkingCompletion = false
   }
+}
+const canInsertRecovered = computed(() => {
+  const result = recoveredForInsertion.value
+  return (
+    !!result &&
+    isCurrentScope.value &&
+    !props.disabled &&
+    !props.readonly &&
+    result.entityType === props.entityType &&
+    result.entityId === String(props.entityId)
+  )
+})
+const insertRecovered = () => {
+  const result = recoveredForInsertion.value
+  if (!result || !canInsertRecovered.value) return
+  if (result.category === 'video') insertVideoIntoEditor(result.file, result.filename)
+  else insertImageIntoEditor(result.file, result.filename)
+  emit('files-uploaded', [result.file.id])
+  releaseCompletion(result.completion)
+  recoveredForInsertion.value = null
+}
+const dismissRecovered = () => {
+  const result = recoveredForInsertion.value
+  if (!result || !canInsertRecovered.value) return
+  releaseCompletion(result.completion)
+  recoveredForInsertion.value = null
 }
 const uploadProgress = ref(0)
 const uploadedFiles = ref<number[]>([]) // Для отслеживания загруженных файлов
@@ -1541,6 +1608,7 @@ const uploadMediaToServer = async (
               if (!retainCompletion(session, file)) {
                 throw new Error('Check the unconfirmed upload before starting another.')
               }
+              ownedCompletionLocation.value = session.location
               completion = session
             },
             entityType: props.entityType,
@@ -1563,6 +1631,7 @@ const uploadMediaToServer = async (
 
     if (response.uncertainCompletion) {
       completion = response.uncertainCompletion
+      if (!pending) ownedCompletionLocation.value = completion.location
       retainCompletion(completion, file)
     }
     if (!response.uncertainCompletion && response.error && completion) releaseCompletion(completion)
@@ -1680,7 +1749,7 @@ const uploadMediaToServer = async (
       String(originalEntityId) !== String(props.entityId)
     )
       throw new Error('Return to the original entity to check this upload.')
-    if (completion) releaseCompletion(completion)
+    if (completion && !pending) releaseCompletion(completion)
     uploadProgress.value = 100
     emit('upload-progress', 100)
     uploadedFiles.value.push(normalized.id)

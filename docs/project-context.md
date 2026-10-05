@@ -448,7 +448,7 @@ the earlier request.
 Built-in upload widgets retain completion metadata before dispatch using
 `useUploadCompletion`. Its same-tab registry survives Inertia remounts, and
 sessionStorage restores metadata after reload. Keys include authenticated admin,
-TUS endpoint, entity and upload context. File bytes stay only in memory; replay
+TUS endpoint, entity, upload context and stable field recovery key. File bytes stay only in memory; replay
 after reload needs no original File. Unmount aborts transport without discarding
 the fence; stale results cannot clear another entity's session or resurrect a
 session already resolved. Storage failures fall back to in-memory remount

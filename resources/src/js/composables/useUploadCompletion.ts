@@ -17,8 +17,9 @@ const storageKey = (
   entityType: string,
   entityId: unknown,
   context?: string,
+  field = '',
 ) =>
-  `goadmin:upload-completion:${JSON.stringify([owner, endpoint, entityType, String(entityId), context ?? ''])}`
+  `goadmin:upload-completion:${JSON.stringify([owner, endpoint, entityType, String(entityId), context ?? '', field])}`
 
 const stateFor = (key: string): ShallowRef<PendingUploadCompletion | null> => {
   let state = states.get(key)
@@ -33,7 +34,7 @@ const stateFor = (key: string): ShallowRef<PendingUploadCompletion | null> => {
         typeof data.entityType === 'string' &&
         ['number', 'string'].includes(typeof data.entityId) &&
         JSON.stringify([data.entityType, String(data.entityId), data.context ?? '']) ===
-          JSON.stringify(JSON.parse(key.slice('goadmin:upload-completion:'.length)).slice(2))
+          JSON.stringify(JSON.parse(key.slice('goadmin:upload-completion:'.length)).slice(2, 5))
       ) {
         restored = { completion: data }
       }
@@ -52,11 +53,13 @@ export function useUploadCompletion(
   entityId: () => string | number | null | undefined,
   context: () => string | undefined = () => undefined,
   uploadUrl: () => string | undefined = () => undefined,
+  field: () => string | undefined = () => undefined,
 ) {
   const auth = useAuthUserStore()
   const owner = auth.id
   const endpoint = resolveTusEndpoint(uploadUrl())
   const initialContext = context()
+  const initialField = field() ?? ''
   const keyFor = (completion: UncertainUploadCompletion) =>
     storageKey(
       owner,
@@ -64,16 +67,19 @@ export function useUploadCompletion(
       completion.entityType,
       completion.entityId,
       completion.context ?? initialContext,
+      initialField,
     )
   const isCurrentScope = computed(
     () =>
       auth.id === owner &&
       resolveTusEndpoint(uploadUrl()) === endpoint &&
-      context() === initialContext,
+      context() === initialContext &&
+      (field() ?? '') === initialField,
   )
   const pending = computed(() =>
     isCurrentScope.value
-      ? stateFor(storageKey(owner, endpoint, entityType(), entityId(), context())).value
+      ? stateFor(storageKey(owner, endpoint, entityType(), entityId(), context(), initialField))
+          .value
       : null,
   )
 
