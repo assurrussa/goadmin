@@ -2,7 +2,6 @@ package host
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	logger "github.com/assurrussa/gologger"
@@ -19,7 +18,6 @@ import (
 	adminnotificationrepo "github.com/assurrussa/goadmin/infrastructure/pgsql/repositories/adminnotificationrepo"
 	goadminuserrepo "github.com/assurrussa/goadmin/infrastructure/pgsql/repositories/userrepo"
 	redis "github.com/assurrussa/goadmin/infrastructure/redis"
-	adminrolesfacade "github.com/assurrussa/goadmin/infrastructure/roles/adminroles"
 	"github.com/assurrussa/goadmin/internal/admintx"
 	"github.com/assurrussa/goadmin/internal/firstadminsetup"
 	adminnotificationsjob "github.com/assurrussa/goadmin/outbox/notifications"
@@ -108,20 +106,11 @@ func buildDependencies(input assemblyInput) (bootstrap.Dependencies, error) {
 	authAdapter := input.Auth.inner
 	rolesService := authAdapter.Roles()
 	rolesRepo := rolesService
-	subjectPermissions := input.Services.SubjectPermissions
-	var err error
-	if subjectPermissions == nil {
-		subjectPermissions, err = subjectPermissionCheckerFromRoles(rolesService, lg)
-		if err != nil {
-			return bootstrap.Dependencies{}, fmt.Errorf("host install: build subject permission checker: %w", err)
-		}
-	} else if !subjectPermissions.validForInstall() {
-		return bootstrap.Dependencies{}, errors.New("host install: subject permission checker is invalid")
-	}
-	subjectRolesGuard := subjectPermissions.rolesGuard
-	rolesGuard, err := adminrolesfacade.New(subjectRolesGuard, adminRepoImpl)
+	rolesGuard, mutationRolesGuard, err := buildAdminRoleGuards(
+		rolesService, input.Services.SubjectPermissions, adminRepoImpl, lg,
+	)
 	if err != nil {
-		return bootstrap.Dependencies{}, fmt.Errorf("host install: build admin roles facade: %w", err)
+		return bootstrap.Dependencies{}, err
 	}
 	var adminNotificationRepoImpl bootstrap.NotificationsRepo
 	if enabled("notifications") {
@@ -222,7 +211,7 @@ func buildDependencies(input assemblyInput) (bootstrap.Dependencies, error) {
 			FileLoader:      input.Repositories.FileLoader,
 			UserRepo:        adminUsersRepo,
 			AdminLoginAudit: input.Repositories.AdminLoginAudit,
-			RolesService:    rolesGuard,
+			RolesService:    mutationRolesGuard,
 			RolesManager:    rolesService,
 			RolesRepo:       rolesRepo,
 			JobsRepo:        jobsRepo,

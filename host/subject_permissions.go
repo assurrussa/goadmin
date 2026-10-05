@@ -9,6 +9,7 @@ import (
 	"github.com/assurrussa/goauth/postgres"
 	"github.com/jackc/pgx/v5/stdlib"
 
+	adminrolesfacade "github.com/assurrussa/goadmin/infrastructure/roles/adminroles"
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 )
 
@@ -97,4 +98,32 @@ func subjectPermissionCheckerFromRoles(
 	}
 
 	return &SubjectPermissionChecker{guard: guard, rolesGuard: guard, rolesService: rolesService}, nil
+}
+
+// Keep a supplied checker's action policy at the route boundary. Transactional
+// state checks must use the canonical Runtime handle, since a shared checker may
+// own a separate database/sql handle over the same pool.
+func buildAdminRoleGuards(
+	roles *integrationroles.RoleService, supplied *SubjectPermissionChecker,
+	admins adminrolesfacade.AdminRepository, lg Logger,
+) (actions, canonical *adminrolesfacade.Service, err error) {
+	if supplied != nil && !supplied.validForInstall() {
+		return nil, nil, errors.New("host install: subject permission checker is invalid")
+	}
+	checker, err := subjectPermissionCheckerFromRoles(roles, lg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("host install: build canonical role checker: %w", err)
+	}
+	canonical, err = adminrolesfacade.New(checker.rolesGuard, admins)
+	if err != nil {
+		return nil, nil, fmt.Errorf("host install: build canonical admin roles facade: %w", err)
+	}
+	if supplied == nil {
+		return canonical, canonical, nil
+	}
+	actions, err = adminrolesfacade.New(supplied.rolesGuard, admins)
+	if err != nil {
+		return nil, nil, fmt.Errorf("host install: build admin roles facade: %w", err)
+	}
+	return actions, canonical, nil
 }

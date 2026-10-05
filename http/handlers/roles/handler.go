@@ -67,6 +67,10 @@ type assignAdminRolesUseCase interface {
 	Handle(ctx context.Context, req AssignAdminRolesRequest) (AssignAdminRolesResponse, error)
 }
 
+type adminRoleTransaction interface {
+	InAdminRoleTransaction(ctx context.Context, actorID, adminID int64, fn func(context.Context) error) error
+}
+
 type listPermissionsUseCase interface {
 	Handle(ctx context.Context, req integrationroles.ListPermissionsRequest) (integrationroles.ListPermissionsResponse, error)
 }
@@ -100,17 +104,18 @@ type adminRepository interface {
 
 // UseCases агрегирует зависимости хендлера.
 type UseCases struct {
-	ListRoles           listRolesUseCase
-	GetRole             getRoleUseCase
-	CreateRole          createRoleUseCase
-	UpdateRole          updateRoleUseCase
-	DeleteRole          deleteRoleUseCase
-	SetPermissions      setPermissionsUseCase
-	AssignAdminRoles    assignAdminRolesUseCase
-	ListPermissions     listPermissionsUseCase
-	ListRolePermissions listRolePermissionsUseCase
-	ListAdminRoles      listAdminRolesUseCase
-	ListAllRoles        listAllRolesUseCase
+	ListRoles            listRolesUseCase
+	GetRole              getRoleUseCase
+	CreateRole           createRoleUseCase
+	UpdateRole           updateRoleUseCase
+	DeleteRole           deleteRoleUseCase
+	SetPermissions       setPermissionsUseCase
+	AssignAdminRoles     assignAdminRolesUseCase
+	AdminRoleTransaction adminRoleTransaction
+	ListPermissions      listPermissionsUseCase
+	ListRolePermissions  listRolePermissionsUseCase
+	ListAdminRoles       listAdminRolesUseCase
+	ListAllRoles         listAllRolesUseCase
 }
 
 type Handler struct {
@@ -122,17 +127,18 @@ type Handler struct {
 
 	adminRepo adminRepository
 
-	listRoles           listRolesUseCase
-	getRole             getRoleUseCase
-	createRole          createRoleUseCase
-	updateRole          updateRoleUseCase
-	deleteRole          deleteRoleUseCase
-	setPermissions      setPermissionsUseCase
-	assignAdminRoles    assignAdminRolesUseCase
-	listPermissions     listPermissionsUseCase
-	listRolePermissions listRolePermissionsUseCase
-	listAdminRoles      listAdminRolesUseCase
-	listAllRoles        listAllRolesUseCase
+	listRoles            listRolesUseCase
+	getRole              getRoleUseCase
+	createRole           createRoleUseCase
+	updateRole           updateRoleUseCase
+	deleteRole           deleteRoleUseCase
+	setPermissions       setPermissionsUseCase
+	assignAdminRoles     assignAdminRolesUseCase
+	adminRoleTransaction adminRoleTransaction
+	listPermissions      listPermissionsUseCase
+	listRolePermissions  listRolePermissionsUseCase
+	listAdminRoles       listAdminRolesUseCase
+	listAllRoles         listAllRolesUseCase
 }
 
 func NewHandler(
@@ -227,22 +233,23 @@ func NewHandler(
 	}, adminApp.Logger())
 
 	return &Handler{
-		adminApp:            adminApp,
-		routePath:           routePath,
-		logger:              adminApp.Logger().WithNamed("roles-handler"),
-		dataGridHandler:     gridHandler,
-		adminRepo:           adminRepo,
-		listRoles:           useCases.ListRoles,
-		getRole:             useCases.GetRole,
-		createRole:          useCases.CreateRole,
-		updateRole:          useCases.UpdateRole,
-		deleteRole:          useCases.DeleteRole,
-		setPermissions:      useCases.SetPermissions,
-		assignAdminRoles:    useCases.AssignAdminRoles,
-		listPermissions:     useCases.ListPermissions,
-		listRolePermissions: useCases.ListRolePermissions,
-		listAdminRoles:      useCases.ListAdminRoles,
-		listAllRoles:        useCases.ListAllRoles,
+		adminApp:             adminApp,
+		routePath:            routePath,
+		logger:               adminApp.Logger().WithNamed("roles-handler"),
+		dataGridHandler:      gridHandler,
+		adminRepo:            adminRepo,
+		listRoles:            useCases.ListRoles,
+		getRole:              useCases.GetRole,
+		createRole:           useCases.CreateRole,
+		updateRole:           useCases.UpdateRole,
+		deleteRole:           useCases.DeleteRole,
+		setPermissions:       useCases.SetPermissions,
+		assignAdminRoles:     useCases.AssignAdminRoles,
+		adminRoleTransaction: useCases.AdminRoleTransaction,
+		listPermissions:      useCases.ListPermissions,
+		listRolePermissions:  useCases.ListRolePermissions,
+		listAdminRoles:       useCases.ListAdminRoles,
+		listAllRoles:         useCases.ListAllRoles,
 	}
 }
 
@@ -527,28 +534,31 @@ func (h *Handler) AssignRoles(c fiber.Ctx) error {
 		"roleIds": payload.RoleIDs,
 	})
 
-	targetRoles, err := h.loadAdminRoles(c, payload.AdminID)
-	if err != nil {
-		return h.respondAdminDomainError(c, err, "Не удалось загрузить роли администратора", fiber.StatusInternalServerError)
-	}
-
-	targetHasSuper := adminRoleListHasSlug(targetRoles, integrationroles.SuperAdminRole)
-	requestIncludesSuper, err := h.hasSuperRoleIDs(c, payload.RoleIDs)
-	if err != nil {
-		return h.respondAdminDomainError(c, err, "Не удалось загрузить роль", fiber.StatusInternalServerError)
-	}
-
-	if targetHasSuper || requestIncludesSuper {
-		if !h.adminApp.RolesService().IsSuperAdmin(c, adminmiddleware.MustGetAdminAuth(c).ID) {
-			if requestIncludesSuper {
-				return h.respondSuperRoleForbidden(c)
-			}
-			return h.respondSuperAdminForbidden(c)
+	actorID := adminmiddleware.MustGetAdminAuth(c).ID
+	err := h.inAdminRoleTransaction(c, actorID, payload.AdminID, func(txCtx context.Context) error {
+		targetRoles, err := h.loadAdminRoles(txCtx, payload.AdminID)
+		if err != nil {
+			return roleMutationFailure(err, "Не удалось загрузить роли администратора")
 		}
-	}
-
-	assignReq := AssignAdminRolesRequest(payload)
-	if _, err := h.assignAdminRoles.Handle(c, assignReq); err != nil {
+		requestIncludesSuper, err := h.hasSuperRoleIDs(txCtx, payload.RoleIDs)
+		if err != nil {
+			return roleMutationFailure(err, "Не удалось загрузить роль")
+		}
+		requestedRole := roleDetail{}
+		if requestIncludesSuper {
+			requestedRole.Slug = integrationroles.SuperAdminRole
+		}
+		if err := h.checkRoleMutation(txCtx, actorID, requestedRole, targetRoles); err != nil {
+			return err
+		}
+		_, err = h.assignAdminRoles.Handle(txCtx, AssignAdminRolesRequest(payload))
+		return err
+	})
+	if err != nil {
+		var failure *roleMutationError
+		if errors.As(err, &failure) {
+			return h.respondRoleMutationError(c, err, "Не удалось назначить роли")
+		}
 		h.flashDomainError(c, err, "Не удалось назначить роли")
 		return h.adminApp.HTTPManager().RedirectBack(c)
 	}
@@ -649,54 +659,18 @@ func (h *Handler) AttachRoleToAdmin(c fiber.Ctx) error {
 		return h.respondAdminFormError(c, "Некорректный идентификатор администратора", fiber.StatusBadRequest, nil)
 	}
 
-	roleDetail, err := h.fetchRoleDetail(c, roleID, false)
+	admin, changed, err := h.attachAdminRole(c, adminmiddleware.MustGetAdminAuth(c).ID, payload.AdminID, roleID)
 	if err != nil {
-		return h.respondAdminDomainError(c, err, "Не удалось загрузить роль", fiber.StatusInternalServerError)
+		return h.respondRoleMutationError(c, err, "Не удалось назначить роль администратору")
 	}
-
-	resp, err := h.listAdminRoles.Handle(c, ListAdminRolesRequest{AdminID: payload.AdminID})
-	if err != nil {
-		return h.respondAdminDomainError(c, err, "Не удалось загрузить роли администратора", fiber.StatusInternalServerError)
-	}
-
-	targetHasSuper := adminRoleListHasSlug(resp.Roles, integrationroles.SuperAdminRole)
-	roleIsSuper := roleDetail.Slug == integrationroles.SuperAdminRole
-	if (targetHasSuper || roleIsSuper) &&
-		!h.adminApp.RolesService().IsSuperAdmin(c, adminmiddleware.MustGetAdminAuth(c).ID) {
-		if roleIsSuper {
-			return h.respondSuperRoleForbidden(c)
-		}
-		return h.respondSuperAdminForbidden(c)
-	}
-
-	roleIDs := uniqueRoleIDs(resp.Roles)
-	if containsRoleID(roleIDs, roleID) {
-		adminModel, getErr := h.adminRepo.GetByID(c, payload.AdminID)
-		if getErr != nil {
-			return h.respondAdminDomainError(c, getErr, "Не удалось загрузить администратора", fiber.StatusInternalServerError)
-		}
+	if !changed {
 		if isInertiaRequest(c) {
 			h.adminApp.HTTPManager().WithFlashInfo(c, "Эта роль уже назначена выбранному администратору")
 			return h.adminApp.HTTPManager().RedirectBack(c)
 		}
-
-		return c.JSON(fiber.Map{"admin": toRoleAssignedAdmin(adminModel)})
+		return c.JSON(fiber.Map{"admin": toRoleAssignedAdmin(admin)})
 	}
-	roleIDs = append(roleIDs, roleID)
-
-	if _, err := h.assignAdminRoles.Handle(c, AssignAdminRolesRequest{
-		AdminID: payload.AdminID,
-		RoleIDs: roleIDs,
-	}); err != nil {
-		return h.respondAdminDomainError(c, err, "Не удалось назначить роль администратору", fiber.StatusInternalServerError)
-	}
-
-	adminModel, err := h.adminRepo.GetByID(c, payload.AdminID)
-	if err != nil {
-		return h.respondAdminDomainError(c, err, "Не удалось загрузить администратора", fiber.StatusInternalServerError)
-	}
-
-	return h.respondAttachSuccess(c, adminModel)
+	return h.respondAttachSuccess(c, admin)
 }
 
 func (h *Handler) DetachRoleFromAdmin(c fiber.Ctx) error {
@@ -715,73 +689,17 @@ func (h *Handler) DetachRoleFromAdmin(c fiber.Ctx) error {
 		return h.respondAdminFormError(c, "Некорректный идентификатор администратора", fiber.StatusBadRequest, nil)
 	}
 
-	adminAuth := adminmiddleware.MustGetAdminAuth(c)
-
-	roleDetail, err := h.fetchRoleDetail(c, roleID, false)
+	changed, err := h.detachAdminRole(c, adminmiddleware.MustGetAdminAuth(c).ID, payload.AdminID, roleID)
 	if err != nil {
-		return h.respondAdminDomainError(c, err, "Не удалось загрузить роль", fiber.StatusInternalServerError)
+		return h.respondRoleMutationError(c, err, "Не удалось отменить роль у администратора")
 	}
-
-	resp, err := h.listAdminRoles.Handle(c, ListAdminRolesRequest{AdminID: payload.AdminID})
-	if err != nil {
-		return h.respondAdminDomainError(c, err, "Не удалось загрузить роли администратора", fiber.StatusInternalServerError)
-	}
-
-	targetHasSuper := adminRoleListHasSlug(resp.Roles, integrationroles.SuperAdminRole)
-	roleIsSuper := roleDetail.Slug == integrationroles.SuperAdminRole
-	if (targetHasSuper || roleIsSuper) &&
-		!h.adminApp.RolesService().IsSuperAdmin(c, adminmiddleware.MustGetAdminAuth(c).ID) {
-		if roleIsSuper {
-			return h.respondSuperRoleForbidden(c)
-		}
-		return h.respondSuperAdminForbidden(c)
-	}
-
-	roleIDs := make([]int64, 0, len(resp.Roles))
-	for _, r := range resp.Roles {
-		if r.ID != roleID {
-			roleIDs = append(roleIDs, r.ID)
-			continue
-		}
-
-		adopted, err := h.adminApp.RolesService().IsAdoptedDetachRole(c, adminAuth.ID, payload.AdminID, roleID)
-		if adopted {
-			continue
-		}
-
-		message := "Нельзя удалить текущую роль"
-		if err != nil {
-			message += ":" + err.Error()
-		}
-
-		if isInertiaRequest(c) {
-			h.withAdminIDError(c, message)
-			h.adminApp.HTTPManager().WithFlashError(c, message)
-			return h.adminApp.HTTPManager().RedirectBack(c)
-		}
-
-		if err != nil {
-			return goinertia.NewError(fiber.StatusInternalServerError, message, err)
-		}
-
-		return goinertia.NewError(fiber.StatusForbidden, message)
-	}
-
-	if len(roleIDs) == len(resp.Roles) {
+	if !changed {
 		if isInertiaRequest(c) {
 			h.adminApp.HTTPManager().WithFlashInfo(c, "У администратора нет этой роли")
 			return h.adminApp.HTTPManager().RedirectBack(c)
 		}
 		return c.JSON(fiber.Map{"adminId": payload.AdminID})
 	}
-
-	if _, err := h.assignAdminRoles.Handle(c, AssignAdminRolesRequest{
-		AdminID: payload.AdminID,
-		RoleIDs: roleIDs,
-	}); err != nil {
-		return h.respondAdminDomainError(c, err, "Не удалось отменить роль у администратора", fiber.StatusInternalServerError)
-	}
-
 	return h.respondDetachSuccess(c, payload.AdminID)
 }
 
@@ -868,14 +786,6 @@ func (h *Handler) flashDomainError(c fiber.Ctx, err error, fallback string) {
 	}
 
 	h.adminApp.HTTPManager().WithFlashError(c, message)
-}
-
-func (h *Handler) respondSuperAdminForbidden(c fiber.Ctx) error {
-	return h.respondAdminFormError(c, superAdminChangeForbiddenMessage, fiber.StatusForbidden, nil)
-}
-
-func (h *Handler) respondSuperRoleForbidden(c fiber.Ctx) error {
-	return h.respondAdminFormError(c, superRoleChangeForbiddenMessage, fiber.StatusForbidden, nil)
 }
 
 type roleGridItem struct {
@@ -1393,7 +1303,6 @@ func (h *Handler) withAdminIDError(c fiber.Ctx, message string) {
 	})
 }
 
-//nolint:unparam // it's valid
 func (h *Handler) respondAdminDomainError(c fiber.Ctx, err error, fallback string, status int) error {
 	if isInertiaRequest(c) {
 		message, _ := mapRoleDomainError(err, fallback)
