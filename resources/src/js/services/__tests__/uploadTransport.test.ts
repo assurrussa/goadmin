@@ -11,6 +11,12 @@ const request = () => ({
   entityId: 1,
   requestTimeoutMs: 1000,
 })
+const completion = () => ({
+  location: '/files/tus/original',
+  filename: 'track.mp3',
+  entityType: 'meditation',
+  entityId: 1,
+})
 const tick = async () => {
   await vi.advanceTimersByTimeAsync(0)
 }
@@ -181,10 +187,13 @@ describe('bounded upload requests', () => {
     expect(axios.patch).not.toHaveBeenCalled()
   })
   it.each([
+    null,
     {},
     { tasks: [] },
     { tasks: [{ id: 0, status: 'queued' }] },
     { tasks: [{ id: -1, status: 'queued' }] },
+    { error: { message: 'Malformed error' } },
+    { error: true },
   ])('retains completion uncertainty for malformed successful acknowledgment %j', async (data) => {
     vi.mocked(axios.post)
       .mockReset()
@@ -209,6 +218,163 @@ describe('bounded upload requests', () => {
     const result = await uploadFiles(request())
     expect(result.error).toBe('Invalid media')
     expect(result.uncertainCompletion).toBeUndefined()
+  })
+  it.each([400, 410])(
+    'releases completion uncertainty after a definitive HTTP %i rejection',
+    async (status) => {
+      vi.mocked(axios.post)
+        .mockReset()
+        .mockRejectedValue({
+          response: {
+            status,
+            data: {
+              status: 'error',
+              error:
+                status === 410 ? 'completed upload is no longer available' : 'Completion rejected',
+            },
+          },
+        })
+      vi.mocked(axios.isAxiosError).mockReturnValue(true)
+
+      expect(await reconcileUploadCompletion(completion())).toEqual({
+        status: 'error',
+        tasks: [],
+        error: status === 410 ? 'completed upload is no longer available' : 'Completion rejected',
+      })
+      expect(axios.post).toHaveBeenCalledExactlyOnceWith(
+        '/files/tus/original/complete',
+        {},
+        expect.any(Object),
+      )
+      expect(axios.head).not.toHaveBeenCalled()
+      expect(axios.patch).not.toHaveBeenCalled()
+      expect(vi.getTimerCount()).toBe(0)
+    },
+  )
+  it.each([
+    [
+      { status: 'error', errors: { media: 'Invalid media', context: 'Invalid context' } },
+      'Invalid media, Invalid context',
+    ],
+    [{ status: 'error', error: 'Invalid media' }, 'Invalid media'],
+  ])('preserves rejection details from HTTP error payload %j', async (data, error) => {
+    vi.mocked(axios.post)
+      .mockReset()
+      .mockRejectedValue({ response: { status: 400, data } })
+    vi.mocked(axios.isAxiosError).mockReturnValue(true)
+    expect(await reconcileUploadCompletion(completion())).toEqual({
+      status: 'error',
+      tasks: [],
+      error,
+    })
+  })
+  it.each([undefined, 'error', 'queued'])(
+    'normalizes a structured rejection with status %s into a terminal error',
+    async (status) => {
+      vi.mocked(axios.post)
+        .mockReset()
+        .mockResolvedValueOnce({ headers: { location: '/files/tus/session' } })
+        .mockResolvedValue({ data: { status, error: 'Invalid media' } })
+      const expected = { status: 'error', tasks: [], error: 'Invalid media' }
+      expect(await uploadFiles(request())).toEqual(expected)
+      expect(await reconcileUploadCompletion(completion())).toEqual(expected)
+      expect(axios.post).toHaveBeenCalledTimes(3)
+      expect(axios.head).toHaveBeenCalledTimes(1)
+      expect(axios.patch).toHaveBeenCalledTimes(1)
+    },
+  )
+  it.each([0, 401, 403, 404, 408, 409, 412, 422, 429, 500, 503])(
+    'retains completion uncertainty after HTTP %i even with an error payload',
+    async (status) => {
+      vi.mocked(axios.post)
+        .mockReset()
+        .mockRejectedValue({ response: { status, data: { error: 'Completion interrupted' } } })
+      vi.mocked(axios.isAxiosError).mockReturnValue(true)
+      const original = completion()
+      expect(await reconcileUploadCompletion(original)).toMatchObject({
+        status: 'completion_unknown',
+        tasks: [],
+        uncertainCompletion: original,
+      })
+      expect(axios.post).toHaveBeenCalledTimes(1)
+      expect(axios.head).not.toHaveBeenCalled()
+      expect(axios.patch).not.toHaveBeenCalled()
+    },
+  )
+  it.each([
+    {
+      status: 400,
+      data: { status: 400, code: 'invalid_browser_credentials', message: 'Sign in again' },
+    },
+    {
+      status: 400,
+      data: { status: 'error', error: 'Sign in again' },
+      headers: { 'x-goadmin-auth-error': 'invalid_browser_credentials' },
+    },
+    { status: 400, data: { error: 'Unrecognized rejection' } },
+    { status: 400, data: { status: 'error', errors: ['Malformed validation'] } },
+    { status: 410, data: { error: 'Unknown expired resource' } },
+  ])('retains uncertainty for unrecognized or authentication rejection %j', async (response) => {
+    vi.mocked(axios.post).mockReset().mockRejectedValue({ response })
+    vi.mocked(axios.isAxiosError).mockReturnValue(true)
+    const original = completion()
+    expect(await reconcileUploadCompletion(original)).toMatchObject({
+      status: 'completion_unknown',
+      uncertainCompletion: original,
+    })
+  })
+  it('retains completion uncertainty after a replay network failure', async () => {
+    vi.mocked(axios.post).mockReset().mockRejectedValue(new Error('Network error'))
+    const original = completion()
+    expect(await reconcileUploadCompletion(original)).toMatchObject({
+      status: 'completion_unknown',
+      tasks: [],
+      uncertainCompletion: original,
+    })
+    expect(axios.post).toHaveBeenCalledTimes(1)
+  })
+  it.each(['before replay', 'before dispatch', 'after dispatch'])(
+    'retains the earlier uncertainty when cancellation happens %s',
+    async (stage) => {
+      vi.mocked(axios.post)
+        .mockReset()
+        .mockImplementation(() => new Promise(() => {}))
+      const controller = new AbortController()
+      const original = completion()
+      if (stage === 'before replay') controller.abort()
+      const pending = reconcileUploadCompletion(original, { signal: controller.signal })
+      if (stage === 'after dispatch') await tick()
+      controller.abort()
+      expect(await pending).toMatchObject({
+        status: 'completion_unknown',
+        tasks: [],
+        uncertainCompletion: original,
+      })
+      expect(axios.post).toHaveBeenCalledTimes(stage === 'after dispatch' ? 1 : 0)
+      expect(vi.getTimerCount()).toBe(0)
+    },
+  )
+  it.each([0, -1, NaN, Infinity])(
+    'retains the earlier uncertainty when an invalid timeout %s prevents replay',
+    async (requestTimeoutMs) => {
+      const original = completion()
+      expect(await reconcileUploadCompletion(original, { requestTimeoutMs })).toMatchObject({
+        status: 'completion_unknown',
+        tasks: [],
+        uncertainCompletion: original,
+      })
+      expect(axios.post).not.toHaveBeenCalled()
+      expect(vi.getTimerCount()).toBe(0)
+    },
+  )
+  it('does not dispatch completion when the shared scope already has an unresolved session', async () => {
+    const onCompletionSession = () => {
+      throw new Error('Check the unconfirmed upload before starting another.')
+    }
+    const result = await uploadFiles({ ...request(), onCompletionSession })
+    expect(result.error).toContain('Check the unconfirmed upload')
+    expect(axios.post).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(axios.post).mock.calls[0][0]).toBe('/files/tus')
   })
   it('does not start a pre-cancelled upload', async () => {
     const controller = new AbortController()

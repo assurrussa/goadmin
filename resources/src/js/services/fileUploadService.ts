@@ -665,6 +665,39 @@ class UncertainCompletionError extends Error {
   }
 }
 
+class RejectedCompletionError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly data: unknown,
+    readonly authError: unknown,
+  ) {
+    super(message)
+  }
+}
+
+const isDefinitiveReplayRejection = (error: RejectedCompletionError): boolean => {
+  const data = error.data as {
+    status?: unknown
+    error?: unknown
+    errors?: unknown
+    code?: unknown
+  } | null
+  // Authentication, quota and missing protocol sessions can reject a replay
+  // before durable finalization is checked. They cannot release an earlier fence.
+  if (error.authError || !data || data.code || data.status !== 'error') return false
+  if (error.status === 410) return data.error === 'completed upload is no longer available'
+  if (error.status !== 400) return false
+  if (typeof data.error === 'string' && data.error.trim()) return true
+  return (
+    !!data.errors &&
+    typeof data.errors === 'object' &&
+    !Array.isArray(data.errors) &&
+    Object.values(data.errors).length > 0 &&
+    Object.values(data.errors).every((value) => typeof value === 'string' && value.trim())
+  )
+}
+
 const finalizeTusUpload = async (
   completion: UncertainUploadCompletion,
   options: UploadTransportOptions = {},
@@ -685,23 +718,33 @@ const finalizeTusUpload = async (
         },
       )
     })
-    if (!response.data.error) {
-      const tasks = normalizeTasks(normalizeUploadResponsePayload(response.data).tasks)
-      if (tasks.length !== 1 || !Number.isSafeInteger(tasks[0].id) || tasks[0].id <= 0) {
-        throw new UncertainCompletionError(completion)
-      }
+    if (typeof response.data?.error === 'string' && response.data.error.trim()) {
+      return { status: 'error', tasks: [], error: response.data.error }
+    }
+    const tasks = normalizeTasks(normalizeUploadResponsePayload(response.data).tasks)
+    if (tasks.length !== 1 || !Number.isSafeInteger(tasks[0].id) || tasks[0].id <= 0) {
+      throw new UncertainCompletionError(completion)
     }
     return response.data
   } catch (error) {
     // A response can be lost after durable finalization. Keep the same session
     // for explicit reconciliation; creating a fresh upload can duplicate work.
-    if (
-      dispatched &&
-      (!axios.isAxiosError(error) ||
-        !error.response ||
-        error.response.status >= 500 ||
-        [408, 409].includes(error.response.status))
-    ) {
+    if (dispatched) {
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined
+      if (
+        axios.isAxiosError(error) &&
+        status &&
+        status >= 400 &&
+        status < 500 &&
+        ![408, 409].includes(status)
+      ) {
+        throw new RejectedCompletionError(
+          readTusError(error),
+          status,
+          error.response?.data,
+          error.response?.headers?.['x-goadmin-auth-error'],
+        )
+      }
       throw new UncertainCompletionError(completion)
     }
     throw new Error(readTusError(error))
@@ -720,7 +763,11 @@ export async function reconcileUploadCompletion(
       tasks: normalizeTasks(normalized.tasks),
       error: normalized.error,
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof RejectedCompletionError && isDefinitiveReplayRejection(error)) {
+      return { status: 'error', tasks: [], error: error.message }
+    }
+    // Local failures before replay dispatch cannot resolve the earlier request.
     return {
       status: 'completion_unknown',
       tasks: [],

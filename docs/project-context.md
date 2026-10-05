@@ -439,7 +439,22 @@ before dispatch even when UI cancellation fences the eventual result. Hosts
 must block new upload sessions while this state is unresolved. The explicit
 `reconcileUploadCompletion` helper replays only the same idempotent completion
 endpoint; another uncertain result retains the session. It never creates an
-upload or resends file bytes.
+upload or resends file bytes. A definitive completion rejection (including a
+canonical upload-validation400, finalization-gone410, or structured error acknowledgment) returns `status: error`
+without `uncertainCompletion`; transport/auth/quota failures, missing protocol sessions and malformed
+acknowledgments remain uncertain. A replay that never dispatches cannot resolve
+the earlier request.
+
+Built-in upload widgets retain completion metadata before dispatch using
+`useUploadCompletion`. Its same-tab registry survives Inertia remounts, and
+sessionStorage restores metadata after reload. Keys include authenticated admin,
+TUS endpoint, entity and upload context. File bytes stay only in memory; replay
+after reload needs no original File. Unmount aborts transport without discarding
+the fence; stale results cannot clear another entity's session or resurrect a
+session already resolved. Storage failures fall back to in-memory remount
+protection. No automatic expiry unlocks an unresolved completion. Custom host
+widgets must explicitly retain/restore their own session and task state, or
+adopt the composable; raw `uploadFiles` does not own UI recovery state.
 
 Acknowledged chunk progress uses validated `Upload-Offset` values. PATCH must
 return 204 and advance by the exact chunk length. Missing, invalid, out-of-range

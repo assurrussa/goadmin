@@ -463,7 +463,7 @@
       :id="fileInputId"
       type="file"
       name="rich-text-media"
-      :disabled="!!uncertainUpload || isUploading || disabled || readonly"
+      :disabled="!isCurrentScope || !!uncertainUpload || isUploading || disabled || readonly"
       aria-label="Добавить изображение или видео"
       :accept="effectiveAcceptedFileTypes.join(',')"
       multiple
@@ -511,6 +511,7 @@ import {
 } from '@/services/fileUploadService'
 import type { UploadedFileSummary, UploadTaskStatusResponse } from '@/services/fileUploadService'
 import { useAdminWebSocket, type FileUploadStatusEvent } from '@/composables/useAdminWebSocket'
+import { useUploadCompletion } from '@/composables/useUploadCompletion'
 import { useUploadQueueStore } from '@/stores/uploadQueue'
 import { RICH_TEXT_ATTACHMENT_MIME, type RichTextAttachmentPayload } from '@/constants/richText'
 import VideoExtension from './extensions/Video'
@@ -614,15 +615,24 @@ const showImageCropper = ref(false)
 const cropperImageUrl = ref('')
 const cropperFileName = ref('')
 const isUploading = ref(false)
-const uncertainUpload = ref<{
-  file: File
-  category: 'image' | 'video'
-  completion: UncertainUploadCompletion
-} | null>(null)
+const {
+  pending: uncertainUpload,
+  retain: retainCompletion,
+  release: releaseCompletion,
+  isCurrentScope,
+} = useUploadCompletion(
+  () => props.entityType,
+  () => props.entityId,
+  () => 'rich-text',
+  () => props.uploadUrl,
+)
+let uploadController: AbortController | null = null
+let unmounted = false
 const canCheckUpload = computed(() => {
   const pending = uncertainUpload.value
   return (
     !!pending &&
+    isCurrentScope.value &&
     !isUploading.value &&
     !props.disabled &&
     !props.readonly &&
@@ -633,8 +643,7 @@ const canCheckUpload = computed(() => {
 let checkingCompletion = false
 const checkUpload = async () => {
   const pending = uncertainUpload.value
-  if (!pending || isUploading.value || checkingCompletion || props.disabled || props.readonly)
-    return
+  if (!canCheckUpload.value || !pending || checkingCompletion) return
   if (
     pending.completion.entityType !== props.entityType ||
     String(pending.completion.entityId) !== String(props.entityId)
@@ -642,11 +651,15 @@ const checkUpload = async () => {
     return
   checkingCompletion = true
   try {
-    if (pending.category === 'image') {
-      await handleImageUpload(pending.file, { skipCropper: true })
-    } else {
-      await handleVideoUpload(pending.file)
-    }
+    const category = pending.completion.fileCategory === 'video' ? 'video' : 'image'
+    const uploadedFile = await uploadMediaToServer(pending.file, category)
+    if (unmounted) return
+    if (category === 'video') insertVideoIntoEditor(uploadedFile, pending.completion.filename)
+    else insertImageIntoEditor(uploadedFile, pending.completion.filename)
+    if (pending.file) emit('file-upload', pending.file)
+    emit('files-uploaded', [uploadedFile.id])
+  } catch (error) {
+    emit('file-error', String(error))
   } finally {
     checkingCompletion = false
   }
@@ -1434,11 +1447,21 @@ const insertAttachment = (payload: AttachmentPayload) => {
 }
 
 const handleFiles = async (files: File[], options: FileHandleOptions = {}) => {
+  const batchEntityType = props.entityType
+  const batchEntityId = props.entityId
+  if (unmounted || !isCurrentScope.value) return
   if (uncertainUpload.value || isUploading.value || checkingCompletion) return
   captureCurrentSelection()
   console.log('📁 handleFiles called with:', files.length, 'files')
   for (const file of files) {
-    if (uncertainUpload.value) break
+    if (
+      unmounted ||
+      !isCurrentScope.value ||
+      batchEntityType !== props.entityType ||
+      String(batchEntityId) !== String(props.entityId) ||
+      uncertainUpload.value
+    )
+      break
     console.log('📁 Processing file:', file.name, 'type:', file.type, 'size:', file.size)
 
     const detected = detectFileKind(file)
@@ -1476,18 +1499,22 @@ const handleFiles = async (files: File[], options: FileHandleOptions = {}) => {
 
 // Функция для загрузки файла на сервер
 const uploadMediaToServer = async (
-  file: File,
+  file: File | undefined,
   fileCategory: 'image' | 'video',
 ): Promise<UploadResult> => {
+  if (unmounted || !isCurrentScope.value) throw new Error('Upload cancelled')
   const pending = uncertainUpload.value
-  if (
-    pending &&
-    (!checkingCompletion || pending.file !== file || pending.category !== fileCategory)
-  ) {
+  if (pending && (!checkingCompletion || pending.file !== file)) {
     throw new Error('Check the unconfirmed upload before starting another.')
   }
   const baseLabel = fileCategory === 'video' ? 'Загрузка видео' : 'Загрузка изображения'
-  const uploadLabel = file.name ? `${baseLabel}: ${file.name}` : baseLabel
+  const filename = file?.name ?? pending?.completion.filename
+  const uploadLabel = filename ? `${baseLabel}: ${filename}` : baseLabel
+  let completion = pending?.completion
+  const originalEntityType = props.entityType
+  const originalEntityId = props.entityId
+  const controller = new AbortController()
+  uploadController = controller
   let uploadQueueId: string | null = null
 
   try {
@@ -1506,9 +1533,16 @@ const uploadMediaToServer = async (
 
     const response =
       pending && checkingCompletion
-        ? await reconcileUploadCompletion(pending.completion)
+        ? await reconcileUploadCompletion(pending.completion, { signal: controller.signal })
         : await uploadFiles({
             file,
+            signal: controller.signal,
+            onCompletionSession: (session: UncertainUploadCompletion) => {
+              if (!retainCompletion(session, file)) {
+                throw new Error('Check the unconfirmed upload before starting another.')
+              }
+              completion = session
+            },
             entityType: props.entityType,
             entityId: props.entityId,
             context: 'rich-text',
@@ -1528,12 +1562,17 @@ const uploadMediaToServer = async (
           })
 
     if (response.uncertainCompletion) {
-      uncertainUpload.value = {
-        file,
-        category: fileCategory,
-        completion: response.uncertainCompletion,
-      }
+      completion = response.uncertainCompletion
+      retainCompletion(completion, file)
     }
+    if (!response.uncertainCompletion && response.error && completion) releaseCompletion(completion)
+    if (
+      unmounted ||
+      !isCurrentScope.value ||
+      originalEntityType !== props.entityType ||
+      String(originalEntityId) !== String(props.entityId)
+    )
+      throw new Error('Return to the original entity to check this upload.')
     if (response.status === 'completion_unknown') {
       throw new Error(
         response.error ||
@@ -1559,11 +1598,11 @@ const uploadMediaToServer = async (
 
     const releaseTerminalUncertainty = () => {
       if (
-        pending &&
-        pending.completion.entityType === props.entityType &&
-        String(pending.completion.entityId) === String(props.entityId)
+        completion &&
+        completion.entityType === props.entityType &&
+        String(completion.entityId) === String(props.entityId)
       ) {
-        uncertainUpload.value = null
+        if (completion) releaseCompletion(completion)
       }
     }
     if (taskStatus === 'failed' || taskStatus === 'error') {
@@ -1635,12 +1674,13 @@ const uploadMediaToServer = async (
     }
 
     if (
-      pending &&
-      (pending.completion.entityType !== props.entityType ||
-        String(pending.completion.entityId) !== String(props.entityId))
+      unmounted ||
+      !isCurrentScope.value ||
+      originalEntityType !== props.entityType ||
+      String(originalEntityId) !== String(props.entityId)
     )
       throw new Error('Return to the original entity to check this upload.')
-    uncertainUpload.value = null
+    if (completion) releaseCompletion(completion)
     uploadProgress.value = 100
     emit('upload-progress', 100)
     uploadedFiles.value.push(normalized.id)
@@ -1999,6 +2039,8 @@ onMounted(() => {
 
 // Cleanup
 onBeforeUnmount(() => {
+  unmounted = true
+  uploadController?.abort()
   editor.value?.destroy()
   cleanupTaskSubscription()
 

@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
+import { createApp, h, nextTick, reactive } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
 import ImageUploader from './ImageUploader.vue'
 import { setAdminCapabilities } from '@/composables/useAdminCapabilities'
+
+import { useUploadCompletion } from '@/composables/useUploadCompletion'
 
 const mocks = vi.hoisted(() => ({
   connect: vi.fn(),
@@ -22,6 +24,7 @@ vi.mock('@/services/fileUploadService', () => ({
 }))
 vi.mock('@/services/pollUploadTask', () => ({ pollUploadTask: mocks.poll }))
 
+let nextSession = 0
 const apps: ReturnType<typeof createApp>[] = []
 function mountUploader(onUpdate = vi.fn()) {
   const root = document.createElement('div')
@@ -35,9 +38,20 @@ function mountUploader(onUpdate = vi.fn()) {
   return root
 }
 
-afterEach(() => {
+afterEach(async () => {
   apps.splice(0).forEach((app) => app.unmount())
   setAdminCapabilities({ props: {} })
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  setActivePinia(createPinia())
+  for (const id of [7, 8]) {
+    const recovery = useUploadCompletion(
+      () => 'admin',
+      () => id,
+      () => 'image-uploader',
+    )
+    if (recovery.pending.value) recovery.release(recovery.pending.value.completion)
+  }
+  sessionStorage.clear()
   vi.clearAllMocks()
 })
 
@@ -76,7 +90,7 @@ describe('image upload capabilities', () => {
   it('retains an unconfirmed session and blocks fresh uploads until an explicit recheck succeeds', async () => {
     setAdminCapabilities({ props: { adminCapabilities: { uploads: true } } })
     const completion = {
-      location: '/tus/original',
+      location: `/tus/original-${++nextSession}`,
       filename: 'avatar.png',
       entityType: 'admin',
       entityId: 7,
@@ -118,8 +132,12 @@ describe('image upload capabilities', () => {
     expect(input.disabled).toBe(true)
     check().click()
     await vi.waitFor(() => expect(update).toHaveBeenCalledWith(expect.objectContaining({ id: 42 })))
-    expect(mocks.reconcile).toHaveBeenNthCalledWith(1, completion)
-    expect(mocks.reconcile).toHaveBeenNthCalledWith(2, completion)
+    expect(mocks.reconcile).toHaveBeenNthCalledWith(1, completion, {
+      signal: expect.any(AbortSignal),
+    })
+    expect(mocks.reconcile).toHaveBeenNthCalledWith(2, completion, {
+      signal: expect.any(AbortSignal),
+    })
     expect(mocks.upload).toHaveBeenCalledTimes(1)
     expect(mocks.upload.mock.calls[0][0].file).toBe(file)
     expect(root.textContent).not.toContain('Check upload')
@@ -128,7 +146,7 @@ describe('image upload capabilities', () => {
   it('accepts a completed same-session replay without waiting for another realtime event', async () => {
     setAdminCapabilities({ props: { adminCapabilities: { uploads: true, realtime: true } } })
     const completion = {
-      location: '/tus/original',
+      location: `/tus/original-${++nextSession}`,
       filename: 'avatar.png',
       entityType: 'admin',
       entityId: 7,
@@ -162,7 +180,7 @@ describe('image upload capabilities', () => {
     await vi.waitFor(() =>
       expect(update).toHaveBeenCalledWith(expect.objectContaining({ id: 42, url: '/avatar.png' })),
     )
-    expect(mocks.reconcile).toHaveBeenCalledWith(completion)
+    expect(mocks.reconcile).toHaveBeenCalledWith(completion, { signal: expect.any(AbortSignal) })
     expect(mocks.upload).toHaveBeenCalledTimes(1)
     expect(mocks.on).not.toHaveBeenCalled()
     expect(mocks.poll).not.toHaveBeenCalled()
@@ -190,7 +208,7 @@ describe('image upload capabilities', () => {
     'unlocks fresh uploads after definitive %s completion replay',
     async (status) => {
       const completion = {
-        location: '/tus/original',
+        location: `/tus/original-${++nextSession}`,
         filename: 'avatar.png',
         entityType: 'admin',
         entityId: 7,
@@ -217,10 +235,87 @@ describe('image upload capabilities', () => {
         .click()
       await vi.waitFor(() => expect(input.disabled).toBe(false))
       expect(root.textContent).not.toContain('Check upload')
-      expect(mocks.reconcile).toHaveBeenCalledWith(completion)
+      expect(mocks.reconcile).toHaveBeenCalledWith(completion, { signal: expect.any(AbortSignal) })
       expect(mocks.upload).toHaveBeenCalledTimes(1)
       input.dispatchEvent(new Event('change'))
       await vi.waitFor(() => expect(mocks.upload).toHaveBeenCalledTimes(2))
     },
   )
+  it.each(['unknown', 'dispatch'])(
+    'restores the %s fence after navigation and releases a definite replay rejection',
+    async (stage) => {
+      setAdminCapabilities({ props: { adminCapabilities: { uploads: true } } })
+      const completion = {
+        location: `/files/tus/original-${++nextSession}`,
+        filename: 'avatar.png',
+        entityType: 'admin',
+        entityId: 7,
+      }
+      mocks.upload.mockImplementation((request) => {
+        request.onCompletionSession(completion)
+        return stage === 'dispatch'
+          ? new Promise(() => {})
+          : Promise.resolve({
+              status: 'completion_unknown',
+              tasks: [],
+              uncertainCompletion: completion,
+            })
+      })
+      const root = mountUploader()
+      const input = root.querySelector<HTMLInputElement>('input[type=file]')!
+      Object.defineProperty(input, 'files', {
+        value: [new File(['image'], 'avatar.png', { type: 'image/png' })],
+      })
+      input.dispatchEvent(new Event('change'))
+      await vi.waitFor(() => expect(mocks.upload).toHaveBeenCalledTimes(1))
+      apps.pop()!.unmount()
+      expect(mocks.upload.mock.calls[0][0].signal.aborted).toBe(true)
+      const remounted = mountUploader()
+      const newInput = remounted.querySelector<HTMLInputElement>('input[type=file]')!
+      expect(newInput.disabled).toBe(true)
+      expect(remounted.textContent).toContain('Check upload')
+      newInput.dispatchEvent(new Event('change'))
+      expect(mocks.upload).toHaveBeenCalledTimes(1)
+      mocks.reconcile.mockResolvedValue({ status: 'error', tasks: [], error: 'Session expired' })
+      Array.from(remounted.querySelectorAll('button'))
+        .find((button) => button.textContent?.includes('Check upload'))!
+        .click()
+      await vi.waitFor(() => expect(newInput.disabled).toBe(false))
+      expect(remounted.textContent).toContain('Session expired')
+      expect(mocks.reconcile).toHaveBeenCalledWith(completion, { signal: expect.any(AbortSignal) })
+      expect(mocks.upload).toHaveBeenCalledTimes(1)
+    },
+  )
+  it('does not apply an old task result after the entity changes', async () => {
+    setAdminCapabilities({ props: { adminCapabilities: { uploads: true } } })
+    mocks.upload.mockResolvedValue({ status: 'queued', tasks: [{ id: 42, status: 'queued' }] })
+    let finish!: (value: unknown) => void
+    mocks.poll.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
+    const update = vi.fn()
+    const props = reactive({ objectType: 'admin', objectId: 7, 'onUpdate:modelValue': update })
+    const root = document.createElement('div')
+    const app = createApp({ render: () => h(ImageUploader, props) }).use(createPinia())
+    apps.push(app)
+    app.mount(root)
+    const input = root.querySelector<HTMLInputElement>('input[type=file]')!
+    Object.defineProperty(input, 'files', {
+      value: [new File(['image'], 'avatar.png', { type: 'image/png' })],
+    })
+    input.dispatchEvent(new Event('change'))
+    await vi.waitFor(() => expect(mocks.poll).toHaveBeenCalled())
+    props.objectId = 8
+    await nextTick()
+    finish({
+      status: 'completed',
+      task: { id: 42 },
+      file: { id: 42, filename: 'old.png', url: '/old.png' },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(update).not.toHaveBeenCalled()
+  })
 })
