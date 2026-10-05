@@ -84,3 +84,36 @@ unmount/remount, narrow viewport overflow, horizontal/vertical scroll and
 100/1000-row rendering. Keep the 1000-row case labeled synthetic; the production
 GET endpoint cap remains 100. Report actual browser/viewport/measurements rather
 than converting JSDOM or subjective speed into a production SLA.
+
+## Native browser baseline and nullable-date repair
+
+The approved native IAB pass used Chrome 154 against candidate `eafcaff`.
+The actual authenticated users host passed 1440px and 390px contained-scroll
+checks, keyboard name sorting, pagination at limit 1, forward navigation to the
+second-page Beta record after login-history traversal, Alpha filtering with
+page reset, and expired-session return to login. The separate synthetic demo
+covered keyboard selection/reset, 401/403/500 with retry, out-of-order 600/30ms
+responses, unmount/remount, safe HTML rendering, and 100/1000-row paints. These
+synthetic paints are not production performance/SLA evidence. The demo alone
+had 414px horizontal width at a 390px viewport; the actual host measured
+390px/390px.
+
+The baseline exposed `Invalid Date` in all six nullable confirmation-date
+cells. Go `sql.NullTime` arrives as `{Time, Valid}`; the grid was converting it
+to `[object Object]` before formatting. Preserve the value until formatting,
+honor `Valid`, and leave absent or malformed dates blank. Component regression
+coverage includes valid RFC3339 strings and nullable timestamp objects, invalid
+flags, malformed timestamps, null/missing/empty values, and unexpected shapes.
+All 98 focused table tests and focused ESLint passed after this repair. The
+final aggregate `make check` passed: Go race/coverage, 40 manifest/tooling
+tests, 347 frontend tests across 31 files, lint, formatting, type-check, production
+asset rebuild, and verification of three admin template assets. The final
+native browser recheck remains pending.
+
+Native CSV download remains **unverified**, not passed or a confirmed product
+failure. The export button's download event timed out after 20 seconds; direct
+attachment navigation then hung and browser control was interrupted before a
+saved path or filename could be established. HTTP CSV status, content, scope,
+quoting, and authorization evidence above does not prove native download
+filename or saved bytes. No alternate browser route was used to bypass a
+restriction, and no speculative export implementation change was made.

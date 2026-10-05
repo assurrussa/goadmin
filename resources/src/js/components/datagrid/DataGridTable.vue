@@ -270,32 +270,28 @@ const getItemId = (item: DataItem, config: Config): string | number => {
 }
 
 // Helper function to safely get column value
-const getColumnValue = (item: DataItem, columnKey: string): string | number | boolean => {
+const getColumnValue = (item: DataItem, columnKey: string): unknown => {
   const hasComputedValue =
     item.values && Object.prototype.hasOwnProperty.call(item.values, columnKey)
   const source = hasComputedValue ? item.values! : item.item
-  const value = source[columnKey]
-
-  if (typeof value === 'string' || typeof value === 'number') {
-    return value
-  }
-
-  if (typeof value === 'boolean') {
-    return value
-  }
-
-  if (value === null || value === undefined) {
-    return ''
-  }
-
-  return String(value)
+  return source[columnKey] ?? ''
 }
 
 const formatValue = (value: unknown, column: Column): string => {
   if (value === null || value === undefined || value === '') return ''
 
   if (column.type === 'date' && column.format) {
-    return new Date(value as string).toLocaleDateString('ru-RU', {
+    // Go's sql.NullTime is serialized as { Time, Valid }. Keep this shape
+    // intact until formatting so absent confirmations do not become invalid dates.
+    if (typeof value === 'object' && 'Valid' in value && 'Time' in value) {
+      if (value.Valid !== true) return ''
+      value = value.Time
+    }
+    if (typeof value !== 'string' && typeof value !== 'number') return ''
+    if (value === '') return ''
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    return date.toLocaleDateString('ru-RU', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
