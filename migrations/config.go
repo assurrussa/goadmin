@@ -36,6 +36,21 @@ type DatabaseConfig struct {
 // canonical gouploads lifecycle storage in that order. Legacy goauth v0.1
 // schemas are rejected by the canonical runner and are never reset implicitly.
 func Migrate(ctx context.Context, cfg DatabaseConfig, db *sql.DB) error {
+	return migrate(ctx, cfg, db, false)
+}
+
+// MigrateWithHostManagedUploads installs canonical auth and GoAdmin core while
+// leaving GoUploads migrations and their history entirely under host ownership.
+// The host must install and verify every migration from the pinned GoUploads
+// package before calling this function, and serialize its complete migration
+// sequence. It must keep doing so on future dependency upgrades. This function
+// neither adopts existing upload history nor creates a GoAdmin upload ledger.
+// Use Migrate unless the host explicitly owns the complete upload schema.
+func MigrateWithHostManagedUploads(ctx context.Context, cfg DatabaseConfig, db *sql.DB) error {
+	return migrate(ctx, cfg, db, true)
+}
+
+func migrate(ctx context.Context, cfg DatabaseConfig, db *sql.DB, hostManagedUploads bool) error {
 	return withDatabase(ctx, cfg, db, func(database *sql.DB, storageCfg outbox.StoragePgsqlConfig) error {
 		if err := postgres.Migrate(ctx, database); err != nil {
 			return fmt.Errorf("migrate canonical goauth schema: %w", err)
@@ -43,8 +58,10 @@ func Migrate(ctx context.Context, cfg DatabaseConfig, db *sql.DB) error {
 		if err := run(ctx, storageCfg, database, "up", logger.Discard()); err != nil {
 			return fmt.Errorf("migrate goadmin schema: %w", err)
 		}
-		if err := migrateUploads(ctx, database); err != nil {
-			return fmt.Errorf("migrate canonical gouploads schema: %w", err)
+		if !hostManagedUploads {
+			if err := migrateUploads(ctx, database); err != nil {
+				return fmt.Errorf("migrate canonical gouploads schema: %w", err)
+			}
 		}
 
 		return nil

@@ -112,6 +112,7 @@ func TestCoreMigrationPublicConfigSurfaceCompiles(t *testing.T) {
 
 	_ = DatabaseConfig{}
 	requireMigrateSignature(Migrate)
+	requireMigrateSignature(MigrateWithHostManagedUploads)
 	requireResetSignature(Reset)
 }
 

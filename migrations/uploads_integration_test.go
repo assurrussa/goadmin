@@ -50,6 +50,29 @@ SELECT id, '{}'::jsonb FROM files WHERE slug = 'preserved-audio';`)
 	assertUploadLifecycleRows(t, ctx, db)
 }
 
+// The host-managed facade intentionally has the same auth/core behavior as the
+// pre-v0.9.1 facade. Upload execution and ledger ownership remain the caller's.
+func TestHostManagedUploadsMigrateDoesNotCreateOrAdoptUploadHistory(t *testing.T) {
+	ctx, db := uploadMigrationDatabase(t, "HostManagedUploads")
+	require.NoError(t, postgres.Down(ctx, db, postgres.ConfirmResetAuthState))
+	require.NoError(t, MigrateWithHostManagedUploads(ctx, DatabaseConfig{}, db))
+	var auth, core, uploadLedger, sessions bool
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT
+ to_regclass('public.auth_subjects') IS NOT NULL,
+ to_regclass('public.goadmin_browser_sessions') IS NOT NULL,
+ to_regclass('public.goadmin_uploads_goose_db_version') IS NOT NULL,
+ to_regclass('public.upload_sessions') IS NOT NULL`).Scan(&auth, &core, &uploadLedger, &sessions))
+	require.True(t, auth)
+	require.True(t, core)
+	require.False(t, uploadLedger)
+	require.False(t, sessions, "the caller, not this facade, installs upload migrations")
+	require.NoError(t, MigrateWithHostManagedUploads(ctx, DatabaseConfig{}, db))
+	// The unchanged default remains fully managed and installs the upload pack.
+	require.NoError(t, Migrate(ctx, DatabaseConfig{}, db))
+	assertUploadSchema(t, ctx, db)
+	assertUploadLedger(t, ctx, db)
+}
+
 func TestUploadsMigrateExistingGoAdminPreservesFiles(t *testing.T) {
 	ctx, db := uploadMigrationDatabase(t, "UploadMigrationsUpgrade")
 	// Reproduce the previous public facade exactly: canonical GoAuth (fixture)
