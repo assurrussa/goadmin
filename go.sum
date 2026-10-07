@@ -3,8 +3,8 @@ github.com/BurntSushi/toml v1.6.0 h1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk
 github.com/BurntSushi/toml v1.6.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/Masterminds/squirrel v1.5.4 h1:uUcX/aBc8O7Fg9kaISIUsHXdKuqehiXAMQTYX8afzqM=
 github.com/Masterminds/squirrel v1.5.4/go.mod h1:NNaOrjSoIDfDA40n7sr2tPNZRfjzjA400rg+riTZj10=
-github.com/assurrussa/goauth v0.5.1 h1:keEV/dnHTbEzAbg4QvxgmSTYJ5uF3ON1uQ7Lw3ofYqk=
-github.com/assurrussa/goauth v0.5.1/go.mod h1:b/HbzBG2IackVlpnTklK57jS0Hr4HK/qTdBfpUtE0VY=
+github.com/assurrussa/goauth v0.6.0 h1:dnyuCvyMXE/bN1o767+cWMh04q9vwx4tLuzzHCqHog8=
+github.com/assurrussa/goauth v0.6.0/go.mod h1:b/HbzBG2IackVlpnTklK57jS0Hr4HK/qTdBfpUtE0VY=
 github.com/assurrussa/gocache v0.2.2 h1:Ca2Q+rjoxpEMjKtxpBNvo7U7y0beW3JjUgXCO38DjGE=
 github.com/assurrussa/gocache v0.2.2/go.mod h1:2phNxsjBMsJ8l9pu04tuhAKEOOVR2ZmU799DLgQZEo8=
 github.com/assurrussa/godi v0.9.3 h1:41DOaW+kAV4387ZERN5GjUzGFjGIaHcCBqUpxuPnVIM=
