@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createApp, defineComponent, nextTick, type App } from 'vue'
+import { createApp, defineComponent, h, nextTick, reactive, type App } from 'vue'
 import IndexPage from './IndexPage.vue'
 import type { ApiResponse } from '@/composables/useDataGrid'
 
+const visits = vi.hoisted(() => ({ get: vi.fn(), visit: vi.fn(), delete: vi.fn(), post: vi.fn() }))
 const notices = vi.hoisted(() => ({ warning: vi.fn(), error: vi.fn() }))
 vi.mock('@/composables/useNotifications', () => ({ useNotifications: () => notices }))
-vi.mock('@inertiajs/vue3', () => ({ router: { get: vi.fn(), visit: vi.fn() } }))
+vi.mock('@inertiajs/vue3', () => ({ router: visits }))
 vi.mock('@/components/layout/AppHead.vue', () => ({
   default: defineComponent({ render: () => null }),
 }))
@@ -68,8 +69,8 @@ describe('users export with the real DataGrid URL contract', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     const root = document.createElement('div')
     document.body.append(root)
-    const pageProps = { data: data() }
-    app = createApp(IndexPage, pageProps)
+    const pageProps = reactive({ data: data() })
+    app = createApp(defineComponent({ setup: () => () => h(IndexPage, pageProps) }))
     app.mount(root)
     await settle()
     const exportButton = [...root.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
@@ -141,8 +142,8 @@ describe('users export with the real DataGrid URL contract', () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     const root = document.createElement('div')
     document.body.append(root)
-    const pageProps = { data: data() }
-    app = createApp(IndexPage, pageProps)
+    const pageProps = reactive({ data: data() })
+    app = createApp(defineComponent({ setup: () => () => h(IndexPage, pageProps) }))
     app.mount(root)
     await settle()
     const search = root.querySelector<HTMLInputElement>('input')!
@@ -172,8 +173,14 @@ describe('users export with the real DataGrid URL contract', () => {
     expect(notices.warning).toHaveBeenCalledWith(expect.stringContaining('10 000'))
     expect(window.history.state).toEqual({ host: 'kept' })
     window.history.replaceState({ host: 'back' }, '', '/users')
+    const callsBeforeBack = requests.length
     window.dispatchEvent(new PopStateEvent('popstate'))
+    // Inertia restores the page props after its history handler; DataGrid must not fetch here.
+    pageProps.data = data()
+    pageProps.data.meta!.requestQuery = ''
+    pageProps.data.meta!.filters = {}
     await settle()
+    expect(requests).toHaveLength(callsBeforeBack)
     exportButton.click()
     await settle()
     expect(downloads).toHaveLength(2)
@@ -181,7 +188,7 @@ describe('users export with the real DataGrid URL contract', () => {
     expect(downloads[1].searchParams.has('search')).toBe(false)
     expect(downloads[1].searchParams.has('limit')).toBe(false)
     expect(downloads[1].searchParams.has('page')).toBe(false)
-    expect(requests.at(-1)!.searchParams.get('search')).toBe('')
+    expect(search.value).toBe('')
     expect(notices.error).not.toHaveBeenCalled()
     expect(document.querySelector('a[download]')).toBeNull()
   })
