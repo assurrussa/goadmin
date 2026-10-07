@@ -1,6 +1,7 @@
 <template>
   <AppHead :title="props.title" />
   <DataGrid
+    navigation-mode="inertia"
     ref="dataGridRef"
     :api-url="apiUrl"
     :initial-data="apiResponseData"
@@ -89,11 +90,6 @@ function handleActionClick(actionId: string, val: string | number | null) {
     case 'refresh':
       router.visit(`${apiUrl.value}/refresh`, {
         method: 'post',
-        onFinish: (visit) => {
-          if (visit.completed && dataGridRef.value) {
-            dataGridRef.value.refreshData()
-          }
-        },
       })
       break
     default:
@@ -115,28 +111,12 @@ function handleDataAction(actionKey: string, item: Record<string, unknown>) {
       break
     case 'delete':
       if (confirm(`Вы уверены, что хотите удалить запись #${item.id}?`)) {
-        router.delete(`${apiUrl.value}/${item.id}`, {
-          onFinish: (visit) => {
-            if (visit.completed && dataGridRef.value) {
-              dataGridRef.value.refreshData()
-            }
-          },
-        })
+        router.delete(`${apiUrl.value}/${item.id}`)
       }
       break
     case 'restore':
       if (confirm(`Вы уверены, что хотите восстановить запись #${item.id}?`)) {
-        router.post(
-          `${apiUrl.value}/${item.id}/restore`,
-          {},
-          {
-            onFinish: (visit) => {
-              if (visit.completed && dataGridRef.value) {
-                dataGridRef.value.refreshData()
-              }
-            },
-          },
-        )
+        router.post(`${apiUrl.value}/${item.id}/restore`, {})
       }
       break
     default:

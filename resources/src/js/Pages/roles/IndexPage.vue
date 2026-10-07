@@ -13,6 +13,7 @@
       </p>
     </section>
     <DataGrid
+      navigation-mode="inertia"
       ref="dataGridRef"
       :api-url="apiUrl"
       :initial-data="apiResponseData"
@@ -65,11 +66,6 @@ function handleActionClick(actionId: string) {
     case 'refresh':
       router.visit(`${apiUrl.value}/refresh`, {
         method: 'post',
-        onFinish: (visit) => {
-          if (visit.completed && dataGridRef.value) {
-            dataGridRef.value.refreshData()
-          }
-        },
       })
       break
     default:
@@ -96,13 +92,7 @@ function handleRowAction(actionKey: string, item: Record<string, unknown>) {
       break
     case 'delete':
       if (confirm(`Удалить роль #${roleId}?`)) {
-        router.delete(`${apiUrl.value}/${roleId}`, {
-          onFinish: (visit) => {
-            if (visit.completed && dataGridRef.value) {
-              dataGridRef.value.refreshData()
-            }
-          },
-        })
+        router.delete(`${apiUrl.value}/${roleId}`)
       }
       break
     default:

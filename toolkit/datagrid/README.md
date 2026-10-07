@@ -82,3 +82,19 @@ are checked by `reference/externalconsumer` and `make externalconsumer-local`.
 For repository-wide verification use `make check` as described in
 [AGENTS.md](../../AGENTS.md). Measure coverage from the current test run rather
 than relying on a fixed documentation percentage.
+
+### Initial data and query provenance
+
+Handler-generated GET page/data responses include optional `meta.requestQuery`.
+It identifies the request query that produced the response; effective state stays
+in `meta.pagination`, `meta.sorting` and `meta.filters`. A known empty query is
+serialized as `""`; absent provenance must not be treated as a query match.
+`Response.RequestQuery` is optional for manual responses; the GET handler sets it
+automatically. POST body responses do not claim URL query provenance.
+
+The Vue DataGrid can hydrate matching initial data without another request,
+including server default/cap fallbacks. Legacy responses continue to work and
+load once when their applicability to a nonempty URL cannot be established.
+`initialData` can be replaced reactively. Generic grids use native browser
+navigation by default; Inertia-owned pages set `navigationMode="inertia"` and
+receive authoritative rows through restored/replaced page props.

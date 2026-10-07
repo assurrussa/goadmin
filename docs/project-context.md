@@ -225,6 +225,13 @@ templates address them directly. Hashed secondary chunks and the runtime
 extension manifest are already emitted; changing the entry filename requires a
 separate template asset-resolution migration.
 
+DataGrid GET responses expose optional `meta.requestQuery` provenance. Matching
+server rows are reused on client mount/hydration; reactive replacements also
+hydrate preserved page components. Built-in Inertia grids let Inertia restore
+history props; generic grids keep native popstate loading. Grid supersession and
+unmount abort browser fetches and discard obsolete responses before JSON decoding.
+The public GET page-size cap remains 100; abort does not imply database cancellation.
+
 The browser entrypoint uses the client `createInertiaApp` contract and mounts
 the Vue application directly. An SSR `render` callback belongs only in a
 separate server entrypoint and is intentionally absent from

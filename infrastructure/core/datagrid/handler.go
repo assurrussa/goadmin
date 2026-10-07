@@ -234,6 +234,11 @@ func (h *Handler[T]) loadDataInternal(c fiber.Ctx, filters Filters) (Response[T]
 		RoutePath: h.config.RoutePath,
 	}
 
+	if c.Method() == http.MethodGet {
+		query := string(c.Request().URI().QueryString())
+		internalResp.RequestQuery = &query
+	}
+
 	return internalResp, nil
 }
 

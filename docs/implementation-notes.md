@@ -1271,3 +1271,60 @@ previous-GoAdmin migrations, auth-reset preservation, transactional conflict
 rollback/retry, and real native TUS audio completion with finalizer execution.
 Published release readiness still requires live PostgreSQL/Redis, clean Codex
 review and the exact published-tag anonymous consumer gate.
+
+## DataGrid initial response reuse and request lifetime (2026-10-07)
+
+GET DataGrid responses now carry optional `meta.requestQuery`, copied from the
+request that produced their rows. The empty string is a known unfiltered request;
+absence means unknown provenance (manual/legacy responses and POST body loads).
+Effective server defaults, validation fallbacks and page caps remain in the
+existing pagination/sorting/filter metadata. Matching the query, including its
+absence/presence and duplicates, avoids a second load without assuming that an
+arbitrary `initialData` object applies to the current URL. Key order and equivalent
+URL encoding do not force reloads. Legacy/mismatched nonempty URL intent still
+loads once, preserving missing server-default parameters.
+
+The composable accepts an initialData ref/getter as well as a plain response. It
+initializes rows synchronously for Vue server rendering/hydration, starts network
+work only on the client, and hydrates replaced server props under preserveState.
+The current admin entrypoint is client-rendered from GoInertia's HTML data; this
+change does not add a Node SSR server or replace the entrypoint.
+
+Built-in users/admins/roles/permissions grids opt into `navigationMode="inertia"`:
+Inertia owns history remount/prop restoration, so they do not start a competing
+native popstate fetch. Generic/network-only grids retain `browser` navigation,
+which loads Back/Forward URL intent once. Redirected refresh/delete/restore props
+are authoritative; successful-visit callbacks no longer refetch the same grid.
+Selection retains its existing page-load reset behavior. Export cancellation,
+authorization, row actions, filters, sorting, pagination, rich-text rendering and
+the public 100-row GET limit remain unchanged.
+
+Each grid fetch has an AbortController. New requests, pending query edits,
+endpoint changes, replaced server props and unmount invalidate the sequence and
+abort old browser transport. An obsolete response is discarded before status/JSON
+work; the post-decode guard remains for bodies already decoding or transports
+that ignore abort. Intentional AbortError is quiet across browser realms. This
+does not claim cancellation of PostgreSQL work.
+
+Verification and bounded production before/after evidence are recorded in the
+DataGrid integration acceptance report; no synthetic dev heap is used as the
+production baseline. Independent review belongs to the coordinating task.
+
+Bounded production check on the same 1,000-user synthetic fixture (100-row
+public page, Chrome 154, fresh context per sample, one warmup plus five samples):
+initial loads and filtered CSR/refresh dropped from two row GETs to one;
+initial decoded page/data bodies fell from 296,862 to 185,427 bytes. Median
+navigation-to-rows plus two frames was 1,264.4 ms before and 893.2 ms after
+(with local outliers); full-page post-GC heap was 14.805 MiB and 14.030 MiB.
+Separate API fetch/JSON medians were 12.6 ms and 14.1 ms, so this does not claim
+a server-latency gain. Cached Back needed no row request; normalized Forward
+needed one because its URL no longer matched cached response provenance.
+Real supersession/unmount and delayed success/500/abort checks stayed quiet,
+and delete/restore each used one redirected row GET. GET `limit=1000` still
+falls back to 20; 1,000 rendered host rows were not forced past the public cap.
+
+Validation passed tidy, scoped format, vet, 73-linter policy, repository
+race/coverage tests, client manifest checks, all 510 frontend tests, ESLint,
+Prettier, Vue type check and production asset build. Format excludes only the
+pre-existing intentionally invalid generic-method audit fixture; no fixture
+source or production limit was changed.

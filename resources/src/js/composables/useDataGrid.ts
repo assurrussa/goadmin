@@ -39,6 +39,7 @@ interface Column {
 }
 
 interface Config {
+  routePath?: string
   columns?: Column[]
   ui?: {
     title?: string
@@ -87,6 +88,8 @@ interface ApiResponse {
 }
 
 interface Meta {
+  // Query that produced these rows; effective defaults remain in pagination/sorting/filters.
+  requestQuery?: string
   title: string
   description: string
   pagination?: Pagination
@@ -99,8 +102,9 @@ interface Meta {
 
 interface UseDataGridParams {
   apiUrl: MaybeRefOrGetter<string>
-  initialData?: ApiResponse | null
+  initialData?: MaybeRefOrGetter<ApiResponse | null | undefined>
   initialParams?: LoadDataParams
+  initialQuery?: MaybeRefOrGetter<string | undefined>
 }
 
 interface LoadDataParams {
@@ -154,12 +158,36 @@ export function parseDataGridQuery(
 const ordinaryFilters = (values: Record<string, unknown>): Record<string, unknown> =>
   Object.fromEntries(Object.entries(values).filter(([key]) => isDataGridFilterKey(key)))
 
-export function useDataGrid({ apiUrl, initialData, initialParams }: UseDataGridParams) {
+const canonicalQuery = (query: string): string => {
+  const params = new URLSearchParams(query)
+  params.sort()
+  return params.toString()
+}
+
+// Response provenance is explicit: effective defaults alone cannot prove which URL was loaded.
+export function matchesDataGridQuery(data: ApiResponse, query: string): boolean {
+  return (
+    typeof data.meta?.requestQuery === 'string' &&
+    canonicalQuery(data.meta.requestQuery) === canonicalQuery(query)
+  )
+}
+
+export function useDataGrid({
+  apiUrl,
+  initialData,
+  initialParams,
+  initialQuery,
+}: UseDataGridParams) {
   // Reactive state
   const loading: Ref<boolean> = ref(false)
   const loadError = ref<string | null>(null)
   const hasLoaded = ref(false)
   let requestSequence = 0
+  let activeController: AbortController | null = null
+  const abortActiveRequest = (): void => {
+    activeController?.abort()
+    activeController = null
+  }
   let lastRequest: LoadDataParams = {}
   let lastRequestUsesServerDefaults = false
   const metaInfo: Ref<Meta | null> = ref(null)
@@ -184,6 +212,7 @@ export function useDataGrid({ apiUrl, initialData, initialParams }: UseDataGridP
     () => toValue(apiUrl),
     () => {
       requestSequence++
+      abortActiveRequest()
       cancelPendingQuery()
       loading.value = false
       loadError.value = null
@@ -221,9 +250,7 @@ export function useDataGrid({ apiUrl, initialData, initialParams }: UseDataGridP
     }
     if (result.meta?.filters) {
       filters.value = ordinaryFilters(result.meta.filters)
-      if (Object.hasOwn(result.meta.filters, '_search')) {
-        searchQuery.value = String(result.meta.filters._search ?? '')
-      }
+      searchQuery.value = String(result.meta.filters._search ?? '')
     }
     hasLoaded.value = true
   }
@@ -235,6 +262,9 @@ export function useDataGrid({ apiUrl, initialData, initialParams }: UseDataGridP
   ): Promise<void> => {
     cancelPendingQuery()
     const request = ++requestSequence
+    abortActiveRequest()
+    const controller = new AbortController()
+    activeController = controller
     loading.value = true
     loadError.value = null
     if (params.sortBy !== undefined) sortBy.value = params.sortBy
@@ -286,7 +316,11 @@ export function useDataGrid({ apiUrl, initialData, initialParams }: UseDataGridP
         }
       })
 
-      const response = await fetch(`${toValue(apiUrl)}/data?${searchParams}`)
+      const response = await fetch(`${toValue(apiUrl)}/data?${searchParams}`, {
+        signal: controller.signal,
+      })
+      // Avoid status handling and JSON decoding even when the transport ignores cancellation.
+      if (request !== requestSequence || controller.signal.aborted) return
       if (!response.ok) {
         if (response.status === 401)
           throw new Error('Сеанс истёк. Войдите снова и повторите попытку.')
@@ -295,14 +329,19 @@ export function useDataGrid({ apiUrl, initialData, initialParams }: UseDataGridP
       }
 
       const result: ApiResponse = await response.json()
-      if (request !== requestSequence) return
+      if (request !== requestSequence || controller.signal.aborted) return
 
       hydrateResponse(result)
     } catch (error) {
-      if (request === requestSequence) {
+      if (
+        request === requestSequence &&
+        !controller.signal.aborted &&
+        !(error && typeof error === 'object' && 'name' in error && error.name === 'AbortError')
+      ) {
         loadError.value = error instanceof Error ? error.message : 'Не удалось загрузить данные.'
       }
     } finally {
+      if (activeController === controller) activeController = null
       if (request === requestSequence) loading.value = false
     }
   }
@@ -325,33 +364,90 @@ export function useDataGrid({ apiUrl, initialData, initialParams }: UseDataGridP
     )
   }
 
-  // Initialize data
-  const initializeData = (): void => {
-    let data: ApiResponse | null = null
-    if (initialData && typeof initialData === 'object' && initialData.data) {
-      data = initialData
-    } else if (window.AdminDataGrid) {
+  const readInitialData = (allowGlobal: boolean): ApiResponse | null => {
+    const provided = toValue(initialData)
+    if (provided && Array.isArray(provided.data)) return provided
+    if (allowGlobal && typeof window !== 'undefined' && window.AdminDataGrid) {
       try {
         const globalData = window.AdminDataGrid
-        data =
+        const data =
           typeof globalData === 'string'
             ? JSON.parse(globalData)
             : 'dataResponse' in globalData
               ? JSON.parse(globalData.dataResponse)
               : globalData
-      } catch (e) {
-        console.error('Error parsing AdminDataGrid:', e)
+        if (data && Array.isArray(data.data)) return data
+      } catch (error) {
+        console.error('Error parsing AdminDataGrid:', error)
       }
     }
-
-    if (data && Array.isArray(data.data)) hydrateResponse(data)
-    if (initialParams !== undefined) void requestData(initialParams, true)
-    else if (!hasLoaded.value) void loadData()
+    return null
   }
+
+  const acceptProvidedData = (data: ApiResponse): void => {
+    requestSequence++
+    abortActiveRequest()
+    cancelPendingQuery()
+    loading.value = false
+    loadError.value = null
+    searchQuery.value = ''
+    filters.value = {}
+    sortBy.value = ''
+    sortOrder.value = 'desc'
+    lastRequest = {}
+    lastRequestUsesServerDefaults = false
+    hydrateResponse(data)
+  }
+
+  // Initialize synchronously for Vue SSR/hydration. Network work starts only on the client.
+  const bootstrapData = readInitialData(true)
+  if (bootstrapData) acceptProvidedData(bootstrapData)
+
+  const initializeData = (allowGlobal: boolean): void => {
+    const data = readInitialData(false) ?? (allowGlobal ? bootstrapData : null)
+    if (data) acceptProvidedData(data)
+    const query = toValue(initialQuery)
+    const params =
+      query !== undefined
+        ? parseDataGridQuery(new URLSearchParams(query), undefined, true)
+        : initialParams
+    const routeMatches =
+      !data?.config?.routePath ||
+      data.config.routePath.replace(/\/$/, '') === toValue(apiUrl).replace(/\/$/, '')
+    if (
+      data &&
+      routeMatches &&
+      (params === undefined ||
+        (query === '' && data.meta?.requestQuery === undefined) ||
+        (query !== undefined && matchesDataGridQuery(data, query)))
+    )
+      return
+    if (params !== undefined) {
+      void requestData(
+        {
+          ...params,
+          page: params.page ?? 1,
+          search:
+            params.search ?? (data?.meta?.requestQuery === undefined ? searchQuery.value : ''),
+          filters: params.filters ?? (data?.meta?.requestQuery === undefined ? filters.value : {}),
+        },
+        true,
+      )
+    } else void loadData()
+  }
+
+  let mounted = false
+  watch(
+    () => toValue(initialData),
+    () => {
+      if (mounted) initializeData(false)
+    },
+  )
 
   const scheduleQuery = (delay: number): void => {
     cancelPendingQuery()
     requestSequence++
+    abortActiveRequest()
     loading.value = true
     loadError.value = null
     queryTimeout = setTimeout(() => {
@@ -451,11 +547,14 @@ export function useDataGrid({ apiUrl, initialData, initialParams }: UseDataGridP
 
   // Lifecycle
   onMounted(() => {
-    initializeData()
+    mounted = true
+    initializeData(true)
   })
 
   onUnmounted(() => {
+    mounted = false
     requestSequence++
+    abortActiveRequest()
     cancelPendingQuery()
   })
 

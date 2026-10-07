@@ -110,12 +110,14 @@ interface Props {
   apiUrl: string
   initialData?: ApiResponse | null
   syncWithUrl?: boolean
+  navigationMode?: 'browser' | 'inertia'
 }
 
 // Define props with defaults
 const props = withDefaults(defineProps<Props>(), {
   initialData: null,
   syncWithUrl: true,
+  navigationMode: 'browser',
 })
 
 // Define emits для передачи событий наружу
@@ -160,7 +162,9 @@ const {
   retryLoad,
 } = useDataGrid({
   apiUrl: () => props.apiUrl,
-  initialData: props.initialData,
+  initialData: () => props.initialData,
+  initialQuery: () =>
+    props.syncWithUrl && typeof window !== 'undefined' ? window.location.search : undefined,
   initialParams:
     props.syncWithUrl && typeof window !== 'undefined' && window.location.search
       ? parseDataGridQuery(new URLSearchParams(window.location.search), undefined, true)
@@ -245,6 +249,8 @@ defineExpose({
   refreshData,
 })
 
-onMounted(() => window.addEventListener('popstate', handlePopState))
+onMounted(() => {
+  if (props.navigationMode === 'browser') window.addEventListener('popstate', handlePopState)
+})
 onUnmounted(() => window.removeEventListener('popstate', handlePopState))
 </script>
