@@ -183,6 +183,7 @@ export function useDataGrid({
   const loadError = ref<string | null>(null)
   const hasLoaded = ref(false)
   let requestSequence = 0
+  let navigationSuspended = false
   let activeController: AbortController | null = null
   const abortActiveRequest = (): void => {
     activeController?.abort()
@@ -214,7 +215,7 @@ export function useDataGrid({
       requestSequence++
       abortActiveRequest()
       cancelPendingQuery()
-      loading.value = false
+      loading.value = navigationSuspended
       loadError.value = null
     },
     { flush: 'sync' },
@@ -385,6 +386,7 @@ export function useDataGrid({
   }
 
   const acceptProvidedData = (data: ApiResponse): void => {
+    navigationSuspended = false
     requestSequence++
     abortActiveRequest()
     cancelPendingQuery()
@@ -443,6 +445,17 @@ export function useDataGrid({
       if (mounted) initializeData(false)
     },
   )
+
+  // History restoration is asynchronous in Inertia. Invalidate immediately and keep
+  // URL synchronization paused until authoritative props arrive or this grid unmounts.
+  const suspendForNavigation = (): void => {
+    navigationSuspended = true
+    requestSequence++
+    abortActiveRequest()
+    cancelPendingQuery()
+    loading.value = true
+    loadError.value = null
+  }
 
   const scheduleQuery = (delay: number): void => {
     cancelPendingQuery()
@@ -582,6 +595,7 @@ export function useDataGrid({
     loadData,
     loadDataFromUrl,
     retryLoad,
+    suspendForNavigation,
     handleSearch,
     handleFilterChange,
     handleSort,

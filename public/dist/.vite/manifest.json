@@ -91,8 +91,8 @@
       "_VisuallyHidden-Jyu0EBME.js"
     ]
   },
-  "_DataGrid.vue_vue_type_script_setup_true_lang-C-3suhMY.js": {
-    "file": "js/DataGrid.vue_vue_type_script_setup_true_lang-C-3suhMY.js",
+  "_DataGrid.vue_vue_type_script_setup_true_lang-KyxMuzG7.js": {
+    "file": "js/DataGrid.vue_vue_type_script_setup_true_lang-KyxMuzG7.js",
     "name": "DataGrid.vue_vue_type_script_setup_true_lang",
     "imports": [
       "_editor-BLvWQyNR.js",
@@ -260,12 +260,12 @@
     ]
   },
   "src/js/Pages/admin/IndexPage.vue": {
-    "file": "js/IndexPage-CMiMYDIv.js",
+    "file": "js/IndexPage-DQKp-Q9A.js",
     "name": "IndexPage",
     "src": "src/js/Pages/admin/IndexPage.vue",
     "isDynamicEntry": true,
     "imports": [
-      "_DataGrid.vue_vue_type_script_setup_true_lang-C-3suhMY.js",
+      "_DataGrid.vue_vue_type_script_setup_true_lang-KyxMuzG7.js",
       "_AppHead.vue_vue_type_script_setup_true_lang-Cldt15P1.js",
       "src/js/app.ts",
       "_editor-BLvWQyNR.js",
@@ -430,14 +430,14 @@
     ]
   },
   "src/js/Pages/permissions/IndexPage.vue": {
-    "file": "js/IndexPage-hco_A6nR.js",
+    "file": "js/IndexPage-BH6Mgs1K.js",
     "name": "IndexPage",
     "src": "src/js/Pages/permissions/IndexPage.vue",
     "isDynamicEntry": true,
     "imports": [
       "src/js/app.ts",
       "_AppHead.vue_vue_type_script_setup_true_lang-Cldt15P1.js",
-      "_DataGrid.vue_vue_type_script_setup_true_lang-C-3suhMY.js",
+      "_DataGrid.vue_vue_type_script_setup_true_lang-KyxMuzG7.js",
       "_editor-BLvWQyNR.js",
       "_Card.vue_vue_type_script_setup_true_lang-BapGU0Rc.js",
       "_AppInput.vue_vue_type_script_setup_true_lang-C1B05WvD.js",
@@ -513,14 +513,14 @@
     ]
   },
   "src/js/Pages/queues/ActivePage.vue": {
-    "file": "js/ActivePage-CNC9k2wA.js",
+    "file": "js/ActivePage-C-tMhHJm.js",
     "name": "ActivePage",
     "src": "src/js/Pages/queues/ActivePage.vue",
     "isDynamicEntry": true,
     "imports": [
       "src/js/app.ts",
       "_AppHead.vue_vue_type_script_setup_true_lang-Cldt15P1.js",
-      "_DataGrid.vue_vue_type_script_setup_true_lang-C-3suhMY.js",
+      "_DataGrid.vue_vue_type_script_setup_true_lang-KyxMuzG7.js",
       "_Card.vue_vue_type_script_setup_true_lang-BapGU0Rc.js",
       "_editor-BLvWQyNR.js",
       "_AppInput.vue_vue_type_script_setup_true_lang-C1B05WvD.js",
@@ -534,14 +534,14 @@
     ]
   },
   "src/js/Pages/queues/FailedPage.vue": {
-    "file": "js/FailedPage-DO3UnudN.js",
+    "file": "js/FailedPage-Bv55923a.js",
     "name": "FailedPage",
     "src": "src/js/Pages/queues/FailedPage.vue",
     "isDynamicEntry": true,
     "imports": [
       "src/js/app.ts",
       "_AppHead.vue_vue_type_script_setup_true_lang-Cldt15P1.js",
-      "_DataGrid.vue_vue_type_script_setup_true_lang-C-3suhMY.js",
+      "_DataGrid.vue_vue_type_script_setup_true_lang-KyxMuzG7.js",
       "_Card.vue_vue_type_script_setup_true_lang-BapGU0Rc.js",
       "_editor-BLvWQyNR.js",
       "_AppInput.vue_vue_type_script_setup_true_lang-C1B05WvD.js",
@@ -615,14 +615,14 @@
     ]
   },
   "src/js/Pages/roles/IndexPage.vue": {
-    "file": "js/IndexPage-DRPyh3L1.js",
+    "file": "js/IndexPage-CAOGUS3w.js",
     "name": "IndexPage",
     "src": "src/js/Pages/roles/IndexPage.vue",
     "isDynamicEntry": true,
     "imports": [
       "src/js/app.ts",
       "_AppHead.vue_vue_type_script_setup_true_lang-Cldt15P1.js",
-      "_DataGrid.vue_vue_type_script_setup_true_lang-C-3suhMY.js",
+      "_DataGrid.vue_vue_type_script_setup_true_lang-KyxMuzG7.js",
       "_editor-BLvWQyNR.js",
       "_Card.vue_vue_type_script_setup_true_lang-BapGU0Rc.js",
       "_AppInput.vue_vue_type_script_setup_true_lang-C1B05WvD.js",
@@ -694,12 +694,12 @@
     ]
   },
   "src/js/Pages/users/IndexPage.vue": {
-    "file": "js/IndexPage-Dd7Tpxq_.js",
+    "file": "js/IndexPage-BcKdFfuf.js",
     "name": "IndexPage",
     "src": "src/js/Pages/users/IndexPage.vue",
     "isDynamicEntry": true,
     "imports": [
-      "_DataGrid.vue_vue_type_script_setup_true_lang-C-3suhMY.js",
+      "_DataGrid.vue_vue_type_script_setup_true_lang-KyxMuzG7.js",
       "_AppHead.vue_vue_type_script_setup_true_lang-Cldt15P1.js",
       "src/js/app.ts",
       "_editor-BLvWQyNR.js",

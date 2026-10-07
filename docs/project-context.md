@@ -228,7 +228,9 @@ separate template asset-resolution migration.
 DataGrid GET responses expose optional `meta.requestQuery` provenance. Matching
 server rows are reused on client mount/hydration; reactive replacements also
 hydrate preserved page components. Built-in Inertia grids let Inertia restore
-history props; generic grids keep native popstate loading. Grid supersession and
+history props, while their popstate listener synchronously invalidates old requests
+and debounces without fetching. URL synchronization stays paused during async
+restoration, including endpoint changes. Generic grids keep native popstate loading. Grid supersession and
 unmount abort browser fetches and discard obsolete responses before JSON decoding.
 The public GET page-size cap remains 100; abort does not imply database cancellation.
 

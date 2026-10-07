@@ -1328,3 +1328,20 @@ race/coverage tests, client manifest checks, all 510 frontend tests, ESLint,
 Prettier, Vue type check and production asset build. Format excludes only the
 pre-existing intentionally invalid generic-method audit fixture; no fixture
 source or production limit was changed.
+
+Independent review exposed an asynchronous Inertia history gap: between native
+`popstate` and decrypted/resolved restored props, old requests or debounce timers
+were still current and could rewrite the destination URL. A synchronous
+invalidation-only listener now aborts/cancels those operations and pauses URL
+synchronization until authoritative props arrive or the grid unmounts. Endpoint
+changes preserve that pause; null-state hash-only events do not suspend the grid.
+Four deterministic delayed Back/Forward regressions (in-flight request and pending
+debounce, same and different path) failed before the fix and pass after it, with
+no obsolete JSON parsing, destination URL changes, or duplicate data requests.
+Production-host evidence above is CSR through `createApp`; SSR evidence covers
+component server rendering and Vue hydration only.
+
+The final history follow-up passed 39 affected lifecycle/URL/cancellation and
+component-SSR tests, scoped lint/format, Vue type check and production asset
+build. Earlier unchanged backend and bounded production-host results were
+reused; no extra host/browser benchmark was run.

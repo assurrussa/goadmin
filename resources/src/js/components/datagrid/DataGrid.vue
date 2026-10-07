@@ -160,6 +160,7 @@ const {
   loadData,
   loadDataFromUrl,
   retryLoad,
+  suspendForNavigation,
 } = useDataGrid({
   apiUrl: () => props.apiUrl,
   initialData: () => props.initialData,
@@ -176,6 +177,9 @@ const hasActiveFilters = computed(() =>
     (value) => value !== '' && value !== null && value !== undefined,
   ),
 )
+
+let synchronizedLocation =
+  typeof window === 'undefined' ? '' : window.location.pathname + window.location.search
 
 const updateURL = (): void => {
   if (!props.syncWithUrl || loading.value || loadError.value || typeof window === 'undefined')
@@ -200,10 +204,20 @@ const updateURL = (): void => {
   const query = params.toString()
   const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`
   window.history.replaceState(window.history.state, '', newUrl)
+  synchronizedLocation = window.location.pathname + window.location.search
 }
 
-const handlePopState = (): void => {
+const handlePopState = (event: PopStateEvent): void => {
   if (!props.syncWithUrl) return
+  if (props.navigationMode === 'inertia') {
+    // A null-state hash-only event does not restore an Inertia page.
+    if (
+      event.state !== null ||
+      window.location.pathname + window.location.search !== synchronizedLocation
+    )
+      suspendForNavigation()
+    return
+  }
   void loadDataFromUrl(window.location.href)
 }
 
@@ -250,7 +264,7 @@ defineExpose({
 })
 
 onMounted(() => {
-  if (props.navigationMode === 'browser') window.addEventListener('popstate', handlePopState)
+  window.addEventListener('popstate', handlePopState)
 })
 onUnmounted(() => window.removeEventListener('popstate', handlePopState))
 </script>

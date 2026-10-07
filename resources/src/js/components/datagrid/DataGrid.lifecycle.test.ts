@@ -55,6 +55,7 @@ afterEach(() => {
   document.body.innerHTML = ''
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
+  vi.useRealTimers()
 })
 
 describe('server response and URL provenance', () => {
@@ -172,5 +173,85 @@ describe('server response and URL provenance', () => {
     expect(root.textContent).toContain('After mutation')
     expect(root.textContent).not.toContain('Obsolete page')
     expect(fetchMock).toHaveBeenCalledOnce()
+  })
+  it.each([
+    ['Back', '/users?search=Destination', 'request'],
+    ['Forward', '/roles?search=Destination', 'request'],
+    ['Back', '/users?search=Destination', 'debounce'],
+    ['Forward', '/roles?search=Destination', 'debounce'],
+  ])(
+    'invalidates %s %s during delayed Inertia props with pending %s',
+    async (_, destination, pending) => {
+      vi.useFakeTimers()
+      const initial = data('Old rows', '')
+      initial.meta!.filters = {}
+      const { props, root } = mount(initial, 'inertia')
+      await settle()
+      let resolve!: (value: Response) => void
+      fetchMock.mockImplementationOnce(
+        () =>
+          new Promise((r) => {
+            resolve = r
+          }),
+      )
+      if (pending === 'request') {
+        const sort = [...root.querySelectorAll<HTMLButtonElement>('th button')].find((b) =>
+          b.textContent?.includes('Name'),
+        )!
+        sort.click()
+        await settle()
+        expect(fetchMock).toHaveBeenCalledOnce()
+      } else {
+        const input = root.querySelector<HTMLInputElement>('input')!
+        input.value = 'Obsolete pending query'
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+        await settle()
+      }
+      window.history.replaceState({ page: { delayed: true } }, '', destination + '#destination')
+      window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }))
+      await settle()
+      if (pending === 'request') {
+        expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true)
+        const json = vi.fn(async () => data('Obsolete response'))
+        resolve({ ok: true, json } as unknown as Response)
+        await settle()
+        expect(json).not.toHaveBeenCalled()
+      }
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(fetchMock).toHaveBeenCalledTimes(pending === 'request' ? 1 : 0)
+      expect(window.location.pathname + window.location.search + window.location.hash).toBe(
+        destination + '#destination',
+      )
+      expect(root.textContent).not.toContain('Obsolete response')
+      const restored = data('Restored destination', 'search=Destination')
+      restored.config!.routePath = destination.split('?')[0]
+      restored.meta!.filters = { _search: 'Destination' }
+      props.apiUrl = restored.config!.routePath!
+      props.initialData = restored
+      await settle()
+      expect(root.textContent).toContain('Restored destination')
+      expect(fetchMock).toHaveBeenCalledTimes(pending === 'request' ? 1 : 0)
+      expect(window.location.pathname).toBe(destination.split('?')[0])
+      expect(new URLSearchParams(window.location.search).get('search')).toBe('Destination')
+      expect(window.location.hash).toBe('#destination')
+    },
+  )
+  it('does not suspend an Inertia grid for a null-state hash-only history event', async () => {
+    const initial = data('Existing page', '')
+    initial.meta!.filters = {}
+    const { root } = mount(initial, 'inertia')
+    await settle()
+    const search = window.location.search
+    window.history.replaceState(null, '', '/users' + search + '#section')
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    await settle()
+    const exportButton = [...root.querySelectorAll<HTMLButtonElement>('button')].find(
+      (b) => b.textContent?.trim() === 'Экспорт',
+    )!
+    expect(exportButton.disabled).toBe(false)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(root.textContent).toContain('Existing page')
+    expect(window.location.search).toBe(search)
+    expect(window.location.hash).toBe('#section')
   })
 })
