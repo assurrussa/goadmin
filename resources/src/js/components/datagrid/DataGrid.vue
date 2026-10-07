@@ -136,6 +136,7 @@ const {
   loading,
   loadError,
   hasLoaded,
+  navigationSuspended,
   items,
   pagination,
   config,
@@ -182,7 +183,13 @@ let synchronizedLocation =
   typeof window === 'undefined' ? '' : window.location.pathname + window.location.search
 
 const updateURL = (): void => {
-  if (!props.syncWithUrl || loading.value || loadError.value || typeof window === 'undefined')
+  if (
+    !props.syncWithUrl ||
+    navigationSuspended.value ||
+    loading.value ||
+    loadError.value ||
+    typeof window === 'undefined'
+  )
     return
 
   const params = new URLSearchParams()
@@ -221,7 +228,11 @@ const handlePopState = (event: PopStateEvent): void => {
   void loadDataFromUrl(window.location.href)
 }
 
-watch([pagination, sortBy, sortOrder, searchQuery, filters, loading], updateURL, { deep: true })
+watch(
+  [pagination, sortBy, sortOrder, searchQuery, filters, loading, navigationSuspended],
+  updateURL,
+  { deep: true },
+)
 
 const handleCreate = (): void => {
   emit('action-create')

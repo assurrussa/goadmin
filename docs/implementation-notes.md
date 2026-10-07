@@ -1345,3 +1345,10 @@ The final history follow-up passed 39 affected lifecycle/URL/cancellation and
 component-SSR tests, scoped lint/format, Vue type check and production asset
 build. Earlier unchanged backend and bounded production-host results were
 reused; no extra host/browser benchmark was run.
+
+The final review also exercised new input during the suspended interval. New
+search/sort/page requests and debounce scheduling now return while navigation
+is suspended, and URL synchronization explicitly checks the reactive suspension
+state. Authoritative props end the boundary. Three real-control interaction
+regressions failed before the guard and pass after it; all 42 affected tests
+pass, including interaction resuming after restored props.

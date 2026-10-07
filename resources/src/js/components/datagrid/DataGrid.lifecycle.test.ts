@@ -254,4 +254,61 @@ describe('server response and URL provenance', () => {
     expect(window.location.search).toBe(search)
     expect(window.location.hash).toBe('#section')
   })
+  it.each(['sort', 'search', 'page'])(
+    'blocks new %s interaction while Inertia history props are delayed',
+    async (interaction) => {
+      vi.useFakeTimers()
+      const initial = data('Departing rows', '')
+      initial.meta!.filters = {}
+      initial.meta!.pagination!.prevPageUrl = '/users?page=1&limit=25'
+      const { props, root } = mount(initial, 'inertia')
+      await settle()
+      window.history.replaceState(
+        { page: { delayed: true } },
+        '',
+        '/roles?search=Destination#destination',
+      )
+      window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }))
+      await settle()
+      if (interaction === 'sort') {
+        const oldSort = [...root.querySelectorAll<HTMLButtonElement>('th button')].find((b) =>
+          b.textContent?.includes('Name'),
+        )!
+        oldSort.click()
+      } else if (interaction === 'search') {
+        const input = root.querySelector<HTMLInputElement>('input')!
+        input.value = 'Departing new search'
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+      } else {
+        const previous = [...root.querySelectorAll<HTMLButtonElement>('button')].find(
+          (b) => b.textContent?.trim() === 'Назад',
+        )!
+        expect(previous.disabled).toBe(false)
+        previous.click()
+      }
+      await vi.advanceTimersByTimeAsync(1000)
+      await settle()
+      expect(fetchMock).not.toHaveBeenCalled()
+      expect(window.location.pathname + window.location.search + window.location.hash).toBe(
+        '/roles?search=Destination#destination',
+      )
+      expect(root.textContent).toContain('Departing rows')
+      const restored = data('Destination rows', 'search=Destination')
+      restored.config!.routePath = '/roles'
+      restored.meta!.filters = { _search: 'Destination' }
+      props.apiUrl = '/roles'
+      props.initialData = restored
+      await settle()
+      expect(fetchMock).not.toHaveBeenCalled()
+      expect(root.textContent).toContain('Destination rows')
+      // The boundary ends when authoritative props arrive: normal interaction works again.
+      const destinationSort = [...root.querySelectorAll<HTMLButtonElement>('th button')].find((b) =>
+        b.textContent?.includes('Name'),
+      )!
+      destinationSort.click()
+      await settle()
+      expect(fetchMock).toHaveBeenCalledOnce()
+      expect(String(fetchMock.mock.calls[0][0])).toMatch(/^\/roles\/data\?/)
+    },
+  )
 })

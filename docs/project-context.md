@@ -230,7 +230,8 @@ server rows are reused on client mount/hydration; reactive replacements also
 hydrate preserved page components. Built-in Inertia grids let Inertia restore
 history props, while their popstate listener synchronously invalidates old requests
 and debounces without fetching. URL synchronization stays paused during async
-restoration, including endpoint changes. Generic grids keep native popstate loading. Grid supersession and
+restoration, including endpoint changes and new search/sort/page interaction.
+The request/debounce boundary and URL synchronization both enforce suspension. Generic grids keep native popstate loading. Grid supersession and
 unmount abort browser fetches and discard obsolete responses before JSON decoding.
 The public GET page-size cap remains 100; abort does not imply database cancellation.
 
