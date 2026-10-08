@@ -24,6 +24,12 @@ func TestValidateSetupSecretOutputRejectsStandardStreamsAndLooseFiles(t *testing
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, file.Close()) })
 
+	// Creation permissions are filtered by umask; explicitly establish the unsafe fixture.
+	require.NoError(t, file.Chmod(0o644)) //nolint:gosec // deliberately unsafe mode must be rejected
+	info, err := file.Stat()
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0o644), info.Mode().Perm())
+
 	_, err = ValidateSetupSecretOutput(file)
 	require.Error(t, err)
 }
