@@ -1352,3 +1352,19 @@ is suspended, and URL synchronization explicitly checks the reactive suspension
 state. Authoritative props end the boundary. Three real-control interaction
 regressions failed before the guard and pass after it; all 42 affected tests
 pass, including interaction resuming after restored props.
+
+## Typed host page resolver boundary
+
+The generated extension registry retains each Vue SFC's inferred props. The
+heterogeneous resolver accepts Vue `Component` plus the optional persistent
+layout contract, rather than bare `DefineComponent` (whose default props reject
+SFCs with required props). The only assertion lives at the Inertia 2 resolver
+boundary: its declaration requires bare `DefineComponent`, while its runtime
+passes the component unchanged to Vue with server-provided page props. No
+wrapper, prop conversion, host type suppression, or dependency change is needed.
+
+`npm run test:host-types`, also included in `npm run type-check`, materializes a
+minimal host using the normal generator and checks the complete resource build
+graph. It then requires compiler errors for incorrect/missing required host
+props and a non-component loader payload. These are compile-time client checks;
+they do not validate server-provided page props at runtime.

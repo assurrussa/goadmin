@@ -11,7 +11,8 @@
     "test:unit": "vitest run",
     "test:manifest": "node --test scripts/*.test.cjs",
     "build-only": "npm run admin:paths && vite build && node scripts/verify-client-assets.cjs",
-    "type-check": "npm run admin:paths && vue-tsc --build",
+    "type-check": "npm run admin:paths && vue-tsc --build && npm run test:host-types",
+    "test:host-types": "node scripts/check-typed-host.cjs",
     "lint": "eslint . --fix",
     "format": "prettier --write src/"
   },
