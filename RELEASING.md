@@ -328,3 +328,10 @@ merge/registry isolation, shared breadcrumbs, and menu-based login landing.
 Permission fields must stay absent from JSON. This changes navigation only;
 endpoint authorization, role grants, existing superadmin/nil-checker behavior,
 and explicit deep-link redirects remain unchanged.
+
+## Unpublished external-session candidate
+
+The additive candidate host admission/validity API and its dependency/rollback
+contract are described in [external-browser-admission.md](docs/external-browser-admission.md). It retains the pinned GoAuth API, adds no public package/import path,
+and does not enable a host SSO mode. Release readiness and the real RP consumer
+acceptance remain required before publication.

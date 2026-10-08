@@ -21,7 +21,7 @@ func newRealtimeHandler(lg logger.Logger, stream eventstream.EventStream, origin
 	if err != nil {
 		return nil, err
 	}
-	return handlers.NewHTTPHandler(handlers.NewOptions(lg, stream, upgrader, nil, "",
+	return handlers.NewHTTPHandler(handlers.NewOptions(lg, stream, externalDeadlineUpgrader{upgrader}, nil, "",
 		handlers.WithUserIDExtractor(realtimeUserID),
 		handlers.WithWireFormat(handlers.JSON),
 		handlers.WithEventAdapters(map[string]eventadapter.EventAdapter{

@@ -9,21 +9,22 @@ import (
 )
 
 type SessionAdmin struct {
-	ID          int64               `json:"id"`
-	SubjectID   authcore.SubjectID  `json:"subjectId"`
-	UUID        identity.UserID     `json:"uuid"`
-	Username    string              `json:"username,omitempty"`
-	Name        string              `json:"name"`
-	LastName    string              `json:"lastName,omitempty"`
-	Email       string              `json:"email,omitempty"`
-	Roles       []string            `json:"roles,omitempty"`
-	RoleSlugs   []string            `json:"roleSlugs,omitempty"`
-	Permissions map[string][]string `json:"permissions,omitempty"`
-	PreviewID   int64               `json:"previewId,omitempty"`
-	SessionID   string              `json:"-"`
-	CreatedAt   time.Time           `json:"createdAt,omitempty"`
-	UpdatedAt   time.Time           `json:"updatedAt,omitempty"`
-	DeletedAt   sql.NullTime        `json:"deletedAt,omitempty"`
+	ExternalValidUntil time.Time           `json:"-"`
+	ID                 int64               `json:"id"`
+	SubjectID          authcore.SubjectID  `json:"subjectId"`
+	UUID               identity.UserID     `json:"uuid"`
+	Username           string              `json:"username,omitempty"`
+	Name               string              `json:"name"`
+	LastName           string              `json:"lastName,omitempty"`
+	Email              string              `json:"email,omitempty"`
+	Roles              []string            `json:"roles,omitempty"`
+	RoleSlugs          []string            `json:"roleSlugs,omitempty"`
+	Permissions        map[string][]string `json:"permissions,omitempty"`
+	PreviewID          int64               `json:"previewId,omitempty"`
+	SessionID          string              `json:"-"`
+	CreatedAt          time.Time           `json:"createdAt,omitempty"`
+	UpdatedAt          time.Time           `json:"updatedAt,omitempty"`
+	DeletedAt          sql.NullTime        `json:"deletedAt,omitempty"`
 }
 
 func (a *SessionAdmin) GetUUID() identity.UserID {

@@ -496,3 +496,10 @@ legacy child deduplication; declare their complete policy in the first contribut
 permission slices through nested items. No grants or endpoint guards are changed.
 Explicit breadcrumb overrides remove disallowed links even when no menu routes
 are allowed; plain-text crumbs remain. See the host example in `README.md`.
+
+## Unpublished external-session candidate
+
+The additive candidate host admission/validity API and its dependency/rollback
+contract are described in [external-browser-admission.md](external-browser-admission.md). It retains the pinned GoAuth API, adds no public package/import path,
+and does not enable a host SSO mode. Release readiness and the real RP consumer
+acceptance remain required before publication.

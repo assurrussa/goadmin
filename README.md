@@ -482,3 +482,10 @@ children, and groups without visible children are omitted. Matching top-level me
 retain the first nonempty value of each permission field; their OR lists are not
 combined. Existing child deduplication is unchanged: matching nested children
 keep the first entire item. Put their complete policy in that first contribution. Both permission fields stay server-side and are absent from menu JSON.
+
+## Unpublished external-session candidate
+
+The additive candidate host admission/validity API and its dependency/rollback
+contract are described in [external-browser-admission.md](docs/external-browser-admission.md). It retains the pinned GoAuth API, adds no public package/import path,
+and does not enable a host SSO mode. Release readiness and the real RP consumer
+acceptance remain required before publication.
