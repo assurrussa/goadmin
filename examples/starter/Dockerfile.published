@@ -7,7 +7,7 @@ RUN test -n "$GOADMIN_VERSION" && \
     for module in goadmin goauth gonotify gouploads gowebsocket; do \
       go mod edit -dropreplace=github.com/assurrussa/$module; \
     done && \
-    go mod edit -require=github.com/assurrussa/goadmin=$GOADMIN_VERSION && \
+    go mod edit -require=github.com/assurrussa/goadmin@$GOADMIN_VERSION && \
     GOAUTH=off GOPRIVATE= GONOPROXY= GONOSUMDB= GOPROXY=https://proxy.golang.org \
     GOSUMDB=sum.golang.org GOVCS='*:off' GOWORK=off go build -mod=mod -o /tmp/goadmin-starter .
 

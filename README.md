@@ -4,7 +4,7 @@
 projects integrate it through the stable `github.com/assurrussa/goadmin/host`
 facade instead of copying admin internals.
 
-Install the public release with `go get github.com/assurrussa/goadmin@v0.9.1`.
+Install the public release with `go get github.com/assurrussa/goadmin@v0.9.6`.
 Its dependency graph uses GoAuth v0.5.1, GoNotify v0.6.0, GoUploads v0.11.0 and
 GoWebSocket v0.2.1 without sibling replacements.
 
@@ -14,16 +14,19 @@ The [standalone starter](examples/starter/README.md) runs the embedded admin,
 PostgreSQL with Docker Compose. Redis is an optional profile; mail modules use
 NotifyHub when explicitly enabled. Copy
 `examples/starter/.env.example` to `examples/starter/.env`, fill every required
-value, then run `docker compose up --build` from `examples/starter`. Open
+value, then run `GOADMIN_VERSION=v0.9.6 docker compose up --build` from
+`examples/starter`. This builds the starter against the published GoAdmin library
+and uses the release's embedded UI; it requires no sibling checkouts. Open
 `http://localhost:8080`; the login page offers first-admin registration until
-an administrator exists. No administrator password is bundled. The starter
-builds this checkout and its embedded UI together; it is a local example, not
-evidence that an unpublished module version resolves remotely.
-The explicit Docker source mode uses sibling checkouts. Run
+an administrator exists. No administrator password is bundled.
+
+For source candidates, run `bash ../../scripts/starter-local.sh up --build` from
+`examples/starter` to build this checkout and its embedded UI together.
+This source mode requires sibling checkouts; the [starter instructions](examples/starter/README.md)
+describe the prerequisites. From the repository root, run
 `make externalconsumer-candidates GOAUTH_LOCAL_PATH=../goauth GONOTIFY_LOCAL_PATH=../gonotify`
-to validate the selected source candidates; the [starter instructions](examples/starter/README.md)
-describe the prerequisites. This local build does not prove that a clean public
-consumer can resolve those dependencies.
+to validate the selected source candidates. This source build does not prove
+that a clean public consumer can resolve those dependencies.
 
 The built-in interface is currently Russian-only. Navigation and the home
 screen use the signed-in administrator's permissions; optional host features

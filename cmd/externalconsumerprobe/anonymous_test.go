@@ -166,3 +166,10 @@ func TestMakeConsumerTargetsSeparateCandidatesFromReadiness(t *testing.T) {
 		}
 	}
 }
+
+func TestPublishedStarterRequireUsesModuleAtVersion(t *testing.T) {
+	dockerfile, err := os.ReadFile(filepath.Join("..", "..", "examples", "starter", "Dockerfile.published"))
+	require.NoError(t, err)
+	require.Contains(t, string(dockerfile), "go mod edit -require=github.com/assurrussa/goadmin@$GOADMIN_VERSION")
+	require.NotContains(t, string(dockerfile), "-require=github.com/assurrussa/goadmin=")
+}
