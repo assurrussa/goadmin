@@ -205,6 +205,10 @@ func (f Filters) GetFields() map[string]any {
 
 // Response ответ для Vue DataGrid - совместимый с Vue компонентом.
 type Response[T any] struct {
+	// RequestQuery identifies the GET query whose effective state and rows this response applies.
+	// nil means provenance is unknown; an empty string means a known query without parameters.
+	RequestQuery *string `json:"-"`
+
 	// Основные данные
 	Items      []Item[T]  `json:"items"`      // данные для отображения
 	Pagination Pagination `json:"pagination"` // пагинация
@@ -274,6 +278,8 @@ type APIResponse[T any] struct {
 
 // APIMeta мета-информация для API ответа.
 type APIMeta struct {
+	RequestQuery *string `json:"requestQuery,omitempty"`
+
 	Title       string            `json:"title"`
 	Description string            `json:"description"`
 	Pagination  APIPagination     `json:"pagination"`
@@ -351,8 +357,9 @@ func NewAPIResponse[T any](response Response[T], sortBy, sortOrder string) APIRe
 	return APIResponse[T]{
 		Data: response.Items,
 		Meta: APIMeta{
-			Title:       response.Title,
-			Description: response.Description,
+			RequestQuery: response.RequestQuery,
+			Title:        response.Title,
+			Description:  response.Description,
 			Pagination: APIPagination{
 				CurrentPage:     response.Pagination.CurrentPage,
 				PerPage:         response.Pagination.PerPage,

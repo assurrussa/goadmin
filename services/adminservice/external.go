@@ -25,6 +25,7 @@ type ExternalProof struct{ IssuedAt, ExpiresAt time.Time }
 // AuthorityID references the host's encrypted durable provider-state journal.
 type ExternalBinding struct {
 	Issuer, Subject, LinkID, AuthorityID, ProviderSessionID string
+	ClientID, ProjectID                                     string
 	ExternalAuthTime                                        time.Time
 	Generation                                              uint64
 	LoginGeneration                                         uint64

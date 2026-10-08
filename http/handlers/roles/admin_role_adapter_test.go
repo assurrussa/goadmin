@@ -142,3 +142,67 @@ func (r *listSubjectRolesRecorder) Handle(
 
 	return integrationroles.ListSubjectRolesResponse{Roles: r.roles}, nil
 }
+
+type roleTransactionContextKey struct{}
+
+type subjectRoleTransactionFunc func(context.Context, []string, func(context.Context) error) error
+
+func (f subjectRoleTransactionFunc) InSubjectRoleTransaction(
+	ctx context.Context, subjects []string, fn func(context.Context) error,
+) error {
+	return f(ctx, subjects, fn)
+}
+
+type changingAdminProjection struct {
+	adapterAdminRepo
+	changedID   int64
+	replacement models.Admin
+	err         error
+}
+
+func (r changingAdminProjection) GetByID(ctx context.Context, id int64) (models.Admin, error) {
+	if ctx.Value(roleTransactionContextKey{}) != nil && id == r.changedID {
+		return r.replacement, r.err
+	}
+	return r.adapterAdminRepo.GetByID(ctx, id)
+}
+
+func TestAdminRoleTransactionRechecksCanonicalSubjectMapping(t *testing.T) {
+	actor := integrationroles.MustParseSubjectIDString("00000000-0000-4000-8000-000000000011")
+	target := integrationroles.MustParseSubjectIDString("00000000-0000-4000-8000-000000000012")
+	foreign := integrationroles.MustParseSubjectIDString("00000000-0000-4000-8000-000000000013")
+	repository := adapterAdminRepo{byID: map[int64]models.Admin{1: {ID: 1, SubjectID: actor}, 2: {ID: 2, SubjectID: target}}}
+	failure := errors.New("transaction failed")
+	for _, tc := range []struct {
+		name          string
+		changed       int64
+		replacement   models.Admin
+		repositoryErr error
+		expected      error
+	}{
+		{name: "original mapping", expected: failure},
+		{name: "target remapped", changed: 2, replacement: models.Admin{ID: 2, SubjectID: foreign}, expected: errInvalidAdminID},
+		{name: "actor remapped", changed: 1, replacement: models.Admin{ID: 1, SubjectID: foreign}, expected: errInvalidAdminID},
+		{name: "membership disappeared", changed: 2, repositoryErr: failure, expected: failure},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			adapter := &adminRoleTransactionAdapter{
+				admins: changingAdminProjection{
+					adapterAdminRepo: repository, changedID: tc.changed, replacement: tc.replacement, err: tc.repositoryErr,
+				},
+				service: subjectRoleTransactionFunc(func(ctx context.Context, subjects []string, fn func(context.Context) error) error {
+					require.Equal(t, []string{actor.String(), target.String()}, subjects)
+					return fn(context.WithValue(ctx, roleTransactionContextKey{}, true))
+				}),
+			}
+			err := adapter.InAdminRoleTransaction(t.Context(), 1, 2, func(ctx context.Context) error {
+				require.Equal(t, true, ctx.Value(roleTransactionContextKey{}))
+				called = true
+				return failure
+			})
+			require.ErrorIs(t, err, tc.expected)
+			require.Equal(t, tc.changed == 0, called)
+		})
+	}
+}

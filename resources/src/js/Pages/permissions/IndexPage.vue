@@ -1,6 +1,7 @@
 <template>
   <AppHead :title="props.title" />
   <DataGrid
+    navigation-mode="inertia"
     ref="dataGridRef"
     :api-url="apiUrl"
     :initial-data="apiResponseData"
@@ -53,11 +54,6 @@ function handleAction(actionId: string) {
     case 'refresh':
       router.visit(`${apiUrl.value}/refresh`, {
         method: 'post',
-        onFinish: (visit) => {
-          if (visit.completed && dataGridRef.value) {
-            dataGridRef.value.refreshData()
-          }
-        },
       })
       break
     default:
@@ -70,11 +66,6 @@ function handleDataAction(actionKey: string, item: Record<string, unknown>) {
       if (confirm('Синхронизировать разрешения с кодовой базой?')) {
         router.visit(`${apiUrl.value}/sync`, {
           method: 'post',
-          onFinish: (visit) => {
-            if (visit.completed && dataGridRef.value) {
-              dataGridRef.value.refreshData()
-            }
-          },
         })
       }
       break

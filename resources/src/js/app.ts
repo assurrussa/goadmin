@@ -1,7 +1,8 @@
 import { createApp, h, defineComponent, Fragment, ref } from 'vue'
 import { createInertiaApp, router, usePage } from '@inertiajs/vue3'
 import { createPinia } from 'pinia'
-import type { Component, DefineComponent, VNode } from 'vue'
+import { toInertiaPage } from '@/inertiaPage'
+import type { LayoutResolver, PageLoader, PageModule, PageWithLayout } from '@/inertiaPage'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import { useThemeStore } from '@/stores/theme'
 import { useAdminProfileStore } from '@/stores/adminProfile'
@@ -24,13 +25,6 @@ axios.defaults.xsrfHeaderName = 'X-CSRF-Token'
 
 import '../css/app.css'
 
-type LayoutComponent = Component
-type LayoutResolver = (render: typeof h, page: VNode) => VNode
-type PageWithLayout = DefineComponent & {
-  layout?: LayoutComponent | LayoutComponent[] | LayoutResolver
-}
-type PageModule = { default: PageWithLayout }
-type PageLoader = () => Promise<PageModule>
 const renderAdminLayout: LayoutResolver = (render, page) =>
   render(AdminLayout, null, { default: () => page })
 const toPageMap = (pages: Record<string, PageLoader>) => {
@@ -44,11 +38,9 @@ const toPageMap = (pages: Record<string, PageLoader>) => {
   })
   return map
 }
-const corePages = import.meta.glob('@admin-core/Pages/**/*.vue') as Record<string, PageLoader>
+const corePages = import.meta.glob<PageModule>('@admin-core/Pages/**/*.vue')
 const corePageMap = toPageMap(corePages)
-const extPageMap = new Map<string, PageLoader>(
-  Object.entries(extensionPages) as [string, PageLoader][],
-)
+const extPageMap = new Map<string, PageLoader>(Object.entries(extensionPages))
 
 void createInertiaApp({
   progress: {
@@ -67,18 +59,18 @@ void createInertiaApp({
       if (!mod.default.layout && !name.startsWith('auth/')) {
         mod.default.layout = renderAdminLayout
       }
-      return mod.default
+      return toInertiaPage(mod.default)
     }
 
     // Fallback: компонент не найден — отображаем подсказку в UI
-    const FallbackWrapper = defineComponent({
+    const FallbackWrapper: PageWithLayout = defineComponent({
       name: 'InertiaFallbackWrapper',
       setup: () => () => h(InertiaFallbackPage, { name }),
-    }) as DefineComponent
+    })
 
     // Навсякий случай проверяем, есть ли шаблон нужный, если нет, то будет FallbackWrapper
-    ;(FallbackWrapper as PageWithLayout).layout = renderAdminLayout
-    return FallbackWrapper
+    FallbackWrapper.layout = renderAdminLayout
+    return toInertiaPage(FallbackWrapper)
   },
   setup({ el, App, props, plugin }) {
     const pinia = createPinia()

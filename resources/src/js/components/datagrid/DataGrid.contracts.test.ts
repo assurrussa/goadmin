@@ -603,7 +603,7 @@ describe('DataGrid regression fixes and remaining behavior boundaries', () => {
     expect(fetchMock).toHaveBeenCalledOnce()
     expect(query().get('limit')).toBe('50')
   })
-  it('does not refetch when initialData or apiUrl props change after mount', async () => {
+  it('hydrates replacement initialData with preserveState without a second fetch', async () => {
     const { props, element } = grid()
     await settle()
     props.initialData = fixture({
@@ -611,8 +611,8 @@ describe('DataGrid regression fixes and remaining behavior boundaries', () => {
     })
     props.apiUrl = '/other'
     await settle()
-    expect(text(element)).toContain('Record one')
-    expect(text(element)).not.toContain('Changed prop')
+    expect(text(element)).not.toContain('Record one')
+    expect(text(element)).toContain('Changed prop')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })

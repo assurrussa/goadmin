@@ -71,7 +71,7 @@ func TestExternalAssemblyCanonicalLinkMembershipAndRegrant(t *testing.T) {
 	cfg, deps := assemblyFixture(t)
 	now := time.Now().UTC()
 	authority := &externalAssemblyAuthority{proof: ExternalProof{IssuedAt: now.Add(-time.Second), ExpiresAt: now.Add(time.Hour)}}
-	binding := ExternalBinding{Issuer: "https://synthetic-issuer.invalid", Subject: "synthetic-external", AuthorityID: "synthetic-authority", Generation: 1, LoginGeneration: 1, Deadline: now.Add(5*time.Minute - time.Second), ProviderSessionID: "synthetic-provider-sid", ExternalAuthTime: now.Add(-time.Minute), AbsoluteUntil: now.Add(time.Hour), Proof: authority.proof}
+	binding := ExternalBinding{Issuer: "https://synthetic-issuer.invalid", ClientID: "synthetic-client", ProjectID: "synthetic-project", Subject: "synthetic-external", AuthorityID: "synthetic-authority", Generation: 1, LoginGeneration: 1, Deadline: now.Add(5*time.Minute - time.Second), ProviderSessionID: "synthetic-provider-sid", ExternalAuthTime: now.Add(-time.Minute), AbsoluteUntil: now.Add(time.Hour), Proof: authority.proof}
 	deps.ExternalAuthority = authority
 	runtime, err := New(t.Context(), cfg, deps, DefinedFeatureModule(ModuleDescriptor{Key: "synthetic-external", RouteNamespaces: []string{"/sso-fixture"}}, externalAssemblyFeature{&binding}))
 	require.NoError(t, err)

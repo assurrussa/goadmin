@@ -1,11 +1,13 @@
 # Candidate external browser admission
 
-This is an additive unpublished patch based on v0.9.6
-(`39cd199538335d1db05e359a474d96ec0a90d128`), using its existing GoAuth v0.5.1
-primitives. TSOP selects compatible GoAuth
-`v0.5.2-0.20261003210830-ad7d1db0bd12`. Master `d16ce6bb` instead selects
-GoAuth v0.6.0; adopting that cohort/schema transition is not necessary here.
-No dependency pin or migration is changed in this patch.
+This additive draft started from v0.9.6
+(`39cd199538335d1db05e359a474d96ec0a90d128`) and is now reconciled with current
+master `d16ce6bb99aff780b2b28b646d5d94f1e22f895e`, preserving its complete upstream
+changes, including GoAuth v0.6.0. No dependency pin or migration differs from that
+master. Earlier v0.9.6 test evidence is historical; current-cohort verification is
+recorded separately. TSOP's source-mode temporary modfile selects this candidate,
+while its committed dependency manifests remain unchanged until normal immutable
+client/library availability and the assembled gates are established.
 
 `host.Dependencies.ExternalAuthority` / `host.Services.ExternalAuthority` is an
 optional provider-neutral interface. GoAdmin imports no private AuthHub package,
@@ -14,7 +16,7 @@ The reusable RP component owns verification, bounded refresh, a durable encrypte
 CAS journal, unknown-response fencing and upstream revoke.
 
 `host.ExternalBinding` records exact issuer/external subject, expected local
-SubjectID, canonical link INSTANCE ID, RP authority handle, provider session ID,
+SubjectID, client/project scope pins, canonical link INSTANCE ID, RP authority handle, provider session ID,
 external auth_time, refresh generation, immutable LoginGeneration, admission deadline/absolute end and
 signed proof issue/expiry times.
 The authority hook validates the full binding and current grant/mapping/local
@@ -74,9 +76,9 @@ cannot lose its hook. Both hooks receive a detached bounded context.
 
 Synthetic tests prove host dispatch and candidate races in both commit orders;
 the RP package must independently prove its actual durable journal/CAS property.
-No GoAdmin test claims to reimplement or verify that engine. A client bridge may
-use its supported RevokeBinding(ctx, binding), once its final source/API is
-available. ErrRevocationUnconfirmed after local terminal commit is preserved as an
+No GoAdmin test claims to reimplement or verify that engine. The TSOP source-mode client bridge uses supported RevokeBinding(ctx, binding)
+at immutable a08d944. The final combined head and assembled consumer gates remain
+pending. ErrRevocationUnconfirmed after local terminal commit is preserved as an
 error; it does not restore native or RP authority and does not trigger refresh or
 an automatic revoke retry. Unknown refresh commit remains fenced by that client.
 

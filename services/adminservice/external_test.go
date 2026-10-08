@@ -93,7 +93,7 @@ func newExternalFixture(t *testing.T, options ...testkit.RuntimeOption) external
 	authority := &externalAuthorityFake{proof: ExternalProof{now.Add(-time.Second), now.Add(time.Hour)}}
 	resolver := &linkResolverFake{IdentityLinkResolver: f.Store}
 	svc := NewService(fibersession.NewStore(), roleServiceStub{}, WithRuntime(f.Runtime, adminRepositoryStub{admin: admin}), WithBrowserState(browserstate.NewMemory()), WithExternalAuthority(authority, resolver))
-	binding := ExternalBinding{Issuer: "https://synthetic-issuer.invalid", Subject: "synthetic-external", AuthorityID: "synthetic-provider-session", Generation: 1, LoginGeneration: 1, Deadline: now.Add(5*time.Minute - time.Second), ProviderSessionID: "synthetic-sid", ExternalAuthTime: now.Add(-time.Minute), LocalSubject: account.Subject.ID, AbsoluteUntil: now.Add(time.Hour), Proof: authority.proof}
+	binding := ExternalBinding{Issuer: "https://synthetic-issuer.invalid", ClientID: "synthetic-client", ProjectID: "synthetic-project", Subject: "synthetic-external", AuthorityID: "synthetic-provider-session", Generation: 1, LoginGeneration: 1, Deadline: now.Add(5*time.Minute - time.Second), ProviderSessionID: "synthetic-sid", ExternalAuthTime: now.Add(-time.Minute), LocalSubject: account.Subject.ID, AbsoluteUntil: now.Add(time.Hour), Proof: authority.proof}
 	app := fiber.New()
 	app.Post("/local", func(c fiber.Ctx) error {
 		_, _, err := svc.LoginAdmin(c, account.PrimaryEmail.DisplayValue, testAdminPassword, false)

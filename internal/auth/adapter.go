@@ -74,8 +74,14 @@ func New(config Config) (*Adapter, error) {
 		return nil, fmt.Errorf("goadmin auth: create RBAC: %w", err)
 	}
 
+	roleService := NewRoleService(roles)
+	if err := configureRoleTransaction(roleService, runtime, config.Database.DB().Pool()); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("goadmin auth: create role transaction: %w", err)
+	}
+
 	return &Adapter{
-		runtime: runtime, roles: NewRoleService(roles), memberships: config.Memberships, db: db,
+		runtime: runtime, roles: roleService, memberships: config.Memberships, db: db,
 		stateKeys: config.Runtime.OutboxAEADKeys, database: config.Database,
 	}, nil
 }

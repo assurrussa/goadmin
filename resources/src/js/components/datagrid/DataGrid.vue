@@ -110,12 +110,14 @@ interface Props {
   apiUrl: string
   initialData?: ApiResponse | null
   syncWithUrl?: boolean
+  navigationMode?: 'browser' | 'inertia'
 }
 
 // Define props with defaults
 const props = withDefaults(defineProps<Props>(), {
   initialData: null,
   syncWithUrl: true,
+  navigationMode: 'browser',
 })
 
 // Define emits для передачи событий наружу
@@ -134,6 +136,7 @@ const {
   loading,
   loadError,
   hasLoaded,
+  navigationSuspended,
   items,
   pagination,
   config,
@@ -158,9 +161,12 @@ const {
   loadData,
   loadDataFromUrl,
   retryLoad,
+  suspendForNavigation,
 } = useDataGrid({
   apiUrl: () => props.apiUrl,
-  initialData: props.initialData,
+  initialData: () => props.initialData,
+  initialQuery: () =>
+    props.syncWithUrl && typeof window !== 'undefined' ? window.location.search : undefined,
   initialParams:
     props.syncWithUrl && typeof window !== 'undefined' && window.location.search
       ? parseDataGridQuery(new URLSearchParams(window.location.search), undefined, true)
@@ -173,8 +179,17 @@ const hasActiveFilters = computed(() =>
   ),
 )
 
+let synchronizedLocation =
+  typeof window === 'undefined' ? '' : window.location.pathname + window.location.search
+
 const updateURL = (): void => {
-  if (!props.syncWithUrl || loading.value || loadError.value || typeof window === 'undefined')
+  if (
+    !props.syncWithUrl ||
+    navigationSuspended.value ||
+    loading.value ||
+    loadError.value ||
+    typeof window === 'undefined'
+  )
     return
 
   const params = new URLSearchParams()
@@ -196,14 +211,28 @@ const updateURL = (): void => {
   const query = params.toString()
   const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`
   window.history.replaceState(window.history.state, '', newUrl)
+  synchronizedLocation = window.location.pathname + window.location.search
 }
 
-const handlePopState = (): void => {
+const handlePopState = (event: PopStateEvent): void => {
   if (!props.syncWithUrl) return
+  if (props.navigationMode === 'inertia') {
+    // A null-state hash-only event does not restore an Inertia page.
+    if (
+      event.state !== null ||
+      window.location.pathname + window.location.search !== synchronizedLocation
+    )
+      suspendForNavigation()
+    return
+  }
   void loadDataFromUrl(window.location.href)
 }
 
-watch([pagination, sortBy, sortOrder, searchQuery, filters, loading], updateURL, { deep: true })
+watch(
+  [pagination, sortBy, sortOrder, searchQuery, filters, loading, navigationSuspended],
+  updateURL,
+  { deep: true },
+)
 
 const handleCreate = (): void => {
   emit('action-create')
@@ -245,6 +274,8 @@ defineExpose({
   refreshData,
 })
 
-onMounted(() => window.addEventListener('popstate', handlePopState))
+onMounted(() => {
+  window.addEventListener('popstate', handlePopState)
+})
 onUnmounted(() => window.removeEventListener('popstate', handlePopState))
 </script>

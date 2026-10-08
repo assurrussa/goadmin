@@ -118,7 +118,7 @@ describe('useDataGrid passing contracts: initialization and response', () => {
   it('falls back to one GET with default parameters for missing initial data', async () => {
     const { grid } = mount(null)
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(fetchMock.mock.calls[0]).toHaveLength(1)
+    expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal)
     expect(url().pathname).toBe('/audit/data')
     expect(Object.fromEntries(url().searchParams)).toEqual({
       page: '1',
@@ -347,7 +347,7 @@ describe('useDataGrid passing contracts: debounce, races and lifecycle', () => {
     await vi.advanceTimersByTimeAsync(1000)
     expect(fetchMock).not.toHaveBeenCalled()
   })
-  it('ignores in-flight success after unmount and does not attach an AbortSignal to fetch', async () => {
+  it('aborts in-flight success after unmount and ignores its result', async () => {
     const pending = deferred<Response>()
     fetchMock.mockReturnValueOnce(pending.promise)
     const { grid, app } = mount()
@@ -357,7 +357,7 @@ describe('useDataGrid passing contracts: debounce, races and lifecycle', () => {
     pending.resolve(response(fixture({ data: [{ item: { id: 'late' }, actions: [] }] })))
     await task
     expect(grid.items.value[0].item.id).toBe(0)
-    expect(fetchMock.mock.calls[0]).toHaveLength(1)
+    expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true)
   })
 })
 

@@ -8,7 +8,7 @@ tool github.com/assurrussa/goadmin/tools/toolsmocks
 
 require (
 	github.com/Masterminds/squirrel v1.5.4
-	github.com/assurrussa/goauth v0.5.1
+	github.com/assurrussa/goauth v0.6.0
 	github.com/assurrussa/godi v0.9.3
 	github.com/assurrussa/goinertia v0.11.0
 	github.com/assurrussa/gologger v0.1.0

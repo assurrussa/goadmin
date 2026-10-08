@@ -116,17 +116,18 @@ func NewHandlerSuite(t *testing.T, opts ...suiteOption) (context.Context, contex
 			testApp.App,
 			adminRepo,
 			roles.UseCases{
-				ListRoles:           listMock,
-				GetRole:             getMock,
-				CreateRole:          createMock,
-				UpdateRole:          updateMock,
-				DeleteRole:          deleteMock,
-				SetPermissions:      setPermMock,
-				AssignAdminRoles:    assignMock,
-				ListPermissions:     listPermMock,
-				ListRolePermissions: listRolePermMock,
-				ListAdminRoles:      listAdminRolesMock,
-				ListAllRoles:        listAllRolesMock,
+				ListRoles:            listMock,
+				GetRole:              getMock,
+				CreateRole:           createMock,
+				UpdateRole:           updateMock,
+				DeleteRole:           deleteMock,
+				SetPermissions:       setPermMock,
+				AssignAdminRoles:     assignMock,
+				AdminRoleTransaction: passthroughRoleTransaction{},
+				ListPermissions:      listPermMock,
+				ListRolePermissions:  listRolePermMock,
+				ListAdminRoles:       listAdminRolesMock,
+				ListAllRoles:         listAllRolesMock,
 			},
 		)
 
@@ -806,4 +807,10 @@ func (f *fakeAdminRepo) setRoles(id int64, roles []string) {
 	}
 	adm.Data.Roles = append([]string(nil), roles...)
 	f.admins[id] = adm
+}
+
+type passthroughRoleTransaction struct{}
+
+func (passthroughRoleTransaction) InAdminRoleTransaction(ctx context.Context, _, _ int64, fn func(context.Context) error) error {
+	return fn(ctx)
 }
