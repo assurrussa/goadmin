@@ -10,16 +10,19 @@ Source mode requires Git, Python 3 and Docker Compose. Its GoUploads pin is
 explicit candidate consumer resolves GoUploads v0.11.0 without that override
 when only GoAuth and GoNotify paths are selected.
 
-For source candidates use `bash ../../scripts/starter-local.sh up --build`. For a released version use `GOADMIN_VERSION=<exact-tag> docker
-compose up --build`; that build removes local overrides and resolves libraries
+For published GoAdmin v0.9.6, use `GOADMIN_VERSION=v0.9.6 docker compose up --build`
+from this directory. That build removes local overrides and resolves libraries
 anonymously through the public Go proxy. Its embedded UI comes from the selected
-published goadmin release. This mode cannot pass before compatible public tags
-exist. Always run the root published consumer gate for that tag first.
+published release, not the current checkout. Run
+`make externalconsumer-published VERSION=v0.9.6` from the repository root first.
 
-For a local run, copy `.env.example` to `.env`. Set PostgreSQL credentials,
-a unique CSRF secret and first-admin setup token of at least 32 bytes, and three
-distinct 32-byte keys encoded with standard base64. Generate each key with
-`openssl rand -base64 32`. Then run `bash ../../scripts/starter-local.sh up --build`.
+For either mode, copy `.env.example` to `.env`. It sets `GOADMIN_VERSION=v0.9.6`
+for the published build. Set PostgreSQL credentials, a unique CSRF secret and
+first-admin setup token of at least 32 bytes, and three distinct 32-byte keys
+encoded with standard base64. Generate each key with `openssl rand -base64 32`.
+Then run the published command above. For source candidates, prepare the four
+sibling checkouts and run `bash ../../scripts/starter-local.sh up --build`
+instead; this explicit source mode does not use `GOADMIN_VERSION`.
 The default core uses PostgreSQL for browser and canonical auth sessions; it
 needs no Redis or SMTP. The login page offers first-admin registration until an
 administrator exists. Enter the setup token from `.env` in that form.
