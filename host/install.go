@@ -49,16 +49,17 @@ type Outbox interface {
 
 // Services collects external infrastructure that the embedded admin mounts onto.
 type Services struct {
-	ExternalAuthority ExternalSessionAuthority
-	DB                outbox.StoragePgsqlClient
-	TxManager         outbox.StoragePgsqlTxManager
-	Logger            logger.Logger
-	CSRF              *CSRFService
-	EventStream       eventstream.EventStream
-	Outbox            Outbox
-	SessionStore      *session.Store
-	SessionRedis      redis.ClientContract
-	Notifier          notify.NotificationManager
+	ExternalAuthority   ExternalSessionAuthority
+	LocalAdminAdmission LocalAdminAdmission
+	DB                  outbox.StoragePgsqlClient
+	TxManager           outbox.StoragePgsqlTxManager
+	Logger              logger.Logger
+	CSRF                *CSRFService
+	EventStream         eventstream.EventStream
+	Outbox              Outbox
+	SessionStore        *session.Store
+	SessionRedis        redis.ClientContract
+	Notifier            notify.NotificationManager
 	// SubjectPermissions may be prebuilt and shared with transport-neutral
 	// features such as gocms. Install builds it when omitted.
 	SubjectPermissions *SubjectPermissionChecker
@@ -164,6 +165,7 @@ func buildDependencies(input assemblyInput) (bootstrap.Dependencies, error) {
 		adminservice.WithRuntime(authAdapter.Runtime(), adminRepoImpl),
 		adminservice.WithBrowserState(states),
 		adminservice.WithExternalAuthority(input.Services.ExternalAuthority, links),
+		adminservice.WithLocalAdminAdmission(input.Services.LocalAdminAdmission),
 	)
 
 	var jobsRepo bootstrap.JobsRepo

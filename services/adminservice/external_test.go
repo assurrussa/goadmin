@@ -315,3 +315,63 @@ func TestExplicitExternalLogoutForwardsSupersededSnapshot(t *testing.T) {
 	require.Equal(t, uint64(1), f.authority.lastLogoutLoginGeneration)
 	require.Equal(t, 0, f.authority.detached)
 }
+
+func TestLocalAdmissionEvictsLegacySessionsAndRejectsPassword(t *testing.T) {
+	f := newExternalFixture(t)
+	f.app.Get("/local-auth", func(c fiber.Ctx) error {
+		admin, err := f.service.GetAdminAuth(c)
+		if err != nil {
+			return err
+		}
+		if admin == nil {
+			return fiber.ErrUnauthorized
+		}
+		return c.SendStatus(http.StatusNoContent)
+	})
+	local := performSessionRequest(t, f.app, http.MethodPost, "/local", nil)
+	cookie := requireSessionCookie(t, local)
+	_ = local.Body.Close()
+	allowed := performSessionRequest(t, f.app, http.MethodGet, "/local-auth", cookie)
+	require.Equal(t, http.StatusNoContent, allowed.StatusCode)
+	_ = allowed.Body.Close()
+	f.service.localAdmission = func(context.Context, goauth.SubjectID) error { return goauth.ErrMembershipDenied }
+	legacy, err := f.app.Test(requestWithCookie(http.MethodGet, "/local-auth", cookie))
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, legacy.StatusCode, 400)
+	_ = legacy.Body.Close()
+	denied, err := f.app.Test(httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/local", nil))
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, denied.StatusCode, 400)
+	for _, value := range denied.Cookies() {
+		require.Empty(t, value.Value, "denied local login must not issue a browser credential")
+	}
+	_ = denied.Body.Close()
+}
+
+func TestExternalMetadataCopiesAndDetachDoesNotRevokeProvider(t *testing.T) {
+	f := newExternalFixture(t)
+	cookie := admittedExternal(t, f)
+	f.app.Get("/metadata", func(c fiber.Ctx) error {
+		binding, err := f.service.ExternalAdminBinding(c)
+		require.NoError(t, err)
+		require.NotNil(t, binding)
+		binding.Generation = 999
+		again, err := f.service.ExternalAdminBinding(c)
+		require.NoError(t, err)
+		require.Equal(t, f.binding.Generation, again.Generation)
+		return c.SendStatus(http.StatusNoContent)
+	})
+	f.app.Delete("/detach", func(c fiber.Ctx) error {
+		if err := f.service.DetachAdminAuth(c); err != nil {
+			return err
+		}
+		return c.SendStatus(http.StatusNoContent)
+	})
+	response := performSessionRequest(t, f.app, http.MethodGet, "/metadata", cookie)
+	require.Equal(t, http.StatusNoContent, response.StatusCode)
+	_ = response.Body.Close()
+	response = performSessionRequest(t, f.app, http.MethodDelete, "/detach", cookie)
+	_ = response.Body.Close()
+	require.Zero(t, f.authority.invalidated)
+	require.Equal(t, 1, f.authority.detached)
+}

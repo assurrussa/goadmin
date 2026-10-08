@@ -107,12 +107,12 @@ func initServer(ctx context.Context, deps Dependencies, cfg Config, app *adminap
 
 	// Define Middlewares
 	defaultMiddlewares := make([]fiber.Handler, 0, 3+len(extensions.middlewares))
+	defaultMiddlewares = append(defaultMiddlewares, extensions.middlewares...)
 	defaultMiddlewares = append(defaultMiddlewares,
 		middlewares.NewRequestID(),
 		responseCompression(opts.publicFS != nil),
 		favicon.New(),
 	)
-	defaultMiddlewares = append(defaultMiddlewares, extensions.middlewares...)
 
 	// Core routes are always mounted; module routes use the same capability snapshot.
 	httpHandlers := []server.Handler{adminmain.NewHandler(app), adminauthhandler.NewHandler(adminauthhandler.HandlerOptions{

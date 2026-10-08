@@ -243,6 +243,11 @@ func (s *Service) externalProof(ctx context.Context, b ExternalBinding) (Externa
 
 func (s *Service) checkExternal(c fiber.Ctx, sess *session.Session, state *browserSession) error {
 	if state.External == nil {
+		if s.localAdmission != nil {
+			if err := s.localAdmission(c, state.SubjectID); err != nil {
+				return errors.Join(err, s.clearAdminBrowserSession(c, sess))
+			}
+		}
 		return nil
 	}
 	binding := *state.External
@@ -314,3 +319,35 @@ func (s *Service) saveAuthenticatedProjection(c fiber.Ctx, sess *session.Session
 	}
 	return sess.Save()
 }
+
+// LocalAdminAdmission applies host credential policy to local/password sessions.
+// It also runs on existing local sessions: enabling stronger external auth must
+// not leave a weaker browser session usable. External sessions use Validate.
+type LocalAdminAdmission func(context.Context, goauth.SubjectID) error
+
+func WithLocalAdminAdmission(policy LocalAdminAdmission) Option {
+	return func(s *Service) error { s.localAdmission = policy; return nil }
+}
+
+// ExternalAdminBinding reads protected server metadata BEFORE provider Verify
+// advances a generation. It is not an authentication/authorization result and
+// must never be sent to the browser or accepted back as input.
+func (s *Service) ExternalAdminBinding(c fiber.Ctx) (*ExternalBinding, error) {
+	if err := browsercookie.Check(c, s.store); err != nil {
+		return nil, err
+	}
+	sess, err := s.store.Get(c)
+	if err != nil {
+		return nil, err
+	}
+	defer sess.Release()
+	state, ok := sess.Get(sessioncore.AuthAdminKey.String()).(*browserSession)
+	if !ok || state == nil || state.External == nil {
+		return nil, nil //nolint:nilnil // local/anonymous session has no external metadata
+	}
+	binding := *state.External
+	return &binding, nil
+}
+
+// DetachAdminAuth removes only native authority; explicit logout uses DelAdminAuth.
+func (s *Service) DetachAdminAuth(c fiber.Ctx) error { return s.delAdminAuth(c, false) }

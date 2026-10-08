@@ -85,6 +85,7 @@ type Option func(*Service) error
 
 type Service struct {
 	externalAuthority ExternalSessionAuthority
+	localAdmission    LocalAdminAdmission
 	externalLinks     IdentityLinkResolver
 	store             *session.Store
 	roleService       roleService
@@ -141,6 +142,12 @@ func (s *Service) LoginAdmin(
 	})
 	if err != nil {
 		return models.Admin{}, goauth.Account{}, err
+	}
+	if s.localAdmission != nil {
+		if err := s.localAdmission(c, result.Account.Subject.ID); err != nil {
+			_ = s.runtime.Logout(context.WithoutCancel(c.Context()), result.Account.Subject.ID, result.Tokens.Session.ID)
+			return models.Admin{}, goauth.Account{}, err
+		}
 	}
 	admin, err := s.admins.GetBySubjectID(c, result.Account.Subject.ID)
 	if err != nil || admin.ID <= 0 {

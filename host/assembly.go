@@ -33,16 +33,17 @@ type Config struct {
 // Dependencies are borrowed. New creates admin-owned adapter/session wrappers
 // when Auth/Sessions are omitted; it never closes the host PostgreSQL/Redis pool.
 type Dependencies struct {
-	ExternalAuthority  ExternalSessionAuthority
-	Database           StoragePgsqlClient
-	TxManager          StoragePgsqlTxManager
-	Logger             Logger
-	Auth               *AuthAdapter
-	Sessions           *SessionStore
-	SessionRedis       RedisClient
-	CSRF               *CSRFService
-	LoginAudit         LoginAuditWriter
-	SubjectPermissions *SubjectPermissionChecker
+	ExternalAuthority   ExternalSessionAuthority
+	LocalAdminAdmission LocalAdminAdmission
+	Database            StoragePgsqlClient
+	TxManager           StoragePgsqlTxManager
+	Logger              Logger
+	Auth                *AuthAdapter
+	Sessions            *SessionStore
+	SessionRedis        RedisClient
+	CSRF                *CSRFService
+	LoginAudit          LoginAuditWriter
+	SubjectPermissions  *SubjectPermissionChecker
 }
 
 type assembly struct {
@@ -90,7 +91,8 @@ func New(ctx context.Context, cfg Config, deps Dependencies, modules ...Module) 
 		Services: Services{
 			DB: deps.Database, TxManager: deps.TxManager, Logger: deps.Logger, CSRF: deps.CSRF,
 			SessionStore: deps.Sessions, SessionRedis: deps.SessionRedis, SubjectPermissions: deps.SubjectPermissions,
-			ExternalAuthority: deps.ExternalAuthority,
+			ExternalAuthority:   deps.ExternalAuthority,
+			LocalAdminAdmission: deps.LocalAdminAdmission,
 		},
 		Repositories: Repositories{AdminLoginAudit: deps.LoginAudit}, FirstAdminSetupToken: cfg.FirstAdminSetupToken,
 		Options: append([]Option{}, cfg.Options...),
