@@ -9,6 +9,7 @@ import (
 // Extension is a small reusable bootstrap extension implementation for host features.
 type Extension struct {
 	handlers       []server.Handler
+	middlewares    []fiber.Handler
 	publicRegister []func(*fiber.App)
 	register       []func(*fiber.App)
 }
@@ -55,3 +56,11 @@ func (e *Extension) RegisterPublic(app *fiber.App) {
 		register(app)
 	}
 }
+
+// WithMiddlewares adds host boundaries before every core/static/public route.
+func (e *Extension) WithMiddlewares(handlers ...fiber.Handler) *Extension {
+	e.middlewares = append(e.middlewares, handlers...)
+	return e
+}
+
+func (e *Extension) Middlewares() []fiber.Handler { return e.middlewares }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/assurrussa/goauth/postgres"
 	logger "github.com/assurrussa/gologger"
 	uploadhost "github.com/assurrussa/gouploads/host"
 	eventstream "github.com/assurrussa/gowebsocket/eventstream"
@@ -48,15 +49,17 @@ type Outbox interface {
 
 // Services collects external infrastructure that the embedded admin mounts onto.
 type Services struct {
-	DB           outbox.StoragePgsqlClient
-	TxManager    outbox.StoragePgsqlTxManager
-	Logger       logger.Logger
-	CSRF         *CSRFService
-	EventStream  eventstream.EventStream
-	Outbox       Outbox
-	SessionStore *session.Store
-	SessionRedis redis.ClientContract
-	Notifier     notify.NotificationManager
+	ExternalAuthority   ExternalSessionAuthority
+	LocalAdminAdmission LocalAdminAdmission
+	DB                  outbox.StoragePgsqlClient
+	TxManager           outbox.StoragePgsqlTxManager
+	Logger              logger.Logger
+	CSRF                *CSRFService
+	EventStream         eventstream.EventStream
+	Outbox              Outbox
+	SessionStore        *session.Store
+	SessionRedis        redis.ClientContract
+	Notifier            notify.NotificationManager
 	// SubjectPermissions may be prebuilt and shared with transport-neutral
 	// features such as gocms. Install builds it when omitted.
 	SubjectPermissions *SubjectPermissionChecker
@@ -152,11 +155,17 @@ func buildDependencies(input assemblyInput) (bootstrap.Dependencies, error) {
 	if err != nil {
 		return bootstrap.Dependencies{}, fmt.Errorf("host install: browser auth state: %w", err)
 	}
+	links, err := postgres.NewStore(input.Auth.Runtime().Database())
+	if err != nil {
+		return bootstrap.Dependencies{}, err
+	}
 	adminAuthService := adminservice.NewService(
 		input.Services.SessionStore,
 		rolesGuard,
 		adminservice.WithRuntime(authAdapter.Runtime(), adminRepoImpl),
 		adminservice.WithBrowserState(states),
+		adminservice.WithExternalAuthority(input.Services.ExternalAuthority, links),
+		adminservice.WithLocalAdminAdmission(input.Services.LocalAdminAdmission),
 	)
 
 	var jobsRepo bootstrap.JobsRepo

@@ -131,7 +131,7 @@ func TestCSRFTokenProvider_GuestGeneratesCookieWithPathAndLax(t *testing.T) {
 	require.Equal(t, token, csrfCookieVal)
 	claims, err := csrfSvc.ExtractClaims(token)
 	require.NoError(t, err)
-	require.Equal(t, csrfSessionBinding(sessCookieVal), claims.SessionID)
+	require.Equal(t, CSRFSessionBinding(sessCookieVal), claims.SessionID)
 	require.NotEqual(t, sessCookieVal, claims.SessionID)
 
 	// 2. POST /auth/register with matching CSRF cookie, session cookie, and X-CSRF-Token header

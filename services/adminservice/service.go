@@ -72,6 +72,7 @@ type adminRepository interface {
 }
 
 type browserSession struct {
+	External      *ExternalBinding
 	Version       int64
 	AccessToken   string
 	RefreshToken  string
@@ -83,12 +84,15 @@ type browserSession struct {
 type Option func(*Service) error
 
 type Service struct {
-	store       *session.Store
-	roleService roleService
-	runtime     runtime
-	admins      adminRepository
-	sessionTTL  time.Duration
-	states      browserstate.Store
+	externalAuthority ExternalSessionAuthority
+	localAdmission    LocalAdminAdmission
+	externalLinks     IdentityLinkResolver
+	store             *session.Store
+	roleService       roleService
+	runtime           runtime
+	admins            adminRepository
+	sessionTTL        time.Duration
+	states            browserstate.Store
 }
 
 func NewService(store *session.Store, roles roleService, options ...Option) *Service {
@@ -138,6 +142,12 @@ func (s *Service) LoginAdmin(
 	})
 	if err != nil {
 		return models.Admin{}, goauth.Account{}, err
+	}
+	if s.localAdmission != nil {
+		if err := s.localAdmission(c, result.Account.Subject.ID); err != nil {
+			_ = s.runtime.Logout(context.WithoutCancel(c.Context()), result.Account.Subject.ID, result.Tokens.Session.ID)
+			return models.Admin{}, goauth.Account{}, err
+		}
 	}
 	admin, err := s.admins.GetBySubjectID(c, result.Account.Subject.ID)
 	if err != nil || admin.ID <= 0 {
@@ -277,7 +287,7 @@ func (s *Service) GetAdminAuth(c fiber.Ctx) (*models.SessionAdmin, error) {
 	if !ok || state == nil || (s.states == nil && (state.AccessToken == "" || state.RefreshToken == "")) {
 		return nil, nil //nolint:nilnil // no authenticated browser session
 	}
-	active, err := s.loadBrowserAuthority(c, sess, state)
+	active, err := s.loadAuthenticatedAuthority(c, sess, state)
 	if err != nil {
 		return nil, err
 	}
@@ -329,7 +339,7 @@ func (s *Service) GetAdminAuth(c fiber.Ctx) (*models.SessionAdmin, error) {
 		state.RefreshToken = ""
 	}
 	sess.Set(sessioncore.AuthAdminKey.String(), state)
-	if err := sess.Save(); err != nil {
+	if err := s.saveAuthenticatedProjection(c, sess, state); err != nil {
 		return nil, fmt.Errorf("save refreshed admin browser session: %w", err)
 	}
 
@@ -401,6 +411,7 @@ func (s *Service) saveAuthenticatedSession(
 	account goauth.Account,
 	tokens goauth.TokenPair,
 	persistent bool,
+	external ...*ExternalBinding,
 ) error {
 	if err := browsercookie.Check(c, s.store); err != nil {
 		return err
@@ -422,6 +433,11 @@ func (s *Service) saveAuthenticatedSession(
 		Version:     1,
 		AccessToken: tokens.AccessToken, RefreshToken: tokens.RefreshToken,
 		AuthSessionID: tokens.Session.ID, SubjectID: account.Subject.ID, Payload: payload,
+	}
+	if len(external) > 0 && external[0] != nil {
+		binding := *external[0]
+		state.External = &binding
+		state.Payload.ExternalValidUntil = binding.Deadline
 	}
 	if s.states != nil {
 		state.AccessToken = ""
@@ -445,7 +461,13 @@ func (s *Service) saveAuthenticatedSession(
 	return nil
 }
 
+// DelAdminAuth is explicit logout, including termination of an attached RP
+// session even if its saved generation has been superseded by renewal.
 func (s *Service) DelAdminAuth(c fiber.Ctx) error {
+	return s.delAdminAuth(c, true)
+}
+
+func (s *Service) delAdminAuth(c fiber.Ctx, userLogout bool) (result error) {
 	if s == nil || s.store == nil {
 		return nil
 	}
@@ -457,6 +479,13 @@ func (s *Service) DelAdminAuth(c fiber.Ctx) error {
 		return fmt.Errorf("get admin browser session: %w", err)
 	}
 	defer sess.Release()
+	var external *ExternalBinding
+	original, ok := sess.Get(sessioncore.AuthAdminKey.String()).(*browserSession)
+	if ok && original != nil && original.External != nil {
+		binding := *original.External
+		external = &binding
+	}
+	defer func() { result = errors.Join(result, s.finishExternal(c.Context(), external, userLogout)) }()
 	var revokeErr error
 	if s.states != nil {
 		record, found, loadErr := s.states.Load(c, sess.ID())
@@ -465,6 +494,7 @@ func (s *Service) DelAdminAuth(c fiber.Ctx) error {
 		}
 		if found {
 			sess.Set(sessioncore.AuthAdminKey.String(), &browserSession{
+				External:      external,
 				SubjectID:     record.SubjectID,
 				AuthSessionID: record.Tokens.Session.ID,
 			})

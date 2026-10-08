@@ -232,7 +232,7 @@ func newCSRFTokenProvider(
 			return "", goinertia.NewError(fiber.StatusBadRequest, "failed getting session id", err)
 		}
 
-		sessionID = csrfSessionBinding(sessionID)
+		sessionID = CSRFSessionBinding(sessionID)
 		csrfTokenName := getCookieTokenName(cfg)
 		adminID := adminmiddleware.GetAdminAuthUUID(c)
 
@@ -298,7 +298,7 @@ func newCheckCSRFTokenProvider(
 			return goinertia.NewError(fiber.StatusBadRequest, "failed admin session id", err)
 		}
 
-		sessionID = csrfSessionBinding(sessionID)
+		sessionID = CSRFSessionBinding(sessionID)
 		adminID := adminmiddleware.GetAdminAuthUUID(c)
 
 		csrfTokenName := getCookieTokenName(cfg)
@@ -333,7 +333,9 @@ func getCookieTokenName(cfg adminconfig.Config) string {
 }
 
 // A readable signed proof must never expose the opaque authentication cookie.
-func csrfSessionBinding(id string) string {
+// CSRFSessionBinding derives the native signed proof binding without exposing
+// the bearer cookie in a readable JWT. Hosts must reject empty cookies first.
+func CSRFSessionBinding(id string) string {
 	sum := sha256.Sum256([]byte("goadmin-csrf-v1\x00" + id))
 	return hex.EncodeToString(sum[:])
 }

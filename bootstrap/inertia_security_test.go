@@ -60,7 +60,7 @@ func TestAdminCSRFOriginAndOpaqueBinding(t *testing.T) {
 	claims, err := service.ExtractClaims(proof.Value)
 	require.NoError(t, err)
 	require.NotEqual(t, sessionCookie.Value, claims.SessionID)
-	require.Equal(t, csrfSessionBinding(sessionCookie.Value), claims.SessionID)
+	require.Equal(t, CSRFSessionBinding(sessionCookie.Value), claims.SessionID)
 	cases := []struct {
 		name, origin, referer, extra string
 		code                         int
