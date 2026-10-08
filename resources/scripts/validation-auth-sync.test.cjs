@@ -36,14 +36,14 @@ test('validation and navigation synchronize auth from the live Inertia page', as
     const source = fs
       .readFileSync(filename, 'utf8')
       .replaceAll('import.meta.env', '({})')
-      .replace("import.meta.glob('@admin-core/Pages/**/*.vue')", '({})')
     const result = ts.transpileModule(source, {
       fileName: filename,
       reportDiagnostics: true,
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
     })
     assert.equal(result.diagnostics?.length ?? 0, 0)
-    return result.outputText
+    // Replace Vite's glob after TypeScript erases any module type argument.
+    return result.outputText.replace("import.meta.glob('@admin-core/Pages/**/*.vue')", '({})')
   }
 
   const authModule = { exports: {}, URL }
@@ -51,6 +51,8 @@ test('validation and navigation synchronize auth from the live Inertia page', as
     compile(path.join(__dirname, '../src/js/auth/browserAuthFailures.ts')),
     authModule,
   )
+  const inertiaPageModule = { exports: {} }
+  vm.runInNewContext(compile(path.join(__dirname, '../src/js/inertiaPage.ts')), inertiaPageModule)
   const calls = { connected: 0, disconnected: 0, login: 0 }
   const authStore = {
     authUser: null,
@@ -94,6 +96,7 @@ test('validation and navigation synchronize auth from the live Inertia page', as
       },
     },
     pinia,
+    '@/inertiaPage': inertiaPageModule.exports,
     '@/components/layout/AdminLayout.vue': { default: component },
     '@/components/system/InertiaFallbackPage.vue': { default: component },
     '@/components/system/AuthFailureNotice.vue': { default: component },
