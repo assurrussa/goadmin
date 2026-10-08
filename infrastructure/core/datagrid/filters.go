@@ -2,7 +2,9 @@ package datagrid
 
 import (
 	"fmt"
+	"maps"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -186,23 +188,44 @@ func (f Filters) Validate(config FilterConfig[any]) []string {
 		errors = append(errors, "Лимит должен быть от 1 до 1000")
 	}
 
-	// Валидация фильтров - проверяем только фильтруемые колонки с опциями
+	// Defaults are trusted configuration; request sorting uses the GET allowlist.
+	if f.SortBy != "" && f.SortBy != config.DefaultSort && !IsValidSortField(f.SortBy, config) {
+		errors = append(errors, "Недопустимое поле сортировки")
+	}
+	sortOrder := strings.ToLower(strings.TrimSpace(f.SortOrder))
+	if f.SortOrder != "" && f.SortOrder != config.DefaultOrder && sortOrder != sortOrderAsc && sortOrder != sortOrderDesc {
+		errors = append(errors, "Недопустимый порядок сортировки")
+	}
+
+	errors = append(errors, f.validateFields(config)...)
+
+	return errors
+}
+
+// validateFields shares the configured GET field boundary without coercing POST values.
+func (f Filters) validateFields(config FilterConfig[any]) []string {
+	columns := make(map[string]Column, len(config.Columns))
 	for _, column := range config.Columns {
-		if !column.Filterable {
+		if column.Filterable {
+			columns[column.Key] = column
+		}
+	}
+
+	var errors []string
+	for _, key := range slices.Sorted(maps.Keys(f.Fields)) {
+		column, allowed := columns[key]
+		if !allowed {
+			errors = append(errors, "Недопустимое поле фильтра '"+key+"'")
 			continue
 		}
-
-		value, exists := f.Fields[column.Key]
-		if !exists || value == nil {
+		value := f.Fields[key]
+		if value == nil {
 			continue
 		}
-
-		// Валидация select фильтров (если есть опции)
 		if err := f.validateSelectFilter(column, value); err != "" {
 			errors = append(errors, err)
 		}
 	}
-
 	return errors
 }
 
@@ -212,14 +235,13 @@ func (f Filters) validateSelectFilter(column Column, value any) string {
 		return ""
 	}
 
-	strValue, ok := value.(string)
-	if !ok {
-		return ""
-	}
-
-	for _, option := range column.FilterOptions {
-		if option["value"] == strValue {
-			return ""
+	// Query parsing produces typed scalars; JSON numbers remain float64.
+	// Check their wire value too, so non-string bodies cannot bypass options.
+	if strValue, ok := formatFilterValue(value); ok {
+		for _, option := range column.FilterOptions {
+			if option["value"] == strValue {
+				return ""
+			}
 		}
 	}
 

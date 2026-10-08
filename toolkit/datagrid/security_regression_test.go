@@ -203,15 +203,14 @@ func TestPublicFiltersSerializeEffectiveLimitAndReservedControls(t *testing.T) {
 func TestPublicPOSTFilterMetadataPreservesScalarsAndSearch(t *testing.T) {
 	cfg := auditConfig(func(_ context.Context, f datagrid.Filtered) ([]auditRow, int, error) {
 		require.Equal(t, "needle", f.GetSearch())
-		require.Equal(t, "hijack", f.GetFields()["_search"])
+		require.NotContains(t, f.GetFields(), "_search")
 		require.IsType(t, float64(0), f.GetFields()["count"])
 		require.Zero(t, f.GetFields()["count"])
 		require.Equal(t, false, f.GetFields()["enabled"])
 		return nil, 0, nil
 	})
 	status, bs := auditRequest(t, cfg, http.MethodPost, "/audit/data",
-		`{"search":"needle","fields":{"name":"","count":0,"enabled":false,"day":"2026-10-02",`+
-			`"page":99,"limit":999,"search":"hijack","sortBy":"private","sortOrder":"SIDEWAYS","_search":"hijack"}}`)
+		`{"search":"needle","fields":{"name":"","count":0,"enabled":false,"day":"2026-10-02"}}`)
 	require.Equal(t, http.StatusOK, status)
 	var api datagrid.APIResponse[auditRow]
 	require.NoError(t, json.Unmarshal(bs, &api))
