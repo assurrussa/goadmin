@@ -123,10 +123,14 @@ const runnableProbeTest = `package probe
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	goauth "github.com/assurrussa/goauth"
 	"github.com/assurrussa/goauth/postgres"
+	"github.com/gofiber/fiber/v3"
 
 	_ "github.com/assurrussa/goadmin/features/access"
 	_ "github.com/assurrussa/goadmin/features/authmail"
@@ -138,11 +142,57 @@ import (
 	_ "github.com/assurrussa/goadmin/features/operations"
 	_ "github.com/assurrussa/goadmin/features/users"
 	adminhost "github.com/assurrussa/goadmin/host"
-	_ "github.com/assurrussa/goadmin/hosttest"
+	adminhosttest "github.com/assurrussa/goadmin/hosttest"
 	adminmigrations "github.com/assurrussa/goadmin/migrations"
 	_ "github.com/assurrussa/goadmin/toolkit/datagrid"
 	_ "github.com/assurrussa/goadmin/toolkit/formvalidator"
 )
+
+func TestHostActorCommandContract(t *testing.T) {
+	want := adminhost.Actor{AdminID: 42, SubjectID: "123e4567-e89b-12d3-a456-426614174201"}
+	withActor, err := adminhosttest.WithActor(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	harness := adminhosttest.NewApp(t)
+	key := adminhost.NewPermissionKey(adminhost.PermissionDomainUsers, adminhost.PermissionActionUpdate)
+	guardCalled := false
+	harness.ExpertGuard(key.Domain, key.Action, func(c fiber.Ctx) error {
+		guardCalled = true
+		return c.Next()
+	})
+	wrapper := adminhost.WrapApp(harness.App)
+	type command struct {
+		Name string
+	}
+	var gotActor adminhost.Actor
+	var gotName string
+	handlers := adminhost.Command(wrapper, key, func(c fiber.Ctx, actor adminhost.Actor, input command) error {
+		current, ok := wrapper.CurrentActor(c)
+		if !ok || current != actor {
+			return fiber.ErrUnauthorized
+		}
+		gotActor = actor
+		gotName = input.Name
+		return c.SendStatus(fiber.StatusNoContent)
+	})
+	app := fiber.New()
+	app.Post("/", withActor, handlers[0], handlers[1])
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/", strings.NewReader("{\"name\":\"updated\"}"))
+	request.Header.Set("Content-Type", "application/json")
+	response, err := app.Test(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := response.Body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if response.StatusCode != http.StatusNoContent || !guardCalled || gotActor != want || gotName != "updated" {
+		t.Fatalf("unexpected command result: status=%d guard=%v actor=%+v name=%q",
+			response.StatusCode, guardCalled, gotActor, gotName)
+	}
+}
 
 func TestMenuAnyPermissionKeysContract(t *testing.T) {
 	key := adminhost.NewPermissionKey("users", adminhost.PermissionActionUpdate)

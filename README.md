@@ -272,6 +272,17 @@ again; account data and database UUIDs are unchanged.
 by a host feature. Roles, permissions, session data, credentials, and mutable
 admin records remain internal.
 
+Host feature tests can use `hosttest.WithActor(host.Actor{AdminID: 42,
+SubjectID: "123e4567-e89b-12d3-a456-426614174201"})`. Check the returned error,
+then mount the returned Fiber middleware before handlers using `CurrentActor`
+or `host.Command`. It validates a positive admin ID and a valid nonzero canonical
+subject ID, without importing session/auth internals. Each request receives a
+fresh identity-only fixture. Configure the test harness's permission guard
+separately, for example with `hosttest.NewApp(t).ExpertGuard`; the actor helper
+grants no permissions and must never be mounted in production. The existing
+`WithSessionAdmin(adminID)` remains an ID-only fixture and does not satisfy
+`CurrentActor` or `Command` by itself.
+
 Transport-neutral features construct `host.NewSubjectPermissionChecker` from
 the same PostgreSQL client and transaction manager used by goadmin. Pass that
 checker through `host.Dependencies.SubjectPermissions` so goadmin and embedded
