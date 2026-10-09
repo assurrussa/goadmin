@@ -325,14 +325,15 @@ func (h *Handler) RetryFailedJob(c fiber.Ctx) error {
 
 		newJobID := outbox.NewJobID()
 		_, err = h.jobsRepo.Create(ctx, outbox.JobModel{
-			ID:          newJobID,
-			Queue:       ensureQueue(failedJob.Queue),
-			Name:        failedJob.Name,
-			Payload:     failedJob.Payload,
-			Attempts:    0,
-			ReservedAt:  sql.NullTime{},
-			AvailableAt: availableAt,
-			CreatedAt:   availableAt,
+			ID:            newJobID,
+			Queue:         ensureQueue(failedJob.Queue),
+			Name:          failedJob.Name,
+			SchemaVersion: failedJob.SchemaVersion,
+			Payload:       failedJob.Payload,
+			Attempts:      0,
+			ReservedAt:    sql.NullTime{},
+			AvailableAt:   availableAt,
+			CreatedAt:     availableAt,
 		})
 		if err != nil {
 			return fmt.Errorf("create retry job: %w", err)

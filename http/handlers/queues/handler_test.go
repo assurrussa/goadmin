@@ -49,7 +49,7 @@ func TestRetryFailedJobReadsDeletesAndCreatesInsideOneTransaction(t *testing.T) 
 	handler := NewHandler(adminAppTest.App, jobsRepo, failedRepo, audit)
 	id := outbox.NewJobID()
 	failedJob := outbox.JobFailedModel{
-		ID: id, Queue: testJobQueue, Name: testJobName, Payload: `{"to":"user@example.test"}`,
+		ID: id, Queue: testJobQueue, Name: testJobName, SchemaVersion: 2, Payload: `{"to":"user@example.test"}`,
 	}
 	txContext := context.WithValue(context.Background(), retryTxContextKey{}, true)
 
@@ -63,6 +63,8 @@ func TestRetryFailedJobReadsDeletesAndCreatesInsideOneTransaction(t *testing.T) 
 	createCall := jobsRepo.EXPECT().Create(txContext, gomock.Any()).DoAndReturn(
 		func(_ context.Context, job outbox.JobModel) (outbox.JobID, error) {
 			require.Equal(t, testJobQueue, job.Queue)
+			require.Equal(t, failedJob.Name, job.Name)
+			require.Equal(t, failedJob.SchemaVersion, job.SchemaVersion)
 			require.Equal(t, failedJob.Payload, job.Payload)
 			require.Equal(t, 0, job.Attempts)
 
