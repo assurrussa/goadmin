@@ -78,6 +78,14 @@ Sort order must be `asc` or `desc` (case-insensitive), or the configured default
 Invalid POST field/sort selections return HTTP 400 before repository access.
 Both transports check configured `FilterOptions` against scalar wire values,
 including numbers, booleans and dates; arrays/objects cannot bypass options.
+For `number` columns, floating-point values also match their shortest non-exponent
+decimal spelling (`1e6` matches option `"1000000"`, `1e-6` matches `"0.000001"`).
+Existing exact scalar spellings remain accepted; option strings are not parsed
+into floats. Non-finite floats and whole floats outside the safe integer range
+(±(2^53−1) for float64, ±(2^24−1) for float32) are rejected for numeric options,
+preventing rounded adjacent integers from matching. String identifiers remain
+exact, and repository-facing values are not converted. GET still parses only
+integer number filters; fractional/exponent query strings remain ignored.
 Configured fields without options retain custom JSON values, including arrays
 and objects, and nil values retain their existing no-option-check behavior.
 POST does not apply GET's typed query conversion: JSON numbers remain numbers

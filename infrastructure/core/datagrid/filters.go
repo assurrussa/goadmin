@@ -3,6 +3,7 @@ package datagrid
 import (
 	"fmt"
 	"maps"
+	"math"
 	"net/url"
 	"slices"
 	"strconv"
@@ -235,17 +236,40 @@ func (f Filters) validateSelectFilter(column Column, value any) string {
 		return ""
 	}
 
-	// Query parsing produces typed scalars; JSON numbers remain float64.
-	// Check their wire value too, so non-string bodies cannot bypass options.
-	if strValue, ok := formatFilterValue(value); ok {
+	// Keep exact scalar spellings, with a decimal alternative for numeric JSON
+	// floats: fmt.Sprint uses exponents where query integers use decimal digits.
+	strValue, valid := formatFilterValue(value)
+	decimalValue := strValue
+	if column.Type == "number" {
+		switch number := value.(type) {
+		case float64:
+			decimalValue, valid = numericFilterOptionDecimal(number, 64)
+		case float32:
+			decimalValue, valid = numericFilterOptionDecimal(float64(number), 32)
+		}
+	}
+	if valid {
 		for _, option := range column.FilterOptions {
-			if option["value"] == strValue {
+			if option["value"] == strValue || option["value"] == decimalValue {
 				return ""
 			}
 		}
 	}
 
 	return "Недопустимое значение для фильтра '" + column.Key + "'"
+}
+
+// numericFilterOptionDecimal avoids parsing configured strings into lossy floats.
+func numericFilterOptionDecimal(number float64, bits int) (string, bool) {
+	maxSafeInteger := float64(1<<53 - 1)
+	if bits == 32 {
+		maxSafeInteger = 1<<24 - 1
+	}
+	if math.IsNaN(number) || math.IsInf(number, 0) ||
+		(math.Trunc(number) == number && math.Abs(number) > maxSafeInteger) {
+		return "", false
+	}
+	return strconv.FormatFloat(number, 'f', -1, bits), true
 }
 
 // BuildURL строит URL с текущими фильтрами.
