@@ -34,6 +34,14 @@ Stable test support:
 
 - `github.com/assurrussa/goadmin/hosttest`
 
+`hosttest.WithActor(host.Actor)` returns test-only Fiber middleware and a
+validation error. A positive admin ID and a valid nonzero canonical subject ID
+are required. It supplies a fresh identity-only session per request for
+`CurrentActor` and `Command`, with no roles or permission grants. Test guards
+remain explicit; production authentication and RBAC are unchanged.
+`WithSessionAdmin` retains its ID-only behavior for existing tests. The generated
+clean-consumer probe exercises the actor and typed command using public imports.
+
 Stable reusable feature packages:
 
 - `github.com/assurrussa/goadmin/features/operations`
