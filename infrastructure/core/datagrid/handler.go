@@ -148,8 +148,12 @@ func (h *Handler[T]) HandleData(c fiber.Ctx) error {
 	// POST запросы для фильтров могут быть удобны, если фильтры сложные
 	if c.Method() == http.MethodPost {
 		if err := c.Bind().Body(&filters); err != nil {
-			h.logger.WarnContext(c, "failed to parse body for filters, falling back to query", logger.Error(err))
-			filters = h.parseFilters(c) // Fallback to query params if body parsing fails or not a JSON request
+			if len(c.Body()) > 0 {
+				h.logger.WarnContext(c, "failed to parse filter body", logger.Error(err))
+				return fiber.NewError(fiber.StatusBadRequest, "Invalid filter request body")
+			}
+			// Keep query-only POST requests compatible, but never ignore an invalid body.
+			filters = h.parseFilters(c)
 		}
 	} else {
 		filters = h.parseFilters(c)

@@ -2,7 +2,10 @@ package datagrid
 
 import (
 	"fmt"
+	"maps"
+	"math"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -186,23 +189,44 @@ func (f Filters) Validate(config FilterConfig[any]) []string {
 		errors = append(errors, "Лимит должен быть от 1 до 1000")
 	}
 
-	// Валидация фильтров - проверяем только фильтруемые колонки с опциями
+	// Defaults are trusted configuration; request sorting uses the GET allowlist.
+	if f.SortBy != "" && f.SortBy != config.DefaultSort && !IsValidSortField(f.SortBy, config) {
+		errors = append(errors, "Недопустимое поле сортировки")
+	}
+	sortOrder := strings.ToLower(strings.TrimSpace(f.SortOrder))
+	if f.SortOrder != "" && f.SortOrder != config.DefaultOrder && sortOrder != sortOrderAsc && sortOrder != sortOrderDesc {
+		errors = append(errors, "Недопустимый порядок сортировки")
+	}
+
+	errors = append(errors, f.validateFields(config)...)
+
+	return errors
+}
+
+// validateFields shares the configured GET field boundary without coercing POST values.
+func (f Filters) validateFields(config FilterConfig[any]) []string {
+	columns := make(map[string]Column, len(config.Columns))
 	for _, column := range config.Columns {
-		if !column.Filterable {
+		if column.Filterable {
+			columns[column.Key] = column
+		}
+	}
+
+	var errors []string
+	for _, key := range slices.Sorted(maps.Keys(f.Fields)) {
+		column, allowed := columns[key]
+		if !allowed {
+			errors = append(errors, "Недопустимое поле фильтра '"+key+"'")
 			continue
 		}
-
-		value, exists := f.Fields[column.Key]
-		if !exists || value == nil {
+		value := f.Fields[key]
+		if value == nil {
 			continue
 		}
-
-		// Валидация select фильтров (если есть опции)
 		if err := f.validateSelectFilter(column, value); err != "" {
 			errors = append(errors, err)
 		}
 	}
-
 	return errors
 }
 
@@ -212,18 +236,40 @@ func (f Filters) validateSelectFilter(column Column, value any) string {
 		return ""
 	}
 
-	strValue, ok := value.(string)
-	if !ok {
-		return ""
+	// Keep exact scalar spellings, with a decimal alternative for numeric JSON
+	// floats: fmt.Sprint uses exponents where query integers use decimal digits.
+	strValue, valid := formatFilterValue(value)
+	decimalValue := strValue
+	if column.Type == "number" {
+		switch number := value.(type) {
+		case float64:
+			decimalValue, valid = numericFilterOptionDecimal(number, 64)
+		case float32:
+			decimalValue, valid = numericFilterOptionDecimal(float64(number), 32)
+		}
 	}
-
-	for _, option := range column.FilterOptions {
-		if option["value"] == strValue {
-			return ""
+	if valid {
+		for _, option := range column.FilterOptions {
+			if option["value"] == strValue || option["value"] == decimalValue {
+				return ""
+			}
 		}
 	}
 
 	return "Недопустимое значение для фильтра '" + column.Key + "'"
+}
+
+// numericFilterOptionDecimal avoids parsing configured strings into lossy floats.
+func numericFilterOptionDecimal(number float64, bits int) (string, bool) {
+	maxSafeInteger := float64(1<<53 - 1)
+	if bits == 32 {
+		maxSafeInteger = 1<<24 - 1
+	}
+	if math.IsNaN(number) || math.IsInf(number, 0) ||
+		(math.Trunc(number) == number && math.Abs(number) > maxSafeInteger) {
+		return "", false
+	}
+	return strconv.FormatFloat(number, 'f', -1, bits), true
 }
 
 // BuildURL строит URL с текущими фильтрами.

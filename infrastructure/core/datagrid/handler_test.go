@@ -513,8 +513,8 @@ func TestHandler_HandleData_POST_InvalidJSON(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { assert.NoError(t, resp.Body.Close()) }()
 
-	// Должен fallback на query параметры и вернуть успешный ответ
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	// Невалидное тело не должно подменяться query параметрами.
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
 func TestHandler_NewHandler_Defaults(t *testing.T) {

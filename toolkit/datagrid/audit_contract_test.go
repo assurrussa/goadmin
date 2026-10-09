@@ -22,8 +22,8 @@ import (
 	"github.com/assurrussa/goadmin/toolkit/datagrid"
 )
 
-// These public contract tests retain transport asymmetries awaiting an API decision
-// and protect the corrected security and round-trip behavior.
+// These public contract tests retain pagination and typed-value transport differences
+// while protecting the shared field boundary and corrected round-trip behavior.
 type auditRow struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
@@ -80,14 +80,14 @@ func TestAuditPublicGETAndPOSTFilterContracts(t *testing.T) {
 			limit: 25, sortBy: "name", sortOrder: "asc", fields: map[string]any{"name": "Alice", "count": 7, "enabled": true},
 		},
 		{
-			name: "POST permits arbitrary fields and sorting", method: http.MethodPost, path: "/audit/data",
-			body: `{"page":1,"limit":1000,"sortBy":"private","sortOrder":"SIDEWAYS",` +
-				`"fields":{"count":7,"private":"hidden","unknown":"x"}}`,
-			limit: 1000, sortBy: "private", sortOrder: "SIDEWAYS",
-			fields: map[string]any{"count": float64(7), "private": "hidden", "unknown": "x"},
+			name: "POST keeps JSON scalar types and its limit", method: http.MethodPost, path: "/audit/data",
+			body: `{"page":1,"limit":1000,"sortBy":"name","sortOrder":"asc",` +
+				`"fields":{"count":7,"name":"Alice","enabled":true}}`,
+			limit: 1000, sortBy: "name", sortOrder: "asc",
+			fields: map[string]any{"count": float64(7), "name": "Alice", "enabled": true},
 		},
 		{
-			name: "invalid JSON falls back to query", method: http.MethodPost, path: "/audit/data?limit=100&name=Alice", body: `{`,
+			name: "empty POST falls back to query", method: http.MethodPost, path: "/audit/data?limit=100&name=Alice",
 			limit: 100, sortBy: "name", sortOrder: "asc", fields: map[string]any{"name": "Alice"},
 		},
 	} {
