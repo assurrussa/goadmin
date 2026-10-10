@@ -6,8 +6,8 @@ Last updated: 2026-10-03.
 
 `goadmin` is the standalone embedded admin subsystem for Go hosts. It uses
 `github.com/assurrussa/goadmin` as its module path. The current checkout pins
-`github.com/assurrussa/goauth v0.5.1` as the canonical auth/RBAC Runtime.
-GoAuth and GoNotify resolve published v0.5.1 and v0.6.0 without replacements;
+`github.com/assurrussa/goauth v0.6.0` as the canonical auth/RBAC Runtime.
+GoAuth and GoNotify resolve published v0.6.0 and v0.6.0 without replacements;
 GoUploads resolves published v0.11.0.
 GoNotify uses `transport.Transport` and NotifyHub rather than its
 removed direct-delivery manager. Core and PostgreSQL Outbox pins are v0.16.0,
