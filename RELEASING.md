@@ -6,7 +6,7 @@ This module is published as `github.com/assurrussa/goadmin`.
 
 - Go 1.27 is the minimum. Modular host assembly is a breaking source API:
   migrate hosts to `host.New`, explicit modules and `host.AdminConfig`.
-- GoAuth v0.5.1 supplies the shared-transaction/delivery-policy API. The root
+- GoAuth v0.6.0 supplies the shared-transaction/delivery-policy API. The root
   module resolves the published tag without a sibling replacement.
 - GoNotify v0.5.0 changes `host.NotificationManager` to
   `transport.Transport`; `host.NewNotificationManager` now takes
@@ -22,7 +22,7 @@ This module is published as `github.com/assurrussa/goadmin`.
 - The clean-history baseline was published as v0.7.0.
   Old history, PRs and tags remain in the private history archive; do not move
   or rewrite them. Verify the new remote tag and public module independently.
-- Current `go.mod` pins GoAuth v0.5.1 and GoNotify v0.6.0. GoInertia v0.11.0
+- Current `go.mod` pins GoAuth v0.6.0 and GoNotify v0.6.0. GoInertia v0.11.0
   retains protocol v2 by default, matching the embedded v2 frontend. GoCache
   resolves v0.2.2. GoDI and GoLogger retain their existing compatible pins.
 - `VERSION` is intentionally unset by default. Pass the exact planned or

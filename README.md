@@ -10,6 +10,9 @@ GoWebSocket v0.2.1 without sibling replacements.
 
 ## Try the admin locally
 
+New to embedding? Start with [the consumer guide](docs/consumer-guide.md) for
+the visible result, required stack, and path to your own entity page.
+
 The [standalone starter](examples/starter/README.md) runs the embedded admin,
 PostgreSQL with Docker Compose. Redis is an optional profile; mail modules use
 NotifyHub when explicitly enabled. Copy
@@ -211,7 +214,7 @@ Verification is local by default. Hosted CI is manual-only, with no automatic
 push or pull-request runs. See [local checks and manual CI](docs/ci.md) for
 tool versions, disposable PostgreSQL/Redis setup, and the proven CI baseline.
 
-This checkout pins published `goauth v0.5.1` and `gonotify v0.6.0`, including
+This checkout pins published `goauth v0.6.0` and `gonotify v0.6.0`, including
 the shared transaction and optional-delivery API. Uploads resolve
 `gouploads v0.11.0` and WebSockets resolve `gowebsocket v0.2.1`. Outbox core and
 its PostgreSQL backend both resolve `v0.16.0`, and GoCache resolves `v0.2.2`.
