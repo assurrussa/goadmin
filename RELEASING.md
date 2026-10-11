@@ -4,15 +4,15 @@ This module is published as `github.com/assurrussa/goadmin`.
 
 ## Current Baseline
 
-- Go 1.27 is the minimum. Modular host assembly is a breaking source API:
+- Go 1.27.2 is the minimum. Modular host assembly is a breaking source API:
   migrate hosts to `host.New`, explicit modules and `host.AdminConfig`.
-- GoAuth v0.6.0 supplies the shared-transaction/delivery-policy API. The root
+- GoAuth v0.7.0 supplies the shared-transaction/delivery-policy API. The root
   module resolves the published tag without a sibling replacement.
 - GoNotify v0.5.0 changes `host.NotificationManager` to
   `transport.Transport`; `host.NewNotificationManager` now takes
   `host.NotificationConfig` and returns `(NotificationManager, error)`. Its
   published tag replaces the former local override. Outbox core and
-  PostgreSQL backend are aligned at v0.16.0, retaining the API
+  PostgreSQL backend are aligned at v0.17.0, retaining the API
   supporting no-attempt authorization deferral.
 - Apply the additive notification dispatch-key migration before starting jobs.
   Drain legacy external-delivery jobs that lack an email sender; these payloads
@@ -22,7 +22,7 @@ This module is published as `github.com/assurrussa/goadmin`.
 - The clean-history baseline was published as v0.7.0.
   Old history, PRs and tags remain in the private history archive; do not move
   or rewrite them. Verify the new remote tag and public module independently.
-- Current `go.mod` pins GoAuth v0.6.0 and GoNotify v0.6.0. GoInertia v0.11.0
+- Current `go.mod` pins GoAuth v0.7.0 and GoNotify v0.6.0. GoInertia v0.11.1
   retains protocol v2 by default, matching the embedded v2 frontend. GoCache
   resolves v0.2.2. GoDI and GoLogger retain their existing compatible pins.
 - `VERSION` is intentionally unset by default. Pass the exact planned or
@@ -36,7 +36,7 @@ This module is published as `github.com/assurrussa/goadmin`.
   `golang.org/x/vuln/cmd/govulncheck` separately before running the gate.
 - Keep module path unchanged: `module github.com/assurrussa/goadmin`.
 - The root dependency graph has no local replacements. GoUploads is pinned to
-  published v0.11.0 and GoWebSocket to v0.2.1. The nested starter keeps explicit
+  published v0.13.0 and GoWebSocket to v0.2.1. The nested starter keeps explicit
   source-mode overrides; its published Docker build removes them all.
   Published verification rejects every replacement and legacy shared/Redis module.
 - The frontend advisory gate and its remaining moderate findings are reviewed

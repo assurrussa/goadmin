@@ -22,6 +22,7 @@ type SessionAdmin struct {
 	Permissions        map[string][]string `json:"permissions,omitempty"`
 	PreviewID          int64               `json:"previewId,omitempty"`
 	SessionID          string              `json:"-"`
+	AuthSessionID      string              `json:"-"`
 	CreatedAt          time.Time           `json:"createdAt,omitempty"`
 	UpdatedAt          time.Time           `json:"updatedAt,omitempty"`
 	DeletedAt          sql.NullTime        `json:"deletedAt,omitempty"`

@@ -28,8 +28,8 @@ func TestUploadsMigrateFreshRepeatAndResetPreservesLifecycle(t *testing.T) {
 	assertUploadLedger(t, ctx, db)
 
 	_, err := db.ExecContext(ctx, `
-INSERT INTO files (original_filename, filename, slug, file_type, mime_type)
-VALUES ('preserved.wav', 'preserved.wav', 'preserved-audio', 7, 'audio/wav');
+INSERT INTO files (id, original_filename, filename, slug, file_type, mime_type, object_type)
+VALUES (101, 'preserved.wav', 'preserved.wav', 'preserved-audio', 7, 'audio/wav', 'fixture_object');
 INSERT INTO upload_sessions (id, upload_length, object_path, original_name, file_name,
  owner_uuid, multipart_upload_id, status, finalization_key, expires_at)
 VALUES ('00000000-0000-4000-8000-000000000001', 10, 'preserved/session', 'preserved.wav',
@@ -38,8 +38,19 @@ VALUES ('00000000-0000-4000-8000-000000000001', 10, 'preserved/session', 'preser
 INSERT INTO upload_finalizations (finalization_key, binding_hash, file_id)
 SELECT '00000000-0000-4000-8000-000000000003', repeat('a', 64), id FROM files WHERE slug = 'preserved-audio';
 INSERT INTO file_deletions (file_id, payload)
-SELECT id, '{}'::jsonb FROM files WHERE slug = 'preserved-audio';`)
+SELECT id, '{}'::jsonb FROM files WHERE slug = 'preserved-audio';
+INSERT INTO file_job_associations
+(job_id, file_id, generation, object_type, object_id, operation, job_name, schema_version, created_at)
+SELECT '00000000-0000-4000-8000-000000000004', id, slug, object_type, object_id,
+ 'original_finalization', 'fixture.original_finalization', 1, '2026-10-10T00:00:00Z'
+FROM files WHERE slug = 'preserved-audio';`)
 	require.NoError(t, err)
+
+	// Synthetic provenance has no active queue row; repeat migration and auth
+	// reset must preserve the original FileID and complete association binding.
+	require.NoError(t, Migrate(ctx, DatabaseConfig{}, db))
+	assertUploadLedger(t, ctx, db)
+	assertUploadLifecycleRows(t, ctx, db)
 
 	require.NoError(t, Reset(ctx, DatabaseConfig{}, db, postgres.ConfirmResetAuthState))
 	assertUploadLedger(t, ctx, db)
@@ -100,6 +111,39 @@ SELECT file_type, (data->>'width')::int FROM files WHERE id=101 AND slug='existi
 	require.Equal(t, 42, sentinel)
 }
 
+func TestUploadsMigratePreviousCanonicalLedgerPreservesFileIDs(t *testing.T) {
+	ctx, db := uploadMigrationDatabase(t, "UploadMigrationsPreviousLedger")
+	require.NoError(t, run(ctx, outbox.StoragePgsqlConfig{}, db, "up", logger.Discard()))
+	provider, err := uploadsProvider(db)
+	require.NoError(t, err)
+	// Reuse the existing provider to reproduce the two migrations selected by
+	// GoUploads v0.11.0. Do not stamp history or replay core's files migration.
+	_, err = provider.UpTo(ctx, 20260930120000)
+	require.NoError(t, err)
+	var count int
+	require.NoError(t, db.QueryRowContext(ctx, `
+SELECT count(*) FROM goadmin_uploads_goose_db_version WHERE version_id>0 AND is_applied`).Scan(&count))
+	require.Equal(t, 2, count)
+	var associationTable sql.NullString
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT to_regclass('public.file_job_associations')::text`).Scan(&associationTable))
+	require.False(t, associationTable.Valid)
+	_, err = db.ExecContext(ctx, `
+INSERT INTO files (id, original_filename, filename, slug, file_type, mime_type)
+VALUES (101, 'old.wav', 'old.wav', 'previous-canonical-audio', 7, 'audio/wav');`)
+	require.NoError(t, err)
+
+	require.NoError(t, Migrate(ctx, DatabaseConfig{}, db))
+	require.NoError(t, Migrate(ctx, DatabaseConfig{}, db))
+	assertUploadSchema(t, ctx, db)
+	assertUploadLedger(t, ctx, db)
+	require.NoError(t, db.QueryRowContext(ctx, `
+SELECT count(*) FROM files WHERE id=101 AND slug='previous-canonical-audio'
+ AND file_type=7 AND mime_type='audio/wav'`).Scan(&count))
+	require.Equal(t, 1, count)
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT count(*) FROM file_job_associations`).Scan(&count))
+	require.Zero(t, count, "the additive migration must not invent links for historical files")
+}
+
 func TestUploadsMigrateDuplicatePrimaryRollsBackAndCanRetry(t *testing.T) {
 	ctx, db := uploadMigrationDatabase(t, "UploadMigrationsPrimaryConflict")
 	require.NoError(t, run(ctx, outbox.StoragePgsqlConfig{}, db, "up", logger.Discard()))
@@ -148,7 +192,7 @@ func assertUploadSchema(t *testing.T, ctx context.Context, db *sql.DB) {
 	t.Helper()
 	for _, table := range []string{
 		"auth_subjects", "goadmin_browser_sessions", "jobs", "files",
-		"upload_sessions", "upload_finalizations", "file_deletions",
+		"upload_sessions", "upload_finalizations", "file_deletions", "file_job_associations",
 		"files_primary_unique_idx", "upload_sessions_expiry_all_idx",
 	} {
 		var name sql.NullString
@@ -162,8 +206,8 @@ func assertUploadLedger(t *testing.T, ctx context.Context, db *sql.DB) {
 	var count int
 	require.NoError(t, db.QueryRowContext(ctx, `
 SELECT count(*) FROM goadmin_uploads_goose_db_version WHERE version_id>0 AND is_applied`).Scan(&count))
-	require.Equal(t, 2, count)
-	for _, version := range []int64{20260710120000, 20260930120000} {
+	require.Equal(t, 3, count)
+	for _, version := range []int64{20260710120000, 20260930120000, 20261008120000} {
 		require.NoError(t, db.QueryRowContext(ctx, `
 SELECT count(*) FROM goadmin_uploads_goose_db_version WHERE version_id=$1 AND is_applied`, version).Scan(&count))
 		require.Equal(t, 1, count)
@@ -183,4 +227,14 @@ SELECT status FROM upload_sessions WHERE object_path='preserved/session'`).Scan(
 	require.Equal(t, 1, count)
 	require.NoError(t, db.QueryRowContext(ctx, `SELECT file_type FROM files WHERE slug='preserved-audio'`).Scan(&fileType))
 	require.Equal(t, 7, fileType)
+	require.NoError(t, db.QueryRowContext(ctx, `
+SELECT count(*) FROM file_job_associations a
+JOIN files f ON f.id = a.file_id
+WHERE a.job_id = '00000000-0000-4000-8000-000000000004'
+ AND a.file_id = 101 AND f.slug = 'preserved-audio'
+ AND a.generation = f.slug AND a.object_type = f.object_type
+ AND a.object_id IS NOT DISTINCT FROM f.object_id
+ AND a.operation = 'original_finalization' AND a.job_name = 'fixture.original_finalization'
+ AND a.schema_version = 1 AND a.created_at = '2026-10-10T00:00:00Z'::timestamptz`).Scan(&count))
+	require.Equal(t, 1, count, "repeat migration and auth reset must preserve file-job provenance")
 }

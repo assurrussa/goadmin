@@ -48,6 +48,9 @@ func realtimeUserID(c fiber.Ctx) (eventstream.UserID, error) {
 func registerRealtimeRoute(app *fiber.App, service *adminservice.Service, handler *handlers.HTTPHandler, csrfCookieName string) {
 	authenticate := adminmiddleware.AuthAdminMiddleware(service, csrfCookieName)
 	app.Get("/ws", func(c fiber.Ctx) error {
+		admission := service.BeginRealtimeAdmission()
+		defer admission.Cancel()
+		c.Locals(realtimeAdmissionKey{}, admission)
 		err := authenticate(c)
 		if c.Response().StatusCode() >= 300 && c.Response().StatusCode() < 400 {
 			c.Response().Header.Del(fiber.HeaderLocation)

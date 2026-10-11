@@ -67,9 +67,20 @@ offline persistence is provided. Fix invalid input before retrying policy/size
 failures. The embedded client currently retries disconnected sessions every 5s;
 HTTP upload polling remains available when realtime is disabled.
 
-The session is authenticated at handshake. Existing sockets are not automatically
-reauthorized on logout, membership changes or token expiry; immediate revocation
-requires a separate connection revocation mechanism in the host integration.
+After successful explicit logout, this admin runtime closes sockets belonging to
+the logged-out canonical `(SubjectID, AuthSessionID)` pair, including sockets
+opened before browser-ID or token rotation. Independent logins of the same admin
+remain connected. Authentication and pending upgrades that overlap logout are
+fenced; a rejected stale handshake returns 401, and a late upgrade callback
+closes without subscribing. Socket closure can end without a close frame.
+
+This registry is process-local, with no cross-replica bus or periodic database
+checks. It does not add socket invalidation for logout-all, password changes,
+membership changes, native token expiry, or external detach. Existing external
+proof deadlines still close already-open external sockets. Host-supplied streams
+and canonical auth clients remain borrowed. Canonical revocation closes the
+selected sockets even if later browser-save or external-cleanup steps fail; an
+unsuccessful canonical logout does not report successful socket revocation.
 
 ## Server lifetime
 

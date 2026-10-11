@@ -1,20 +1,20 @@
 # goadmin Project Context
 
-Last updated: 2026-10-03.
+Last updated: 2026-10-10.
 
 ## Current Role
 
 `goadmin` is the standalone embedded admin subsystem for Go hosts. It uses
 `github.com/assurrussa/goadmin` as its module path. The current checkout pins
-`github.com/assurrussa/goauth v0.6.0` as the canonical auth/RBAC Runtime.
-GoAuth and GoNotify resolve published v0.6.0 and v0.6.0 without replacements;
-GoUploads resolves published v0.11.0.
+`github.com/assurrussa/goauth v0.7.0` as the canonical auth/RBAC Runtime.
+GoAuth resolves published v0.7.0 and GoNotify v0.6.0 without replacements;
+GoUploads resolves published v0.13.0.
 GoNotify uses `transport.Transport` and NotifyHub rather than its
-removed direct-delivery manager. Core and PostgreSQL Outbox pins are v0.16.0,
+removed direct-delivery manager. Core and PostgreSQL Outbox pins are v0.17.0,
 including the no-attempt `DeferAt` contract required for authorization outages.
 Realtime resolves the
 published `gowebsocket v0.2.1` dependency. GoCache resolves v0.2.2. GoInertia
-v0.11.0 retains its protocol v2 default, matching the embedded frontend.
+v0.11.1 retains its protocol v2 default, matching the embedded frontend.
 
 The module is intended to be consumed by clean host applications through a small
 supported package list. Do not model future host integration as copying
@@ -123,7 +123,11 @@ Realtime authenticates `GET /ws` before HTTP 101 through the current browser
 session and a typed `WithUserIDExtractor`. Stream identity is the admin projection
 UUID. `realtime.New(nil)` creates an independent stream for each runtime;
 shutdown drains its handler, closes that stream, then stops HTTP. A supplied
-stream is borrowed. `Runtime.Close` also drains realtime when Run never started.
+stream is borrowed. Successful explicit logout closes only the same runtime's
+sockets for the verified canonical subject/session pair, fencing concurrent
+authentication and delayed upgrades. Browser/token rotation preserves that key;
+independent logins stay connected. This adds no cross-replica or global/password/
+membership revocation policy; external proof deadlines remain unchanged. `Runtime.Close` also drains realtime when Run never started.
 Hosts that stop the server directly use `Server.Shutdown(ctx)` to receive drain
 errors; direct Fiber App shutdown invokes a bounded fallback hook.
 
@@ -521,3 +525,24 @@ The additive candidate host admission/validity API and its dependency/rollback
 contract are described in [external-browser-admission.md](external-browser-admission.md). It retains the pinned GoAuth API, adds no public package/import path,
 and does not enable a host SSO mode. Release readiness and the real RP consumer
 acceptance remain required before publication.
+
+## PostgreSQL DSN startup policy
+
+The shared parser preserves application_name, timezone/TimeZone,
+statement_timeout, lock_timeout and idle_in_transaction_session_timeout in
+host-owned and migration-owned connections. Matching timezone aliases are
+accepted; conflicting aliases fail. Only search_path=public is allowed;
+options, unsupported startup parameters, and decoded NUL in startup values,
+user or database fail with sanitized errors before connection creation.
+Literal percent-encoded text remains valid when it does not decode to NUL.
+Existing scalar/TLS handling and borrowed *sql.DB ownership remain unchanged.
+PG environment/service defaults remain parser inputs; this is not process
+environment isolation.
+
+## Browser history after logout
+
+Authenticated admin responses opt into encrypted Inertia history. Anonymous
+GET /auth/login clears the history key after auth and Inertia middleware.
+A secure browser context is required. This cannot erase pre-upgrade plaintext
+history and does not change canonical session or cookie policy. It complements
+session-specific realtime logout and does not replace backend authorization.

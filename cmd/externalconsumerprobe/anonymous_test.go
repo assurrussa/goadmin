@@ -43,7 +43,7 @@ fi
 	require.NoError(t, err)
 	env = append(os.Environ(), "PATH="+dir+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"GOAUTH_LOCAL_PATH=", "GONOTIFY_LOCAL_PATH=", "GOUPLOADS_LOCAL_PATH=", "GOWEBSOCKET_LOCAL_PATH=",
-		"GOAUTH_VERSION=v999.0.0")
+		"GOAUTH_VERSION=v999.0.0", "GOAUTH=netrc")
 	return script, dir, env
 }
 
