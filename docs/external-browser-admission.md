@@ -1,5 +1,17 @@
 # Candidate external browser admission
 
+## Current release order
+
+The candidate cohort and source-mode integration details below are historical.
+The current dependency-first release order publishes GoAdmin after its
+exact-candidate publish-readiness, agreed browser acceptance, and final review,
+then verifies the published tag with release-readiness. Real RP consumer and
+end-to-end SSO acceptance follow in consuming projects using released
+dependencies. Library publication does not establish downstream SSO acceptance.
+The security, authority, lifecycle, and rollback contracts below remain required.
+
+## Historical candidate context
+
 This additive draft started from v0.9.6
 (`39cd199538335d1db05e359a474d96ec0a90d128`) and is now reconciled with current
 master `d16ce6bb99aff780b2b28b646d5d94f1e22f895e`, preserving its complete upstream
