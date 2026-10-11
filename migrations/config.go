@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/assurrussa/goauth/postgres"
@@ -131,6 +132,10 @@ func withDatabase(
 	if err != nil {
 		return err
 	}
+	runtimeParams, err := connectionconfig.PgsqlRuntimeParams(cfg.DSN)
+	if err != nil {
+		return err
+	}
 	_, dsn, err := outbox.PgsqlCreateDSN(outbox.PgsqlNewOptions(
 		storageCfg.Address,
 		storageCfg.Username,
@@ -146,6 +151,18 @@ func withDatabase(
 	))
 	if err != nil {
 		return fmt.Errorf("create goadmin migration DSN: %w", err)
+	}
+	if len(runtimeParams) > 0 {
+		parsed, parseErr := url.Parse(dsn)
+		if parseErr != nil {
+			return errors.New("create goadmin migration DSN: invalid generated URL")
+		}
+		query := parsed.Query()
+		for key, value := range runtimeParams {
+			query.Set(key, value)
+		}
+		parsed.RawQuery = query.Encode()
+		dsn = parsed.String()
 	}
 	database, err := sql.Open("pgx", dsn)
 	if err != nil {

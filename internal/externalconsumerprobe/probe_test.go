@@ -75,6 +75,7 @@ func TestValidateRejectsIncompleteAndAmbiguousInputs(t *testing.T) {
 func TestCleanPublishedGraphDoesNotOverrideGoauth(t *testing.T) {
 	mod, err := (Config{Version: "v0.7.0"}).BuildGoMod()
 	require.NoError(t, err)
+	require.Contains(t, mod, "\ngo 1.27.2\n\ntoolchain go1.27.2\n")
 	require.NotContains(t, mod, "require github.com/assurrussa/goauth")
 	require.NotContains(t, mod, "replace")
 }

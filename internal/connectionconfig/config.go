@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/pgconn"
 	goredis "github.com/redis/go-redis/v9"
 
 	"github.com/assurrussa/goadmin/infrastructure/outbox"
@@ -78,12 +78,10 @@ func NormalizePgsql(cfg PgsqlConfig) (PgsqlConfig, error) {
 		return cfg, nil
 	}
 
-	parsed, err := pgxpool.ParseConfig(dsn)
+	conn, err := parsePgsqlDSN(dsn)
 	if err != nil {
-		return cfg, fmt.Errorf("parse database dsn: %w", err)
+		return cfg, err
 	}
-
-	conn := parsed.ConnConfig
 	if conn.Host != "" {
 		cfg.Address = conn.Host
 		if conn.Port > 0 && !strings.Contains(conn.Host, "/") {
@@ -104,6 +102,65 @@ func NormalizePgsql(cfg PgsqlConfig) (PgsqlConfig, error) {
 	}
 
 	return cfg, nil
+}
+
+// PgsqlRuntimeParams returns the supported startup settings without rebuilding
+// their values from the scalar storage config. An absent DSN adds no overrides.
+func PgsqlRuntimeParams(dsn string) (map[string]string, error) {
+	if strings.TrimSpace(dsn) == "" {
+		return map[string]string{}, nil
+	}
+	conn, err := parsePgsqlDSN(strings.TrimSpace(dsn))
+	if err != nil {
+		return nil, err
+	}
+	return conn.RuntimeParams, nil
+}
+
+func parsePgsqlDSN(dsn string) (*pgconn.Config, error) {
+	conn, err := pgconn.ParseConfigWithOptions(dsn, pgconn.ParseConfigOptions{
+		ConnStringAllowedKeys: []string{
+			"host", "port", "database", "user", "password", "sslmode",
+			"application_name", "timezone", "TimeZone",
+			"statement_timeout", "lock_timeout", "idle_in_transaction_session_timeout",
+			"search_path", "options",
+		},
+	})
+	if err != nil {
+		// Parser errors may contain DSN values, so never wrap or log them.
+		return nil, errors.New("parse database dsn: invalid or unsupported PostgreSQL parameter")
+	}
+	// Startup messages use NUL-terminated strings; a decoded NUL could inject
+	// another parameter and bypass validation of explicit DSN parameter names.
+	if strings.IndexByte(conn.User, 0) >= 0 || strings.IndexByte(conn.Database, 0) >= 0 {
+		return nil, errors.New("parse database dsn: NUL in PostgreSQL startup value")
+	}
+	for _, value := range conn.RuntimeParams {
+		if strings.IndexByte(value, 0) >= 0 {
+			return nil, errors.New("parse database dsn: NUL in PostgreSQL startup value")
+		}
+	}
+	if value, ok := conn.RuntimeParams["TimeZone"]; ok {
+		if other, exists := conn.RuntimeParams["timezone"]; exists && value != other {
+			return nil, errors.New("conflicting database dsn parameters timezone and TimeZone")
+		}
+		conn.RuntimeParams["timezone"] = value
+		delete(conn.RuntimeParams, "TimeZone")
+	}
+	for key, value := range conn.RuntimeParams {
+		switch key {
+		case "application_name", "timezone", "TimeZone",
+			"statement_timeout", "lock_timeout", "idle_in_transaction_session_timeout":
+		case "search_path":
+			if value != "public" {
+				return nil, errors.New("unsupported database dsn parameter search_path: only public is supported")
+			}
+		default:
+			// Only a parameter name is exposed, never its value or the DSN.
+			return nil, fmt.Errorf("unsupported database dsn parameter %q", key)
+		}
+	}
+	return conn, nil
 }
 
 // RedisPoolConfig converts public Redis config to the local redis pool config.

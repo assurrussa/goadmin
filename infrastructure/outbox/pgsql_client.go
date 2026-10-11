@@ -109,3 +109,8 @@ func WithPgsqlMinConnectionsCount(minConnections int32) PgsqlOptPoolOptionsSette
 func WithPgsqlSSLMode(sslMode string) PgsqlOptPoolOptionsSetter {
 	return pgsqlclient.WithSSLMode(sslMode)
 }
+
+// WithPgsqlRuntimeParams forwards validated PostgreSQL startup settings.
+func WithPgsqlRuntimeParams(params map[string]string) PgsqlOptPoolOptionsSetter {
+	return pgsqlclient.WithRuntimeParams(params)
+}

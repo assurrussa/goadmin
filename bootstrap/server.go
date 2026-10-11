@@ -290,6 +290,7 @@ func buildRegisteredHandler(
 			adminmiddleware.AuthAdminMiddleware(deps.System.AdminAuthService, staticFiles.csrfCookieName),
 			adminmiddleware.IsNotAuthAdminMiddleware(),
 			app.HTTPManager().Middleware(),
+			adminHistoryMiddleware(app.HTTPManager()),
 		)
 		for _, transport := range opts.uploadTransports {
 			store := transport.TusStore

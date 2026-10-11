@@ -66,6 +66,7 @@ func TestUploadsProviderUsesCanonicalMigrationsExceptCoreFiles(t *testing.T) {
 	require.Equal(t, []string{
 		"20260710120000_create_upload_sessions.sql",
 		"20260930120000_upload_lifecycle_safety.sql",
+		"20261008120000_file_job_associations.sql",
 	}, actual)
 	require.Equal(t, expected, actual)
 }

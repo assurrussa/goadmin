@@ -1368,3 +1368,22 @@ minimal host using the normal generator and checks the complete resource build
 graph. It then requires compiler errors for incorrect/missing required host
 props and a non-component loader payload. These are compile-time client checks;
 they do not validate server-provided page props at runtime.
+
+
+## 2026-10-10: coherent DSN, realtime, adoption and history candidate
+
+Compose the reviewed DSN startup correction, canonical-session realtime logout,
+upload/outbox adoption tests and history-response policy on d703e51. Original
+source packets touch disjoint paths; realtime and history share bootstrap
+behavior, so final acceptance belongs to the combined tree.
+Use released GoUploads v0.13.0 and Outbox root/PostgreSQL v0.17.0. Uploads differs
+from its tested candidate only in mock header comments; PostgreSQL differs
+only in module metadata; Outbox root is the exact tested commit. Natural
+GoAuth v0.6.0 and GoInertia v0.11.0 remain; diagnostic SSO replacements are not
+product dependency pins.
+
+Retain earlier results on their original source/graph. One make check verifies
+the coherent batch; do not stack separate full race/coverage on its successful
+aggregate. Resolver, affected integrations and browser acceptance need exact
+final-tree evidence. Source preparation and static review alone do not prove
+merge, release, deployment, or cross-project SSO readiness.

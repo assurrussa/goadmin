@@ -17,6 +17,7 @@ import (
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 	"github.com/assurrussa/goadmin/internal/auth/browsercookie"
 	"github.com/assurrussa/goadmin/internal/auth/browserstate"
+	"github.com/assurrussa/goadmin/internal/realtimesession"
 	"github.com/assurrussa/goadmin/models"
 )
 
@@ -93,6 +94,7 @@ type Service struct {
 	admins            adminRepository
 	sessionTTL        time.Duration
 	states            browserstate.Store
+	realtimeSessions  realtimesession.Registry
 }
 
 func NewService(store *session.Store, roles roleService, options ...Option) *Service {
@@ -344,6 +346,10 @@ func (s *Service) GetAdminAuth(c fiber.Ctx) (*models.SessionAdmin, error) {
 	}
 
 	payload := cloneSessionAdmin(state.Payload)
+	// Only canonical, introspected identity reaches the WebSocket lifecycle key.
+	// Never reuse these values from a persisted browser projection.
+	payload.SubjectID = authContext.SubjectID
+	payload.AuthSessionID = authContext.SessionID
 	return &payload, nil
 }
 
@@ -506,6 +512,11 @@ func (s *Service) delAdminAuth(c fiber.Ctx, userLogout bool) (result error) {
 	if state, ok := sess.Get(sessioncore.AuthAdminKey.String()).(*browserSession); ok && state != nil && s.runtime != nil {
 		if err := s.runtime.Logout(c, state.SubjectID, state.AuthSessionID); err != nil && !errors.Is(err, goauth.ErrSessionRevoked) {
 			revokeErr = fmt.Errorf("revoke admin Runtime session: %w", err)
+		} else if userLogout {
+			// Canonical revocation has succeeded even if browser persistence or
+			// deferred external cleanup fails. Detach and global revocation keep
+			// their existing policy; this hook is explicit session logout only.
+			s.realtimeSessions.Revoke(realtimesession.Key{SubjectID: state.SubjectID, AuthSessionID: state.AuthSessionID})
 		}
 	}
 	sess.Delete(sessioncore.AuthAdminKey.String())
