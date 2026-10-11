@@ -8,6 +8,7 @@ import (
 	"github.com/valyala/fasthttp"
 
 	sessioncore "github.com/assurrussa/goadmin/infrastructure/core/session"
+	"github.com/assurrussa/goadmin/internal/realtimesession"
 	"github.com/assurrussa/goadmin/models"
 )
 
@@ -18,12 +19,31 @@ import (
 // Reconnect uses the ordinary authentication boundary and fresh live authority.
 type externalDeadlineUpgrader struct{ websocketstream.Upgrader }
 
+type realtimeAdmissionKey struct{}
+
 func (u externalDeadlineUpgrader) UpgradeFastHTTP(ctx *fasthttp.RequestCtx, handler libwebsocket.FastHTTPHandler) error {
-	var deadline time.Time
-	if admin, ok := ctx.UserValue(sessioncore.AuthAdminKey.String()).(*models.SessionAdmin); ok && admin != nil {
-		deadline = admin.ExternalValidUntil
+	admin, ok := ctx.UserValue(sessioncore.AuthAdminKey.String()).(*models.SessionAdmin)
+	admission, _ := ctx.UserValue(realtimeAdmissionKey{}).(*realtimesession.Admission)
+	if !ok || admin == nil {
+		return rejectRealtimeUpgrade(ctx)
 	}
-	return u.Upgrader.UpgradeFastHTTP(ctx, func(ws *libwebsocket.Conn) {
+	lease := admission.Bind(realtimesession.Key{SubjectID: admin.SubjectID, AuthSessionID: admin.AuthSessionID}, 5*time.Second)
+	if lease == nil {
+		return rejectRealtimeUpgrade(ctx)
+	}
+	deadline := admin.ExternalValidUntil
+	handedOff := false
+	defer func() {
+		if !handedOff {
+			lease.Release()
+		}
+	}()
+	err := u.Upgrader.UpgradeFastHTTP(ctx, func(ws *libwebsocket.Conn) {
+		if !lease.Attach(func() { _ = ws.Close() }) {
+			_ = ws.Close()
+			return
+		}
+		defer lease.Release()
 		if !deadline.IsZero() {
 			if !time.Now().Before(deadline) {
 				_ = ws.Close()
@@ -34,6 +54,14 @@ func (u externalDeadlineUpgrader) UpgradeFastHTTP(ctx *fasthttp.RequestCtx, hand
 		}
 		handler(ws)
 	})
+	handedOff = err == nil
+	return err
+}
+
+func rejectRealtimeUpgrade(ctx *fasthttp.RequestCtx) error {
+	ctx.Error("Authentication required", fasthttp.StatusUnauthorized)
+	ctx.Response.Header.Set("Cache-Control", "no-store")
+	return libwebsocket.HandshakeError{}
 }
 
 func (u externalDeadlineUpgrader) ReadLimit() int64 {

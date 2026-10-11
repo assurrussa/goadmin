@@ -28,7 +28,7 @@ jobs:
       - name: Read the declared Go toolchain
         id: go-toolchain
         run: |
-          version=$(awk '$1 == "toolchain" { sub(/^go/, "", $2); print $2 }' go.mod)
+          version=$(awk '$1 == "go" { floor=$2 } $1 == "toolchain" { sub(/^go/, "", $2); preferred=$2 } END { print preferred != "" ? preferred : floor }' go.mod)
           test -n "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
@@ -95,7 +95,7 @@ jobs:
       - name: Read the declared Go toolchain
         id: go-toolchain
         run: |
-          version=$(awk '$1 == "toolchain" { sub(/^go/, "", $2); print $2 }' go.mod)
+          version=$(awk '$1 == "go" { floor=$2 } $1 == "toolchain" { sub(/^go/, "", $2); preferred=$2 } END { print preferred != "" ? preferred : floor }' go.mod)
           test -n "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5

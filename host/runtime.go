@@ -106,10 +106,16 @@ func NewPgsqlClient(ctx context.Context, cfg PgsqlConfig, lg Logger) (StoragePgs
 		storageCfg.MaxConnLifeTime = time.Hour
 	}
 
+	runtimeParams, err := connectionconfig.PgsqlRuntimeParams(cfg.DSN)
+	if err != nil {
+		return nil, err
+	}
+
 	client, err := outbox.PgsqlCreateWithConfig(
 		ctx,
 		storageCfg,
 		outbox.WithPgsqlEnvironment(env),
+		outbox.WithPgsqlRuntimeParams(runtimeParams),
 		outbox.WithPgsqlLogger(outbox.WrapNamed(lg)),
 	)
 	if err != nil {

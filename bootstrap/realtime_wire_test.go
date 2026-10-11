@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/assurrussa/goauth"
 	logger "github.com/assurrussa/gologger"
 	uploadhost "github.com/assurrussa/gouploads/host"
 	inmem "github.com/assurrussa/gowebsocket/eventstream/inmem"
@@ -20,6 +21,7 @@ import (
 	adminsession "github.com/assurrussa/goadmin/infrastructure/core/session"
 	server "github.com/assurrussa/goadmin/infrastructure/fiber/server"
 	"github.com/assurrussa/goadmin/internal/identity"
+	"github.com/assurrussa/goadmin/internal/realtimesession"
 	"github.com/assurrussa/goadmin/internal/uploadintegration"
 	"github.com/assurrussa/goadmin/models"
 )
@@ -70,7 +72,7 @@ func TestRealtimeTerminatedDeliveryRequestsResync(t *testing.T) {
 
 func realtimeWireConnection(t *testing.T) (*ws.Conn, *inmem.Service, *models.SessionAdmin) {
 	t.Helper()
-	admin := &models.SessionAdmin{UUID: identity.NewUserID()}
+	admin := &models.SessionAdmin{UUID: identity.NewUserID(), SubjectID: goauth.NewSubjectID(), AuthSessionID: "canonical-session"}
 	stream := inmem.New()
 	handler, err := newRealtimeHandler(logger.Discard(), stream, []string{realtimeTestOrigin})
 	require.NoError(t, err)
@@ -80,6 +82,10 @@ func realtimeWireConnection(t *testing.T) (*ws.Conn, *inmem.Service, *models.Ses
 		server.WithRegistered(func(app *fiber.App) {
 			app.Get("/ws", func(c fiber.Ctx) error {
 				c.Locals(adminsession.AuthAdminKey.String(), admin)
+				var sessions realtimesession.Registry
+				admission := sessions.Begin(time.Second)
+				defer admission.Cancel()
+				c.Locals(realtimeAdmissionKey{}, admission)
 				return handler.Serve(c)
 			})
 		}),

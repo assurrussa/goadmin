@@ -1,0 +1,1 @@
+import{C as r}from"./app.js";import{d as o,N as n,V as l,a1 as t,y as c,Q as p}from"./editor-BuenWU43.js";const i=o({__name:"CardHeader",props:{class:{type:[Boolean,null,String,Object,Array]}},setup(e){const a=e;return(s,m)=>(n(),l("div",{class:t(c(r)("flex flex-col gap-y-1.5 p-6",a.class))},[p(s.$slots,"default")],2))}});export{i as _};

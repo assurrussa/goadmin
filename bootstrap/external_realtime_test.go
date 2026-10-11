@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/assurrussa/goauth"
 	logger "github.com/assurrussa/gologger"
 	inmem "github.com/assurrussa/gowebsocket/eventstream/inmem"
 	libwebsocket "github.com/fasthttp/websocket"
@@ -17,6 +18,7 @@ import (
 	sessioncore "github.com/assurrussa/goadmin/infrastructure/core/session"
 	"github.com/assurrussa/goadmin/infrastructure/fiber/server"
 	"github.com/assurrussa/goadmin/internal/identity"
+	"github.com/assurrussa/goadmin/internal/realtimesession"
 	"github.com/assurrussa/goadmin/models"
 )
 
@@ -33,7 +35,12 @@ func TestRealtimeExternalProofDeadlineClosesAlreadyOpenSocket(t *testing.T) {
 			app.Get("/ws", func(c fiber.Ctx) error {
 				c.Locals(sessioncore.AuthAdminKey.String(), &models.SessionAdmin{
 					ID: 1, UUID: identity.NewUserID(), ExternalValidUntil: deadline,
+					SubjectID: goauth.NewSubjectID(), AuthSessionID: "external-canonical-session",
 				})
+				var sessions realtimesession.Registry
+				admission := sessions.Begin(time.Second)
+				defer admission.Cancel()
+				c.Locals(realtimeAdmissionKey{}, admission)
 				return handler.Serve(c)
 			})
 		}), server.WithShutdownConnections(realtimeShutdown(handler, nil)), server.WithDisableStartupMessage(true)))

@@ -1,12 +1,10 @@
 module example.com/goadmin-starter
 
-go 1.27.0
-
-toolchain go1.27.1
+go 1.27.2
 
 require (
 	github.com/assurrussa/goadmin v0.7.0
-	github.com/assurrussa/goauth v0.5.1
+	github.com/assurrussa/goauth v0.7.0
 	github.com/assurrussa/gonotify v0.6.0
 	github.com/gofiber/fiber/v3 v3.5.0
 )
@@ -15,12 +13,12 @@ require (
 	github.com/Masterminds/squirrel v1.5.4 // indirect
 	github.com/assurrussa/gocache v0.2.2 // indirect
 	github.com/assurrussa/godi v0.9.3 // indirect
-	github.com/assurrussa/goinertia v0.11.0 // indirect
+	github.com/assurrussa/goinertia v0.11.1 // indirect
 	github.com/assurrussa/gologger v0.1.0 // indirect
-	github.com/assurrussa/gouploads v0.10.1 // indirect
+	github.com/assurrussa/gouploads v0.13.0 // indirect
 	github.com/assurrussa/gowebsocket v0.2.1 // indirect
-	github.com/assurrussa/outbox v0.16.0 // indirect
-	github.com/assurrussa/outbox/backends/pgsql v0.16.0 // indirect
+	github.com/assurrussa/outbox v0.17.0 // indirect
+	github.com/assurrussa/outbox/backends/pgsql v0.17.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.41.11 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.12 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.21 // indirect
@@ -77,19 +75,11 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/dig v1.19.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.55.0 // indirect
-	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 )
 
 replace github.com/assurrussa/goadmin => ../..
-
-replace github.com/assurrussa/goauth => ../../../goauth
-
-replace github.com/assurrussa/gonotify => ../../../gonotify
-
-replace github.com/assurrussa/gouploads => ../../../gouploads
-
-replace github.com/assurrussa/gowebsocket => ../../../gowebsocket

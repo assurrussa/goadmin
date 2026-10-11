@@ -1,0 +1,1 @@
+import{C as s}from"./app.js";import{d as o,N as n,V as t,a1 as c,y as l,Q as d}from"./editor-BuenWU43.js";const f=o({__name:"Card",props:{class:{type:[Boolean,null,String,Object,Array]}},setup(r){const e=r;return(a,p)=>(n(),t("div",{class:c(l(s)("rounded-xl border bg-card text-card-foreground shadow",e.class))},[d(a.$slots,"default")],2))}});export{f as _};

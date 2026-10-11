@@ -1,0 +1,1 @@
+import{C as n}from"./app.js";import{d as o,N as r,V as t,a1 as l,y as c,Q as p}from"./editor-BuenWU43.js";const f=o({__name:"CardContent",props:{class:{type:[Boolean,null,String,Object,Array]}},setup(s){const e=s;return(a,m)=>(r(),t("div",{class:l(c(n)("p-6 pt-0",e.class))},[p(a.$slots,"default")],2))}});export{f as _};
