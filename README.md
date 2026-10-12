@@ -214,7 +214,7 @@ Verification is local by default. Hosted CI is manual-only, with no automatic
 push or pull-request runs. See [local checks and manual CI](docs/ci.md) for
 tool versions, disposable PostgreSQL/Redis setup, and the proven CI baseline.
 
-This checkout pins published `goauth v0.7.0` and `gonotify v0.6.0`, including
+This checkout pins published `goauth v0.8.0` and `gonotify v0.6.0`, including
 the shared transaction and optional-delivery API. Uploads resolve
 `gouploads v0.13.0` and WebSockets resolve `gowebsocket v0.2.1`. Outbox core and
 its PostgreSQL backend both resolve `v0.17.0`, and GoCache resolves `v0.2.2`.
