@@ -3,7 +3,7 @@
   <PageActionBar back-href="/auth/profile" label="Настройки" />
 
   <div class="space-y-8">
- <LocalMFASettings v-if="props.mfaAvailable" :enabled="props.mfaEnabled || false" />
+    <LocalMFASettings v-if="props.mfaAvailable" :enabled="props.mfaEnabled || false" />
     <Card v-if="authmail">
       <CardHeader class="border-b border-border-secondary bg-surface-variant/40">
         <CardTitle>Смена email</CardTitle>
@@ -134,7 +134,7 @@
 </template>
 
 <script setup lang="ts">
-import LocalMFASettings from "@/components/profile/LocalMFASettings.vue"
+import LocalMFASettings from '@/components/profile/LocalMFASettings.vue'
 import { computed } from 'vue'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 import { useForm } from '@inertiajs/vue3'
@@ -152,8 +152,8 @@ interface PendingEmailChange {
 }
 
 interface SettingsProps {
- mfaAvailable?: boolean
- mfaEnabled?: boolean
+  mfaAvailable?: boolean
+  mfaEnabled?: boolean
   title?: string
   data: {
     email: string

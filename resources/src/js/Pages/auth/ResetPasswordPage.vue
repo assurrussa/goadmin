@@ -96,7 +96,13 @@
     <template #footer>
       <div class="text-center">
         <span class="text-sm text-text-secondary"> Вспомнили пароль? </span>
-        <a v-if="props.loginURL" :href="props.loginURL" class="text-sm text-primary hover:text-primary-dark"> Войти </a>
+        <a
+          v-if="props.loginURL"
+          :href="props.loginURL"
+          class="text-sm text-primary hover:text-primary-dark"
+        >
+          Войти
+        </a>
       </div>
     </template>
   </AuthLayout>
@@ -123,7 +129,9 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
- title: 'Сброс пароля', formAction: '/auth/reset-password', loginURL: '/auth/login',
+  title: 'Сброс пароля',
+  formAction: '/auth/reset-password',
+  loginURL: '/auth/login',
 })
 
 const form = useForm({
