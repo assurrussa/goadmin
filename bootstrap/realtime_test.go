@@ -22,6 +22,7 @@ import (
 
 	"github.com/assurrussa/goadmin/adminapp/adminappt"
 	"github.com/assurrussa/goadmin/infrastructure/fiber/server"
+	"github.com/assurrussa/goadmin/internal/auth/browserstate"
 	"github.com/assurrussa/goadmin/internal/identity"
 	"github.com/assurrussa/goadmin/models"
 	"github.com/assurrussa/goadmin/services/adminservice"
@@ -135,7 +136,8 @@ func realtimeAuthenticatedService(t *testing.T) (*adminservice.Service, *http.Co
 	appTest.MockRoleService.EXPECT().GetRolesAdmin(gomock.Any(), admin.ID).Return(nil, nil).AnyTimes()
 	store := fibersession.NewStore()
 	service := adminservice.NewService(store, appTest.MockRoleService,
-		adminservice.WithRuntime(fixture.Runtime, realtimeAdminRepository{admin: admin}))
+		adminservice.WithRuntime(fixture.Runtime, realtimeAdminRepository{admin: admin}),
+		adminservice.WithBrowserState(browserstate.NewMemory()))
 	app := fiber.New()
 	app.Post("/login", func(c fiber.Ctx) error {
 		_, _, loginErr := service.LoginAdmin(c, account.PrimaryEmail.DisplayValue, password, false)

@@ -22,6 +22,7 @@ import (
 	adminactionauditrepo "github.com/assurrussa/goadmin/infrastructure/pgsql/repositories/adminactionauditrepo"
 	adminnotificationrepo "github.com/assurrussa/goadmin/infrastructure/pgsql/repositories/adminnotificationrepo"
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
+	"github.com/assurrussa/goadmin/internal/authrecovery"
 	csrfservice "github.com/assurrussa/goadmin/internal/csrf"
 	identity "github.com/assurrussa/goadmin/internal/identity"
 	adminloginaudit "github.com/assurrussa/goadmin/loginaudit"
@@ -35,6 +36,7 @@ import (
 
 // Config объединяет все настройки.
 type Config struct {
+	PasswordRecovery       []authrecovery.Routes
 	Env                    string
 	Capabilities           map[string]bool
 	AdminConfig            config.Config

@@ -29,6 +29,7 @@ func WithBrowserState(store browserstate.Store) Option {
 			return errors.New("atomic admin browser state is required")
 		}
 		s.states = browserstate.Guarded(store)
+		s.localLoginStates = store
 		return nil
 	}
 }

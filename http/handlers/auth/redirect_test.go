@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -18,6 +19,11 @@ import (
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 )
 
+const (
+	redirectTestAdminURL = "https://admin.example.test"
+	redirectTestProfile  = "/auth/profile"
+)
+
 func TestPostLoginRedirectUsesFirstPermittedPage(t *testing.T) {
 	const queuesPath = "/queues"
 	for _, tc := range []struct {
@@ -28,7 +34,7 @@ func TestPostLoginRedirectUsesFirstPermittedPage(t *testing.T) {
 		want        string
 	}{
 		{name: "restricted role", allowQueues: true, want: queuesPath},
-		{name: "no menu permission", want: "/auth/profile"},
+		{name: "no menu permission", want: redirectTestProfile},
 		{name: "valid deep link", query: "?redirectback=/auth/profile/settings", want: "/auth/profile/settings"},
 		{name: "external redirect rejected", query: "?redirectback=https://evil.example/", allowQueues: true, want: queuesPath},
 		{
@@ -63,7 +69,7 @@ func TestPostLoginRedirectUsesFirstPermittedPage(t *testing.T) {
 				}).AnyTimes()
 
 			handler := NewHandler(HandlerOptions{
-				AdminApp: appTest.App, AdminDomainURL: "https://admin.example.test",
+				AdminApp: appTest.App, AdminDomainURL: redirectTestAdminURL,
 				AdminMenu: menu.ModuleMenu(map[string]bool{"queues": true}),
 			})
 			app := fiber.New()
@@ -127,9 +133,66 @@ func TestPostLoginRedirectUsesAnyPermissionMenu(t *testing.T) {
 			require.NoError(t, err)
 			want := studentsPath
 			if action == "" {
-				want = "/auth/profile"
+				want = redirectTestProfile
 			}
 			require.Equal(t, want, string(body))
 		})
+	}
+}
+
+func TestNormalizeRedirectTargetRejectsDecodedControls(t *testing.T) {
+	handler := &Handler{baseURL: redirectTestAdminURL}
+	for _, encoded := range []string{"%00", "%09", "%0A", "%0D", "%1F", "%7F", "%C2%85"} {
+		t.Run(encoded, func(t *testing.T) {
+			for _, target := range []string{
+				"/" + encoded + "/evil.example",
+				"https://admin.example.test/" + encoded + "/evil.example",
+				"/reports#" + encoded,
+			} {
+				require.Empty(t, handler.normalizeRedirectTarget(target), target)
+			}
+		})
+	}
+}
+
+func TestNormalizeRedirectTargetPreservesEscapedDestinations(t *testing.T) {
+	handler := &Handler{baseURL: redirectTestAdminURL}
+	require.Equal(t, "/reports", handler.normalizeRedirectTarget("%2Freports"))
+	for _, target := range []string{
+		"/reports?tab=active#summary",
+		"/reports/a%20b?next=%2Fqueues%3Fq%3Da%2520b#row%20one",
+		"/reports/a%3Fb%23c%25?filter=active#part%23one",
+		"/%2509/evil.example",
+		"/%252F/evil.example",
+		"/%255Cevil.example",
+	} {
+		t.Run(target, func(t *testing.T) {
+			cleaned := handler.normalizeRedirectTarget(target)
+			require.Equal(t, target, cleaned)
+			require.Equal(t, cleaned, handler.normalizeRedirectTarget(cleaned))
+			require.Equal(t, cleaned, handler.normalizeRedirectTarget(redirectTestAdminURL+target))
+			parsed, err := url.Parse(cleaned)
+			require.NoError(t, err)
+			require.Empty(t, parsed.Host)
+		})
+	}
+}
+
+func TestPostLoginRedirectRejectsEncodedControlsWithoutPanic(t *testing.T) {
+	handler := &Handler{}
+	app := fiber.New()
+	app.Get("/auth/login", func(c fiber.Ctx) error {
+		return c.SendString(handler.buildPostLoginRedirect(c, 0))
+	})
+	for _, target := range []string{"/%09/evil.example", "/reports#%0A", "/reports%"} {
+		request := httptest.NewRequestWithContext(t.Context(), http.MethodGet,
+			"/auth/login?redirectback="+url.QueryEscape(target), nil)
+		response, err := app.Test(request)
+		require.NoError(t, err)
+		body, err := io.ReadAll(response.Body)
+		require.NoError(t, err)
+		require.NoError(t, response.Body.Close())
+		require.Equal(t, http.StatusOK, response.StatusCode)
+		require.Equal(t, redirectTestProfile, string(body))
 	}
 }

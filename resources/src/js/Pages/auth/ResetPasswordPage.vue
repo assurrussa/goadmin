@@ -1,8 +1,8 @@
 <template>
   <AuthLayout>
-    <AppHead title="Сброс пароля" />
+    <AppHead :title="props.title" />
 
-    <template #title>Сброс пароля</template>
+    <template #title>{{ props.title }}</template>
 
     <template #subtitle>
       Введите ваш новый пароль для завершения процедуры восстановления
@@ -96,14 +96,20 @@
     <template #footer>
       <div class="text-center">
         <span class="text-sm text-text-secondary"> Вспомнили пароль? </span>
-        <Link href="/auth/login" class="text-sm text-primary hover:text-primary-dark"> Войти </Link>
+        <a
+          v-if="props.loginURL"
+          :href="props.loginURL"
+          class="text-sm text-primary hover:text-primary-dark"
+        >
+          Войти
+        </a>
       </div>
     </template>
   </AuthLayout>
 </template>
 
 <script setup lang="ts">
-import { Link, useForm } from '@inertiajs/vue3'
+import { useForm } from '@inertiajs/vue3'
 import { KeyRound, Mail } from 'lucide-vue-next'
 import { computed } from 'vue'
 import AppHead from '@/components/layout/AppHead.vue'
@@ -117,9 +123,16 @@ import AdminForm from '@/components/form/AdminForm.vue'
 interface Props {
   token: string
   email: string
+  title?: string
+  formAction?: string
+  loginURL?: string
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  title: 'Сброс пароля',
+  formAction: '/auth/reset-password',
+  loginURL: '/auth/login',
+})
 
 const form = useForm({
   token: props.token,
@@ -146,6 +159,6 @@ const isFormValid = computed(() => {
 })
 
 function handleReset() {
-  form.post('/auth/reset-password')
+  form.post(props.formAction)
 }
 </script>

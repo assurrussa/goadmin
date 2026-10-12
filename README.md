@@ -214,7 +214,7 @@ Verification is local by default. Hosted CI is manual-only, with no automatic
 push or pull-request runs. See [local checks and manual CI](docs/ci.md) for
 tool versions, disposable PostgreSQL/Redis setup, and the proven CI baseline.
 
-This checkout pins published `goauth v0.7.0` and `gonotify v0.6.0`, including
+This checkout pins published `goauth v0.8.0` and `gonotify v0.6.0`, including
 the shared transaction and optional-delivery API. Uploads resolve
 `gouploads v0.13.0` and WebSockets resolve `gowebsocket v0.2.1`. Outbox core and
 its PostgreSQL backend both resolve `v0.17.0`, and GoCache resolves `v0.2.2`.
@@ -504,5 +504,8 @@ keep the first entire item. Put their complete policy in that first contribution
 
 The additive candidate host admission/validity API and its dependency/rollback
 contract are described in [external-browser-admission.md](docs/external-browser-admission.md). It retains the pinned GoAuth API, adds no public package/import path,
-and does not enable a host SSO mode. Release readiness and the real RP consumer
-acceptance remain required before publication.
+and does not enable a host SSO mode. Publish GoAdmin after its exact-candidate
+publish-readiness, agreed browser acceptance, and final review; verify the
+published tag with release-readiness. Real RP consumer and end-to-end SSO
+acceptance follow using released dependencies and remain required before
+application release. Library publication does not establish that acceptance.

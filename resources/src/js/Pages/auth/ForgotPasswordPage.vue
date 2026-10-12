@@ -1,6 +1,6 @@
 <template>
   <AuthLayout>
-    <template #title>Восстановление пароля</template>
+    <template #title>{{ props.title }}</template>
 
     <template #subtitle> Укажите email, чтобы запросить восстановление пароля </template>
 
@@ -44,9 +44,13 @@
       <div class="text-center space-y-2">
         <div>
           <span class="text-sm text-text-secondary"> Вспомнили пароль? </span>
-          <Link href="/auth/login" class="text-sm text-primary hover:text-primary-dark">
+          <a
+            v-if="props.loginURL"
+            :href="props.loginURL"
+            class="text-sm text-primary hover:text-primary-dark"
+          >
             Войти
-          </Link>
+          </a>
         </div>
       </div>
     </template>
@@ -54,13 +58,21 @@
 </template>
 
 <script setup lang="ts">
-import { Link, useForm, usePage } from '@inertiajs/vue3'
+import { useForm, usePage } from '@inertiajs/vue3'
 import { Mail } from 'lucide-vue-next'
 import AuthLayout from '@/components/layout/AuthLayout.vue'
 import FormInput from '@/components/form/FormInput.vue'
 import FormButton from '@/components/form/FormButton.vue'
 import AdminForm from '@/components/form/AdminForm.vue'
 
+const props = withDefaults(
+  defineProps<{ title?: string; formAction?: string; loginURL?: string }>(),
+  {
+    title: 'Восстановление пароля',
+    formAction: '/auth/forgot-password',
+    loginURL: '/auth/login',
+  },
+)
 const page = usePage()
 const oldData = (page.props.old as Record<string, string | null>) || {}
 
@@ -69,6 +81,6 @@ const form = useForm({
 })
 
 function handleReset() {
-  form.post('/auth/forgot-password')
+  form.post(props.formAction)
 }
 </script>

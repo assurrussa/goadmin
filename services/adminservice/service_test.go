@@ -37,13 +37,15 @@ const (
 )
 
 func TestAdminCookiePolicyAcrossLoginRefreshAndOtherSessionWrites(t *testing.T) {
+	const authPath = "/auth"
+
 	for _, persistent := range []bool{false, true} {
 		name := "browser session"
 		if persistent {
 			name = "remember me"
 		}
 		t.Run(name, func(t *testing.T) {
-			now := time.Date(2026, 9, 27, 0, 0, 0, 0, time.UTC)
+			now := time.Now().UTC()
 			fixture, err := testkit.NewRuntime(func(cfg *goauth.Config) {
 				cfg.AccessTTL = time.Second
 				cfg.Now = func() time.Time { return now }
@@ -59,16 +61,20 @@ func TestAdminCookiePolicyAcrossLoginRefreshAndOtherSessionWrites(t *testing.T) 
 				SessionName: testSessionCookieName, SessionInactiveTTL: 30 * time.Minute,
 				SessionTTL: 24 * time.Hour,
 			})
-			service := NewService(store, roleServiceStub{}, WithRuntime(fixture.Runtime, adminRepositoryStub{admin: admin}))
+			service := NewService(store, roleServiceStub{},
+				WithRuntime(fixture.Runtime, adminRepositoryStub{admin: admin}), withLocalLoginTestState())
 			app := fiber.New()
 			app.Post("/login", func(c fiber.Ctx) error {
 				_, _, loginErr := service.LoginAdmin(c, account.PrimaryEmail.DisplayValue, testAdminPassword, persistent)
 				require.NoError(t, loginErr)
 				return c.SendStatus(http.StatusNoContent)
 			})
-			app.Get("/auth", func(c fiber.Ctx) error {
-				_, authErr := service.GetAdminAuth(c)
+			app.Get(authPath, func(c fiber.Ctx) error {
+				actor, authErr := service.GetAdminAuth(c)
 				require.NoError(t, authErr)
+				require.NotNil(t, actor)
+				require.Equal(t, admin.ID, actor.ID)
+				require.Equal(t, account.Subject.ID, actor.SubjectID)
 				return c.SendStatus(http.StatusNoContent)
 			})
 			app.Get("/flash", func(c fiber.Ctx) error {
@@ -91,21 +97,50 @@ func TestAdminCookiePolicyAcrossLoginRefreshAndOtherSessionWrites(t *testing.T) 
 			assertCookiePolicy(t, sessionCookie, persistent)
 			require.NoError(t, loginResponse.Body.Close())
 
+			beforeRefresh := loadBrowserSession(t, store, sessionCookie.Value)
+			require.NotEmpty(t, beforeRefresh.AccessToken)
+			require.NotEmpty(t, beforeRefresh.RefreshToken)
 			now = now.Add(2 * time.Second)
-			for _, path := range []string{"/auth", "/flash"} {
+			// Reuse the original browser credential after the expired access token
+			// is refreshed. A second auth read must work without any Set-Cookie.
+			for _, path := range []string{authPath, authPath, "/flash"} {
 				request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
 				request.AddCookie(sessionCookie)
 				request.AddCookie(policyCookie)
 				response, requestErr := app.Test(request)
 				require.NoError(t, requestErr)
 				require.Equal(t, http.StatusNoContent, response.StatusCode)
-				updated := requireSessionCookie(t, response)
-				require.Equal(t, sessionCookie.Value, updated.Value)
-				assertCookiePolicy(t, updated, persistent)
+				if path == authPath {
+					require.Empty(t, response.Cookies(), "passive auth must not renew browser credentials")
+					assertRefreshedCookieSession(t, store, fixture.Runtime, sessionCookie.Value, beforeRefresh)
+				} else {
+					// This route explicitly invokes Fiber Save, so its cookie policy
+					// contract remains unchanged by the passive-persistence helper.
+					updated := requireSessionCookie(t, response)
+					require.Equal(t, sessionCookie.Value, updated.Value)
+					assertCookiePolicy(t, updated, persistent)
+				}
 				require.NoError(t, response.Body.Close())
 			}
 		})
 	}
+}
+
+func assertRefreshedCookieSession(
+	t *testing.T, store *fibersession.Store, runtime *goauth.Runtime, cookieID string, previous browserSession,
+) {
+	t.Helper()
+	current := loadBrowserSession(t, store, cookieID)
+	require.Equal(t, cookieID, current.Payload.SessionID)
+	require.Equal(t, previous.SubjectID, current.SubjectID)
+	require.NotEmpty(t, current.AccessToken)
+	require.NotEmpty(t, current.RefreshToken)
+	require.NotEqual(t, previous.AccessToken, current.AccessToken, "expired access token must be refreshed durably")
+	require.NotEqual(t, previous.RefreshToken, current.RefreshToken, "rotated refresh secret must be saved durably")
+	auth, err := runtime.AuthenticateSession(t.Context(), current.AccessToken)
+	require.NoError(t, err)
+	require.Equal(t, previous.SubjectID, auth.SubjectID)
+	require.Equal(t, current.AuthSessionID, auth.SessionID)
 }
 
 func assertCookiePolicy(t *testing.T, cookie *http.Cookie, persistent bool) {
@@ -159,7 +194,7 @@ func newSessionRedisMock(t *testing.T) *redismocks.MockClientContract {
 }
 
 func TestAdminSessionUsesAdminRealmRefreshesAndRevokes(t *testing.T) {
-	now := time.Date(2026, 8, 18, 5, 0, 0, 0, time.UTC)
+	now := time.Now().UTC()
 	var gatedRealm goauth.Realm
 	fixture, err := testkit.NewRuntime(func(config *goauth.Config) {
 		config.AccessTTL = time.Second
@@ -183,7 +218,8 @@ func TestAdminSessionUsesAdminRealmRefreshesAndRevokes(t *testing.T) {
 		Username: "admin-runtime", Email: account.PrimaryEmail.DisplayValue,
 	}
 	store := fibersession.NewStore()
-	service := NewService(store, roleServiceStub{}, WithRuntime(fixture.Runtime, adminRepositoryStub{admin: admin}))
+	service := NewService(store, roleServiceStub{},
+		WithRuntime(fixture.Runtime, adminRepositoryStub{admin: admin}), withLocalLoginTestState())
 	app := fiber.New()
 	app.Post("/login", func(c fiber.Ctx) error {
 		_, loggedIn, loginErr := service.LoginAdmin(
@@ -251,7 +287,7 @@ func TestAdminSessionRejectsUnverifiedEmail(t *testing.T) {
 	service := NewService(
 		fibersession.NewStore(),
 		roleServiceStub{},
-		WithRuntime(fixture.Runtime, adminRepositoryStub{admin: admin}),
+		WithRuntime(fixture.Runtime, adminRepositoryStub{admin: admin}), withLocalLoginTestState(),
 	)
 	app := fiber.New()
 	app.Post("/login", func(c fiber.Ctx) error {
@@ -289,7 +325,7 @@ func TestAdminSessionRejectsMissingMembership(t *testing.T) {
 	service := NewService(
 		fibersession.NewStore(),
 		roleServiceStub{},
-		WithRuntime(fixture.Runtime, adminRepositoryStub{admin: admin}),
+		WithRuntime(fixture.Runtime, adminRepositoryStub{admin: admin}), withLocalLoginTestState(),
 	)
 	app := fiber.New()
 	app.Post("/login", func(c fiber.Ctx) error {
@@ -325,7 +361,8 @@ func TestAdminSessionRejectsUserRealmToken(t *testing.T) {
 
 	admin := models.Admin{ID: 42, SubjectID: account.Subject.ID, UUID: identity.NewUserID()}
 	store := fibersession.NewStore()
-	service := NewService(store, roleServiceStub{}, WithRuntime(fixture.Runtime, adminRepositoryStub{admin: admin}))
+	service := NewService(store, roleServiceStub{},
+		WithRuntime(fixture.Runtime, adminRepositoryStub{admin: admin}), withLocalLoginTestState())
 	app := fiber.New()
 	app.Get("/seed", func(c fiber.Ctx) error {
 		sess, sessionErr := store.Get(c)

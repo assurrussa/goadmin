@@ -4,17 +4,32 @@ package browserstate
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
 	"github.com/assurrussa/goauth"
 )
 
+// LocalLoginPending is encrypted along with the browser journal. No canonical
+// token or authenticated identity exists until the shared factor is completed.
+type LocalLoginPending struct {
+	ID         string              `json:"id"`
+	Kind       goauth.MFALoginKind `json:"kind,omitempty"`
+	Binding    [32]byte            `json:"binding"`
+	ExpiresAt  time.Time           `json:"expiresAt"`
+	Persistent bool                `json:"persistent"`
+}
 type Record struct {
-	Version   int64            `json:"version"`
-	Owner     string           `json:"owner"`
-	SubjectID goauth.SubjectID `json:"subjectId"`
-	Tokens    goauth.TokenPair `json:"tokens"`
+	LocalLoginPending  *LocalLoginPending `json:"localLoginPending,omitempty"`
+	LocalLoginTerminal bool               `json:"localLoginTerminal,omitempty"`
+	//nolint:tagliatelle // Preserve the persisted journal field name across instances.
+	LocalLoginSessionID string           `json:"localLoginSessionID,omitempty"`
+	LocalLoginUntil     time.Time        `json:"localLoginUntil,omitempty"`
+	Version             int64            `json:"version"`
+	Owner               string           `json:"owner"`
+	SubjectID           goauth.SubjectID `json:"subjectId"`
+	Tokens              goauth.TokenPair `json:"tokens"`
 }
 
 // A refresh claim does not expire into another claim. A crashed or uncertain
@@ -48,6 +63,9 @@ func (s *Memory) Load(_ context.Context, id string) (Record, bool, error) {
 func (s *Memory) Create(_ context.Context, id string, r Record, _ time.Duration) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if _, exists := s.records[id]; exists {
+		return errors.New("admin auth state already exists")
+	}
 	r.Version = 1
 	r.Owner = ""
 	s.records[id] = r

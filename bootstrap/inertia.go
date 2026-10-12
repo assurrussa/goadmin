@@ -263,8 +263,17 @@ func newCSRFTokenProvider(
 			sess.Delete(string(coresession.GuestAdminKey))
 		}
 
-		if err := sess.Save(); err != nil {
-			return "", goinertia.NewError(fiber.StatusBadRequest, "failed save cookie", err)
+		var saveErr error
+		if adminID.IsZero() && sess.Fresh() {
+			// Anonymous CSRF bootstrap intentionally publishes a new credential.
+			// Duplicate-cookie recovery has queued canonical expiry first; this
+			// save must replace it while retaining expiries for other scopes.
+			saveErr = sess.SaveWithContext(c)
+		} else {
+			saveErr = coresession.SavePassive(c, store, sess)
+		}
+		if saveErr != nil {
+			return "", goinertia.NewError(fiber.StatusBadRequest, "failed save cookie", saveErr)
 		}
 
 		return csrfToken.Token, nil

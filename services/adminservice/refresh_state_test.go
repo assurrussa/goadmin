@@ -23,6 +23,7 @@ import (
 
 type pausedRefreshRuntime struct {
 	runtime
+	localMFARuntime
 	calls            atomic.Int32
 	entered, release chan struct{}
 }
@@ -63,7 +64,9 @@ func TestConcurrentAdminRefreshAcrossInstancesAndStaleSessionSave(t *testing.T) 
 	admin := models.Admin{ID: 91, SubjectID: account.Subject.ID, UUID: identity.NewUserID()}
 	store := fibersession.NewStore()
 	states := &observedStateStore{Store: browserstate.NewMemory(), pendingRead: make(chan struct{}, 10)}
-	r := &pausedRefreshRuntime{runtime: f.Runtime, entered: make(chan struct{}, 1), release: make(chan struct{})}
+	r := &pausedRefreshRuntime{
+		runtime: f.Runtime, localMFARuntime: f.Runtime, entered: make(chan struct{}, 1), release: make(chan struct{}),
+	}
 	s1 := NewService(store, roleServiceStub{}, WithRuntime(r, adminRepositoryStub{admin: admin}), WithBrowserState(states))
 	s2 := NewService(store, roleServiceStub{}, WithRuntime(r, adminRepositoryStub{admin: admin}), WithBrowserState(states))
 	app := fiber.New()

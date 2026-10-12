@@ -18,11 +18,30 @@ import (
 )
 
 var excludePath = map[string]struct{}{
-	"/auth/login": {}, "/auth/register": {}, "/auth/forgot-password": {},
+	"/auth/login": {}, "/auth/mfa": {}, "/auth/register": {}, "/auth/forgot-password": {},
 	"/reset-password": {}, "/auth/reset-password": {},
+	"/auth/mfa/enrollment/begin": {}, "/auth/mfa/enrollment/confirm": {},
 }
 
 func AuthAdminMiddleware(serviceSession *adminservice.Service, extraCookieNames ...string) fiber.Handler {
+	return AuthAdminMiddlewareWithPublicPaths(serviceSession, nil, extraCookieNames...)
+}
+
+func publicAuthPaths(paths []string) map[string]struct{} {
+	out := make(map[string]struct{}, len(excludePath)+len(paths))
+	for p := range excludePath {
+		out[p] = struct{}{}
+	}
+	for _, p := range paths {
+		out[p] = struct{}{}
+	}
+	return out
+}
+
+func AuthAdminMiddlewareWithPublicPaths(
+	serviceSession *adminservice.Service, paths []string, extraCookieNames ...string,
+) fiber.Handler {
+	publicPaths := publicAuthPaths(paths)
 	return func(c fiber.Ctx) error {
 		var admin *models.SessionAdmin
 		err := serviceSession.ValidateBrowserCredentials(c, extraCookieNames...)
@@ -30,7 +49,7 @@ func AuthAdminMiddleware(serviceSession *adminservice.Service, extraCookieNames 
 			admin, err = serviceSession.GetAdminAuth(c)
 		}
 		if err != nil {
-			_, publicAuth := excludePath[c.Path()]
+			_, publicAuth := publicPaths[c.Path()]
 			if publicAuth && (c.Method() == fiber.MethodGet || c.Method() == fiber.MethodHead) &&
 				errors.Is(err, browsercookie.ErrAmbiguousCookies) {
 				serviceSession.RecoverAmbiguousBrowserCookies(c, extraCookieNames...)
@@ -48,7 +67,8 @@ func browserAuthFailure(c fiber.Ctx, err error) error {
 	switch {
 	case errors.Is(err, goauth.ErrOperationOutcomeUnknown), errors.Is(err, goauth.ErrSessionRevoked),
 		errors.Is(err, goauth.ErrExpiredToken), errors.Is(err, goauth.ErrMembershipDenied),
-		errors.Is(err, goauth.ErrSecurityVersionMismatch), errors.Is(err, goauth.ErrAccountUnavailable),
+		errors.Is(err, goauth.ErrSecurityVersionMismatch), errors.Is(err, goauth.ErrMFARequired),
+		errors.Is(err, goauth.ErrAccountUnavailable),
 		errors.Is(err, goauth.ErrAccountNotFound):
 		if c.Method() == fiber.MethodGet || c.Method() == fiber.MethodHead {
 			return goinertia.Redirect(c, "/auth/login")
@@ -104,14 +124,15 @@ func IsAuthAdminMiddleware(redirectFor ...func(fiber.Ctx, *models.SessionAdmin) 
 	}
 }
 
-func IsNotAuthAdminMiddleware() fiber.Handler {
+func IsNotAuthAdminMiddleware(paths ...string) fiber.Handler {
+	publicPaths := publicAuthPaths(paths)
 	return func(c fiber.Ctx) error {
 		if adminAuth := GetAdminAuth(c); adminAuth == nil {
 			path := c.Path()
 			if strings.HasPrefix(path, "/.well-known/") {
 				return nil
 			}
-			if _, ok := excludePath[path]; !ok {
+			if _, ok := publicPaths[path]; !ok {
 				if c.Method() != fiber.MethodGet && c.Method() != fiber.MethodHead {
 					return sendBrowserAuthFailure(c, fiber.StatusUnauthorized, "reauthentication_required", "Sign in again")
 				}

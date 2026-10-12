@@ -1,0 +1,1 @@
+function d(n,o=()=>window.location.reload()){let t=!0;const e=()=>{t=!1,n()},i=s=>{s.persisted&&o()};return window.addEventListener("pagehide",e),window.addEventListener("pageshow",i),{isActive:()=>t,dispose:()=>{e(),window.removeEventListener("pagehide",e),window.removeEventListener("pageshow",i)}}}export{d as b};

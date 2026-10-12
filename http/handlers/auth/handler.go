@@ -7,6 +7,7 @@ import (
 	"path"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/assurrussa/goauth"
 	logger "github.com/assurrussa/gologger"
@@ -22,9 +23,11 @@ import (
 	"github.com/assurrussa/goadmin/infrastructure/pgsql/repositories/adminactionauditrepo"
 	authcore "github.com/assurrussa/goadmin/internal/auth"
 	"github.com/assurrussa/goadmin/internal/authdelay"
+	"github.com/assurrussa/goadmin/internal/authrecovery"
 	identity "github.com/assurrussa/goadmin/internal/identity"
 	adminloginaudit "github.com/assurrussa/goadmin/loginaudit"
 	models2 "github.com/assurrussa/goadmin/models"
+	"github.com/assurrussa/goadmin/services/adminservice"
 	adminshared "github.com/assurrussa/goadmin/shared"
 )
 
@@ -81,6 +84,8 @@ type firstAdminSetupTokens interface {
 
 // Handler обрабатывает запросы, связанные с аутентификацией.
 type Handler struct {
+	passwordRecovery    []authrecovery.Routes
+	recovery            *authrecovery.Routes
 	adminApp            *adminapp.App
 	sleep               time.Duration
 	adminRepo           adminRepo
@@ -97,6 +102,7 @@ type Handler struct {
 
 // NewHandler создает новый обработчик аутентификации.
 type HandlerOptions struct {
+	PasswordRecovery    []authrecovery.Routes
 	AdminApp            *adminapp.App
 	Sleep               time.Duration
 	AdminRepo           adminRepo
@@ -118,6 +124,7 @@ func NewHandler(opts HandlerOptions) *Handler {
 	}
 
 	return &Handler{
+		passwordRecovery:    opts.PasswordRecovery,
 		adminApp:            opts.AdminApp,
 		sleep:               opts.Sleep,
 		adminRepo:           opts.AdminRepo,
@@ -139,15 +146,27 @@ func (h *Handler) RegisterGroupRoutes(route fiber.Router, _ ...fiber.Handler) {
 	})
 	route.Get("/auth/login", redirectAuthenticated, h.GetLogin)
 	route.Post("/auth/login", redirectAuthenticated, h.PostLogin)
+	route.Get("/auth/mfa", redirectAuthenticated, h.GetLocalMFA)
+	route.Post("/auth/mfa", redirectAuthenticated, h.PostLocalMFA)
+	route.Post("/auth/mfa/enrollment/begin", redirectAuthenticated, h.PostLocalMFAEnrollmentBegin)
+	route.Post("/auth/mfa/enrollment/confirm", redirectAuthenticated, h.PostLocalMFAEnrollmentConfirm)
 	route.Get("/auth/register", redirectAuthenticated, h.GetRegister)
 	route.Post("/auth/register", redirectAuthenticated, h.PostRegister)
 	if h.adminApp.Enabled("authmail") {
-		route.Get("/auth/forgot-password", h.ForgotPassword)
-		route.Post("/auth/forgot-password", h.PostForgotPassword)
-		route.Get("/reset-password", h.ResetPassword)
-		route.Post("/reset-password", h.PostResetPassword)
-		route.Get("/auth/reset-password", h.ResetPassword)
-		route.Post("/auth/reset-password", h.PostResetPassword)
+		recovery, err := authrecovery.Normalize(h.passwordRecovery)
+		if err != nil {
+			panic(err)
+		}
+		for _, r := range recovery {
+			scoped := *h
+			scoped.recovery = &r
+			route.Get(r.ForgotPath, scoped.ForgotPassword)
+			route.Post(r.ForgotPath, scoped.PostForgotPassword)
+			for _, p := range r.ResetPaths {
+				route.Get(p, scoped.ResetPassword)
+				route.Post(p, scoped.PostResetPassword)
+			}
+		}
 	}
 	route.Delete("/auth/logout", h.Logout)
 	route.Get("/auth/profile", h.Profile)
@@ -155,6 +174,9 @@ func (h *Handler) RegisterGroupRoutes(route fiber.Router, _ ...fiber.Handler) {
 	route.Post("/auth/profile/edit", h.PostProfileEdit)
 	route.Get("/auth/profile/settings", h.ProfileSettings)
 	route.Post("/auth/profile/settings/password", h.PostProfileChangePassword)
+	for _, action := range []string{"begin", "confirm", "cancel", "disable", "recovery"} {
+		route.Post("/auth/profile/settings/mfa/"+action, h.PostMFAManagement(action))
+	}
 	if h.adminApp.Enabled("authmail") {
 		route.Post("/auth/profile/settings/email/request", h.PostProfileEmailRequest)
 		route.Post("/auth/profile/settings/email/confirm", h.PostProfileEmailConfirm)
@@ -199,6 +221,11 @@ type FormProfileEmailConfirm struct {
 }
 
 func (h *Handler) GetLogin(c fiber.Ctx) error {
+	if actions, ok := h.sessionStoreActions.(interface{ PrepareLocalLogin(c fiber.Ctx) error }); ok {
+		if err := actions.PrepareLocalLogin(c); err != nil {
+			return err
+		}
+	}
 	canRegisterFirstAdmin := false
 	if h.setupTokens != nil && h.setupTokens.StaticConfigured() {
 		available, err := h.firstAdminRegistrationAvailable(c)
@@ -240,6 +267,9 @@ func (h *Handler) PostLogin(c fiber.Ctx) error {
 	}
 
 	adminUser, account, err := h.sessionStoreActions.LoginAdmin(c, form.Email, form.Password, form.Remember)
+	if errors.Is(err, adminservice.ErrLocalMFARequired) {
+		return h.adminApp.HTTPManager().Redirect(c, h.localMFAURL(c))
+	}
 	if err != nil {
 		h.adminApp.Logger().WarnContext(c, "admin Runtime login rejected", logger.Error(err))
 		h.adminApp.HTTPManager().WithFlashError(c, "Неправильно введен пароль или email!")
@@ -248,6 +278,11 @@ func (h *Handler) PostLogin(c fiber.Ctx) error {
 	h.recordSuccessfulLogin(c, account.Subject.ID, adminUser)
 	h.touchAdminLoginMetadata(c, adminUser.ID, time.Now().UTC())
 
+	if hint, ok := h.sessionStoreActions.(interface{ LocalMFASetupSuggested(c fiber.Ctx) bool }); ok &&
+		hint.LocalMFASetupSuggested(c) {
+		h.adminApp.HTTPManager().WithFlashInfo(c,
+			"Для дополнительной защиты включите двухфакторную проверку в настройках профиля.")
+	}
 	urlRedirect := h.buildPostLoginRedirect(c, adminUser.ID)
 	return h.adminApp.HTTPManager().Redirect(c, urlRedirect)
 }
@@ -255,7 +290,8 @@ func (h *Handler) PostLogin(c fiber.Ctx) error {
 // ForgotPassword обрабатывает запрос на восстановление пароля.
 func (h *Handler) ForgotPassword(c fiber.Ctx) error {
 	return h.adminApp.HTTPManager().Render(c, "auth/ForgotPasswordPage", map[string]any{
-		"title": "Забыли пароль?",
+		"title":      h.recoveryTitle("Забыли пароль?"),
+		"formAction": c.Path(), "loginURL": h.recoveryLoginURL(),
 	})
 }
 
@@ -282,7 +318,11 @@ func (h *Handler) PostForgotPassword(c fiber.Ctx) error {
 		return h.adminApp.HTTPManager().RedirectBack(c)
 	}
 
-	if err := h.adminAccount.RequestPasswordReset(c, form.Email); err != nil {
+	ctx, contextErr := h.recoveryContext(c)
+	if contextErr != nil {
+		return contextErr
+	}
+	if err := h.adminAccount.RequestPasswordReset(ctx, form.Email); err != nil {
 		h.adminApp.Logger().ErrorContext(c, "admin request password reset", logger.Error(err))
 		h.adminApp.HTTPManager().WithFlashError(c, "Что-то пошло не так, попробуйте повторить операцию позже! Код: 13344")
 		return h.adminApp.HTTPManager().RedirectBack(c)
@@ -297,10 +337,12 @@ func (h *Handler) PostForgotPassword(c fiber.Ctx) error {
 
 // ResetPassword обрабатывает сброс пароля.
 func (h *Handler) ResetPassword(c fiber.Ctx) error {
+	c.Set(fiber.HeaderCacheControl, "no-store")
 	token := c.Query("token")
 
 	return h.adminApp.HTTPManager().Render(c, "auth/ResetPasswordPage", map[string]any{
-		"title": "Сброс пароля",
+		"title":      h.recoveryTitle("Сброс пароля"),
+		"formAction": c.Path(), "loginURL": h.recoveryLoginURL(),
 		"token": token,
 	})
 }
@@ -336,7 +378,11 @@ func (h *Handler) PostResetPassword(c fiber.Ctx) error {
 		return h.adminApp.HTTPManager().RedirectBack(c)
 	}
 
-	if err := h.adminAccount.PerformPasswordReset(c, form.Token, form.Password); err != nil {
+	ctx, contextErr := h.recoveryContext(c)
+	if contextErr != nil {
+		return contextErr
+	}
+	if err := h.adminAccount.PerformPasswordReset(ctx, form.Token, form.Password); err != nil {
 		h.adminApp.Logger().ErrorContext(c, "admin perform password reset", logger.Error(err))
 		switch {
 		case errors.Is(err, goauth.ErrInvalidToken), errors.Is(err, goauth.ErrExpiredToken),
@@ -351,7 +397,11 @@ func (h *Handler) PostResetPassword(c fiber.Ctx) error {
 	}
 
 	h.adminApp.HTTPManager().WithFlashSuccess(c, "Успешный сброс пароля!")
-
+	if h.recovery != nil {
+		// Keep POST completion on this recovery origin. A trusted external
+		// login destination is offered only through the ordinary page link.
+		return h.adminApp.HTTPManager().Redirect(c, h.recovery.ForgotPath)
+	}
 	return h.adminApp.HTTPManager().RedirectBack(c)
 }
 
@@ -515,7 +565,15 @@ func (h *Handler) ProfileSettings(c fiber.Ctx) error {
 		}
 	}
 
+	mfaEnabled := false
+	mfaAvailable := false
+	if actions, ok := h.sessionStoreActions.(mfaManagementActions); ok {
+		var err error
+		mfaEnabled, err = actions.LocalMFAStatus(c)
+		mfaAvailable = err == nil
+	}
 	return h.adminApp.HTTPManager().Render(c, "profile/SettingsPage", map[string]any{
+		"mfaAvailable": mfaAvailable, "mfaEnabled": mfaEnabled,
 		"title":              "Настройки",
 		"data":               adminUser,
 		"pendingEmailChange": profilePendingEmailChange(pending),
@@ -729,10 +787,11 @@ func (h *Handler) buildPostLoginRedirect(c fiber.Ctx, adminID int64) string {
 	cleaned := h.normalizeRedirectTarget(target)
 	redirectToHome := false
 	if cleaned != "" {
-		targetURL, _ := url.Parse(cleaned)
-		redirectToHome = targetURL.Path == "/"
-		if targetURL.Path != "/" && targetURL.Path != "/auth/login" && targetURL.Path != "/auth/register" {
-			return cleaned
+		if targetURL, err := url.Parse(cleaned); err == nil {
+			redirectToHome = targetURL.Path == "/"
+			if targetURL.Path != "/" && !isLocalAuthEntryPath(targetURL.Path) {
+				return cleaned
+			}
 		}
 	}
 
@@ -752,6 +811,11 @@ func (h *Handler) buildPostLoginRedirect(c fiber.Ctx, adminID int64) string {
 	}
 
 	return "/auth/profile"
+}
+
+func isLocalAuthEntryPath(value string) bool {
+	return value == "/auth/login" || value == "/auth/register" ||
+		value == "/auth/mfa" || strings.HasPrefix(value, "/auth/mfa/")
 }
 
 func firstMenuDestination(items []menu.Item) string {
@@ -791,6 +855,9 @@ func (h *Handler) normalizeRedirectTarget(value string) string {
 
 	targetURL, err := url.Parse(value)
 	if err != nil {
+		return ""
+	}
+	if strings.ContainsFunc(targetURL.Path, unicode.IsControl) || strings.ContainsFunc(targetURL.Fragment, unicode.IsControl) {
 		return ""
 	}
 	if strings.Contains(targetURL.Path, "\\") || strings.HasPrefix(targetURL.Path, "//") {
@@ -840,20 +907,13 @@ func buildRedirectPath(u *url.URL) string {
 		return ""
 	}
 
-	targetPath := u.Path
-	if targetPath == "" {
-		targetPath = "/"
+	// Re-escape decoded components so repeated normalization cannot expose URL syntax or controls.
+	target := &url.URL{Path: u.Path, RawQuery: u.RawQuery, Fragment: u.Fragment}
+	if target.Path == "" {
+		target.Path = "/"
 	}
 
-	if u.RawQuery != "" {
-		targetPath += "?" + u.RawQuery
-	}
-
-	if u.Fragment != "" {
-		targetPath += "#" + u.Fragment
-	}
-
-	return targetPath
+	return target.String()
 }
 
 func (h *Handler) recordSuccessfulLogin(
@@ -900,4 +960,117 @@ func userAgentFromContext(ctx context.Context) string {
 	}
 
 	return strings.TrimSpace(c.Get(fiber.HeaderUserAgent))
+}
+
+func (h *Handler) recoveryContext(ctx context.Context) (context.Context, error) {
+	if h.recovery != nil && h.recovery.Context != nil {
+		return h.recovery.Context(ctx)
+	}
+	return ctx, nil
+}
+
+func (h *Handler) recoveryLoginURL() string {
+	if h.recovery != nil {
+		return h.recovery.LoginURL
+	}
+	return "/auth/login"
+}
+
+func (h *Handler) recoveryTitle(fallback string) string {
+	if h.recovery != nil && h.recovery.Title != "" {
+		return h.recovery.Title
+	}
+	return fallback
+}
+
+type localMFAActions interface {
+	PendingLocalMFA(c fiber.Ctx) (adminservice.LocalMFAPending, error)
+	CompleteLocalAdmin(c fiber.Ctx, challengeID, code string) (models2.Admin, goauth.Account, error)
+}
+
+func (h *Handler) GetLocalMFA(c fiber.Ctx) error {
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	actions, ok := h.sessionStoreActions.(localMFAActions)
+	if !ok {
+		return h.adminApp.HTTPManager().Redirect(c, "/auth/login")
+	}
+	pending, err := actions.PendingLocalMFA(c)
+	if err != nil {
+		return h.adminApp.HTTPManager().Redirect(c, "/auth/login")
+	}
+	page := "auth/MFAPage"
+	if pending.Kind == goauth.MFALoginKindEnrollment {
+		page = "auth/MFAEnrollmentPage"
+	}
+	return h.adminApp.HTTPManager().Render(c, page, map[string]any{
+		"title": "Подтверждение входа", "expiresAt": pending.ExpiresAt, "challengeID": pending.ID,
+	})
+}
+
+func (h *Handler) PostLocalMFA(c fiber.Ctx) error {
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	var form struct {
+		Code        string `json:"code"`
+		ChallengeID string `json:"challengeID"` //nolint:tagliatelle // Matches the existing MFA page request field.
+	}
+	if err := c.Bind().Body(&form); err != nil {
+		return err
+	}
+	authdelay.RunSleeper(c, h.sleep)
+	actions, ok := h.sessionStoreActions.(localMFAActions)
+	if !ok {
+		return h.adminApp.HTTPManager().Redirect(c, "/auth/login")
+	}
+	if len(form.Code) == 0 || len(form.Code) > 128 || len(form.ChallengeID) == 0 || len(form.ChallengeID) > 256 {
+		h.adminApp.HTTPManager().WithFlashError(c, "Неверный код подтверждения.")
+		return h.adminApp.HTTPManager().Redirect(c, h.localMFAURL(c))
+	}
+	admin, account, err := actions.CompleteLocalAdmin(c, form.ChallengeID, form.Code)
+	if err != nil {
+		h.adminApp.HTTPManager().WithFlashError(c, "Неверный или просроченный код подтверждения.")
+		return h.adminApp.HTTPManager().Redirect(c, h.localMFAURL(c))
+	}
+	h.recordSuccessfulLogin(c, account.Subject.ID, admin)
+	h.touchAdminLoginMetadata(c, admin.ID, time.Now().UTC())
+	return h.adminApp.HTTPManager().Redirect(c, h.buildPostLoginRedirect(c, admin.ID))
+}
+
+type mfaManagementActions interface {
+	LocalMFAStatus(c fiber.Ctx) (bool, error)
+	ManageLocalMFA(c fiber.Ctx, action string, input adminservice.MFAManagementInput) (adminservice.MFAManagementResult, error)
+}
+
+func (h *Handler) PostMFAManagement(action string) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		c.Set(fiber.HeaderCacheControl, "no-store")
+		var input adminservice.MFAManagementInput
+		if err := c.Bind().Body(&input); err != nil {
+			return err
+		}
+		if len(input.Password) > 1024 || len(input.Code) > 128 || len(input.EnrollmentID) > 256 {
+			return c.SendStatus(fiber.StatusBadRequest)
+		}
+		actions, ok := h.sessionStoreActions.(mfaManagementActions)
+		if !ok {
+			return c.SendStatus(fiber.StatusServiceUnavailable)
+		}
+		result, err := actions.ManageLocalMFA(c, action, input)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(map[string]string{
+				"message": "Не удалось изменить двухфакторную защиту. Проверьте пароль и код.",
+			})
+		}
+		return c.JSON(result)
+	}
+}
+
+func (h *Handler) localMFAURL(c fiber.Ctx) string {
+	target := strings.TrimSpace(c.Query("redirectback"))
+	if target == "" {
+		target = h.extractRedirectFromReferer(c.Get(fiber.HeaderReferer))
+	}
+	if target = h.normalizeRedirectTarget(target); target != "" {
+		return "/auth/mfa?redirectback=" + url.QueryEscape(target)
+	}
+	return "/auth/mfa"
 }

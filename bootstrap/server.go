@@ -31,6 +31,7 @@ import (
 	middlewares "github.com/assurrussa/goadmin/infrastructure/fiber/middlewares"
 	server "github.com/assurrussa/goadmin/infrastructure/fiber/server"
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
+	"github.com/assurrussa/goadmin/internal/authrecovery"
 	"github.com/assurrussa/goadmin/internal/uploadintegration"
 	adminshared "github.com/assurrussa/goadmin/shared"
 )
@@ -117,6 +118,7 @@ func initServer(ctx context.Context, deps Dependencies, cfg Config, app *adminap
 	// Core routes are always mounted; module routes use the same capability snapshot.
 	httpHandlers := []server.Handler{adminmain.NewHandler(app), adminauthhandler.NewHandler(adminauthhandler.HandlerOptions{
 		AdminApp:            app,
+		PasswordRecovery:    cfg.PasswordRecovery,
 		Sleep:               opts.authSleep,
 		AdminRepo:           deps.System.AdminRepo,
 		RolesManager:        deps.Repos.RolesManager,
@@ -176,7 +178,8 @@ func initServer(ctx context.Context, deps Dependencies, cfg Config, app *adminap
 		uploadContextBuild,
 		staticFilesConfig{
 			routes: staticRoutes, uploadsRoot: filepath.Clean(uploadsRoot),
-			csrfCookieName: getCookieTokenName(cfg.AdminConfig),
+			csrfCookieName:  getCookieTokenName(cfg.AdminConfig),
+			publicAuthPaths: authrecovery.Paths(cfg.PasswordRecovery),
 		},
 		extensions.publicRegistered,
 		extensions.registered,
@@ -265,9 +268,10 @@ func validateUploadTransports(transports []UploadTransport) error {
 }
 
 type staticFilesConfig struct {
-	routes         []StaticRoute
-	uploadsRoot    string
-	csrfCookieName string
+	publicAuthPaths []string
+	routes          []StaticRoute
+	uploadsRoot     string
+	csrfCookieName  string
 }
 
 func buildRegisteredHandler(
@@ -287,8 +291,10 @@ func buildRegisteredHandler(
 		registerStaticRoutes(fiberApp, opts.publicFS, staticFiles.routes, publicRegistered, staticFiles.uploadsRoot,
 			deps.Repos.FileRepo,
 			app.Guard(integrationroles.PermissionDomainUploads, integrationroles.PermissionActionRead),
-			adminmiddleware.AuthAdminMiddleware(deps.System.AdminAuthService, staticFiles.csrfCookieName),
-			adminmiddleware.IsNotAuthAdminMiddleware(),
+			adminmiddleware.AuthAdminMiddlewareWithPublicPaths(
+				deps.System.AdminAuthService, staticFiles.publicAuthPaths, staticFiles.csrfCookieName,
+			),
+			adminmiddleware.IsNotAuthAdminMiddleware(staticFiles.publicAuthPaths...),
 			app.HTTPManager().Middleware(),
 			adminHistoryMiddleware(app.HTTPManager()),
 		)

@@ -13,6 +13,7 @@ import (
 	"github.com/assurrussa/goauth/postgres"
 
 	"github.com/assurrussa/goadmin/bootstrap"
+	"github.com/assurrussa/goadmin/internal/authrecovery"
 	"github.com/assurrussa/goadmin/internal/uploadintegration"
 )
 
@@ -186,21 +187,31 @@ func RealtimeModule(stream EventStream) Module {
 	}}
 }
 
+type PasswordRecoveryRoutes = authrecovery.Routes
+
 type AuthMailConfig struct {
-	Sender goauth.NotificationSender
-	Worker postgres.NotificationWorkerConfig
+	PasswordRecovery []PasswordRecoveryRoutes
+	Sender           goauth.NotificationSender
+	Worker           postgres.NotificationWorkerConfig
 	// BorrowedWorker means the host already supervises this Runtime's delivery.
 	BorrowedWorker bool
 }
 
 func AuthMailModule(cfg AuthMailConfig) Module {
+	recovery, recoveryErr := authrecovery.Normalize(cfg.PasswordRecovery)
+	paths := authrecovery.Paths(recovery)
+	claims := make([]string, 0, 2+2*len(paths))
+	claims = append(claims, "POST /auth/profile/settings/email/request", "POST /auth/profile/settings/email/confirm")
+	for _, p := range paths {
+		claims = append(claims, "GET "+p, "POST "+p)
+	}
 	return Module{descriptor: ModuleDescriptor{
-		Key: authMailModuleKey, Routes: []string{
-			"GET /auth/forgot-password", "POST /auth/forgot-password",
-			"GET /reset-password", "POST /reset-password", "GET /auth/reset-password", "POST /auth/reset-password",
-			"POST /auth/profile/settings/email/request", "POST /auth/profile/settings/email/confirm",
-		},
+		Key: authMailModuleKey, Routes: claims,
 	}, configure: func(a *assembly) error {
+		if recoveryErr != nil {
+			return recoveryErr
+		}
+		a.input.Config.PasswordRecovery = recovery
 		if cfg.BorrowedWorker && a.borrowedAuth == nil {
 			return errors.New("borrowed authmail worker requires borrowed Auth")
 		}
@@ -224,9 +235,14 @@ func validateModules(modules []Module) (map[string]bool, []Module, error) {
 	claims, err := moduleRouteClaims(ModuleDescriptor{
 		Key: coreModuleKey,
 		Routes: []string{
-			"GET /", "GET /auth/login", "POST /auth/login", "GET /auth/register", "POST /auth/register", "GET /auth/profile",
+			"GET /auth/mfa", "POST /auth/mfa",
+			"POST /auth/mfa/enrollment/begin", "POST /auth/mfa/enrollment/confirm", "GET /", "GET /auth/login", "POST /auth/login",
+			"GET /auth/register", "POST /auth/register", "GET /auth/profile",
 			"DELETE /auth/logout", "GET /auth/profile/edit", "POST /auth/profile/edit",
 			"GET /auth/profile/settings", "POST /auth/profile/settings/password",
+			"POST /auth/profile/settings/mfa/begin", "POST /auth/profile/settings/mfa/confirm",
+			"POST /auth/profile/settings/mfa/cancel", "POST /auth/profile/settings/mfa/disable",
+			"POST /auth/profile/settings/mfa/recovery",
 		},
 		// Reserve development pages in every environment to keep ownership stable.
 		RouteNamespaces: []string{"/public", "/test"},
