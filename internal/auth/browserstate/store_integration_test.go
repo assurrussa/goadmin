@@ -1,6 +1,6 @@
 //go:build integration
 
-package browserstate
+package browserstate //nolint:testpackage // Verifies encrypted records under the private Redis storage key.
 
 import (
 	"bytes"
@@ -32,7 +32,10 @@ func exerciseAtomicState(t *testing.T, s Store) string {
 	t.Helper()
 	id := uuid.NewString()
 	ctx := t.Context()
-	record := Record{SubjectID: goauth.NewSubjectID(), Tokens: goauth.TokenPair{AccessToken: "synthetic-access", RefreshToken: "synthetic-refresh"}}
+	record := Record{
+		SubjectID: goauth.NewSubjectID(),
+		Tokens:    goauth.TokenPair{AccessToken: "synthetic-access", RefreshToken: "synthetic-refresh"},
+	}
 	require.NoError(t, s.Create(ctx, id, record, time.Hour))
 	t.Cleanup(func() { _ = s.Delete(context.Background(), id) })
 	start := make(chan struct{})
@@ -112,7 +115,9 @@ func TestPostgresStateUsesIndependentConnectionsAndEncryptedRecords(t *testing.T
 	require.NoError(t, err)
 	db.SetMaxOpenConns(16)
 	t.Cleanup(func() { _ = db.Close() })
-	_, err = db.ExecContext(t.Context(), `CREATE TABLE goadmin_browser_auth_state(id text PRIMARY KEY,version bigint NOT NULL,owner text NOT NULL,record jsonb NOT NULL,expires_at timestamptz NOT NULL)`)
+	_, err = db.ExecContext(t.Context(), `CREATE TABLE goadmin_browser_auth_state(
+		id text PRIMARY KEY,version bigint NOT NULL,owner text NOT NULL,record jsonb NOT NULL,expires_at timestamptz NOT NULL
+	)`)
 	require.NoError(t, err)
 	id := exerciseAtomicState(t, NewPostgres(db, integrationKeys(t)))
 	var raw string

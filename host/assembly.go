@@ -78,6 +78,9 @@ type Runtime struct {
 
 // New assembles an admin core with exactly the requested modules.
 func New(ctx context.Context, cfg Config, deps Dependencies, modules ...Module) (_ *Runtime, err error) {
+	if err := validateBorrowedAuthPolicy(cfg.Auth.MFAMode, deps.Auth); err != nil {
+		return nil, err
+	}
 	capabilities, ordered, err := validateModules(modules)
 	if err != nil {
 		return nil, err
@@ -335,4 +338,29 @@ func validateAssemblyAuth(auth *AuthAdapter, database StoragePgsqlClient) error 
 		return errors.New("admin auth adapter is invalid")
 	}
 	return nil
+}
+
+// Borrowing never mutates the owner's Runtime. An explicit host policy must
+// match the policy used when that adapter was constructed.
+func validateBorrowedMFAMode(requested, actual goauth.MFAMode) error {
+	if requested == "" {
+		return nil
+	}
+	if requested != goauth.MFAModeOptional && requested != goauth.MFAModeRequired {
+		return errors.New("invalid admin MFA mode")
+	}
+	if requested != actual {
+		return errors.New("borrowed admin auth MFA mode differs from explicit host policy")
+	}
+	return nil
+}
+
+func validateBorrowedAuthPolicy(requested goauth.MFAMode, auth *AuthAdapter) error {
+	if auth == nil || requested == "" {
+		return nil
+	}
+	if auth.Runtime() == nil {
+		return errors.New("borrowed admin auth runtime is unavailable")
+	}
+	return validateBorrowedMFAMode(requested, auth.Runtime().MFAMode())
 }

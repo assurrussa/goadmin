@@ -317,7 +317,7 @@ func (s *Service) saveAuthenticatedProjection(c fiber.Ctx, sess *session.Session
 		}
 		state.Payload.ExternalValidUntil = state.External.Deadline
 	}
-	return sess.Save()
+	return sessioncore.SavePassive(c, s.store, sess)
 }
 
 // LocalAdminAdmission applies host credential policy to local/password sessions.

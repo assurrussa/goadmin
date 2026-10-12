@@ -73,13 +73,14 @@ type adminRepository interface {
 }
 
 type browserSession struct {
-	External      *ExternalBinding
-	Version       int64
-	AccessToken   string
-	RefreshToken  string
-	AuthSessionID string
-	SubjectID     goauth.SubjectID
-	Payload       models.SessionAdmin
+	LocalLoginFlowKey string
+	External          *ExternalBinding
+	Version           int64
+	AccessToken       string
+	RefreshToken      string
+	AuthSessionID     string
+	SubjectID         goauth.SubjectID
+	Payload           models.SessionAdmin
 }
 
 type Option func(*Service) error
@@ -94,6 +95,7 @@ type Service struct {
 	admins            adminRepository
 	sessionTTL        time.Duration
 	states            browserstate.Store
+	localLoginStates  browserstate.Store
 	realtimeSessions  realtimesession.Registry
 }
 
@@ -135,36 +137,7 @@ func (s *Service) LoginAdmin(
 	if s == nil || s.runtime == nil || s.store == nil {
 		return models.Admin{}, goauth.Account{}, errors.New("admin auth Runtime is not configured")
 	}
-	result, err := s.runtime.Login(c, goauth.LoginRequest{
-		Credential: goauth.Credential{
-			Identifier: goauth.IdentifierInput{Scheme: goauth.IdentifierSchemeEmail, Value: email},
-			Password:   password,
-		},
-		Realm: goauth.RealmAdmin,
-	})
-	if err != nil {
-		return models.Admin{}, goauth.Account{}, err
-	}
-	if s.localAdmission != nil {
-		if err := s.localAdmission(c, result.Account.Subject.ID); err != nil {
-			_ = s.runtime.Logout(context.WithoutCancel(c.Context()), result.Account.Subject.ID, result.Tokens.Session.ID)
-			return models.Admin{}, goauth.Account{}, err
-		}
-	}
-	admin, err := s.admins.GetBySubjectID(c, result.Account.Subject.ID)
-	if err != nil || admin.ID <= 0 {
-		_ = s.runtime.Logout(c, result.Account.Subject.ID, result.Tokens.Session.ID)
-		if err == nil {
-			err = goauth.ErrMembershipDenied
-		}
-		return models.Admin{}, goauth.Account{}, fmt.Errorf("load admin membership: %w", err)
-	}
-	if err := s.saveAuthenticatedSession(c, admin, result.Account, result.Tokens, persistent); err != nil {
-		_ = s.runtime.Logout(c, result.Account.Subject.ID, result.Tokens.Session.ID)
-		return models.Admin{}, goauth.Account{}, err
-	}
-
-	return admin, result.Account, nil
+	return s.beginLocalAdmin(c, email, password, persistent)
 }
 
 func (s *Service) ProvisionTrustedAdmin(
@@ -289,7 +262,7 @@ func (s *Service) GetAdminAuth(c fiber.Ctx) (*models.SessionAdmin, error) {
 	if !ok || state == nil || (s.states == nil && (state.AccessToken == "" || state.RefreshToken == "")) {
 		return nil, nil //nolint:nilnil // no authenticated browser session
 	}
-	active, err := s.loadAuthenticatedAuthority(c, sess, state)
+	active, err := s.loadPublishedAdminAuthority(c, sess, state)
 	if err != nil {
 		return nil, err
 	}
@@ -403,6 +376,7 @@ func (s *Service) clearAdminBrowserSession(c fiber.Ctx, sess *session.Session) e
 			return fmt.Errorf("delete admin auth state: %w", err)
 		}
 	}
+	sess.Delete(localMFAKey)
 	sess.Delete(sessioncore.AuthAdminKey.String())
 	if err := sess.Save(); err != nil {
 		return fmt.Errorf("delete invalid admin browser session: %w", err)
@@ -419,25 +393,40 @@ func (s *Service) saveAuthenticatedSession(
 	persistent bool,
 	external ...*ExternalBinding,
 ) error {
+	_, err := s.saveAuthenticatedSessionWithLocalFlow(c, c, admin, account, tokens, persistent, "", external...)
+	return err
+}
+
+func (s *Service) saveAuthenticatedSessionWithLocalFlow(
+	ctx context.Context,
+	c fiber.Ctx,
+	admin models.Admin,
+	account goauth.Account,
+	tokens goauth.TokenPair,
+	persistent bool,
+	flowKey string,
+	external ...*ExternalBinding,
+) (string, error) {
 	if err := browsercookie.Check(c, s.store); err != nil {
-		return err
+		return "", err
 	}
 	sess, err := s.store.Get(c)
 	if err != nil {
-		return fmt.Errorf("get admin browser session: %w", err)
+		return "", fmt.Errorf("get admin browser session: %w", err)
 	}
 	defer sess.Release()
-	if err := sess.Regenerate(); err != nil {
-		return fmt.Errorf("rotate admin browser session: %w", err)
+	if err := sess.RegenerateWithContext(ctx); err != nil {
+		return "", fmt.Errorf("rotate admin browser session: %w", err)
 	}
-	payload, err := s.buildSessionAdmin(c, admin, sess.ID())
+	payload, err := s.buildSessionAdmin(ctx, admin, sess.ID())
 	if err != nil {
-		return err
+		return sess.ID(), err
 	}
 	payload.Email = account.PrimaryEmail.DisplayValue
 	state := &browserSession{
-		Version:     1,
-		AccessToken: tokens.AccessToken, RefreshToken: tokens.RefreshToken,
+		LocalLoginFlowKey: flowKey,
+		Version:           1,
+		AccessToken:       tokens.AccessToken, RefreshToken: tokens.RefreshToken,
 		AuthSessionID: tokens.Session.ID, SubjectID: account.Subject.ID, Payload: payload,
 	}
 	if len(external) > 0 && external[0] != nil {
@@ -449,22 +438,23 @@ func (s *Service) saveAuthenticatedSession(
 		state.AccessToken = ""
 		state.RefreshToken = ""
 	}
+	sess.Delete(localMFAKey)
 	sess.Set(sessioncore.AuthAdminKey.String(), state)
 	if s.states != nil {
 		ttl := min(s.sessionTTL, time.Until(tokens.Session.ExpiresAt))
-		if err := s.states.Create(c, sess.ID(), browserstate.Record{SubjectID: account.Subject.ID, Tokens: tokens}, ttl); err != nil {
-			return fmt.Errorf("create admin auth state: %w", err)
+		if err := s.states.Create(ctx, sess.ID(), browserstate.Record{SubjectID: account.Subject.ID, Tokens: tokens}, ttl); err != nil {
+			return sess.ID(), fmt.Errorf("create admin auth state: %w", err)
 		}
 	}
-	if err := sess.Save(); err != nil {
+	if err := sess.SaveWithContext(ctx); err != nil {
 		if s.states != nil {
-			_ = s.states.Delete(c, sess.ID())
+			_ = s.states.Delete(ctx, sess.ID())
 		}
-		return fmt.Errorf("save admin browser session: %w", err)
+		return sess.ID(), fmt.Errorf("save admin browser session: %w", err)
 	}
 	s.writeSessionCookie(c, sess.ID(), persistent)
 
-	return nil
+	return sess.ID(), nil
 }
 
 // DelAdminAuth is explicit logout, including termination of an attached RP
@@ -573,13 +563,13 @@ func (s *Service) DeleteAllExcept(
 func isInvalidRefreshToken(err error) bool {
 	return errors.Is(err, goauth.ErrInvalidToken) || errors.Is(err, goauth.ErrExpiredToken) ||
 		errors.Is(err, goauth.ErrSessionRevoked) || errors.Is(err, goauth.ErrRefreshReplay) ||
-		errors.Is(err, goauth.ErrSecurityVersionMismatch) ||
+		errors.Is(err, goauth.ErrSecurityVersionMismatch) || errors.Is(err, goauth.ErrMFARequired) ||
 		errors.Is(err, goauth.ErrAccountUnavailable) || errors.Is(err, goauth.ErrAccountNotFound)
 }
 
 func isTerminalSessionError(err error) bool {
 	return errors.Is(err, goauth.ErrMembershipDenied) || errors.Is(err, goauth.ErrSessionRevoked) ||
-		errors.Is(err, goauth.ErrSecurityVersionMismatch) ||
+		errors.Is(err, goauth.ErrSecurityVersionMismatch) || errors.Is(err, goauth.ErrMFARequired) ||
 		errors.Is(err, goauth.ErrAccountUnavailable) || errors.Is(err, goauth.ErrAccountNotFound)
 }
 
@@ -615,7 +605,7 @@ func (s *Service) RotateAdminAuth(c fiber.Ctx, _ models.Admin) (string, error) {
 	return sess.ID(), nil
 }
 
-func (s *Service) RegenerateSessionID(_ context.Context, sess *session.Session) (string, error) {
+func (s *Service) RegenerateSessionID(ctx context.Context, sess *session.Session) (string, error) {
 	if sess == nil {
 		return "", errors.New("session is nil")
 	}
@@ -627,7 +617,13 @@ func (s *Service) RegenerateSessionID(_ context.Context, sess *session.Session) 
 	if state, ok := sess.Get(sessioncore.AuthAdminKey.String()).(*browserSession); ok && state != nil {
 		state.Payload.SessionID = sess.ID()
 		sess.Set(sessioncore.AuthAdminKey.String(), state)
-		if err := sess.Save(); err != nil {
+		var err error
+		if c, ok := ctx.(fiber.Ctx); ok {
+			err = sessioncore.SavePassive(c, s.store, sess)
+		} else {
+			err = sess.SaveWithContext(ctx)
+		}
+		if err != nil {
 			return "", err
 		}
 	}

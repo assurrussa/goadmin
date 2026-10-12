@@ -549,3 +549,46 @@ GET /auth/login clears the history key after auth and Inertia middleware.
 A secure browser context is required. This cannot erase pre-upgrade plaintext
 history and does not change canonical session or cookie policy. It complements
 session-specific realtime logout and does not replace backend authorization.
+
+## Local second factor and scoped password recovery
+
+The GoAuth MFA candidate API is consumed by the built-in admin service; hosts
+continue supplying canonical GoAuth configuration through `Config.Auth`.
+`MFAKeys` is optional for unenrolled installations. Already enrolled local
+accounts fail closed if factor keys become unavailable. The default MFA policy is optional; required mode uses password-bound setup
+before issuing local session authority. See [local-mfa-policy.md](local-mfa-policy.md).
+Verified external admissions continue using their external authority and do
+not run local MFA or expose local-factor management controls.
+
+Local login uses `BeginLocalLogin` and `CompleteLocalLogin`. Password success
+with an enrolled factor creates only a pending challenge. The anonymous browser
+identifier and the encrypted browser journal pin its challenge, binding,
+deadline and remember choice. Non-stealable owner/version claims fence
+replacement, cancellation and uncertain outcomes. Only completed factor
+verification can publish a canonical browser session, whose flow journal pins
+the exact canonical session ID on every read. Authenticated save failures revoke
+the provisional canonical result. Returning to login abandons the anonymous
+flow and rotates its identifier; an old response cannot restore its authority.
+Low-level test fixtures that bypass host assembly must supply a browser journal.
+
+Profile settings use the current canonical session plus password/factor proof.
+Enrollment secret and newly generated recovery codes are returned once through
+a no-store JSON response and held only in transient component memory. They are
+not Inertia page props, flash messages, remembered forms or local storage.
+Successful enrollment, disable and recovery-code regeneration revoke every
+canonical session. Restoring a page from browser back/forward cache reloads
+authoritative state and never reactivates old asynchronous responses.
+
+`AuthMailConfig.PasswordRecovery` accepts `[]PasswordRecoveryRoutes`, each
+with `ForgotPath`, `ResetPaths`, `LoginURL`, `Title` and a trusted
+`Context func(context.Context) (context.Context, error)`. Host code chooses
+recovery scope before calling the canonical runtime. Browser form fields,
+query parameters and email contents never choose scope. When configuring
+custom entries, one entry must explicitly cover all existing operator aliases:
+`/auth/forgot-password`, `/auth/reset-password`, and `/reset-password`.
+Additional exact routes are claimed by authmail and included in the existing
+anonymous-auth allowlist while retaining the ordinary CSRF/Inertia middleware.
+A successful configured reset always returns to its same-origin `ForgotPath`;
+`LoginURL` is used only by an ordinary navigation link, including when the
+trusted login service has a different origin. An empty `LoginURL` hides that
+link. The default configuration retains the original routes.

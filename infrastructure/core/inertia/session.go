@@ -4,6 +4,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/session"
 	"github.com/valyala/fasthttp"
+
+	sessioncore "github.com/assurrussa/goadmin/infrastructure/core/session"
 )
 
 // SessionBridge follows the cookie issued by authentication in this request.
@@ -42,7 +44,7 @@ func (b SessionBridge) Set(c fiber.Ctx, key string, value any) error {
 	}
 	defer sess.Release()
 	sess.Set(key, value)
-	return sess.SaveWithContext(c)
+	return sessioncore.SavePassive(c, b.Store, sess)
 }
 
 func (b SessionBridge) Delete(c fiber.Ctx, key string) error {
@@ -52,7 +54,7 @@ func (b SessionBridge) Delete(c fiber.Ctx, key string) error {
 	}
 	defer sess.Release()
 	sess.Delete(key)
-	return sess.SaveWithContext(c)
+	return sessioncore.SavePassive(c, b.Store, sess)
 }
 
 func (b SessionBridge) Flash(c fiber.Ctx, key string, value any) error { return b.Set(c, key, value) }
@@ -66,7 +68,7 @@ func (b SessionBridge) GetFlash(c fiber.Ctx, key string) (any, error) {
 	value := sess.Get(key)
 	if value != nil {
 		sess.Delete(key)
-		if err := sess.SaveWithContext(c); err != nil {
+		if err := sessioncore.SavePassive(c, b.Store, sess); err != nil {
 			return nil, err
 		}
 	}

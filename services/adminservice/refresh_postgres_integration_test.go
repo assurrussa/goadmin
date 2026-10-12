@@ -50,7 +50,9 @@ func TestPostgresAdminOpaqueRefreshAndRevocation(t *testing.T) {
 			})
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, adapter.Close()) })
-			account, err := adapter.Runtime().ProvisionTrustedLocalAccount(ctx, goauth.RegisterRequest{Email: "admin-acceptance@example.test", Password: pgAdminPassword})
+			account, err := adapter.Runtime().ProvisionTrustedLocalAccount(ctx, goauth.RegisterRequest{
+				Email: "admin-acceptance@example.test", Password: pgAdminPassword,
+			})
 			require.NoError(t, err)
 			admin, err := repo.ProvisionAccount(ctx, account, identity.NewUserID())
 			require.NoError(t, err)
@@ -62,7 +64,9 @@ func TestPostgresAdminOpaqueRefreshAndRevocation(t *testing.T) {
 			role, err := roles.CreateRole(ctx, rbac.Role{Slug: "acceptance", Name: "Acceptance"}, []rbac.PermissionKey{permission})
 			require.NoError(t, err)
 			require.NoError(t, roles.ReplaceSubjectRoles(ctx, account.Subject.ID, []int64{role.ID}))
-			guard, err := internalauth.NewGuardService(internalauth.MustListSubjectRolesUseCase(adapter.Roles()), adapter.Roles(), logger.Discard())
+			guard, err := internalauth.NewGuardService(
+				internalauth.MustListSubjectRolesUseCase(adapter.Roles()), adapter.Roles(), logger.Discard(),
+			)
 			require.NoError(t, err)
 			facade := adminroles.Must(guard, repo)
 			var conn *redis.Client
@@ -119,44 +123,7 @@ func TestPostgresAdminOpaqueRefreshAndRevocation(t *testing.T) {
 			defer stale.Release()
 			require.NotNil(t, stale.Get(sessioncore.AuthAdminKey.String()))
 			clock.Add(int64(2 * time.Second))
-			results := make(chan int, 2)
-			failures := make(chan error, 2)
-			request := func(path string) {
-				req := httptest.NewRequestWithContext(ctx, http.MethodGet, path, nil)
-				req.AddCookie(cookie)
-				resp, err := app.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
-				if err != nil {
-					failures <- err
-					return
-				}
-				defer resp.Body.Close()
-				results <- resp.StatusCode
-			}
-			go request("/one")
-			select {
-			case <-r.entered:
-			case <-time.After(5 * time.Second):
-				t.Fatal("refresh did not start")
-			}
-			<-states.pendingRead
-			go request("/two")
-			select {
-			case <-states.pendingRead:
-			case <-time.After(5 * time.Second):
-				t.Fatal("second process did not observe claim")
-			}
-			close(r.release)
-			for range 2 {
-				select {
-				case code := <-results:
-					require.Equal(t, 204, code)
-				case err := <-failures:
-					t.Fatal(err)
-				case <-time.After(10 * time.Second):
-					t.Fatal("request stalled")
-				}
-			}
-			require.Equal(t, int32(1), r.calls.Load())
+			pgAssertConcurrentRefresh(t, app, cookie, r, states)
 			before, found, err := states.Load(ctx, cookie.Value)
 			require.NoError(t, err)
 			require.True(t, found)
@@ -251,4 +218,49 @@ func pgRequireSessionCookie(t *testing.T, resp *http.Response) *http.Cookie {
 	}
 	t.Fatal("session cookie missing")
 	return nil
+}
+
+func pgAssertConcurrentRefresh(
+	t *testing.T, app *fiber.App, cookie *http.Cookie, r *pgPausedRefreshRuntime, states *pgObservedStateStore,
+) {
+	t.Helper()
+	ctx := t.Context()
+	results := make(chan int, 2)
+	failures := make(chan error, 2)
+	request := func(path string) {
+		req := httptest.NewRequestWithContext(ctx, http.MethodGet, path, nil)
+		req.AddCookie(cookie)
+		resp, err := app.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
+		if err != nil {
+			failures <- err
+			return
+		}
+		defer resp.Body.Close()
+		results <- resp.StatusCode
+	}
+	go request("/one")
+	select {
+	case <-r.entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("refresh did not start")
+	}
+	<-states.pendingRead
+	go request("/two")
+	select {
+	case <-states.pendingRead:
+	case <-time.After(5 * time.Second):
+		t.Fatal("second process did not observe claim")
+	}
+	close(r.release)
+	for range 2 {
+		select {
+		case code := <-results:
+			require.Equal(t, 204, code)
+		case err := <-failures:
+			t.Fatal(err)
+		case <-time.After(10 * time.Second):
+			t.Fatal("request stalled")
+		}
+	}
+	require.Equal(t, int32(1), r.calls.Load())
 }
