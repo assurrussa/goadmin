@@ -17,6 +17,7 @@ import (
 
 	"github.com/assurrussa/goauth"
 	"github.com/assurrussa/goauth/rbac"
+	"github.com/gofiber/fiber/v3"
 	"github.com/stretchr/testify/require"
 
 	adminrepo "github.com/assurrussa/goadmin/infrastructure/pgsql/repositories/adminrepo"
@@ -143,7 +144,8 @@ func assemblyRequest(
 	for _, cookie := range cookies {
 		request.AddCookie(cookie)
 	}
-	response, err := runtime.App().Test(request)
+	// Real hashing and database work are bounded by the package test watchdog.
+	response, err := runtime.App().Test(request, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	require.NoError(t, err)
 	body, err := io.ReadAll(response.Body)
 	require.NoError(t, err)
