@@ -382,9 +382,9 @@ func writeAdminCSRFCookie(c fiber.Ctx, store *session.Store, cfg adminconfig.Con
 		if store.CookiePath != "" {
 			cookiePath = store.CookiePath
 		}
-		if store.CookieDomain != "" {
-			cookieDomain = store.CookieDomain
-		}
+		// An empty configured domain deliberately means host-only. Keep the
+		// CSRF cookie aligned with the session instead of widening its scope.
+		cookieDomain = store.CookieDomain
 		cookieSecure = store.CookieSecure
 		if store.CookieSameSite != "" {
 			cookieSameSite = store.CookieSameSite
