@@ -15,9 +15,11 @@ import (
 )
 
 const (
-	hostScopeIPv6 = "::1"
-	hostScopePath = "/admin"
-	hostScopeDNS  = "admin.example.test"
+	hostScopeProduction  = "production"
+	hostScopeHTTPSOrigin = "https://admin.example.test"
+	hostScopeIPv6        = "::1"
+	hostScopePath        = "/admin"
+	hostScopeDNS         = "admin.example.test"
 )
 
 func TestWriteAdminCSRFCookieKeepsStoreScope(t *testing.T) {
@@ -33,23 +35,23 @@ func TestWriteAdminCSRFCookieKeepsStoreScope(t *testing.T) {
 		omitted                                bool
 	}{
 		{
-			name: "host-only IPv6", origin: "https://[::1]:19443", tokenDomain: hostScopeIPv6, environment: "production",
+			name: "host-only IPv6", origin: "https://[::1]:19443", tokenDomain: hostScopeIPv6, environment: hostScopeProduction,
 			store: &session.Store{Config: session.Config{CookiePath: hostScopePath, CookieSecure: true, CookieSameSite: "Strict"}},
 			path:  hostScopePath, secure: true, sameSite: http.SameSiteStrictMode,
 		},
 		{
-			name: "host-only IPv4", origin: "http://127.0.0.1:19443", tokenDomain: "127.0.0.1", environment: "production",
+			name: "host-only IPv4", origin: "http://127.0.0.1:19443", tokenDomain: "127.0.0.1", environment: hostScopeProduction,
 			store: &session.Store{Config: session.Config{CookiePath: "/", CookieSameSite: "Lax"}},
 			path:  "/", sameSite: http.SameSiteLaxMode,
 		},
 		{
-			name: "host-only DNS", origin: "https://admin.example.test", tokenDomain: hostScopeDNS, environment: "production",
+			name: "host-only DNS", origin: hostScopeHTTPSOrigin, tokenDomain: hostScopeDNS, environment: hostScopeProduction,
 			store: &session.Store{Config: session.Config{CookiePath: "/account", CookieSecure: true, CookieSameSite: "None"}},
 			path:  "/account", secure: true, sameSite: http.SameSiteNoneMode,
 		},
 		{
-			name: "explicit store domain", origin: "https://admin.example.test", tokenDomain: hostScopeDNS,
-			environment: "production",
+			name: "explicit store domain", origin: hostScopeHTTPSOrigin, tokenDomain: hostScopeDNS,
+			environment: hostScopeProduction,
 			store: &session.Store{Config: session.Config{
 				CookieDomain: "example.test", CookiePath: hostScopePath, CookieSameSite: "Strict",
 			}},
@@ -57,12 +59,12 @@ func TestWriteAdminCSRFCookieKeepsStoreScope(t *testing.T) {
 		},
 		{
 			name: "empty store path and SameSite retain defaults", origin: "http://admin.example.test",
-			tokenDomain: hostScopeDNS, environment: "production",
+			tokenDomain: hostScopeDNS, environment: hostScopeProduction,
 			store: &session.Store{}, path: "/", sameSite: http.SameSiteLaxMode,
 		},
 		{
-			name: "nil store production fallback", origin: "https://admin.example.test",
-			tokenDomain: hostScopeDNS, environment: "production",
+			name: "nil store production fallback", origin: hostScopeHTTPSOrigin,
+			tokenDomain: hostScopeDNS, environment: hostScopeProduction,
 			path: "/", domain: hostScopeDNS, secure: true, sameSite: http.SameSiteLaxMode,
 		},
 		{
@@ -71,7 +73,7 @@ func TestWriteAdminCSRFCookieKeepsStoreScope(t *testing.T) {
 		},
 		{
 			name: "nil store IPv6 behavior unchanged", origin: "https://[::1]:19443",
-			tokenDomain: hostScopeIPv6, environment: "production",
+			tokenDomain: hostScopeIPv6, environment: hostScopeProduction,
 			omitted: true,
 		},
 	}
