@@ -65,6 +65,13 @@ func AuthAdminMiddlewareWithPublicPaths(
 func browserAuthFailure(c fiber.Ctx, err error) error {
 	c.Set(fiber.HeaderCacheControl, "no-store")
 	switch {
+	case errors.Is(err, adminservice.ErrExternalRecoveryRequired):
+		if adminservice.ExternalAdminRecoveryEnabled(c) {
+			c.Set("X-Goadmin-Auth-Recovery", "1")
+		} else if c.Method() == fiber.MethodGet || c.Method() == fiber.MethodHead {
+			return goinertia.Redirect(c, "/auth/login")
+		}
+		return sendBrowserAuthFailure(c, fiber.StatusUnauthorized, "reauthentication_required", "Refresh your sign-in")
 	case errors.Is(err, goauth.ErrOperationOutcomeUnknown), errors.Is(err, goauth.ErrSessionRevoked),
 		errors.Is(err, goauth.ErrExpiredToken), errors.Is(err, goauth.ErrMembershipDenied),
 		errors.Is(err, goauth.ErrSecurityVersionMismatch), errors.Is(err, goauth.ErrMFARequired),

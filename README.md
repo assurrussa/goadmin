@@ -4,7 +4,7 @@
 projects integrate it through the stable `github.com/assurrussa/goadmin/host`
 facade instead of copying admin internals.
 
-Install the public release with `go get github.com/assurrussa/goadmin@v0.11.1`.
+Install the public release with `go get github.com/assurrussa/goadmin@v0.12.0`.
 Its dependency graph uses GoAuth v0.8.0, GoNotify v0.6.0, GoUploads v0.13.0 and
 GoWebSocket v0.2.1 without sibling replacements.
 
@@ -17,7 +17,7 @@ The [standalone starter](examples/starter/README.md) runs the embedded admin,
 PostgreSQL with Docker Compose. Redis is an optional profile; mail modules use
 NotifyHub when explicitly enabled. Copy
 `examples/starter/.env.example` to `examples/starter/.env`, fill every required
-value, then run `GOADMIN_VERSION=v0.11.1 docker compose up --build` from
+value, then run `GOADMIN_VERSION=v0.12.0 docker compose up --build` from
 `examples/starter`. This builds the starter against the published GoAdmin library
 and uses the release's embedded UI; it requires no sibling checkouts. Open
 `http://localhost:8080`; the login page offers first-admin registration until

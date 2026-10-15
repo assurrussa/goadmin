@@ -11,29 +11,16 @@ import (
 
 	sessioncore "github.com/assurrussa/goadmin/infrastructure/core/session"
 	"github.com/assurrussa/goadmin/internal/auth/browsercookie"
+	"github.com/assurrussa/goadmin/internal/auth/browserstate"
 )
 
 const externalFreshnessCap = 5 * time.Minute
 
-// ExternalProof is verified provider time, never the time a response was received.
-// Validity confirms the admitted immutable snapshot. Fresh provider proof needs
-// explicit admission; neither issue time nor deadline slides on a read.
-type ExternalProof struct{ IssuedAt, ExpiresAt time.Time }
-
-// ExternalBinding is server-side metadata, never a browser credential. LinkID
-// pins the canonical link INSTANCE so unlink/relink cannot revive old sessions.
-// AuthorityID references the host's encrypted durable provider-state journal.
-type ExternalBinding struct {
-	Issuer, Subject, LinkID, AuthorityID, ProviderSessionID string
-	ClientID, ProjectID                                     string
-	ExternalAuthTime                                        time.Time
-	Generation                                              uint64
-	LoginGeneration                                         uint64
-	Deadline                                                time.Time
-	LocalSubject                                            goauth.SubjectID
-	AbsoluteUntil                                           time.Time
-	Proof                                                   ExternalProof
-}
+// External metadata is persisted inside the encrypted owner/version journal.
+type (
+	ExternalProof   = browserstate.ExternalProof
+	ExternalBinding = browserstate.ExternalBinding
+)
 
 // ExternalSessionAuthority is neutral: goadmin does not depend on an OIDC/RP
 // client. Validate checks exact binding, grant and fresh provider authority; its
@@ -255,6 +242,11 @@ func (s *Service) checkExternal(c fiber.Ctx, sess *session.Session, state *brows
 	if err == nil && link.ID != binding.LinkID {
 		err = goauth.ErrExplicitIdentityLink
 	}
+	if err == nil && recoverableExternalDeadline(binding, time.Now()) {
+		// Stale proof is never authority. Retain the native fence only so an
+		// explicitly guarded host recovery can verify fresh provider evidence.
+		return ErrExternalRecoveryRequired
+	}
 	if err == nil {
 		var proof ExternalProof
 		proof, err = s.externalProof(c, binding)
@@ -313,6 +305,9 @@ func (s *Service) loadAuthenticatedAuthority(c fiber.Ctx, sess *session.Session,
 func (s *Service) saveAuthenticatedProjection(c fiber.Ctx, sess *session.Session, state *browserSession) error {
 	if state.External != nil {
 		if !time.Now().Before(state.External.Deadline) {
+			if recoverableExternalDeadline(*state.External, time.Now()) {
+				return ErrExternalRecoveryRequired
+			}
 			return errors.Join(goauth.ErrSessionRevoked, s.clearAdminBrowserSession(c, sess))
 		}
 		state.Payload.ExternalValidUntil = state.External.Deadline
@@ -344,6 +339,19 @@ func (s *Service) ExternalAdminBinding(c fiber.Ctx) (*ExternalBinding, error) {
 	state, ok := sess.Get(sessioncore.AuthAdminKey.String()).(*browserSession)
 	if !ok || state == nil || state.External == nil {
 		return nil, nil //nolint:nilnil // local/anonymous session has no external metadata
+	}
+	if s.states != nil {
+		record, found, err := s.states.Load(c, sess.ID())
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return nil, nil //nolint:nilnil // native authority was removed
+		}
+		if record.External != nil {
+			binding := *record.External
+			return &binding, nil
+		}
 	}
 	binding := *state.External
 	return &binding, nil

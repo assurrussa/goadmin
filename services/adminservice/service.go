@@ -442,7 +442,8 @@ func (s *Service) saveAuthenticatedSessionWithLocalFlow(
 	sess.Set(sessioncore.AuthAdminKey.String(), state)
 	if s.states != nil {
 		ttl := min(s.sessionTTL, time.Until(tokens.Session.ExpiresAt))
-		if err := s.states.Create(ctx, sess.ID(), browserstate.Record{SubjectID: account.Subject.ID, Tokens: tokens}, ttl); err != nil {
+		record := browserstate.Record{SubjectID: account.Subject.ID, Tokens: tokens, External: state.External}
+		if err := s.states.Create(ctx, sess.ID(), record, ttl); err != nil {
 			return sess.ID(), fmt.Errorf("create admin auth state: %w", err)
 		}
 	}

@@ -6,6 +6,8 @@
 
     <template #subtitle> Войдите в административную панель </template>
 
+    <slot name="auth-providers" />
+
     <AdminForm :form="form" :fields="['email', 'password']" @submit="handleLogin">
       <!-- Email -->
       <FormInput

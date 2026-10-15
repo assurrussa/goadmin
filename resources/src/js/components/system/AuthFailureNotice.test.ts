@@ -127,3 +127,90 @@ it('does not suppress an unrelated invalid response', () => {
   })
   expect(document.dispatchEvent(event)).toBe(true)
 })
+
+it('recovers an opted-in failure in the current page without replacing or submitting its draft', async () => {
+  const message = ref('')
+  const loginRequired = ref(false)
+  const submit = vi.fn((event: Event) => event.preventDefault())
+  const navigate = vi.fn()
+  let finishRecovery: ((value: boolean) => void) | undefined
+  const recoverAuth = vi.fn(
+    () =>
+      new Promise<boolean>((resolve) => {
+        finishRecovery = resolve
+      }),
+  )
+  const element = document.createElement('div')
+  document.body.append(element)
+  cleanup.push(() => element.remove())
+  const app = createApp({
+    render: () =>
+      h(Fragment, null, [
+        h('form', { onSubmit: submit }, [h('input', { name: 'draft' })]),
+        h(AuthFailureNotice, {
+          message: message.value,
+          loginRequired: loginRequired.value,
+          onLogin: navigate,
+        }),
+      ]),
+  })
+  app.mount(element)
+  cleanup.push(() => app.unmount())
+  const handler = createAuthFailureHandler({
+    origin: window.location.origin,
+    clearAuth: vi.fn(),
+    disconnect: vi.fn(),
+    navigateToLogin: navigate,
+    showNotice: (notice) => {
+      message.value = notice
+    },
+    recoverAuth,
+    showLogin: () => {
+      loginRequired.value = true
+    },
+  })
+  cleanup.push(() => handler.reset())
+  cleanup.push(router.on('invalid', handler))
+  const input = element.querySelector('input')!
+  input.value = 'unsaved draft'
+  const response = {
+    ...authResponse(401, 'reauthentication_required'),
+    headers: {
+      'x-goadmin-auth-error': '1',
+      'x-goadmin-auth-recovery': '1',
+      'content-type': 'application/json',
+    },
+  }
+  const failure = () =>
+    new CustomEvent('inertia:invalid', {
+      cancelable: true,
+      detail: { response },
+    })
+  expect(document.dispatchEvent(failure())).toBe(false)
+  expect(document.dispatchEvent(failure())).toBe(false)
+  expect(recoverAuth).toHaveBeenCalledTimes(1)
+  finishRecovery!(true)
+  await Promise.resolve()
+  await Promise.resolve()
+  await nextTick()
+  expect(element.querySelector('input')).toBe(input)
+  expect(input.value).toBe('unsaved draft')
+  expect(element.querySelector('[role="alert"]')?.textContent).toContain('Доступ восстановлен')
+  expect(submit).not.toHaveBeenCalled()
+  expect(navigate).not.toHaveBeenCalled()
+
+  // A new manual submission cannot loop. Login stays explicit.
+  handler.cancel()
+  document.dispatchEvent(failure())
+  await nextTick()
+  expect(recoverAuth).toHaveBeenCalledTimes(1)
+  expect(element.querySelector('input')).toBe(input)
+  expect(input.value).toBe('unsaved draft')
+  expect(navigate).not.toHaveBeenCalled()
+  const login = [...element.querySelectorAll<HTMLButtonElement>('aside button')].find((button) =>
+    button.textContent?.includes('Войти снова'),
+  )!
+  login.click()
+  expect(navigate).toHaveBeenCalledTimes(1)
+  expect(submit).not.toHaveBeenCalled()
+})

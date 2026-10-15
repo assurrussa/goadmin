@@ -35,6 +35,12 @@ func WithBrowserState(store browserstate.Store) Option {
 }
 
 func applyBrowserRecord(state *browserSession, r browserstate.Record) {
+	// Legacy records retain ordinary read compatibility, but recovery requires
+	// a journal binding. Once present it always overrides the Fiber projection.
+	if r.External != nil {
+		binding := *r.External
+		state.External = &binding
+	}
 	state.Version = r.Version
 	state.SubjectID = r.SubjectID
 	state.AccessToken = r.Tokens.AccessToken

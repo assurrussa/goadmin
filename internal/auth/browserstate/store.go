@@ -21,6 +21,7 @@ type LocalLoginPending struct {
 	Persistent bool                `json:"persistent"`
 }
 type Record struct {
+	External           *ExternalBinding   `json:"external,omitempty"`
 	LocalLoginPending  *LocalLoginPending `json:"localLoginPending,omitempty"`
 	LocalLoginTerminal bool               `json:"localLoginTerminal,omitempty"`
 	//nolint:tagliatelle // Preserve the persisted journal field name across instances.
