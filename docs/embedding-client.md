@@ -112,3 +112,37 @@ The shared Vite build uses `base: './'`. Lazy page chunks and their CSS resolve
 relative to the emitted JavaScript URL, so embedded bundles continue to load
 under `/public/dist` or a host asset prefix. Keep this setting when adapting the
 build; an absolute root base sends lazy CSS requests to the host's `/css` route.
+
+## Extend the login card with auth providers
+
+A host login page can compose the core `@admin-core/Pages/auth/LoginPage.vue`
+component and supply its optional `auth-providers` named slot. The slot renders
+inside the existing `AuthLayout` card immediately before the built-in local
+login form, outside that form. Do not put another full-page auth layout around
+it.
+
+```vue
+<template>
+  <CoreLoginPage v-bind="$attrs">
+    <template #auth-providers>
+      <div v-if="ssoEnabled" class="mb-6">
+        <a href="/auth/sso/login">Continue with SSO</a>
+      </div>
+    </template>
+  </CoreLoginPage>
+</template>
+
+<script setup lang="ts">
+import CoreLoginPage from '@admin-core/Pages/auth/LoginPage.vue'
+
+defineProps<{ ssoEnabled: boolean }>()
+</script>
+```
+
+Provider content owns its spacing, labels, availability and ordinary navigation
+to the host-owned sign-in endpoint. The slot exposes no form state or auth
+authority. The core retains local credentials, errors, password recovery,
+first-admin registration and submission behavior. An omitted or empty slot
+adds no element or spacing. Rebuild from a GoAdmin version that includes this
+slot; older pinned versions do not render it. This UI contract does not register
+SSO routes, enable a provider, or change CSRF/session policy.
