@@ -330,9 +330,10 @@ Permission fields must stay absent from JSON. This changes navigation only;
 endpoint authorization, role grants, existing superadmin/nil-checker behavior,
 and explicit deep-link redirects remain unchanged.
 
-## Unpublished external-session candidate
+## External-session admission
 
-The additive candidate host admission/validity API and its dependency/rollback
+The additive host admission/validity API shipped in v0.10.0 and is included in
+v0.11.1. Its dependency/rollback
 contract are described in [external-browser-admission.md](docs/external-browser-admission.md). It retains the pinned GoAuth API, adds no public package/import path,
 and does not enable a host SSO mode. Publish GoAdmin only after its exact-candidate
 publish-readiness, agreed browser acceptance, and final review pass. Verify the
