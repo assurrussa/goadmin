@@ -44,3 +44,47 @@ describe('login authmail capability', () => {
     expect(root.querySelector('a[href="/auth/register"]')).not.toBeNull()
   })
 })
+
+describe('login auth-providers slot', () => {
+  it('keeps the default login form without a provider wrapper or spacing', () => {
+    const root = document.createElement('div')
+    const app = createApp(LoginPage)
+    apps.push(app)
+    app.mount(root)
+
+    const form = root.querySelector('form')
+    expect(form).not.toBeNull()
+    expect(root.querySelectorAll('form')).toHaveLength(1)
+    expect(form?.parentElement?.children).toHaveLength(1)
+    expect(root.querySelector('input[name="email"]')).not.toBeNull()
+    expect(root.querySelector('input[name="password"]')).not.toBeNull()
+  })
+
+  it('renders provider content before the unchanged local form in the same layout', () => {
+    const root = document.createElement('div')
+    const app = createApp({
+      render: () =>
+        h(LoginPage, null, {
+          'auth-providers': () =>
+            h('div', { 'data-testid': 'providers', class: 'mb-6' }, [
+              h('a', { href: '/auth/sso/login' }, 'Continue with SSO'),
+            ]),
+        }),
+    })
+    apps.push(app)
+    app.mount(root)
+
+    const providers = root.querySelector('[data-testid="providers"]')
+    const form = root.querySelector('form')
+    expect(providers).not.toBeNull()
+    expect(form).not.toBeNull()
+    expect(providers?.parentElement).toBe(form?.parentElement)
+    expect(providers?.nextElementSibling).toBe(form)
+    expect(form?.contains(providers)).toBe(false)
+    expect(root.querySelectorAll('form')).toHaveLength(1)
+    expect(root.querySelector('a[href="/auth/sso/login"]')?.textContent).toBe('Continue with SSO')
+    expect(form?.querySelector('input[name="email"]')).not.toBeNull()
+    expect(form?.querySelector('input[name="password"]')).not.toBeNull()
+    expect(form?.querySelector('button[type="submit"]')?.textContent).toContain('Войти')
+  })
+})
