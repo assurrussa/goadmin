@@ -5,8 +5,8 @@ This module is published as `github.com/assurrussa/goadmin`.
 ## Current Baseline
 
 - The latest published release is [v0.11.1](https://github.com/assurrussa/goadmin/releases/tag/v0.11.1).
-  Current-page recovery and the separate login-provider slot candidate remain
-  unreleased; no next version or completed release checks are claimed here.
+  Current-page recovery and the login-provider slot are included in this
+  consolidated unreleased candidate; no completed release checks are claimed here.
 
 - Go 1.27.2 is the minimum. Modular host assembly is a breaking source API:
   migrate hosts to `host.New`, explicit modules and `host.AdminConfig`.
@@ -349,9 +349,10 @@ nodes must not overwrite the new journal records. See
 The recovery candidate retains the GoAuth `v0.8.0` pin. These release notes do
 not select a newer dependency. Rebuild and verify embedded frontend assets and
 the consuming host at the final selected source before release, using the
-existing gates above. The optional login-provider slot is a separate candidate
-[PR #35](https://github.com/assurrussa/goadmin/pull/35), not part of this recovery
-branch or published v0.11.1; combine and verify it explicitly if selected.
+existing gates above. The optional login-provider slot from
+[PR #35](https://github.com/assurrussa/goadmin/pull/35) is included in this
+consolidated unreleased candidate, but remains unavailable in published
+v0.11.1. Verify the combined candidate using the existing gates above.
 
 ## Unpublished external-session candidate
 
