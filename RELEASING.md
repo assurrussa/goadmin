@@ -334,7 +334,7 @@ and explicit deep-link redirects remain unchanged.
 
 The additive host admission/validity API shipped in v0.10.0 and is included in
 v0.11.1. Its dependency/rollback
-contract are described in [external-browser-admission.md](docs/external-browser-admission.md). It retains the pinned GoAuth API, adds no public package/import path,
+contract is described in [external-browser-admission.md](docs/external-browser-admission.md). It retains the pinned GoAuth API, adds no public package/import path,
 and does not enable a host SSO mode. Publish GoAdmin only after its exact-candidate
 publish-readiness, agreed browser acceptance, and final review pass. Verify the
 published tag with release-readiness. Real RP consumer and end-to-end SSO
