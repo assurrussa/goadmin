@@ -5,6 +5,19 @@ after a new tag and its clean-consumer checks complete.
 
 ## Unreleased
 
+- Current-page external authentication recovery is opt-in: keep mounted form
+  drafts and require manual resubmission, without retaining or replaying a
+  rejected business mutation. Preserve native cookie/session identity and
+  canonical revocation checks through encrypted-journal owner/version fencing.
+  Legacy journal rows without a binding require one explicit external login
+  after proof expiry. Coordinate application-node rollout and rollback with
+  the host recovery endpoint; see [recovery](docs/external-proof-recovery.md).
+
+- Separate unreleased candidate [PR #35](https://github.com/assurrussa/goadmin/pull/35)
+  adds an optional `auth-providers` slot inside the existing login card, before
+  the local form. It is not included in the recovery branch and is unavailable
+  in published v0.11.1. Default local login stays unchanged when omitted.
+
 - Preserve uncertain upload completion across navigation/remounts in both
   built-in upload widgets, with same-tab metadata recovery scoped by admin,
   endpoint, entity and context. Cancel torn-down transports without allowing a
