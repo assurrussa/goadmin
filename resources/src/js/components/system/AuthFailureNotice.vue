@@ -1,6 +1,6 @@
 <script setup lang="ts">
-defineProps<{ message: string }>()
-defineEmits<{ dismiss: [] }>()
+defineProps<{ message: string; loginRequired?: boolean }>()
+defineEmits<{ dismiss: []; login: [] }>()
 </script>
 
 <template>
@@ -12,6 +12,14 @@ defineEmits<{ dismiss: [] }>()
     class="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-xl rounded-lg border border-border-primary bg-card p-4 text-text-primary shadow-lg"
   >
     <p class="pr-6">{{ message }}</p>
+    <button
+      v-if="loginRequired"
+      type="button"
+      class="mr-3 mt-3 rounded border border-border-primary px-3 py-1 focus-visible:outline"
+      @click="$emit('login')"
+    >
+      Войти снова
+    </button>
     <button
       type="button"
       class="mt-3 rounded border border-border-primary px-3 py-1 focus-visible:outline"

@@ -120,6 +120,11 @@ test('validation and navigation synchronize auth from the live Inertia page', as
     },
     '@/plugins/theme': {},
     '@/auth/browserAuthFailures': authModule.exports,
+    '@/auth/browserAuthRecovery': {
+      recoverBrowserAuthentication: async () => {
+        throw new Error('unexpected auth recovery')
+      },
+    },
     axios: { default: { defaults: {} } },
     '@/extensions': { extensions: { install() {}, webSocketHandlers: {} } },
     '@admin-extensions-generated': { extensionPages: {} },
