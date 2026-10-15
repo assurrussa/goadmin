@@ -56,3 +56,25 @@ membership/link changes, legacy rows and deletion immediately before the CAS
 commit. Run focused adminservice/browserstate/host tests, race tests, the public
 consumer checks and the full repository gate before merge or release. Source
 preparation alone is not evidence that these gates passed.
+
+## Public host frontend helper
+
+Custom admin extensions may import
+`recoverBrowserAuthentication` from
+`@admin-core/auth/browserAuthRecovery`. The supported call shape is
+`recoverBrowserAuthentication(signal: AbortSignal): Promise<boolean>`.
+The existing resource alias resolves this to the shared core source; hosts
+must include that source through their normal GoAdmin resource build.
+
+This helper performs only the bounded, fixed-path recovery transport described
+above. It returns true only after a valid native/CSRF-ready success response;
+false covers denial, cancellation, timeout and malformed responses. It never
+retains or replays a business mutation and never navigates the page.
+
+A custom fetch adapter must own its request lifecycle and single-flight guard,
+cancel obsolete work with the signal, and require manual resubmission after
+success. It must opt in only on the versioned authentication error and recovery
+marker, preserve the exact form draft, and keep an explicit login action on
+failure. It must not import private auth-notice stores or synthesize Inertia
+events to drive the built-in coordinator. This is a recovery-transport contract,
+not a new generic fetch wrapper or an authorization result.
