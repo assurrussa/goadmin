@@ -109,3 +109,55 @@ refresh claims remain unresolved until reauthentication. Keep the legacy queued
 notification handlers available to drain or expire old jobs. Restore databases
 with the matching key versions and revoke restored sessions explicitly when
 policy requires it.
+
+## Opt-in current-page external-session recovery
+
+Hosts may opt a rejected mutation into the shared frontend recovery coordinator
+by returning the existing versioned JSON authentication error:
+HTTP 401, `X-Goadmin-Auth-Error: 1`, `Content-Type: application/json`,
+and `{ "status": 401, "code": "reauthentication_required", "message": "..." }`,
+plus `X-Goadmin-Auth-Recovery: 1`. Do not add this marker to ordinary terminal
+native authentication failures or hosts without the endpoint below.
+
+The client keeps the current page and its in-memory form mounted. It disconnects
+realtime, then sends a fixed same-origin GET to `/auth/session/recover` with
+`X-Goadmin-Auth-Recovery: 1` and `Accept: application/json`. Credentials and fetch
+mode are same-origin, cache is disabled and redirects are errors. No server
+response selects a URL. No original request body, mutation callback or router
+visit is retained for replay.
+
+The host owns this endpoint and the OIDC/RP refresh engine. It must reject foreign
+origins/Fetch-Site and missing/duplicate request markers before doing work. No
+business command, linking or provisioning is allowed. The old protected native
+binding must survive the rejected mutation; metadata alone does not authorize
+renewal. The host must independently establish native recovery eligibility,
+then Verify a current RP proof and enforce unchanged local subject, canonical
+link instance, authority reference, LoginGeneration and identity/session/scope
+pins. Generations cannot move backwards and absolute expiry cannot extend.
+Revocation, missing/changed links, disabled accounts, lost membership and
+uncertain refresh outcomes must fail closed. Validate remains a read-only,
+immutable-snapshot check; do not weaken it or extend an expired deadline.
+
+Every endpoint response is no-store JSON with `X-Goadmin-Auth-Recovery: 1`.
+After native admission rotates the cookie, return HTTP 409 with
+`{ "status": 409, "code": "authentication_recovery_continue" }`.
+The client makes at most one additional GET. Only after that request verifies
+the current native cookie, current RP/link/local policy and a matching
+session-bound CSRF proof may the host return HTTP 200 with
+`{ "status": 200, "code": "authentication_recovered", "csrfReady": true }`.
+An already-settled, valid admission may return 200 immediately. Do not emit
+success merely because an OAuth refresh or cookie write succeeded.
+
+One recovery attempt per failed page lifecycle is bounded by two GET requests
+and a 30-second total timeout. Concurrent failures in the same page share that
+attempt. New Inertia requests abort its client-side continuation; hosts still
+need their durable generation/owner fences across tabs and late responses.
+A successful Inertia navigation/submission resets the attempt budget.
+
+After success the user manually submits the preserved form again, with the
+current CSRF cookie. After failure the draft remains mounted and a fixed login
+button is shown; no automatic navigation discards the draft. Backend auth,
+RBAC and CSRF still gate every later mutation. Recovery is not a save
+acknowledgement and must never automatically repeat a mutation, including
+uploads or requests with unknown outcomes. Without explicit host opt-in the
+existing authentication error behavior is unchanged.

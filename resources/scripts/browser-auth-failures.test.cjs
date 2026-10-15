@@ -14,7 +14,7 @@ const compiled = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 })
 assert.equal(compiled.diagnostics?.length ?? 0, 0)
-const sandbox = { exports: {}, URL }
+const sandbox = { exports: {}, URL, AbortController }
 vm.runInNewContext(compiled.outputText, sandbox, { filename })
 const { createAuthFailureHandler } = sandbox.exports
 
@@ -155,4 +155,87 @@ test('late retryable response does not replace the pending login transition', ()
   assert.equal(late.defaultPrevented, true)
   assert.deepEqual(f.events, ['clear', 'disconnect', 'GET /auth/login'])
   assert.deepEqual(f.notices, [])
+})
+
+function recoveryFixture(recover) {
+  const calls = []
+  const notices = []
+  const handler = createAuthFailureHandler({
+    origin: 'https://admin.test',
+    clearAuth: () => calls.push('clear'),
+    disconnect: () => calls.push('disconnect'),
+    navigateToLogin: () => calls.push('navigate'),
+    showNotice: (value) => notices.push(value),
+    recoverAuth: (signal) => { calls.push('recover'); return recover(signal) },
+    showLogin: () => calls.push('login-button'),
+  })
+  const value = response(401, 'reauthentication_required')
+  value.headers['x-goadmin-auth-recovery'] = '1'
+  return { handler, value, calls, notices }
+}
+
+const flush = async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() }
+
+test('opt-in 401 recovers once without clearing, navigating or replaying the command', async () => {
+  let finish
+  const f = recoveryFixture(() => new Promise((resolve) => { finish = resolve }))
+  for (let i = 0; i < 4; i++) f.handler(eventFor(f.value))
+  assert.deepEqual(f.calls, ['disconnect', 'recover'])
+  finish(true)
+  await flush()
+  assert.deepEqual(f.calls, ['disconnect', 'recover'])
+  assert.match(f.notices.at(-1), /Доступ восстановлен/)
+  assert.match(f.notices.at(-1), /ещё раз/)
+  // A second failure cannot launch an unbounded refresh loop.
+  f.handler(eventFor(f.value))
+  assert.equal(f.calls.filter((call) => call === 'recover').length, 1)
+  assert.equal(f.calls.includes('navigate'), false)
+  assert.equal(f.calls.at(-1), 'login-button')
+})
+
+for (const outcome of [false, 'reject']) {
+  test(`failed recovery ${outcome} preserves the page and offers explicit login`, async () => {
+    const f = recoveryFixture(() => outcome === 'reject' ? Promise.reject(new Error('network')) : Promise.resolve(false))
+    f.handler(eventFor(f.value))
+    await flush()
+    assert.deepEqual(f.calls, ['disconnect', 'recover', 'clear', 'disconnect', 'login-button'])
+    assert.match(f.notices.at(-1), /Данные формы остались/)
+    assert.equal(f.calls.includes('navigate'), false)
+  })
+}
+
+test('new navigation aborts old recovery and fences its late response', async () => {
+  let finish
+  let signal
+  const f = recoveryFixture((value) => {
+    signal = value
+    return new Promise((resolve) => { finish = resolve })
+  })
+  f.handler(eventFor(f.value))
+  f.handler.cancel()
+  assert.equal(signal.aborted, true)
+  const noticesBefore = f.notices.length
+  finish(true)
+  await flush()
+  assert.equal(f.notices.length, noticesBefore)
+  // Cancellation does not create another retry budget.
+  f.handler(eventFor(f.value))
+  assert.equal(f.calls.filter((call) => call === 'recover').length, 1)
+})
+
+test('successful page lifecycle resets the bounded recovery budget', async () => {
+  const f = recoveryFixture(() => Promise.resolve(true))
+  f.handler(eventFor(f.value))
+  await flush()
+  f.handler.reset()
+  f.handler(eventFor(f.value))
+  await flush()
+  assert.equal(f.calls.filter((call) => call === 'recover').length, 2)
+})
+
+test('a host must explicitly opt in; unknown recovery versions use legacy handling', () => {
+  const f = recoveryFixture(() => Promise.resolve(true))
+  f.value.headers['x-goadmin-auth-recovery'] = '2'
+  f.handler(eventFor(f.value))
+  assert.deepEqual(f.calls, ['clear', 'disconnect', 'navigate'])
 })

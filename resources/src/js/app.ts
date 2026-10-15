@@ -14,6 +14,7 @@ import '@/plugins/theme'
 import InertiaFallbackPage from '@/components/system/InertiaFallbackPage.vue'
 import AuthFailureNotice from '@/components/system/AuthFailureNotice.vue'
 import { createAuthFailureHandler } from '@/auth/browserAuthFailures'
+import { recoverBrowserAuthentication } from '@/auth/browserAuthRecovery'
 import axios from 'axios'
 import type { AdminAuthUser } from '@/types/models'
 import { extensions } from '@/extensions'
@@ -79,6 +80,7 @@ void createInertiaApp({
     // Здесь только синхронизируемся с уже примененным состоянием
 
     const authFailureMessage = ref('')
+    const authFailureLogin = ref(false)
     const stopListeners: Array<() => void> = []
     const app = createApp({
       render: () =>
@@ -86,6 +88,8 @@ void createInertiaApp({
           h(App, props),
           h(AuthFailureNotice, {
             message: authFailureMessage.value,
+            loginRequired: authFailureLogin.value,
+            onLogin: () => window.location.assign('/auth/login'),
             onDismiss: () => {
               authFailureMessage.value = ''
             },
@@ -147,29 +151,37 @@ void createInertiaApp({
       const initialAuth = extractAuth((props as { initialPage?: unknown }).initialPage)
       syncAuthState(initialAuth)
 
+      const authFailureHandler = createAuthFailureHandler({
+        origin: window.location.origin,
+        clearAuth: () => {
+          currentAuthId = null
+          authUserStore.setAuthUser(null)
+          profileStore.setAvatarUrl(null)
+        },
+        disconnect,
+        navigateToLogin: () => {
+          leavingForLogin = true
+          window.location.assign('/auth/login')
+        },
+        recoverAuth: recoverBrowserAuthentication,
+        showLogin: () => {
+          authFailureLogin.value = true
+        },
+        showNotice: (message) => {
+          authFailureMessage.value = message
+        },
+      })
       stopListeners.push(
-        router.on(
-          'invalid',
-          createAuthFailureHandler({
-            origin: window.location.origin,
-            clearAuth: () => {
-              leavingForLogin = true
-              currentAuthId = null
-              authUserStore.setAuthUser(null)
-              profileStore.setAvatarUrl(null)
-            },
-            disconnect,
-            navigateToLogin: () => window.location.assign('/auth/login'),
-            showNotice: (message) => {
-              authFailureMessage.value = message
-            },
-          }),
-        ),
+        () => authFailureHandler.reset(),
+        router.on('invalid', authFailureHandler),
+        router.on('start', () => authFailureHandler.cancel()),
         router.on('success', (event) => {
           // A late page response must not restore stale auth while the separate
           // login navigation is in progress.
           if (!leavingForLogin) {
+            authFailureHandler.reset()
             authFailureMessage.value = ''
+            authFailureLogin.value = false
             setAdminCapabilities(event.detail?.page)
             syncAuthState(extractAuth(event.detail?.page))
           }

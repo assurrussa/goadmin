@@ -13,6 +13,9 @@ export interface AuthFailureEffects {
   // The application supplies a fixed same-origin GET navigation, never a replay.
   navigateToLogin(): void
   showNotice(message: string): void
+  // Opt-in recovery changes only authority/CSRF, never repeats the rejected command.
+  recoverAuth?(signal: AbortSignal): Promise<boolean>
+  showLogin?(): void
 }
 
 type AuthFailureCode =
@@ -21,7 +24,7 @@ type AuthFailureCode =
   | 'authentication_unavailable'
   | 'invalid_browser_credentials'
 
-type AuthFailure = { code: AuthFailureCode; retryAfter: number | null }
+type AuthFailure = { code: AuthFailureCode; retryAfter: number | null; recoverable: boolean }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -82,12 +85,26 @@ function parseFailure(response: unknown, origin: string): AuthFailure | null {
   }
   const rawDelay = header(response.headers, 'retry-after')
   const delay = rawDelay && /^\d{1,2}$/.test(rawDelay) ? Number(rawDelay) : 0
-  return { code, retryAfter: delay >= 1 && delay <= 60 ? delay : null }
+  return {
+    code,
+    retryAfter: delay >= 1 && delay <= 60 ? delay : null,
+    recoverable: header(response.headers, 'x-goadmin-auth-recovery') === '1',
+  }
 }
 
 export function createAuthFailureHandler(effects: AuthFailureEffects) {
   let leavingForLogin = false
-  return (event: AuthFailureEvent): void => {
+  let attemptedRecovery = false
+  let pendingRecovery: AbortController | null = null
+  const requireLogin = () => {
+    effects.clearAuth()
+    effects.disconnect()
+    effects.showNotice(
+      'Не удалось восстановить доступ. Данные формы остались на странице. Войдите снова перед повторной отправкой.',
+    )
+    effects.showLogin?.()
+  }
+  const handler = (event: AuthFailureEvent): void => {
     if (event.defaultPrevented) {
       return
     }
@@ -100,10 +117,45 @@ export function createAuthFailureHandler(effects: AuthFailureEffects) {
       return
     }
     if (failure.code === 'reauthentication_required') {
+      if (pendingRecovery !== null) {
+        return
+      }
+      if (attemptedRecovery) {
+        requireLogin()
+        return
+      }
+      if (failure.recoverable && effects.recoverAuth && effects.showLogin) {
+        attemptedRecovery = true
+        const controller = new AbortController()
+        pendingRecovery = controller
+        effects.disconnect()
+        effects.showNotice('Восстанавливаем доступ. Данные формы остаются на странице.')
+        // Keep no request body, router visit or mutation callback to replay.
+        void effects
+          .recoverAuth(controller.signal)
+          .catch(() => false)
+          .then((recovered) => {
+            if (controller.signal.aborted || pendingRecovery !== controller) {
+              return
+            }
+            pendingRecovery = null
+            if (recovered) {
+              effects.showNotice(
+                'Доступ восстановлен. Данные формы сохранены на странице. Нажмите «Сохранить» ещё раз.',
+              )
+            } else {
+              requireLogin()
+            }
+          })
+        return
+      }
       leavingForLogin = true
       effects.clearAuth()
       effects.disconnect()
       effects.navigateToLogin()
+      return
+    }
+    if (pendingRecovery !== null || attemptedRecovery) {
       return
     }
     if (failure.code === 'invalid_browser_credentials') {
@@ -118,4 +170,15 @@ export function createAuthFailureHandler(effects: AuthFailureEffects) {
       `Сервис авторизации временно недоступен. Данные формы сохранены на странице. Повторите отправку вручную ${delay}`,
     )
   }
+  // A successful navigation/submission establishes a new page lifecycle.
+  // Abort any obsolete recovery so a late response cannot replace its notice.
+  handler.cancel = () => {
+    pendingRecovery?.abort()
+    pendingRecovery = null
+  }
+  handler.reset = () => {
+    handler.cancel()
+    attemptedRecovery = false
+  }
+  return handler
 }
