@@ -1,5 +1,17 @@
 # Auth/session review follow-up
 
+## Current status — 2026-10-15
+
+[PR #10](https://github.com/assurrussa/goadmin/pull/10) merged on 2026-10-03
+at `6187d28adc1abf4da0d67f38688654a0d474bc22`. This file preserves the
+September review snapshots and their verification limits; the draft status and
+open-item list below are historical, not a current release checklist.
+For current installation and release requirements, use [README.md](../README.md)
+and [RELEASING.md](../RELEASING.md). This status correction does not reclassify
+any historical failed or unrun check as passed.
+
+## Historical snapshot
+
 Status: **partial implementation; draft PR #10; not ready to merge or release**.
 Branch: `tasks/auth-session-hardening`.
 Review baseline: `0e6b44c5c3206b745b84d777aa60d38002980b3a`.

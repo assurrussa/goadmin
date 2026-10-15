@@ -4,8 +4,8 @@
 projects integrate it through the stable `github.com/assurrussa/goadmin/host`
 facade instead of copying admin internals.
 
-Install the public release with `go get github.com/assurrussa/goadmin@v0.9.6`.
-Its dependency graph uses GoAuth v0.5.1, GoNotify v0.6.0, GoUploads v0.11.0 and
+Install the public release with `go get github.com/assurrussa/goadmin@v0.12.0`.
+Its dependency graph uses GoAuth v0.8.0, GoNotify v0.6.0, GoUploads v0.13.0 and
 GoWebSocket v0.2.1 without sibling replacements.
 
 ## Try the admin locally
@@ -17,7 +17,7 @@ The [standalone starter](examples/starter/README.md) runs the embedded admin,
 PostgreSQL with Docker Compose. Redis is an optional profile; mail modules use
 NotifyHub when explicitly enabled. Copy
 `examples/starter/.env.example` to `examples/starter/.env`, fill every required
-value, then run `GOADMIN_VERSION=v0.9.6 docker compose up --build` from
+value, then run `GOADMIN_VERSION=v0.12.0 docker compose up --build` from
 `examples/starter`. This builds the starter against the published GoAdmin library
 and uses the release's embedded UI; it requires no sibling checkouts. Open
 `http://localhost:8080`; the login page offers first-admin registration until
@@ -500,12 +500,11 @@ retain the first nonempty value of each permission field; their OR lists are not
 combined. Existing child deduplication is unchanged: matching nested children
 keep the first entire item. Put their complete policy in that first contribution. Both permission fields stay server-side and are absent from menu JSON.
 
-## Unpublished external-session candidate
+## External-session admission
 
-The additive candidate host admission/validity API and its dependency/rollback
-contract are described in [external-browser-admission.md](docs/external-browser-admission.md). It retains the pinned GoAuth API, adds no public package/import path,
-and does not enable a host SSO mode. Publish GoAdmin after its exact-candidate
-publish-readiness, agreed browser acceptance, and final review; verify the
-published tag with release-readiness. Real RP consumer and end-to-end SSO
+The additive host admission/validity API is included in v0.11.1. Its dependency/rollback contract is described in
+[external-browser-admission.md](docs/external-browser-admission.md). It retains
+the pinned GoAuth API, adds no public package/import path, and does not enable a
+host SSO mode. Real RP consumer and end-to-end SSO
 acceptance follow using released dependencies and remain required before
 application release. Library publication does not establish that acceptance.

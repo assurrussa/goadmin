@@ -6,17 +6,17 @@ mounts four sibling candidates: goauth, gonotify, gouploads and gowebsocket. It 
 or a media resizer. The helper snapshots tracked and non-ignored candidate
 sources (including working changes), excluding ignored caches and Git metadata.
 Source mode requires Git, Python 3 and Docker Compose. Its GoUploads pin is
-`v0.10.1`; the explicit source mode still replaces sibling modules. The root
-explicit candidate consumer resolves GoUploads v0.11.0 without that override
+`v0.13.0`; the explicit source mode still replaces sibling modules. The root
+explicit candidate consumer resolves GoUploads v0.13.0 without that override
 when only GoAuth and GoNotify paths are selected.
 
-For published GoAdmin v0.9.6, use `GOADMIN_VERSION=v0.9.6 docker compose up --build`
+For published GoAdmin v0.12.0, use `GOADMIN_VERSION=v0.12.0 docker compose up --build`
 from this directory. That build removes local overrides and resolves libraries
 anonymously through the public Go proxy. Its embedded UI comes from the selected
 published release, not the current checkout. Run
-`make externalconsumer-published VERSION=v0.9.6` from the repository root first.
+`make externalconsumer-published VERSION=v0.12.0` from the repository root first.
 
-For either mode, copy `.env.example` to `.env`. It sets `GOADMIN_VERSION=v0.9.6`
+For either mode, copy `.env.example` to `.env`. It sets `GOADMIN_VERSION=v0.12.0`
 for the published build. Set PostgreSQL credentials, a unique CSRF secret and
 first-admin setup token of at least 32 bytes, and three distinct 32-byte keys
 encoded with standard base64. Generate each key with `openssl rand -base64 32`.

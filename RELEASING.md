@@ -334,7 +334,7 @@ Permission fields must stay absent from JSON. This changes navigation only;
 endpoint authorization, role grants, existing superadmin/nil-checker behavior,
 and explicit deep-link redirects remain unchanged.
 
-## Unreleased current-page recovery
+## Current-page recovery — released in v0.12.0
 
 Recovery is opt-in through the trusted host endpoint and
 `host.EnableExternalAdminRecovery`. It preserves mounted drafts and requires
@@ -346,18 +346,18 @@ Coordinate application-node rollout and rollback with the host endpoint; older
 nodes must not overwrite the new journal records. See
 [external proof recovery](docs/external-proof-recovery.md) for the full contract.
 
-The recovery candidate retains the GoAuth `v0.8.0` pin. These release notes do
+The v0.12.0 release retains the GoAuth `v0.8.0` pin. These release notes do
 not select a newer dependency. Rebuild and verify embedded frontend assets and
 the consuming host at the final selected source before release, using the
 existing gates above. The optional login-provider slot from
 [PR #35](https://github.com/assurrussa/goadmin/pull/35) is included in this
-consolidated unreleased candidate, but remains unavailable in published
-v0.11.1. Verify the combined candidate using the existing gates above.
+v0.12.0 release. It is unavailable in older v0.11.1 builds. Verify downstream
+hosts against the selected published version using the existing gates above.
 
-## Unpublished external-session candidate
+## External-session admission
 
-The additive candidate host admission/validity API and its dependency/rollback
-contract are described in [external-browser-admission.md](docs/external-browser-admission.md). It retains the pinned GoAuth API, adds no public package/import path,
+The additive host admission/validity API is included in v0.11.1. Its dependency/rollback
+contract is described in [external-browser-admission.md](docs/external-browser-admission.md). It retains the pinned GoAuth API, adds no public package/import path,
 and does not enable a host SSO mode. Publish GoAdmin only after its exact-candidate
 publish-readiness, agreed browser acceptance, and final review pass. Verify the
 published tag with release-readiness. Real RP consumer and end-to-end SSO
