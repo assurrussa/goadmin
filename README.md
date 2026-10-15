@@ -502,8 +502,7 @@ keep the first entire item. Put their complete policy in that first contribution
 
 ## External-session admission
 
-The additive host admission/validity API shipped in v0.10.0 and is included in
-v0.11.1. Its dependency/rollback contract is described in
+The additive host admission/validity API is included in v0.11.1. Its dependency/rollback contract is described in
 [external-browser-admission.md](docs/external-browser-admission.md). It retains
 the pinned GoAuth API, adds no public package/import path, and does not enable a
 host SSO mode. Real RP consumer and end-to-end SSO
