@@ -155,23 +155,8 @@ func (s *Service) CompleteExternalAdminRecovery(c fiber.Ctx, recovery *ExternalA
 	if err != nil {
 		return err
 	}
-	if auth.SubjectID != fresh.LocalSubject || auth.SessionID != record.Tokens.Session.ID || auth.Realm != goauth.RealmAdmin {
-		return goauth.ErrSessionRevoked
-	}
-	// Recheck local and provider authority after any canonical refresh.
-	if _, err := s.externalProof(c, fresh); err != nil {
+	if err := s.checkExternalRecoveryCommit(c, recovery, fresh, record, auth); err != nil {
 		return err
-	}
-	link, err := s.canonicalExternalLink(c, fresh)
-	if err != nil || link.ID != fresh.LinkID {
-		return errors.Join(goauth.ErrExplicitIdentityLink, err)
-	}
-	admin, err := s.admins.GetBySubjectID(c, fresh.LocalSubject)
-	if err != nil || admin.ID <= 0 {
-		return errors.Join(goauth.ErrMembershipDenied, err)
-	}
-	if !time.Now().Before(recovery.until) || !time.Now().Before(fresh.Deadline) || !time.Now().Before(fresh.AbsoluteUntil) {
-		return goauth.ErrSessionRevoked
 	}
 	binding := fresh
 	record.External = &binding
@@ -194,6 +179,31 @@ func (s *Service) CompleteExternalAdminRecovery(c fiber.Ctx, recovery *ExternalA
 	state.Payload.ExternalValidUntil = fresh.Deadline
 	sess.Set(sessioncore.AuthAdminKey.String(), state)
 	return sessioncore.SavePassive(c, s.store, sess)
+}
+
+func (s *Service) checkExternalRecoveryCommit(
+	c fiber.Ctx, recovery *ExternalAdminRecovery, fresh ExternalBinding,
+	record browserstate.Record, auth goauth.AuthContext,
+) error {
+	if auth.SubjectID != fresh.LocalSubject || auth.SessionID != record.Tokens.Session.ID || auth.Realm != goauth.RealmAdmin {
+		return goauth.ErrSessionRevoked
+	}
+	// Recheck local and provider authority after any canonical refresh.
+	if _, err := s.externalProof(c, fresh); err != nil {
+		return err
+	}
+	link, err := s.canonicalExternalLink(c, fresh)
+	if err != nil || link.ID != fresh.LinkID {
+		return errors.Join(goauth.ErrExplicitIdentityLink, err)
+	}
+	admin, err := s.admins.GetBySubjectID(c, fresh.LocalSubject)
+	if err != nil || admin.ID <= 0 {
+		return errors.Join(goauth.ErrMembershipDenied, err)
+	}
+	if !time.Now().Before(recovery.until) || !time.Now().Before(fresh.Deadline) || !time.Now().Before(fresh.AbsoluteUntil) {
+		return goauth.ErrSessionRevoked
+	}
+	return nil
 }
 
 func (s *Service) checkExternalRecoveryAdmission(c fiber.Ctx, fresh ExternalBinding, linkID string) error {

@@ -17,8 +17,10 @@ import (
 const externalFreshnessCap = 5 * time.Minute
 
 // External metadata is persisted inside the encrypted owner/version journal.
-type ExternalProof = browserstate.ExternalProof
-type ExternalBinding = browserstate.ExternalBinding
+type (
+	ExternalProof   = browserstate.ExternalProof
+	ExternalBinding = browserstate.ExternalBinding
+)
 
 // ExternalSessionAuthority is neutral: goadmin does not depend on an OIDC/RP
 // client. Validate checks exact binding, grant and fresh provider authority; its
