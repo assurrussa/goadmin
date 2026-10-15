@@ -95,6 +95,7 @@ function parseFailure(response: unknown, origin: string): AuthFailure | null {
 export function createAuthFailureHandler(effects: AuthFailureEffects) {
   let leavingForLogin = false
   let attemptedRecovery = false
+  let settledBeforeNextRequest = false
   let pendingRecovery: AbortController | null = null
   const requireLogin = () => {
     effects.clearAuth()
@@ -113,7 +114,7 @@ export function createAuthFailureHandler(effects: AuthFailureEffects) {
       return
     }
     event.preventDefault()
-    if (leavingForLogin) {
+    if (leavingForLogin || settledBeforeNextRequest) {
       return
     }
     if (failure.code === 'reauthentication_required') {
@@ -139,6 +140,7 @@ export function createAuthFailureHandler(effects: AuthFailureEffects) {
               return
             }
             pendingRecovery = null
+            settledBeforeNextRequest = true
             if (recovered) {
               effects.showNotice(
                 'Доступ восстановлен. Данные формы сохранены на странице. Нажмите «Сохранить» ещё раз.',
@@ -173,6 +175,7 @@ export function createAuthFailureHandler(effects: AuthFailureEffects) {
   // A successful navigation/submission establishes a new page lifecycle.
   // Abort any obsolete recovery so a late response cannot replace its notice.
   handler.cancel = () => {
+    settledBeforeNextRequest = false
     pendingRecovery?.abort()
     pendingRecovery = null
   }

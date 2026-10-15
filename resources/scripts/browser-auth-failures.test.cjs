@@ -186,7 +186,11 @@ test('opt-in 401 recovers once without clearing, navigating or replaying the com
   assert.deepEqual(f.calls, ['disconnect', 'recover'])
   assert.match(f.notices.at(-1), /Доступ восстановлен/)
   assert.match(f.notices.at(-1), /ещё раз/)
-  // A second failure cannot launch an unbounded refresh loop.
+  // Late parallel failures do not undo successful recovery.
+  f.handler(eventFor(f.value))
+  assert.deepEqual(f.calls, ['disconnect', 'recover'])
+  // A new manual submission cannot launch an unbounded refresh loop.
+  f.handler.cancel()
   f.handler(eventFor(f.value))
   assert.equal(f.calls.filter((call) => call === 'recover').length, 1)
   assert.equal(f.calls.includes('navigate'), false)

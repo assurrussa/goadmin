@@ -191,7 +191,8 @@ it('recovers an opted-in failure in the current page without replacing or submit
   expect(submit).not.toHaveBeenCalled()
   expect(navigate).not.toHaveBeenCalled()
 
-  // A new failure cannot loop. Login is explicit and the form remains mounted.
+  // A new manual submission cannot loop. Login stays explicit.
+  handler.cancel()
   document.dispatchEvent(failure())
   await nextTick()
   expect(recoverAuth).toHaveBeenCalledTimes(1)
