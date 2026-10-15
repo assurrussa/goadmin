@@ -9,19 +9,26 @@ import (
 // ExternalProof is verified provider time, never the time a response was received.
 // Validity confirms the admitted immutable snapshot. Fresh provider proof needs
 // explicit admission; neither issue time nor deadline slides on a read.
-type ExternalProof struct{ IssuedAt, ExpiresAt time.Time }
+type ExternalProof struct {
+	IssuedAt  time.Time `json:"issuedAt"`
+	ExpiresAt time.Time `json:"expiresAt"`
+}
 
-// ExternalBinding is server-side metadata, never a browser credential. LinkID
-// pins the canonical link INSTANCE so unlink/relink cannot revive old sessions.
-// AuthorityID references the host's encrypted durable provider-state journal.
+// ExternalBinding is encrypted server-side metadata, never a browser credential.
+// LinkID pins the canonical link instance; AuthorityID pins the provider journal.
 type ExternalBinding struct {
-	Issuer, Subject, LinkID, AuthorityID, ProviderSessionID string
-	ClientID, ProjectID                                     string
-	ExternalAuthTime                                        time.Time
-	Generation                                              uint64
-	LoginGeneration                                         uint64
-	Deadline                                                time.Time
-	LocalSubject                                            goauth.SubjectID
-	AbsoluteUntil                                           time.Time
-	Proof                                                   ExternalProof
+	Issuer            string           `json:"issuer"`
+	Subject           string           `json:"subject"`
+	LinkID            string           `json:"linkId"`
+	AuthorityID       string           `json:"authorityId"`
+	ProviderSessionID string           `json:"providerSessionId"`
+	ClientID          string           `json:"clientId"`
+	ProjectID         string           `json:"projectId"`
+	ExternalAuthTime  time.Time        `json:"externalAuthTime"`
+	Generation        uint64           `json:"generation"`
+	LoginGeneration   uint64           `json:"loginGeneration"`
+	Deadline          time.Time        `json:"deadline"`
+	LocalSubject      goauth.SubjectID `json:"localSubject"`
+	AbsoluteUntil     time.Time        `json:"absoluteUntil"`
+	Proof             ExternalProof    `json:"proof"`
 }

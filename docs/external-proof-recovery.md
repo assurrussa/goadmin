@@ -26,6 +26,11 @@ binding rather than trusting a late Fiber projection save. The native session
 ID is unchanged, so concurrent canonical revocation remains effective. An
 expired canonical access token may refresh only after fresh provider evidence
 passes validation, and only through the existing one-consumption claim rules.
+GoAuth v0.8 also reports expired access JWTs as invalid tokens. That error alone
+cannot trigger recovery refresh: the claimed native journal must carry a nonzero,
+expired access deadline. The journal-held refresh credential must still pass
+canonical validation and revocation checks; an invalid access token is never
+accepted as authentication. Zero or future access deadlines fail closed.
 
 Issuer, subject, canonical subject/link instance, client, project, authority,
 provider session, auth time and login generation must remain identical.

@@ -90,7 +90,7 @@ func newExternalFixture(t *testing.T, options ...testkit.RuntimeOption) external
 	require.NoError(t, err)
 	admin := models.Admin{ID: 91, SubjectID: account.Subject.ID, UUID: identity.NewUserID(), Data: &models.AdminData{Permissions: map[string][]string{"synthetic-local": {"read"}}}}
 	now := time.Now().UTC()
-	authority := &externalAuthorityFake{proof: ExternalProof{now.Add(-time.Second), now.Add(time.Hour)}}
+	authority := &externalAuthorityFake{proof: ExternalProof{IssuedAt: now.Add(-time.Second), ExpiresAt: now.Add(time.Hour)}}
 	resolver := &linkResolverFake{IdentityLinkResolver: f.Store}
 	svc := NewService(fibersession.NewStore(), roleServiceStub{}, WithRuntime(f.Runtime, adminRepositoryStub{admin: admin}), WithBrowserState(browserstate.NewMemory()), WithExternalAuthority(authority, resolver))
 	binding := ExternalBinding{Issuer: "https://synthetic-issuer.invalid", ClientID: "synthetic-client", ProjectID: "synthetic-project", Subject: "synthetic-external", AuthorityID: "synthetic-provider-session", Generation: 1, LoginGeneration: 1, Deadline: now.Add(5*time.Minute - time.Second), ProviderSessionID: "synthetic-sid", ExternalAuthTime: now.Add(-time.Minute), LocalSubject: account.Subject.ID, AbsoluteUntil: now.Add(time.Hour), Proof: authority.proof}
@@ -200,11 +200,11 @@ func TestExternalEveryRequestFailsClosedWithoutDowngrade(t *testing.T) {
 			case "authority-disabled":
 				f.service.externalAuthority = nil
 			case "expired":
-				f.authority.proof = ExternalProof{time.Now().Add(-6 * time.Minute), time.Now().Add(time.Hour)}
+				f.authority.proof = ExternalProof{IssuedAt: time.Now().Add(-6 * time.Minute), ExpiresAt: time.Now().Add(time.Hour)}
 			case "receipt-slide":
 				f.authority.proof.ExpiresAt = f.authority.proof.ExpiresAt.Add(time.Hour)
 			case "absolute-end":
-				f.authority.proof = ExternalProof{time.Now().Add(time.Hour), time.Now().Add(2 * time.Hour)}
+				f.authority.proof = ExternalProof{IssuedAt: time.Now().Add(time.Hour), ExpiresAt: time.Now().Add(2 * time.Hour)}
 			}
 			response, err := f.app.Test(requestWithCookie(http.MethodGet, "/auth", cookie))
 			require.NoError(t, err)

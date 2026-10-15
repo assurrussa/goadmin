@@ -4,6 +4,7 @@ package adminservice
 import (
 	"context"
 	"net/http"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -14,6 +15,12 @@ import (
 
 	"github.com/assurrussa/goadmin/internal/auth/browserstate"
 	"github.com/assurrussa/goadmin/internal/refreshpolicy"
+)
+
+const (
+	recoveryOtherSuffix = "-other"
+	recoveryLinkCase    = "link"
+	recoveryLegacyCase  = "legacy"
 )
 
 func changeExternalRecoveryRecord(t *testing.T, f externalFixture, cookie *http.Cookie, change func(*browserstate.Record)) {
@@ -98,12 +105,13 @@ func TestExternalRecoveryPreservesCanonicalSessionAndRejectsReplay(t *testing.T)
 func TestExternalRecoveryRejectsLineageChanges(t *testing.T) {
 	cases := map[string]func(*ExternalBinding){
 		"issuer":                       func(b *ExternalBinding) { b.Issuer += "/other" },
-		"subject":                      func(b *ExternalBinding) { b.Subject += "-other" },
-		"link":                         func(b *ExternalBinding) { b.LinkID += "-other" },
-		"authority":                    func(b *ExternalBinding) { b.AuthorityID += "-other" },
-		"provider-session":             func(b *ExternalBinding) { b.ProviderSessionID += "-other" },
-		"client":                       func(b *ExternalBinding) { b.ClientID += "-other" },
-		"project":                      func(b *ExternalBinding) { b.ProjectID += "-other" },
+		"local-subject":                func(b *ExternalBinding) { b.LocalSubject = goauth.NewSubjectID() },
+		"subject":                      func(b *ExternalBinding) { b.Subject += recoveryOtherSuffix },
+		recoveryLinkCase:               func(b *ExternalBinding) { b.LinkID += recoveryOtherSuffix },
+		"authority":                    func(b *ExternalBinding) { b.AuthorityID += recoveryOtherSuffix },
+		"provider-session":             func(b *ExternalBinding) { b.ProviderSessionID += recoveryOtherSuffix },
+		"client":                       func(b *ExternalBinding) { b.ClientID += recoveryOtherSuffix },
+		"project":                      func(b *ExternalBinding) { b.ProjectID += recoveryOtherSuffix },
 		"auth-time":                    func(b *ExternalBinding) { b.ExternalAuthTime = b.ExternalAuthTime.Add(time.Second) },
 		"login":                        func(b *ExternalBinding) { b.LoginGeneration++ },
 		"generation":                   func(b *ExternalBinding) { b.Generation = 0 },
@@ -131,7 +139,7 @@ func TestExternalRecoveryRejectsLineageChanges(t *testing.T) {
 }
 
 func TestExternalRecoveryRejectsChangesDuringProviderVerification(t *testing.T) {
-	for _, change := range []string{"native-logout", "native-revocation", "version", "membership", "link", "legacy", "absolute"} {
+	for _, change := range []string{"native-logout", "native-revocation", "version", "membership", recoveryLinkCase, recoveryLegacyCase, "absolute"} {
 		t.Run(change, func(t *testing.T) {
 			f := newExternalFixture(t)
 			cookie := admittedExternal(t, f)
@@ -148,9 +156,9 @@ func TestExternalRecoveryRejectsChangesDuringProviderVerification(t *testing.T) 
 					changeExternalRecoveryRecord(t, f, cookie, func(*browserstate.Record) {})
 				case "membership":
 					f.service.admins = adminRepositoryStub{}
-				case "link":
+				case recoveryLinkCase:
 					f.resolver.replacement = true
-				case "legacy":
+				case recoveryLegacyCase:
 					changeExternalRecoveryRecord(t, f, cookie, func(r *browserstate.Record) { r.External = nil })
 				case "absolute":
 					snapshot.binding.AbsoluteUntil = time.Now().Add(-time.Second)
@@ -167,7 +175,7 @@ func TestExternalRecoveryRejectsChangesDuringProviderVerification(t *testing.T) 
 type deleteBeforeRecoveryCommit struct{ browserstate.Store }
 
 func (s deleteBeforeRecoveryCommit) Complete(ctx context.Context, id string, version int64, owner string, record browserstate.Record) (bool, error) {
-	if err := s.Store.Delete(ctx, id); err != nil {
+	if err := s.Delete(ctx, id); err != nil {
 		return false, err
 	}
 	return s.Store.Complete(ctx, id, version, owner, record)
@@ -192,7 +200,7 @@ func TestExternalRecoveryCASCannotResurrectDeletedJournal(t *testing.T) {
 
 func TestExternalRecoveryRequiresJournalBinding(t *testing.T) {
 	for _, legacy := range []bool{false, true} {
-		t.Run(map[bool]string{false: "absolute-expired", true: "legacy"}[legacy], func(t *testing.T) {
+		t.Run(map[bool]string{false: "absolute-expired", true: recoveryLegacyCase}[legacy], func(t *testing.T) {
 			f := newExternalFixture(t)
 			cookie := admittedExternal(t, f)
 			changeExternalRecoveryRecord(t, f, cookie, func(r *browserstate.Record) {
@@ -227,18 +235,20 @@ func TestExternalRecoveryRefreshesNativeTokenOnlyAfterFreshProof(t *testing.T) {
 	for _, valid := range []bool{false, true} {
 		t.Run(map[bool]string{false: "stale-proof", true: "fresh-proof"}[valid], func(t *testing.T) {
 			var clock atomic.Int64
-			clock.Store(time.Now().UTC().Truncate(time.Second).UnixNano())
+			clock.Store(time.Now().UTC().Add(-2 * time.Second).Truncate(time.Second).UnixNano())
 			f := newExternalFixture(t, func(c *goauth.Config) {
 				c.AccessTTL = time.Second
 				c.Now = func() time.Time { return time.Unix(0, clock.Load()) }
 			})
 			cookie := admittedExternal(t, f)
+			_, err := f.runtime.Runtime.AuthenticateSession(t.Context(), mustRecoveryRecord(t, f, cookie).Tokens.AccessToken)
+			require.NoError(t, err)
 			clock.Add(int64(2 * time.Second))
 			record, found, err := f.service.states.Load(t.Context(), cookie.Value)
 			require.NoError(t, err)
 			require.True(t, found)
-			_, err = f.runtime.Runtime.VerifyAccessToken(t.Context(), record.Tokens.AccessToken, true)
-			require.ErrorIs(t, err, goauth.ErrExpiredToken)
+			_, err = f.runtime.Runtime.AuthenticateSession(t.Context(), record.Tokens.AccessToken)
+			require.ErrorIs(t, err, goauth.ErrInvalidToken)
 			rt := &recoveryRefreshRuntime{runtime: f.service.runtime}
 			f.service.runtime = rt
 			f.app.Get("/recover", func(c fiber.Ctx) error {
@@ -256,6 +266,8 @@ func TestExternalRecoveryRefreshesNativeTokenOnlyAfterFreshProof(t *testing.T) {
 					require.NoError(t, loadErr)
 					require.True(t, found)
 					require.Equal(t, snapshot.record.Tokens.Session.ID, record.Tokens.Session.ID)
+					require.Equal(t, snapshot.record.Tokens.Session.ExpiresAt, record.Tokens.Session.ExpiresAt)
+					require.Equal(t, snapshot.record.External.AbsoluteUntil, record.External.AbsoluteUntil)
 				} else {
 					require.Error(t, err)
 					require.Zero(t, rt.refreshes)
@@ -264,6 +276,10 @@ func TestExternalRecoveryRefreshesNativeTokenOnlyAfterFreshProof(t *testing.T) {
 			})
 			response := performSessionRequest(t, f.app, http.MethodGet, "/recover", cookie)
 			_ = response.Body.Close()
+			if valid {
+				authenticated := performSessionRequest(t, f.app, http.MethodGet, "/auth", cookie)
+				_ = authenticated.Body.Close()
+			}
 		})
 	}
 }
@@ -280,5 +296,75 @@ func TestExternalRecoverySnapshotSupportsMutationPreflight(t *testing.T) {
 		return c.SendStatus(http.StatusNoContent)
 	})
 	response := performSessionRequest(t, f.app, http.MethodPost, "/preflight", cookie)
+	_ = response.Body.Close()
+}
+
+func mustRecoveryRecord(t *testing.T, f externalFixture, cookie *http.Cookie) browserstate.Record {
+	t.Helper()
+	record, found, err := f.service.states.Load(t.Context(), cookie.Value)
+	require.NoError(t, err)
+	require.True(t, found)
+	return record
+}
+
+// Invalid access errors alone never authorize refresh, even with fresh provider proof.
+func TestExternalRecoveryInvalidAccessRequiresAuthoritativeExpiry(t *testing.T) {
+	for _, tokenKind := range []string{"malformed", "wrong-signature"} {
+		for _, expiryKind := range []string{"zero", "future"} {
+			t.Run(tokenKind+"/"+expiryKind, func(t *testing.T) {
+				f := newExternalFixture(t)
+				cookie := admittedExternal(t, f)
+				changeExternalRecoveryRecord(t, f, cookie, func(record *browserstate.Record) {
+					if tokenKind == "malformed" {
+						record.Tokens.AccessToken = "malformed-access-token"
+					} else {
+						parts := strings.Split(record.Tokens.AccessToken, ".")
+						require.Len(t, parts, 3)
+						parts[2] = strings.Repeat("A", len(parts[2]))
+						record.Tokens.AccessToken = strings.Join(parts, ".")
+					}
+					record.Tokens.AccessExpiresAt = time.Time{}
+					if expiryKind == "future" {
+						record.Tokens.AccessExpiresAt = time.Now().Add(time.Hour)
+					}
+				})
+				rt := &recoveryRefreshRuntime{runtime: f.service.runtime}
+				f.service.runtime = rt
+				f.app.Get("/recover", func(c fiber.Ctx) error {
+					snapshot, err := f.service.BeginExternalAdminRecovery(c)
+					require.NoError(t, err)
+					fresh := freshRecoveryBinding(f, snapshot.Binding())
+					require.ErrorIs(t, f.service.CompleteExternalAdminRecovery(c, snapshot, fresh), goauth.ErrInvalidToken)
+					require.Zero(t, rt.refreshes)
+					return c.SendStatus(http.StatusNoContent)
+				})
+				response := performSessionRequest(t, f.app, http.MethodGet, "/recover", cookie)
+				_ = response.Body.Close()
+			})
+		}
+	}
+}
+
+func TestExternalRecoveryExpiredAccessCannotReviveRevokedSession(t *testing.T) {
+	var clock atomic.Int64
+	clock.Store(time.Now().UTC().Add(-2 * time.Second).Truncate(time.Second).UnixNano())
+	f := newExternalFixture(t, func(c *goauth.Config) {
+		c.AccessTTL = time.Second
+		c.Now = func() time.Time { return time.Unix(0, clock.Load()) }
+	})
+	cookie := admittedExternal(t, f)
+	clock.Add(int64(2 * time.Second))
+	rt := &recoveryRefreshRuntime{runtime: f.service.runtime}
+	f.service.runtime = rt
+	f.app.Get("/recover", func(c fiber.Ctx) error {
+		snapshot, err := f.service.BeginExternalAdminRecovery(c)
+		require.NoError(t, err)
+		fresh := freshRecoveryBinding(f, snapshot.Binding())
+		require.NoError(t, f.runtime.Runtime.Logout(c, snapshot.record.SubjectID, snapshot.record.Tokens.Session.ID))
+		require.ErrorIs(t, f.service.CompleteExternalAdminRecovery(c, snapshot, fresh), goauth.ErrSessionRevoked)
+		require.Equal(t, 1, rt.refreshes)
+		return c.SendStatus(http.StatusNoContent)
+	})
+	response := performSessionRequest(t, f.app, http.MethodGet, "/recover", cookie)
 	_ = response.Body.Close()
 }

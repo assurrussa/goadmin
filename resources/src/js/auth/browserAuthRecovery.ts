@@ -41,7 +41,12 @@ export async function recoverBrowserAuthentication(
         return false
       }
       const body: unknown = await response.json()
-      if (controller.signal.aborted || typeof body !== 'object' || body === null || Array.isArray(body)) {
+      if (
+        controller.signal.aborted ||
+        typeof body !== 'object' ||
+        body === null ||
+        Array.isArray(body)
+      ) {
         return false
       }
       const result = body as Record<string, unknown>

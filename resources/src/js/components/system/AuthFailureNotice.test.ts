@@ -135,7 +135,10 @@ it('recovers an opted-in failure in the current page without replacing or submit
   const navigate = vi.fn()
   let finishRecovery: ((value: boolean) => void) | undefined
   const recoverAuth = vi.fn(
-    () => new Promise<boolean>((resolve) => { finishRecovery = resolve }),
+    () =>
+      new Promise<boolean>((resolve) => {
+        finishRecovery = resolve
+      }),
   )
   const element = document.createElement('div')
   document.body.append(element)
@@ -158,9 +161,13 @@ it('recovers an opted-in failure in the current page without replacing or submit
     clearAuth: vi.fn(),
     disconnect: vi.fn(),
     navigateToLogin: navigate,
-    showNotice: (notice) => { message.value = notice },
+    showNotice: (notice) => {
+      message.value = notice
+    },
     recoverAuth,
-    showLogin: () => { loginRequired.value = true },
+    showLogin: () => {
+      loginRequired.value = true
+    },
   })
   cleanup.push(() => handler.reset())
   cleanup.push(router.on('invalid', handler))
@@ -174,10 +181,11 @@ it('recovers an opted-in failure in the current page without replacing or submit
       'content-type': 'application/json',
     },
   }
-  const failure = () => new CustomEvent('inertia:invalid', {
-    cancelable: true,
-    detail: { response },
-  })
+  const failure = () =>
+    new CustomEvent('inertia:invalid', {
+      cancelable: true,
+      detail: { response },
+    })
   expect(document.dispatchEvent(failure())).toBe(false)
   expect(document.dispatchEvent(failure())).toBe(false)
   expect(recoverAuth).toHaveBeenCalledTimes(1)
@@ -199,8 +207,9 @@ it('recovers an opted-in failure in the current page without replacing or submit
   expect(element.querySelector('input')).toBe(input)
   expect(input.value).toBe('unsaved draft')
   expect(navigate).not.toHaveBeenCalled()
-  const login = [...element.querySelectorAll<HTMLButtonElement>('aside button')]
-    .find((button) => button.textContent?.includes('Войти снова'))!
+  const login = [...element.querySelectorAll<HTMLButtonElement>('aside button')].find((button) =>
+    button.textContent?.includes('Войти снова'),
+  )!
   login.click()
   expect(navigate).toHaveBeenCalledTimes(1)
   expect(submit).not.toHaveBeenCalled()

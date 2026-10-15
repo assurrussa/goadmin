@@ -7,6 +7,7 @@ import (
 
 	"github.com/assurrussa/goauth"
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/session"
 	"github.com/google/uuid"
 
 	sessioncore "github.com/assurrussa/goadmin/infrastructure/core/session"
@@ -87,7 +88,9 @@ func (s *Service) BeginExternalAdminRecovery(c fiber.Ctx) (*ExternalAdminRecover
 	if admin.ID <= 0 {
 		return nil, goauth.ErrMembershipDenied
 	}
-	return &ExternalAdminRecovery{service: s, id: sess.ID(), record: record, binding: binding, until: time.Now().Add(20 * time.Second)}, nil
+	return &ExternalAdminRecovery{
+		service: s, id: sess.ID(), record: record, binding: binding, until: time.Now().Add(20 * time.Second),
+	}, nil
 }
 
 func sameExternalLogin(old, fresh ExternalBinding) bool {
@@ -126,22 +129,8 @@ func (s *Service) CompleteExternalAdminRecovery(c fiber.Ctx, recovery *ExternalA
 	if sess.ID() != recovery.id {
 		return goauth.ErrSessionRevoked
 	}
-	if _, err := s.externalProof(c, fresh); err != nil {
+	if err := s.checkExternalRecoveryAdmission(c, fresh, recovery.binding.LinkID); err != nil {
 		return err
-	}
-	link, err := s.canonicalExternalLink(c, fresh)
-	if err != nil {
-		return err
-	}
-	if link.ID != recovery.binding.LinkID {
-		return goauth.ErrExplicitIdentityLink
-	}
-	admin, err := s.admins.GetBySubjectID(c, fresh.LocalSubject)
-	if err != nil {
-		return err
-	}
-	if admin.ID <= 0 {
-		return goauth.ErrMembershipDenied
 	}
 	owner := refreshpolicy.Owner("refresh", uuid.NewString(), time.Now())
 	claimed, err := s.states.Claim(c, recovery.id, recovery.record.Version, owner)
@@ -162,21 +151,7 @@ func (s *Service) CompleteExternalAdminRecovery(c fiber.Ctx, recovery *ExternalA
 		record.SubjectID != recovery.record.SubjectID || record.Tokens.Session.ID != recovery.record.Tokens.Session.ID {
 		return errors.Join(goauth.ErrSessionRevoked, err)
 	}
-	auth, err := s.runtime.VerifyAccessToken(c, record.Tokens.AccessToken, true)
-	if errors.Is(err, goauth.ErrExpiredToken) {
-		consumed = true
-		tokens, refreshErr := s.runtime.Refresh(c, record.Tokens.RefreshToken)
-		if refreshErr != nil {
-			_, handledErr := s.failOwnedAdminRefresh(c, sess, record, owner, refreshErr)
-			return errors.Join(goauth.ErrSessionRevoked, handledErr)
-		}
-		// Never transform recovery into a new canonical login.
-		if tokens.Session.ID != record.Tokens.Session.ID || tokens.Session.ExpiresAt.After(record.Tokens.Session.ExpiresAt) {
-			return goauth.ErrSessionRevoked
-		}
-		record.Tokens = tokens
-		auth, err = s.runtime.VerifyAccessToken(c, tokens.AccessToken, true)
-	}
+	auth, err := s.verifyExternalRecoveryToken(c, sess, &record, owner, &consumed)
 	if err != nil {
 		return err
 	}
@@ -187,11 +162,11 @@ func (s *Service) CompleteExternalAdminRecovery(c fiber.Ctx, recovery *ExternalA
 	if _, err := s.externalProof(c, fresh); err != nil {
 		return err
 	}
-	link, err = s.canonicalExternalLink(c, fresh)
+	link, err := s.canonicalExternalLink(c, fresh)
 	if err != nil || link.ID != fresh.LinkID {
 		return errors.Join(goauth.ErrExplicitIdentityLink, err)
 	}
-	admin, err = s.admins.GetBySubjectID(c, fresh.LocalSubject)
+	admin, err := s.admins.GetBySubjectID(c, fresh.LocalSubject)
 	if err != nil || admin.ID <= 0 {
 		return errors.Join(goauth.ErrMembershipDenied, err)
 	}
@@ -219,6 +194,52 @@ func (s *Service) CompleteExternalAdminRecovery(c fiber.Ctx, recovery *ExternalA
 	state.Payload.ExternalValidUntil = fresh.Deadline
 	sess.Set(sessioncore.AuthAdminKey.String(), state)
 	return sessioncore.SavePassive(c, s.store, sess)
+}
+
+func (s *Service) checkExternalRecoveryAdmission(c fiber.Ctx, fresh ExternalBinding, linkID string) error {
+	if _, err := s.externalProof(c, fresh); err != nil {
+		return err
+	}
+	link, err := s.canonicalExternalLink(c, fresh)
+	if err != nil {
+		return err
+	}
+	if link.ID != linkID {
+		return goauth.ErrExplicitIdentityLink
+	}
+	admin, err := s.admins.GetBySubjectID(c, fresh.LocalSubject)
+	if err != nil {
+		return err
+	}
+	if admin.ID <= 0 {
+		return goauth.ErrMembershipDenied
+	}
+	return nil
+}
+
+func (s *Service) verifyExternalRecoveryToken(
+	c fiber.Ctx, sess *session.Session, record *browserstate.Record, owner string, consumed *bool,
+) (goauth.AuthContext, error) {
+	auth, err := s.runtime.VerifyAccessToken(c, record.Tokens.AccessToken, true)
+	// GoAuth also reports JWT expiry as ErrInvalidToken. Only the trusted
+	// journal expiry can admit that case. Invalid alone is never sufficient;
+	// the canonical refresh credential must still prove current authority.
+	expired := !record.Tokens.AccessExpiresAt.IsZero() && !time.Now().Before(record.Tokens.AccessExpiresAt)
+	if errors.Is(err, goauth.ErrExpiredToken) || (errors.Is(err, goauth.ErrInvalidToken) && expired) {
+		*consumed = true
+		tokens, refreshErr := s.runtime.Refresh(c, record.Tokens.RefreshToken)
+		if refreshErr != nil {
+			_, handledErr := s.failOwnedAdminRefresh(c, sess, *record, owner, refreshErr)
+			return goauth.AuthContext{}, errors.Join(goauth.ErrSessionRevoked, handledErr)
+		}
+		// Never transform recovery into a new canonical login.
+		if tokens.Session.ID != record.Tokens.Session.ID || tokens.Session.ExpiresAt.After(record.Tokens.Session.ExpiresAt) {
+			return goauth.AuthContext{}, goauth.ErrSessionRevoked
+		}
+		record.Tokens = tokens
+		auth, err = s.runtime.VerifyAccessToken(c, tokens.AccessToken, true)
+	}
+	return auth, err
 }
 
 type externalRecoveryEnabledKey struct{}
