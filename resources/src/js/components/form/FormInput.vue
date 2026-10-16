@@ -29,7 +29,8 @@
       <!-- Left icon slot -->
       <div
         v-if="$slots.leftIcon"
-        class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"
+        class="absolute top-0 left-0 pl-3 flex items-center pointer-events-none"
+        :class="inputHeightClass"
       >
         <slot name="leftIcon" />
       </div>
@@ -37,8 +38,8 @@
       <!-- Right icon slot (interactive) -->
       <div
         v-if="$slots.rightIcon"
-        class="absolute inset-y-0 right-0 pr-3 flex items-center"
-        :class="{ 'pointer-events-none': readonly || disabled }"
+        class="absolute top-0 right-0 pr-3 flex items-center"
+        :class="[inputHeightClass, { 'pointer-events-none': readonly || disabled }]"
       >
         <slot name="rightIcon" />
       </div>
@@ -46,7 +47,8 @@
       <!-- Loading spinner -->
       <div
         v-if="loading"
-        class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none"
+        class="absolute top-0 right-0 pr-3 flex items-center pointer-events-none"
+        :class="inputHeightClass"
       >
         <svg class="animate-spin h-4 w-4 text-text-tertiary" fill="none" viewBox="0 0 24 24">
           <circle
@@ -126,17 +128,16 @@ const slots = useSlots()
 // Generate unique ID if not provided
 const inputId = computed(() => props.id || useId())
 
+// Keep icons on the input row even when a host appends a policy hint here.
+const inputHeightClass = computed(() => {
+  if (props.size === 'sm') return 'h-8'
+  if (props.size === 'lg') return 'h-10'
+  return 'h-9'
+})
+
 // Computed classes for input styling
 const inputClasses = computed(() => {
-  const classes: string[] = []
-
-  if (props.size === 'sm') {
-    classes.push('h-8 text-xs')
-  } else if (props.size === 'lg') {
-    classes.push('h-10 text-sm')
-  } else {
-    classes.push('h-9 text-sm')
-  }
+  const classes = [inputHeightClass.value, props.size === 'sm' ? 'text-xs' : 'text-sm']
 
   if (props.error) {
     classes.push('border-destructive/70 focus-visible:ring-destructive/40')

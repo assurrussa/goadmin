@@ -19,12 +19,13 @@
       <button
         type="button"
         @click="togglePasswordVisibility"
-        class="text-text-tertiary hover:text-text-secondary transition-colors duration-200"
+        class="rounded-sm text-text-tertiary hover:text-text-secondary transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         :disabled="readonly || disabled"
-        tabindex="-1"
+        :aria-label="showPassword ? 'Скрыть пароль' : 'Показать пароль'"
+        :aria-pressed="showPassword"
       >
-        <EyeIcon v-if="!showPassword" class="w-5 h-5" />
-        <EyeSlashIcon v-else class="w-5 h-5" />
+        <EyeIcon v-if="!showPassword" class="w-5 h-5" aria-hidden="true" />
+        <EyeSlashIcon v-else class="w-5 h-5" aria-hidden="true" />
       </button>
     </template>
   </FormInput>
