@@ -1,0 +1,1 @@
+import{ag as a}from"./app.js";import{d as r,N as o,O as s,P as l,Q as n,y as i}from"./editor-B2BvycsH.js";const c=r({__name:"AppHead",props:{title:String},setup(t){return(e,d)=>(o(),s(i(a),{title:t.title?`${t.title} — Админка`:"Админка"},{default:l(()=>[n(e.$slots,"default")]),_:3},8,["title"]))}});export{c as _};
