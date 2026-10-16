@@ -32,6 +32,8 @@ import (
 
 //go:generate toolsmocks
 
+const adminPreviewIDField = "previewId"
+
 // adminRepo интерфейс репозитория администраторов.
 type adminRepo interface {
 	ProvisionAccount(
@@ -141,7 +143,7 @@ func NewHandler(
 				},
 			},
 			{
-				Key:               "name", //nolint:goconst // required
+				Key:               "name",
 				Label:             "Имя",
 				Type:              "text", //nolint:goconst // required
 				Sortable:          true,
@@ -149,7 +151,7 @@ func NewHandler(
 				FilterPlaceholder: "Введите имя",
 			},
 			{
-				Key:               "lastName", //nolint:goconst // required
+				Key:               "lastName",
 				Label:             "Фамилия",
 				Type:              "text",
 				Sortable:          true,
@@ -157,7 +159,7 @@ func NewHandler(
 				FilterPlaceholder: "Введите фамилию",
 			},
 			{
-				Key:               "email", //nolint:goconst // required
+				Key:               "email",
 				Label:             "Email", //nolint:goconst // required
 				Type:              "text",
 				Sortable:          true,
@@ -394,13 +396,9 @@ func (h *Handler) Store(c fiber.Ctx) error {
 	if err := c.Bind().Body(&form); err != nil {
 		return fmt.Errorf("admin handler store parse: %w", err)
 	}
-	h.adminApp.HTTPManager().WithFlashOld(c, map[string]any{
-		"username":  form.Username,
-		"name":      form.Name,
-		"lastName":  form.LastName,
-		"email":     form.Email,
-		"previewId": form.PreviewID, //nolint:goconst // required
-	})
+	h.adminApp.HTTPManager().WithFlashOld(c, adminFormOld(
+		form.Username, form.Name, form.LastName, form.Email, form.PreviewID,
+	))
 
 	validationErrs := formvalidator.Validate(
 		&validators.StringIsPresent{Name: "Name", Field: form.Name, Message: "Name не задан"},
@@ -488,13 +486,9 @@ func (h *Handler) Update(c fiber.Ctx) error {
 	if err := c.Bind().Body(&form); err != nil {
 		return fmt.Errorf("admin handler update parse: %w", err)
 	}
-	h.adminApp.HTTPManager().WithFlashOld(c, map[string]any{
-		"username":  form.Username,
-		"name":      form.Name,
-		"lastName":  form.LastName,
-		"email":     form.Email,
-		"previewId": form.PreviewID,
-	})
+	h.adminApp.HTTPManager().WithFlashOld(c, adminFormOld(
+		form.Username, form.Name, form.LastName, form.Email, form.PreviewID,
+	))
 
 	validationErrs := formvalidator.Validate(
 		&validators.StringIsPresent{Name: "Name", Field: form.Name, Message: "Name не задан"},
@@ -625,7 +619,7 @@ func (h *Handler) fetchPreviewFile(
 	}
 
 	if h.fileRepo == nil {
-		return nil, goinertia.ValidationErrors{"previewId": {"Загрузка файлов отключена"}}, nil
+		return nil, goinertia.ValidationErrors{adminPreviewIDField: {"Загрузка файлов отключена"}}, nil
 	}
 	file, err := h.fileRepo.GetByID(ctx, *previewID)
 	if err != nil {
@@ -634,23 +628,23 @@ func (h *Handler) fetchPreviewFile(
 
 	if file.ID == 0 {
 		return nil, goinertia.ValidationErrors{
-			"previewId": {"Файл превью не найден"},
+			adminPreviewIDField: {"Файл превью не найден"},
 		}, nil
 	}
 
 	if !uploadintegration.Finalized(file) || file.ObjectType != uploadhost.ObjectTypeAdmin || !isPreviewImage(file.MimeType) {
 		return nil, goinertia.ValidationErrors{
-			"previewId": {"Недопустимый файл для превью"},
+			adminPreviewIDField: {"Недопустимый файл для превью"},
 		}, nil
 	}
 	if file.ObjectID != nil {
 		if adminID <= 0 || file.ObjectID.Int64() != adminID {
-			return nil, goinertia.ValidationErrors{"previewId": {"Файл принадлежит другому администратору"}}, nil
+			return nil, goinertia.ValidationErrors{adminPreviewIDField: {"Файл принадлежит другому администратору"}}, nil
 		}
 	} else {
 		actor := shared.GetAdminAuth(ctx)
 		if actor == nil || file.ManagerID == nil || *file.ManagerID != actor.ID {
-			return nil, goinertia.ValidationErrors{"previewId": {"Файл загружен другим администратором"}}, nil
+			return nil, goinertia.ValidationErrors{adminPreviewIDField: {"Файл загружен другим администратором"}}, nil
 		}
 	}
 
@@ -713,6 +707,17 @@ func (h *Handler) getID(c fiber.Ctx) (int64, error) {
 	}
 
 	return int64(id), nil
+}
+
+func adminFormOld(username, name, lastName, email string, previewID *int64) map[string]any {
+	old := map[string]any{
+		"username": username, "name": name, "lastName": lastName, "email": email,
+	}
+	// Flash values cross the gob session boundary; typed nil pointers cannot be encoded.
+	if previewID != nil {
+		old[adminPreviewIDField] = *previewID
+	}
+	return old
 }
 
 type adminUpdateInput struct {
