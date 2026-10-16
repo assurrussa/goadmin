@@ -7,23 +7,38 @@ interface MockForm {
   [key: string]: unknown
   errors: Record<string, string>
   processing: boolean
+  reset: (...keys: string[]) => void
 }
 const requests = vi.hoisted(() => ({ post: vi.fn(), forms: [] as MockForm[] }))
 vi.mock('@inertiajs/vue3', () => ({
   usePage: () => ({ props: {} }),
   router: { on: () => () => {} },
   useForm: (data: Record<string, string>) => {
+    let defaults = { ...data }
     const form = reactive(
       Object.assign({ ...data }, { errors: {} as Record<string, string>, processing: false }),
     )
-    Object.assign(form, {
-      errors: {},
-      processing: false,
-      reset: (...keys: string[]) => keys.forEach((key) => (form[key] = data[key])),
-      post: (path: string, options: object) => requests.post(path, { ...form }, options),
+    const mockedForm = Object.assign(form, {
+      defaults: (fields: string | Record<string, string>, value?: string) => {
+        Object.assign(defaults, typeof fields === 'string' ? { [fields]: value } : fields)
+      },
+      reset: (...keys: string[]) => keys.forEach((key) => (form[key] = defaults[key])),
+      post: (path: string, options: { onSuccess?: () => void; onFinish?: () => void }) =>
+        requests.post(
+          path,
+          { ...form },
+          {
+            ...options,
+            onSuccess: () => {
+              options.onSuccess?.()
+              // Inertia snapshots successful form data as the next reset defaults before onFinish.
+              defaults = Object.fromEntries(Object.keys(data).map((key) => [key, form[key]]))
+            },
+          },
+        ),
     })
-    requests.forms.push(form)
-    return form
+    requests.forms.push(mockedForm)
+    return mockedForm
   },
 }))
 vi.mock('@/components/layout/AppHead.vue', () => ({
@@ -91,9 +106,16 @@ describe('profile email reauthentication', () => {
       options.onFinish()
       await nextTick()
       expect(password.value).toBe('')
+      expectEmptySecretDefaults(requests.forms[0], ['currentPassword'])
     },
   )
 })
+
+function expectEmptySecretDefaults(form: MockForm, keys: string[]) {
+  for (const key of keys) form[key] = 'another value'
+  form.reset(...keys)
+  for (const key of keys) expect(form[key]).toBe('')
+}
 
 function mountSettings(pendingEmailChange?: { newEmail: string; expiresAt: string }) {
   const root = document.createElement('div')
@@ -132,7 +154,7 @@ describe('independent settings forms', () => {
     expect(root.querySelector('form[aria-label="Запрос смены email"]')).not.toBeNull()
   })
 
-  it.each(['success', 'failure'])('clears a confirmation code after %s', async () => {
+  it.each(['success', 'failure'])('clears a confirmation code after %s', async (outcome) => {
     const { root } = mountSettings({
       newEmail: 'destination@example.test',
       expiresAt: '2099-01-01T00:00:00Z',
@@ -141,14 +163,17 @@ describe('independent settings forms', () => {
     submit(root, 'Подтверждение email')
     expect(requests.post.mock.calls[0][0]).toBe('/auth/profile/settings/email/confirm')
     expect(requests.post.mock.calls[0][1].code).toBe('123456')
-    requests.post.mock.calls[0][2].onFinish()
+    const options = requests.post.mock.calls[0][2]
+    if (outcome === 'success') options.onSuccess()
+    options.onFinish()
     await nextTick()
     expect(requests.forms[1].code).toBe('')
+    expectEmptySecretDefaults(requests.forms[1], ['code'])
   })
 
   it.each(['success', 'failure'])(
     'submits password independently and clears secrets after %s',
-    async () => {
+    async (outcome) => {
       const { root } = mountSettings()
       Object.assign(requests.forms[2], {
         currentPassword: 'proof',
@@ -160,11 +185,17 @@ describe('independent settings forms', () => {
       const [path, payload, options] = requests.post.mock.calls[0]
       expect(path).toBe('/auth/profile/settings/password')
       expect(payload.passwordConfirmation).toBe('new password')
+      if (outcome === 'success') options.onSuccess()
       options.onFinish()
       await nextTick()
       expect(requests.forms[2].currentPassword).toBe('')
       expect(requests.forms[2].password).toBe('')
       expect(requests.forms[2].passwordConfirmation).toBe('')
+      expectEmptySecretDefaults(requests.forms[2], [
+        'currentPassword',
+        'password',
+        'passwordConfirmation',
+      ])
       expect(root.textContent).toContain('потребуется войти заново')
     },
   )

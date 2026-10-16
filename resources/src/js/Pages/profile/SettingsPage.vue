@@ -260,7 +260,9 @@ const sendEmailCode = () => {
   emailRequestForm.post('/auth/profile/settings/email/request', {
     preserveScroll: true,
     onFinish: () => {
+      emailRequestForm.defaults('currentPassword', '')
       emailRequestForm.reset('currentPassword')
+      emailConfirmForm.defaults('code', '')
       emailConfirmForm.reset('code')
     },
   })
@@ -279,6 +281,7 @@ const confirmEmail = () => {
   emailConfirmForm.post('/auth/profile/settings/email/confirm', {
     preserveScroll: true,
     onFinish: () => {
+      emailConfirmForm.defaults('code', '')
       emailConfirmForm.reset('code')
     },
   })
@@ -289,6 +292,7 @@ const changePassword = () => {
   passwordForm.post('/auth/profile/settings/password', {
     preserveScroll: true,
     onFinish: () => {
+      passwordForm.defaults({ currentPassword: '', password: '', passwordConfirmation: '' })
       passwordForm.reset('currentPassword', 'password', 'passwordConfirmation')
     },
   })

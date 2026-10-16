@@ -90,7 +90,8 @@ it('shows canonical readonly administrator email after a rejected email change',
   state.pageProps = { old: { email: 'changed@example.test' } }
   setAdminCapabilities({ props: { adminCapabilities: { authmail: true } } })
   const root = document.createElement('div')
-  const app = createApp(AdminEdit, { data })
+  const editProps = { data }
+  const app = createApp(AdminEdit, editProps)
   apps.push(app)
   app.mount(root)
   const email = root.querySelector<HTMLInputElement>('input[name="email"]')!

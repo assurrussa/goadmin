@@ -73,7 +73,7 @@
 
     <Card v-if="uploads">
       <CardHeader
-        class="border-b border-border-primary flex flex-wrap items-center justify-between gap-2 space-y-0 pb-4"
+        class="border-b border-border-primary flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-4"
       >
         <div class="flex items-center">
           <Pencil class="h-5 w-5 text-primary mr-2" />
