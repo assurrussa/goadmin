@@ -1,11 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createApp, defineComponent, reactive } from 'vue'
+import { createApp, defineComponent, h, reactive } from 'vue'
 import EditPage from './EditPage.vue'
 import CreatePage from './CreatePage.vue'
 import { setAdminCapabilities } from '@/composables/useAdminCapabilities'
 
 vi.mock('@inertiajs/vue3', () => ({
   usePage: () => ({ props: { old: { email: 'tampered@example.test' } } }),
+  Link: defineComponent({
+    props: ['href'],
+    setup:
+      (props, { slots }) =>
+      () =>
+        h('a', { href: props.href }, slots.default?.()),
+  }),
   useForm: (data: object) =>
     reactive({ ...data, errors: {}, put: vi.fn(), post: vi.fn(), processing: false }),
   router: { on: () => () => {} },
@@ -24,7 +31,7 @@ afterEach(() => {
 })
 
 describe('admin email capability', () => {
-  it.each([false, true])('keeps existing email read-only with authmail=%s', (enabled) => {
+  it.each([false, true])('keeps existing email readonly with authmail=%s', (enabled) => {
     setAdminCapabilities({ props: { adminCapabilities: enabled ? { authmail: true } : {} } })
     const root = document.createElement('div')
     const editProps = { data: { id: 1, name: 'Admin', email: 'admin@example.test' } }

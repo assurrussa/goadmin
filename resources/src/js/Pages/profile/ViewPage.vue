@@ -12,9 +12,9 @@
               class="relative h-24 w-24 rounded-full overflow-hidden shadow-lg bg-gradient-to-br from-primary to-primary-light flex items-center justify-center"
             >
               <img
-                v-if="avatarUrl"
+                v-if="uploads && avatarUrl"
                 :src="avatarUrl"
-                alt="Avatar"
+                alt="Аватар профиля"
                 class="h-full w-full object-cover"
               />
               <span v-else class="text-3xl font-bold text-primary-contrast">
@@ -24,22 +24,18 @@
           </div>
 
           <!-- Основная информация -->
-          <div class="flex-grow">
-            <div class="flex items-center gap-3 mb-2">
-              <h1 class="text-2xl font-bold text-text-primary">
+          <div class="min-w-0 flex-grow">
+            <div class="flex flex-wrap items-center gap-3 mb-2">
+              <h1 class="break-words text-2xl font-bold text-text-primary">
                 {{ fullName }}
               </h1>
-              <AppBadge variant="success" class="gap-1.5">
-                <span class="w-1.5 h-1.5 bg-success rounded-full"></span>
-                Активен
-              </AppBadge>
               <AppBadge v-if="primaryRoleLabel" variant="primary" class="gap-1">
                 <ShieldCheck class="h-3.5 w-3.5" />
                 {{ primaryRoleLabel }}
               </AppBadge>
             </div>
 
-            <div class="flex items-center text-text-secondary mb-4">
+            <div v-if="props.data.username" class="flex items-center text-text-secondary mb-4">
               <User class="h-4 w-4 mr-2" />
               <span class="font-medium">@{{ props.data.username }}</span>
             </div>
@@ -57,11 +53,17 @@
           </div>
 
           <!-- Кнопка редактирования -->
-          <div class="flex-shrink-0">
+          <div class="flex flex-wrap gap-3 sm:flex-col flex-shrink-0">
             <AppButton asChild>
               <Link :href="`${basePath}/edit`">
                 <Pencil class="h-4 w-4 mr-2" />
                 Редактировать
+              </Link>
+            </AppButton>
+            <AppButton as-child variant="secondary">
+              <Link :href="`${basePath}/settings`">
+                <Settings class="h-4 w-4 mr-2" />
+                Настройки
               </Link>
             </AppButton>
           </div>
@@ -71,7 +73,7 @@
 
     <Card v-if="uploads">
       <CardHeader
-        class="border-b border-border-primary flex flex-row items-center justify-between space-y-0 pb-4"
+        class="border-b border-border-primary flex flex-wrap items-center justify-between gap-2 space-y-0 pb-4"
       >
         <div class="flex items-center">
           <Pencil class="h-5 w-5 text-primary mr-2" />
@@ -81,6 +83,7 @@
       </CardHeader>
       <CardContent class="pt-6">
         <FormImageUploader
+          class="max-w-sm"
           :model-value="avatarFile"
           label="Аватар администратора"
           description="Загрузите квадратное изображение высокого качества"
@@ -112,19 +115,21 @@
           </div>
         </CardHeader>
         <CardContent class="space-y-4 pt-6">
-          <div class="flex items-center justify-between">
+          <div class="flex flex-wrap items-center justify-between gap-2">
             <span class="text-text-secondary font-medium">Email</span>
             <div class="flex items-center">
               <Mail class="h-4 w-4 text-text-tertiary mr-2" />
-              <span class="text-text-primary">{{ props.data.email }}</span>
+              <span class="break-all text-text-primary">{{ props.data.email || 'Не указан' }}</span>
             </div>
           </div>
 
-          <div class="flex items-center justify-between">
+          <div class="flex flex-wrap items-center justify-between gap-2">
             <span class="text-text-secondary font-medium">Имя пользователя</span>
             <div class="flex items-center">
               <AtSign class="h-4 w-4 text-text-tertiary mr-2" />
-              <span class="text-text-primary">{{ props.data.username }}</span>
+              <span class="break-all text-text-primary">{{
+                props.data.username || 'Не указано'
+              }}</span>
             </div>
           </div>
         </CardContent>
@@ -139,7 +144,7 @@
           </div>
         </CardHeader>
         <CardContent class="space-y-4 pt-6">
-          <div class="flex items-center justify-between">
+          <div class="flex flex-wrap items-center justify-between gap-2">
             <span class="text-text-secondary font-medium">Роль</span>
             <div class="flex flex-wrap gap-2 justify-end max-w-xs">
               <AppBadge v-for="role in formattedRoles" :key="role" variant="primary" class="gap-1">
@@ -152,15 +157,7 @@
             </div>
           </div>
 
-          <div class="flex items-center justify-between">
-            <span class="text-text-secondary font-medium">Статус</span>
-            <AppBadge variant="success" class="gap-1.5">
-              <span class="w-1.5 h-1.5 bg-success rounded-full"></span>
-              Активен
-            </AppBadge>
-          </div>
-
-          <div class="flex items-center justify-between">
+          <div class="flex flex-wrap items-center justify-between gap-2">
             <span class="text-text-secondary font-medium">Уникальный ID</span>
             <div class="flex items-center">
               <Hash class="h-4 w-4 text-text-tertiary mr-2" />
@@ -169,85 +166,6 @@
           </div>
         </CardContent>
       </Card>
-    </div>
-
-    <!-- Временные метки -->
-    <!-- Временные метки -->
-    <Card>
-      <CardHeader class="border-b border-border-primary">
-        <div class="flex items-center">
-          <Clock class="h-5 w-5 text-primary mr-2" />
-          <h2 class="text-lg font-semibold text-text-primary">История изменений</h2>
-        </div>
-      </CardHeader>
-      <CardContent class="pt-6">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div class="flex items-start space-x-3">
-            <div class="flex-shrink-0">
-              <div
-                class="w-10 h-10 bg-surface-variant rounded-full flex items-center justify-center"
-              >
-                <Plus class="h-5 w-5 text-success" />
-              </div>
-            </div>
-            <div class="flex-grow">
-              <p class="text-sm font-medium text-text-primary">Создан</p>
-              <p class="text-sm text-text-secondary">{{ formatDateTime(props.data.createdAt) }}</p>
-              <p class="text-xs text-text-tertiary mt-1">{{ timeAgo(props.data.createdAt) }}</p>
-            </div>
-          </div>
-
-          <div class="flex items-start space-x-3">
-            <div class="flex-shrink-0">
-              <div
-                class="w-10 h-10 bg-surface-variant rounded-full flex items-center justify-center"
-              >
-                <Pencil class="h-5 w-5 text-primary" />
-              </div>
-            </div>
-            <div class="flex-grow">
-              <p class="text-sm font-medium text-text-primary">Последнее обновление</p>
-              <p class="text-sm text-text-secondary">{{ formatDateTime(props.data.updatedAt) }}</p>
-              <p class="text-xs text-text-tertiary mt-1">{{ timeAgo(props.data.updatedAt) }}</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Статус удаления -->
-        <div
-          v-if="props.data.deletedAt && props.data.deletedAt.Valid"
-          class="mt-6 pt-6 border-t border-border-primary"
-        >
-          <div class="flex items-start space-x-3">
-            <div class="flex-shrink-0">
-              <div
-                class="w-10 h-10 bg-surface-variant rounded-full flex items-center justify-center"
-              >
-                <Trash2 class="h-5 w-5 text-error" />
-              </div>
-            </div>
-            <div class="flex-grow">
-              <p class="text-sm font-medium text-text-primary">Удален</p>
-              <p class="text-sm text-text-secondary">
-                {{ formatDateTime(props.data.deletedAt.Time) }}
-              </p>
-              <p class="text-xs text-text-tertiary mt-1">
-                {{ timeAgo(props.data.deletedAt.Time) }}
-              </p>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-
-    <!-- Действия -->
-    <div class="flex justify-end space-x-4">
-      <AppButton asChild>
-        <Link :href="`${basePath}/edit`">
-          <Pencil class="h-4 w-4 mr-2" />
-          Редактировать
-        </Link>
-      </AppButton>
     </div>
   </div>
 </template>
@@ -263,18 +181,7 @@ import AppBadge from '@/components/ui/AppBadge.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import type { UploadedFile } from '@/components/form/ImageUploader.vue'
 import type { CropperAspectRatioOption } from '@/components/form/ImageUploader.vue'
-import {
-  AtSign,
-  Calendar,
-  Clock,
-  Hash,
-  Mail,
-  Pencil,
-  Plus,
-  ShieldCheck,
-  Trash2,
-  User,
-} from 'lucide-vue-next'
+import { AtSign, Calendar, Hash, Mail, Pencil, ShieldCheck, Settings, User } from 'lucide-vue-next'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 
 const { uploads } = useAdminCapabilities()
@@ -443,39 +350,5 @@ const formatDate = (dateString: string) => {
     month: 'long',
     day: 'numeric',
   })
-}
-
-const formatDateTime = (dateString: string) => {
-  if (!dateString) return 'Не указано'
-
-  const date = new Date(dateString)
-  return date.toLocaleString('ru-RU', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-const timeAgo = (dateString: string) => {
-  if (!dateString) return ''
-
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-  const diffMinutes = Math.floor(diffMs / (1000 * 60))
-
-  if (diffDays > 0) {
-    return `${diffDays} ${diffDays === 1 ? 'день' : diffDays < 5 ? 'дня' : 'дней'} назад`
-  } else if (diffHours > 0) {
-    return `${diffHours} ${diffHours === 1 ? 'час' : diffHours < 5 ? 'часа' : 'часов'} назад`
-  } else if (diffMinutes > 0) {
-    return `${diffMinutes} ${diffMinutes === 1 ? 'минуту' : diffMinutes < 5 ? 'минуты' : 'минут'} назад`
-  } else {
-    return 'Только что'
-  }
 }
 </script>
