@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -603,7 +605,7 @@ func TestUpdateAdminUsesCanonicalProfileWriterOnly(t *testing.T) {
 	req := httptest.NewRequestWithContext(context.Background(),
 		http.MethodPut,
 		"/admins/42",
-		strings.NewReader(`{"username":"new-admin","name":"New","lastName":"Admin","email":"new@example.com"}`))
+		strings.NewReader(`{"username":"new-admin","name":"New","lastName":"Admin","email":"old@example.com"}`))
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Referer", "/admins/42/edit")
@@ -620,6 +622,56 @@ func TestUpdateAdminUsesCanonicalProfileWriterOnly(t *testing.T) {
 	require.Equal(t, 1, repo.updateCalls)
 	require.Equal(t, "New", repo.updated.Name)
 	require.Equal(t, "new-admin", repo.updated.Username)
-	require.Equal(t, expectedSubjectID, authRuntime.subjID)
-	require.Equal(t, "new@example.com", authRuntime.email)
+	require.True(t, authRuntime.subjID.IsZero())
+	require.Empty(t, authRuntime.email)
+}
+
+func TestUpdateAdminRejectsRecoveryEmailChanges(t *testing.T) {
+	t.Parallel()
+
+	for _, actorID := range []int64{42, 1} {
+		t.Run(fmt.Sprintf("actor_%d", actorID), func(t *testing.T) {
+			t.Parallel()
+			appTest := adminappt.NewAppTest(t)
+			appTest.ExpertGuard(integrationroles.PermissionDomainAdmins, integrationroles.PermissionActionRead).AnyTimes()
+			appTest.ExpertGuard(integrationroles.PermissionDomainAdmins, integrationroles.PermissionActionCreate).AnyTimes()
+			appTest.ExpertGuard(integrationroles.PermissionDomainAdmins, integrationroles.PermissionActionUpdate).AnyTimes()
+			appTest.ExpertGuard(integrationroles.PermissionDomainAdmins, integrationroles.PermissionActionDelete).AnyTimes()
+			appTest.MockTransaction.EXPECT().RunInTx(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(ctx context.Context, fn func(context.Context) error) error { return fn(ctx) },
+			)
+			repo := &adminRepoStub{current: models.Admin{
+				ID: 42, Email: "owner@example.com", Name: "Owner",
+				SubjectID: integrationroles.MustParseSubjectIDString("123e4567-e89b-12d3-a456-426614174130"),
+			}}
+			runtime := &adminAuthRuntimeStub{}
+			audit := &adminActionAuditStub{}
+			app := fiber.New()
+			app.Use(func(c fiber.Ctx) error {
+				// No password, second factor or fresh-auth proof is supplied.
+				c.Locals(session.AuthAdminKey.String(), &models.SessionAdmin{ID: actorID})
+				return c.Next()
+			})
+			NewHandler(appTest.App, repo, runtime, noopFileRepo{}, noopPreviewService{}, audit).
+				RegisterGroupRoutes(app)
+
+			request := httptest.NewRequestWithContext(context.Background(), http.MethodPut, "/admins/42",
+				strings.NewReader(`{"name":"Changed","email":"attacker@example.com"}`))
+			request.Header.Set("Content-Type", "application/json")
+			response, err := app.Test(request)
+			require.NoError(t, err)
+			defer func() { require.NoError(t, response.Body.Close()) }()
+			require.Equal(t, http.StatusBadRequest, response.StatusCode)
+			body, err := io.ReadAll(response.Body)
+			require.NoError(t, err)
+			require.Contains(t, string(body), "настройках своего профиля")
+			require.Zero(t, runtime.profileCalls)
+			require.Empty(t, runtime.email)
+			require.True(t, runtime.subjID.IsZero())
+			require.Zero(t, repo.updateCalls)
+			require.Equal(t, "Owner", repo.current.Name)
+			require.Equal(t, "owner@example.com", repo.current.Email)
+			require.Empty(t, audit.records)
+		})
+	}
 }

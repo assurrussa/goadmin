@@ -5,7 +5,7 @@ import CreatePage from './CreatePage.vue'
 import { setAdminCapabilities } from '@/composables/useAdminCapabilities'
 
 vi.mock('@inertiajs/vue3', () => ({
-  usePage: () => ({ props: {} }),
+  usePage: () => ({ props: { old: { email: 'tampered@example.test' } } }),
   useForm: (data: object) =>
     reactive({ ...data, errors: {}, put: vi.fn(), post: vi.fn(), processing: false }),
   router: { on: () => () => {} },
@@ -24,7 +24,7 @@ afterEach(() => {
 })
 
 describe('admin email capability', () => {
-  it.each([false, true])('allows existing email editing only with authmail=%s', (enabled) => {
+  it.each([false, true])('keeps existing email read-only with authmail=%s', (enabled) => {
     setAdminCapabilities({ props: { adminCapabilities: enabled ? { authmail: true } : {} } })
     const root = document.createElement('div')
     const editProps = { data: { id: 1, name: 'Admin', email: 'admin@example.test' } }
@@ -32,7 +32,7 @@ describe('admin email capability', () => {
     apps.push(app)
     app.mount(root)
     const email = root.querySelector<HTMLInputElement>('input[name="email"]')
-    expect(email?.readOnly).toBe(!enabled)
+    expect(email?.readOnly).toBe(true)
     expect(email?.value).toBe('admin@example.test')
     expect(root.querySelector<HTMLInputElement>('input[name="name"]')?.readOnly).toBe(false)
   })

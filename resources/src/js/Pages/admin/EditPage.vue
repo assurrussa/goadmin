@@ -38,8 +38,12 @@
             label="Электронная почта"
             required
             :error="form.errors.email"
-            :readonly="!authmail"
+            readonly
           />
+
+          <p class="text-sm text-muted-foreground">
+            Email можно изменить только в настройках своего профиля с подтверждением личности.
+          </p>
 
           <!-- Username -->
           <FormInput
@@ -73,9 +77,7 @@ import PageActionBar from '@/components/layout/PageActionBar.vue'
 import FormInput from '@/components/form/FormInput.vue'
 import FormButton from '@/components/form/FormButton.vue'
 import AdminForm from '@/components/form/AdminForm.vue'
-import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 
-const { authmail } = useAdminCapabilities()
 const basePath = '/admins'
 const props = defineProps({
   title: {
@@ -98,7 +100,7 @@ const oldData = (page.props.old as Record<string, string | null>) || {}
 
 const form = useForm({
   name: oldData.name || props.data.name,
-  email: oldData.email || props.data.email,
+  email: props.data.email,
   lastName: oldData.lastName || props.data.lastName || null,
   username: oldData.username || props.data.username || null,
 })
