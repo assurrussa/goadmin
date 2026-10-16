@@ -437,8 +437,8 @@ func (h *Handler) Profile(c fiber.Ctx) error {
 
 	return h.adminApp.HTTPManager().Render(c, "profile/ViewPage", map[string]any{
 		"title":         "Просмотр профиля",
-		"data":          adminUser,   //nolint:goconst // required
-		"admin_preview": filePreview, //nolint:goconst // required
+		"data":          adminUser, //nolint:goconst // required
+		"admin_preview": filePreview,
 	})
 }
 
@@ -493,40 +493,24 @@ func (h *Handler) PostProfileEdit(c fiber.Ctx) error {
 		return h.adminApp.HTTPManager().RedirectBack(c)
 	}
 
-	adminUser.Username = form.Username
-	adminUser.Name = form.Name
-	adminUser.LastName = form.LastName
-
 	if h.adminAccount == nil {
 		h.adminApp.Logger().ErrorContext(c, "admin auth Runtime unavailable", logger.Error(errors.New("nil admin account service")))
 		h.adminApp.HTTPManager().WithFlashError(c, "Что-то пошло не так, попробуйте повторить операцию позже! Код: 13342")
 		return h.adminApp.HTTPManager().RedirectBack(c)
 	}
 	if _, err := h.adminAccount.UpdateBasicProfile(c, currentAdminSubjectID(adminAuth), goauth.BasicProfile{
-		Username:    adminUser.Username,
-		DisplayName: strings.TrimSpace(adminUser.Name + " " + adminUser.LastName),
-		GivenName:   adminUser.Name, FamilyName: adminUser.LastName,
+		Username:    form.Username,
+		DisplayName: strings.TrimSpace(form.Name + " " + form.LastName),
+		GivenName:   form.Name, FamilyName: form.LastName,
 	}); err != nil {
 		h.adminApp.Logger().ErrorContext(c, "admin subjects UpdateProfile", logger.Error(err))
 		h.adminApp.HTTPManager().WithFlashError(c, "Что-то пошло не так, попробуйте повторить операцию позже! Код: 13342")
 		return h.adminApp.HTTPManager().RedirectBack(c)
 	}
 
-	var filePreview *uploadhost.File
-	if h.previewService != nil && adminUser.GetPreviewFileID() > 0 {
-		filePreview, err = h.previewService.LoadPreview(c, adminUser.GetPreviewFileID())
-		if err != nil {
-			h.adminApp.Logger().ErrorContext(c, "failed to load admin preview", logger.Error(err))
-		}
-	}
-
+	// Reload the canonical profile through the ordinary GET projection after saving.
 	h.adminApp.HTTPManager().WithFlashSuccess(c, "Успешно отредактировано!")
-
-	return h.adminApp.HTTPManager().Render(c, "profile/EditPage", map[string]any{
-		"title":         "Редактирование профиля",
-		"data":          adminUser,
-		"admin_preview": filePreview,
-	})
+	return h.adminApp.HTTPManager().Redirect(c, "/auth/profile/edit")
 }
 
 type pendingEmailChangeProps struct {
@@ -589,14 +573,14 @@ func (h *Handler) PostProfileChangePassword(c fiber.Ctx) error {
 	authdelay.RunSleeper(c, h.sleep)
 
 	errs := formvalidator.Validate(
-		&validators.StringIsPresent{
-			Name: "CurrentPassword", Field: form.CurrentPassword, Message: "Введите текущий пароль",
-		},
 		&validators.StringIsPresent{Name: "Password", Field: form.Password, Message: "Введите новый пароль"},
-		&validators.StringIsPresent{
-			Name: "ConfirmPassword", Field: form.ConfirmPassword, Message: "Повторите новый пароль",
-		},
 	)
+	if strings.TrimSpace(form.CurrentPassword) == "" {
+		errs.Add("currentPassword", "Введите текущий пароль")
+	}
+	if strings.TrimSpace(form.ConfirmPassword) == "" {
+		errs.Add("passwordConfirmation", "Повторите новый пароль")
+	}
 	if form.Password != form.ConfirmPassword {
 		errs.Add("passwordConfirmation", "Пароли не совпадают")
 	}

@@ -1,141 +1,167 @@
 <template>
   <AppHead :title="props.title" />
-  <PageActionBar back-href="/auth/profile" label="Настройки" />
+  <PageActionBar
+    back-href="/auth/profile"
+    back-text="К профилю"
+    :use-history="false"
+    label="Настройки"
+  />
 
   <div class="space-y-8">
-    <LocalMFASettings v-if="props.mfaAvailable" :enabled="props.mfaEnabled || false" />
-    <Card v-if="authmail">
-      <CardHeader class="border-b border-border-secondary bg-surface-variant/40">
-        <CardTitle>Смена email</CardTitle>
-        <CardDescription>
-          Для смены email мы отправим код подтверждения на новый адрес и уведомим старый.
-        </CardDescription>
-      </CardHeader>
-      <CardContent class="space-y-6 pt-6">
-        <div class="flex flex-col gap-2 text-sm">
-          <span class="text-text-tertiary">Текущий email</span>
-          <span class="text-text-primary font-medium">{{ props.data.email }}</span>
-        </div>
+    <section v-if="authmail" aria-labelledby="profile-settings-title" class="space-y-4">
+      <h2 id="profile-settings-title" class="text-xl font-semibold">Профиль</h2>
+      <Card>
+        <CardHeader class="border-b border-border-secondary bg-surface-variant/40">
+          <CardTitle>Смена email</CardTitle>
+          <CardDescription>
+            Для смены email мы отправим код подтверждения на новый адрес и уведомим старый.
+          </CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-6 pt-6">
+          <form aria-label="Запрос смены email" class="space-y-6" @submit.prevent="sendEmailCode">
+            <div class="flex flex-col gap-2 text-sm">
+              <span class="text-text-tertiary">Текущий email</span>
+              <span class="text-text-primary font-medium">{{ props.data.email }}</span>
+            </div>
 
-        <PasswordInput
-          v-model="emailRequestForm.currentPassword"
-          name="currentPassword"
-          label="Текущий пароль"
-          placeholder="Введите текущий пароль"
-          autocomplete="current-password"
-          :error="emailRequestForm.errors.currentPassword"
-        />
+            <PasswordInput
+              v-model="emailRequestForm.currentPassword"
+              name="currentPassword"
+              label="Текущий пароль"
+              placeholder="Введите текущий пароль"
+              autocomplete="current-password"
+              :error="emailRequestForm.errors.currentPassword"
+            />
 
-        <div class="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
-          <FormInput
-            v-model="emailRequestForm.email"
-            name="email"
-            type="email"
-            label="Новый email"
-            placeholder="name@example.com"
-            :error="emailRequestForm.errors.email"
-          />
-          <FormButton
-            type="button"
-            variant="secondary"
-            :loading="emailRequestForm.processing"
-            loading-text="Отправляем..."
-            class="lg:mb-1"
-            @click="sendEmailCode"
+            <div class="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+              <FormInput
+                v-model="emailRequestForm.email"
+                name="email"
+                type="email"
+                label="Новый email"
+                placeholder="name@example.com"
+                :error="emailRequestForm.errors.email"
+              />
+              <FormButton
+                type="submit"
+                variant="secondary"
+                :loading="emailRequestForm.processing"
+                loading-text="Отправляем..."
+                class="lg:mb-1"
+                :disabled="emailRequestForm.processing || emailConfirmForm.processing"
+              >
+                Отправить код
+              </FormButton>
+            </div>
+          </form>
+          <div
+            v-if="pendingEmailChange"
+            class="rounded-xl border border-border-secondary bg-surface px-4 py-3 text-sm text-text-secondary"
           >
-            Отправить код
-          </FormButton>
-        </div>
+            <p>
+              Код отправлен на
+              <span class="font-medium text-text-primary">{{ pendingEmailChange.newEmail }}</span
+              >. Действует до {{ formatDateTime(pendingEmailChange.expiresAt) }}.
+            </p>
+            <p v-if="emailCodeExpired" role="status" class="mt-2">
+              Срок действия кода истёк. Запросите новый код через форму выше.
+            </p>
+          </div>
 
-        <div
-          v-if="pendingEmailChange"
-          class="rounded-xl border border-border-secondary bg-surface px-4 py-3 text-sm text-text-secondary"
-        >
-          <p>
-            Код отправлен на
-            <span class="font-medium text-text-primary">{{ pendingEmailChange.newEmail }}</span
-            >. Действует до {{ formatDateTime(pendingEmailChange.expiresAt) }}.
-          </p>
-        </div>
-
-        <div class="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
-          <FormInput
-            v-model="emailConfirmForm.code"
-            name="code"
-            label="Код подтверждения"
-            placeholder="123456"
-            :error="emailConfirmForm.errors.code"
-            help-text="Введите 6-значный код из письма"
-          />
-          <FormButton
-            type="button"
-            variant="primary"
-            :loading="emailConfirmForm.processing"
-            loading-text="Проверяем..."
-            class="lg:mb-1"
-            @click="confirmEmail"
+          <form
+            v-if="pendingEmailChange && !emailCodeExpired"
+            aria-label="Подтверждение email"
+            class="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end"
+            @submit.prevent="confirmEmail"
           >
-            Подтвердить email
-          </FormButton>
-        </div>
-      </CardContent>
-    </Card>
+            <FormInput
+              v-model="emailConfirmForm.code"
+              name="code"
+              autocomplete="one-time-code"
+              inputmode="numeric"
+              label="Код подтверждения"
+              placeholder="123456"
+              :error="emailConfirmForm.errors.code"
+              help-text="Введите 6-значный код из письма"
+            />
+            <FormButton
+              type="submit"
+              variant="primary"
+              :loading="emailConfirmForm.processing"
+              loading-text="Проверяем..."
+              class="lg:mb-1"
+              :disabled="emailConfirmForm.processing || emailRequestForm.processing"
+            >
+              Подтвердить email
+            </FormButton>
+          </form>
+        </CardContent>
+      </Card>
+    </section>
 
-    <Card>
-      <CardHeader class="border-b border-border-secondary bg-surface-variant/40">
-        <CardTitle>Смена пароля</CardTitle>
-        <CardDescription>Укажите текущий пароль и задайте новый.</CardDescription>
-      </CardHeader>
-      <CardContent class="space-y-6 pt-6">
-        <PasswordInput
-          v-model="passwordForm.currentPassword"
-          name="currentPassword"
-          label="Текущий пароль"
-          placeholder="Введите текущий пароль"
-          autocomplete="current-password"
-          :error="passwordForm.errors.currentPassword"
-        />
-        <PasswordInput
-          v-model="passwordForm.password"
-          name="password"
-          label="Новый пароль"
-          placeholder="Введите новый пароль"
-          autocomplete="new-password"
-          :error="passwordForm.errors.password"
-        />
-        <PasswordInput
-          v-model="passwordForm.passwordConfirmation"
-          name="passwordConfirmation"
-          label="Подтвердите новый пароль"
-          placeholder="Повторите новый пароль"
-          autocomplete="new-password"
-          :error="
-            passwordForm.errors.passwordConfirmation || passwordConfirmationError || undefined
-          "
-        />
+    <section aria-labelledby="security-settings-title" class="space-y-4">
+      <h2 id="security-settings-title" class="text-xl font-semibold">Безопасность</h2>
+      <LocalMFASettings v-if="props.mfaAvailable" :enabled="props.mfaEnabled || false" />
+      <Card>
+        <CardHeader class="border-b border-border-secondary bg-surface-variant/40">
+          <CardTitle>Смена пароля</CardTitle>
+          <CardDescription>
+            Укажите текущий пароль и задайте новый. После смены пароля все сеансы завершатся, и
+            потребуется войти заново.
+          </CardDescription>
+        </CardHeader>
+        <CardContent class="pt-6">
+          <form aria-label="Смена пароля" class="space-y-6" @submit.prevent="changePassword">
+            <PasswordInput
+              v-model="passwordForm.currentPassword"
+              name="currentPassword"
+              label="Текущий пароль"
+              placeholder="Введите текущий пароль"
+              autocomplete="current-password"
+              :error="passwordForm.errors.currentPassword"
+            />
+            <PasswordInput
+              v-model="passwordForm.password"
+              name="password"
+              label="Новый пароль"
+              placeholder="Введите новый пароль"
+              autocomplete="new-password"
+              :error="passwordForm.errors.password"
+            />
+            <PasswordInput
+              v-model="passwordForm.passwordConfirmation"
+              name="passwordConfirmation"
+              label="Подтвердите новый пароль"
+              placeholder="Повторите новый пароль"
+              autocomplete="new-password"
+              :error="
+                passwordForm.errors.passwordConfirmation || passwordConfirmationError || undefined
+              "
+            />
 
-        <PasswordStrengthIndicator :password="passwordForm.password" />
+            <PasswordStrengthIndicator :password="passwordForm.password" />
 
-        <div class="flex justify-end">
-          <FormButton
-            type="button"
-            variant="primary"
-            :loading="passwordForm.processing"
-            loading-text="Сохраняем..."
-            :disabled="!isPasswordFormValid"
-            @click="changePassword"
-          >
-            Обновить пароль
-          </FormButton>
-        </div>
-      </CardContent>
-    </Card>
+            <div class="flex justify-end">
+              <FormButton
+                type="submit"
+                variant="primary"
+                :loading="passwordForm.processing"
+                loading-text="Сохраняем..."
+                :disabled="!isPasswordFormValid || passwordForm.processing"
+              >
+                Обновить пароль
+              </FormButton>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import LocalMFASettings from '@/components/profile/LocalMFASettings.vue'
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 import { useForm } from '@inertiajs/vue3'
 import AppHead from '@/components/layout/AppHead.vue'
@@ -180,6 +206,35 @@ const passwordForm = useForm({
 })
 
 const pendingEmailChange = computed(() => props.pendingEmailChange || null)
+const now = ref(Date.now())
+let expiryTimer: ReturnType<typeof setTimeout> | undefined
+const emailCodeExpired = computed(() => {
+  if (!pendingEmailChange.value) return false
+  const expiresAt = Date.parse(pendingEmailChange.value.expiresAt)
+  return !Number.isFinite(expiresAt) || expiresAt <= now.value
+})
+
+const scheduleExpiry = () => {
+  clearTimeout(expiryTimer)
+  now.value = Date.now()
+  if (!pendingEmailChange.value) return
+  const remaining = Date.parse(pendingEmailChange.value.expiresAt) - now.value
+  if (remaining > 0) {
+    expiryTimer = setTimeout(scheduleExpiry, Math.min(remaining, 2_147_483_647))
+  }
+}
+onMounted(scheduleExpiry)
+watch(
+  () => [props.pendingEmailChange?.newEmail, props.pendingEmailChange?.expiresAt],
+  () => {
+    emailConfirmForm.reset('code')
+    scheduleExpiry()
+  },
+)
+watch(emailCodeExpired, (expired) => {
+  if (expired) emailConfirmForm.reset('code')
+})
+onUnmounted(() => clearTimeout(expiryTimer))
 
 const passwordConfirmationError = computed(() => {
   if (
@@ -201,32 +256,43 @@ const isPasswordFormValid = computed(() => {
 })
 
 const sendEmailCode = () => {
-  if (!authmail.value) return
+  if (!authmail.value || emailRequestForm.processing || emailConfirmForm.processing) return
   emailRequestForm.post('/auth/profile/settings/email/request', {
     preserveScroll: true,
     onFinish: () => {
+      emailRequestForm.defaults('currentPassword', '')
       emailRequestForm.reset('currentPassword')
-    },
-    onSuccess: () => {
+      emailConfirmForm.defaults('code', '')
       emailConfirmForm.reset('code')
     },
   })
 }
 
 const confirmEmail = () => {
-  if (!authmail.value) return
+  scheduleExpiry()
+  if (
+    !authmail.value ||
+    !pendingEmailChange.value ||
+    emailCodeExpired.value ||
+    emailConfirmForm.processing ||
+    emailRequestForm.processing
+  )
+    return
   emailConfirmForm.post('/auth/profile/settings/email/confirm', {
     preserveScroll: true,
-    onSuccess: () => {
+    onFinish: () => {
+      emailConfirmForm.defaults('code', '')
       emailConfirmForm.reset('code')
     },
   })
 }
 
 const changePassword = () => {
+  if (passwordForm.processing || !isPasswordFormValid.value) return
   passwordForm.post('/auth/profile/settings/password', {
     preserveScroll: true,
-    onSuccess: () => {
+    onFinish: () => {
+      passwordForm.defaults({ currentPassword: '', password: '', passwordConfirmation: '' })
       passwordForm.reset('currentPassword', 'password', 'passwordConfirmation')
     },
   })
