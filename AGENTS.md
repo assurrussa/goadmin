@@ -69,6 +69,15 @@ external-consumer manifest explicitly says that surface is supported.
 
 ## Host Integration Rules
 
+Before implementing or expanding a host integration, ask the user which
+components to connect now and wait for their answer. Do not silently enable all
+modules. If the request already specifies the selection, reuse it and clarify
+only unresolved choices. Record selected/deferred components and agreed
+dependencies in the host integration plan; follow the
+[component-selection checklist](docs/consumer-guide.md#choose-the-integration-components-first).
+This is a planning requirement, not a runtime prompt; core auth/RBAC remains
+mandatory even without the optional access-management screens.
+
 `host.NewAuthAdapter` owns the goauth Runtime, admin membership gate, realms,
 and RBAC wiring. `host.New` assembles the core and explicitly requested modules.
 Hosts supply typed core config and PostgreSQL; module constructors receive
