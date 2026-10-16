@@ -6,6 +6,10 @@ rebuild the client from that same version whenever its Vue source or an extensio
 changes. `goadmin` publishes source and embedded templates, but its Go module
 does not contain a ready-to-serve `public/dist` bundle for a host extension.
 
+Before wiring modules or new host sections, complete the mandatory
+[component-selection step](consumer-guide.md#choose-the-integration-components-first)
+with the user and record the agreed scope and dependencies.
+
 ## One page crosses four boundaries
 
 A navigation item is only a link. A working page requires all of these:

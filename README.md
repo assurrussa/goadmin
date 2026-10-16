@@ -8,6 +8,15 @@ Install the public release with `go get github.com/assurrussa/goadmin@v0.12.0`.
 Its dependency graph uses GoAuth v0.8.0, GoNotify v0.6.0, GoUploads v0.13.0 and
 GoWebSocket v0.2.1 without sibling replacements.
 
+## Before integrating
+
+Before implementing or expanding an integration, ask which components the user
+wants connected now and wait for their selection. Use the
+[component-selection checklist](docs/consumer-guide.md#choose-the-integration-components-first)
+for access management (admins, roles and permissions), users, jobs/queues,
+uploads, notifications, realtime, authmail, operations and host features.
+Record the agreed scope and dependencies; do not enable everything by default.
+
 ## Try the admin locally
 
 New to embedding? Start with [the consumer guide](docs/consumer-guide.md) for

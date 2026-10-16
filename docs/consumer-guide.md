@@ -5,6 +5,55 @@ starter to see the shell, then add a host-owned feature through the supported
 facade. This guide connects the pieces; the linked guides own the detailed
 setup and API contracts.
 
+## Choose the integration components first
+
+Before implementing a new GoAdmin integration or expanding an existing one,
+the implementer or coding agent **must ask the user which components to connect
+now and wait for their answer**. A request to "integrate the admin" is not a
+request to enable every module. If the current request already contains an
+explicit selection, confirm that scope in the integration plan without asking
+the same question again; ask about any unresolved choices before wiring them.
+
+Suggested question: "Which components should we connect now: administrator,
+role and permission management; users; background jobs and queue management;
+uploads; notifications; realtime; auth email flows; operations; or your own
+application sections? Which should stay out of this integration?"
+
+Record the answer in the host's integration plan or task notes, separating
+selected components, deferred components, required dependencies and unresolved
+choices. Use this checklist against the pinned GoAdmin version:
+
+- [ ] **Access management** (`features/access`): administrator, role and
+  permission management screens. Core authentication and current membership/RBAC
+  checks remain required even when these screens are omitted.
+- [ ] **Users** (`features/users`): the optional users-management feature,
+  separate from administrator management.
+- [ ] **Background jobs** (`features/jobs`) and **queue management**
+  (`features/queues`): choose worker ownership and whether queue screens are
+  needed; these are separate modules.
+- [ ] **Uploads** (`features/uploads`): choose storage and upload policies.
+- [ ] **Notifications** (`features/notifications`): choose a durable delivery
+  transport.
+- [ ] **Realtime** (`features/realtime`): optional WebSocket updates.
+- [ ] **Auth email flows** (`features/authmail`): choose the required email
+  flows, sender and worker ownership.
+- [ ] **Operations** (`features/operations`): choose the host-backed operations
+  to expose.
+- [ ] **Host-owned sections**: name each application feature and its permission
+  policy; do not assume a generic CRUD generator.
+
+Explain dependencies as part of the choice: uploads, queues and notifications
+require an explicitly mounted jobs module; authmail uses GoAuth's encrypted
+native notification queue and does not require jobs. Include necessary
+dependencies in the confirmed plan rather than silently enabling them. Redis
+is an optional infrastructure choice, not a required module.
+
+Only wire the selected components and their agreed dependencies. Omitted or
+unanswered options are not permission to enable them, and "all components"
+still needs a concrete list and dependency/ownership choices. Keep the core
+security requirements below intact. This is an integration workflow requirement,
+not a new runtime prompt or a change to module defaults.
+
 ## See the existing interface first
 
 Follow the [standalone starter](../examples/starter/README.md), including its
