@@ -227,20 +227,6 @@ func (mr *MockadminAuthRuntimeMockRecorder) ProvisionTrustedAdmin(ctx, request a
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProvisionTrustedAdmin", reflect.TypeOf((*MockadminAuthRuntime)(nil).ProvisionTrustedAdmin), ctx, request)
 }
 
-// RequestEmailChange mocks base method.
-func (m *MockadminAuthRuntime) RequestEmailChange(ctx context.Context, subjectID goauth.SubjectID, newEmail string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RequestEmailChange", ctx, subjectID, newEmail)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// RequestEmailChange indicates an expected call of RequestEmailChange.
-func (mr *MockadminAuthRuntimeMockRecorder) RequestEmailChange(ctx, subjectID, newEmail any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RequestEmailChange", reflect.TypeOf((*MockadminAuthRuntime)(nil).RequestEmailChange), ctx, subjectID, newEmail)
-}
-
 // UpdateBasicProfile mocks base method.
 func (m *MockadminAuthRuntime) UpdateBasicProfile(ctx context.Context, subjectID goauth.SubjectID, profile goauth.BasicProfile) (goauth.Account, error) {
 	m.ctrl.T.Helper()

@@ -58,7 +58,6 @@ type adminAuthRuntime interface {
 		subjectID goauth.SubjectID,
 		profile goauth.BasicProfile,
 	) (goauth.Account, error)
-	RequestEmailChange(ctx context.Context, subjectID goauth.SubjectID, newEmail string) error
 }
 
 type fileRepo interface {
@@ -522,7 +521,7 @@ func (h *Handler) Update(c fiber.Ctx) error {
 	})
 	if err != nil {
 		var httpErr *fiber.Error
-		if errors.As(err, &httpErr) && httpErr.Code == fiber.StatusNotFound {
+		if errors.As(err, &httpErr) && (httpErr.Code == fiber.StatusNotFound || httpErr.Code == fiber.StatusBadRequest) {
 			return httpErr
 		}
 		h.adminApp.Logger().ErrorContext(c, "admin repo update in http handler", logger.Error(err))
@@ -734,7 +733,13 @@ func (h *Handler) updateAdmin(ctx context.Context, id int64, form adminUpdateInp
 	if currentAdmin.ID <= 0 {
 		return fiber.NewError(fiber.StatusNotFound, "Администратор не найден")
 	}
-	currentEmail := currentAdmin.Email
+	// Recovery-address changes require the dedicated authenticated profile flow.
+	// Reject before any profile, preview, repository or audit mutation, even when
+	// the actor is editing their own administrator record.
+	if form.Email != currentAdmin.Email {
+		return fiber.NewError(fiber.StatusBadRequest,
+			"Email можно изменить только в настройках своего профиля с подтверждением личности")
+	}
 
 	currentAdmin.Username = form.Username
 	currentAdmin.Name = form.Name
@@ -758,11 +763,6 @@ func (h *Handler) updateAdmin(ctx context.Context, id int64, form adminUpdateInp
 
 	if err := h.adminRepo.UpdateAdmin(ctx, id, currentAdmin); err != nil {
 		return fmt.Errorf("admin repo update ID: %w", err)
-	}
-	if form.Email != "" && form.Email != currentEmail {
-		if err := h.authRuntime.RequestEmailChange(ctx, subjectID, form.Email); err != nil {
-			return fmt.Errorf("admin canonical email change request: %w", err)
-		}
 	}
 
 	if h.auditWriter == nil {
