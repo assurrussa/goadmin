@@ -1387,3 +1387,35 @@ the coherent batch; do not stack separate full race/coverage on its successful
 aggregate. Resolver, affected integrations and browser acceptance need exact
 final-tree evidence. Source preparation and static review alone do not prove
 merge, release, deployment, or cross-project SSO readiness.
+
+## 2026-10-16: focused profile and settings improvements
+
+The profile overview shows supported identity, role and creation metadata, with
+one Edit action and a Settings link. It no longer claims an active status or a
+profile change history from the administration row's timestamps. Avatar controls
+remain conditional on uploads; email controls remain conditional on authmail.
+Omitted capability maps retain the existing host compatibility behavior.
+
+| Flow | Success | Validation or failure | Ownership and cleanup |
+| --- | --- | --- | --- |
+| Self-profile save | Redirect to the edit GET and remount from its canonical projection | Preserve entered values, including intentionally empty optional fields | GoAuth owns basic profile fields; no administration write is added |
+| Administrator edit | Keep the existing update flow | Restore only fields present in old input | Email stays canonical and readonly; the existing backend rejects changed email |
+| Email request | Show the pending destination and expiry | Keep the request available | Clear the current password and its Inertia defaults after either outcome |
+| Email confirmation | Remove the confirmation form when no challenge remains | Clear the submitted code; expiry offers a new request | Clear code defaults too; never show confirmation without a pending challenge |
+| Password change | End sessions and return to login | Clear all password fields | Clear Inertia defaults as well as visible fields after either outcome |
+
+Settings use separate native forms for email requests, email confirmation and
+password changes. Inertia updates form defaults after success, so resetting only
+visible fields is insufficient: successful completion must also clear secret
+defaults. Processing guards prevent duplicate submissions. Password/email
+operations keep canonical current-password verification for local and linked SSO
+accounts; the server continues to decide MFA availability. MFA management and its
+ephemeral enrollment/recovery-code lifecycle are unchanged.
+
+Regressions cover profile POST/redirect/GET, required-name validation, explicit
+empty optional values, readonly administrator email, pending/absent/expired email
+changes, success/failure cleanup, capability maps and linked account compatibility.
+Disposable browser fixtures exercised the actual Vue/Inertia pages at 1440px and
+390px in light/dark themes, including keyboard submission. HTTP mutations in the
+browser fixture were synthetic; handler/service tests verify backend behavior.
+This change does not merge, release, deploy, or enable hosted CI.

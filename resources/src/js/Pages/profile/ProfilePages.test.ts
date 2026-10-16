@@ -107,7 +107,8 @@ it.each([undefined, {}, { uploads: true }])(
       props: capabilities === undefined ? {} : { adminCapabilities: capabilities },
     })
     const root = document.createElement('div')
-    const app = createApp(ProfileView, { data: { ...data, username: '' } })
+    const viewProps = { data: { ...data, username: '' } }
+    const app = createApp(ProfileView, viewProps)
     apps.push(app)
     app.use(createPinia()).mount(root)
     expect(root.textContent).not.toContain('Активен')

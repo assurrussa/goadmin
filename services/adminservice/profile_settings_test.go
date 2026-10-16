@@ -35,7 +35,7 @@ func TestProfilePendingEmailChangeExpiresCanonically(t *testing.T) {
 	require.Equal(t, "current@example.test", current.PrimaryEmail.DisplayValue)
 }
 
-func TestProfilePasswordChangePreservesLocalAndLinkedSSOAccounts(t *testing.T) {
+func TestProfileSettingsPreserveLocalAndLinkedSSOAccounts(t *testing.T) {
 	for _, linked := range []bool{false, true} {
 		t.Run(map[bool]string{false: "local", true: "linked SSO"}[linked], func(t *testing.T) {
 			fixture, err := testkit.NewRuntime()
@@ -64,6 +64,14 @@ func TestProfilePasswordChangePreservesLocalAndLinkedSSOAccounts(t *testing.T) {
 				require.NoError(t, linkErr)
 			}
 			service := NewService(nil, roleServiceStub{}, WithRuntime(fixture.Runtime, adminRepositoryStub{}))
+			err = service.RequestEmailChangeWithPassword(t.Context(), account.Subject.ID, "incorrect", "next@example.test")
+			require.ErrorIs(t, err, goauth.ErrCurrentPasswordInvalid)
+			require.NoError(t, service.RequestEmailChangeWithPassword(
+				t.Context(), account.Subject.ID, testAdminPassword, "next@example.test",
+			))
+			pending, pendingErr := service.GetPendingEmailChange(t.Context(), account.Subject.ID)
+			require.NoError(t, pendingErr)
+			require.Equal(t, "next@example.test", pending.NewDisplayValue)
 			const nextPassword = "New-Unique-Admin-Passphrase-987"
 			err = service.ChangePassword(t.Context(), account.Subject.ID, "incorrect", nextPassword)
 			require.ErrorIs(t, err, goauth.ErrCurrentPasswordInvalid)
