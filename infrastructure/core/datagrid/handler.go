@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 	logger "github.com/assurrussa/gologger"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v3"
@@ -229,7 +230,7 @@ func (h *Handler[T]) loadDataInternal(c fiber.Ctx, filters Filters) (Response[T]
 		IDKey:             h.config.IDKey,
 		Loading:           false,
 
-		Creatable:   h.config.Creatable,
+		Creatable:   h.config.Creatable && h.previewActionAllowed(c, "create"),
 		Exportable:  h.config.Exportable,
 		Refreshable: h.config.Refreshable,
 
@@ -362,7 +363,7 @@ func (h *Handler[T]) availableActions(ctx context.Context, item T) []Action[T] {
 
 	availableActions := make([]Action[T], 0, len(h.config.Actions))
 	for _, action := range h.config.Actions {
-		if action.CanView == nil || action.CanView(ctx, item) {
+		if h.previewActionAllowed(ctx, action.Key) && (action.CanView == nil || action.CanView(ctx, item)) {
 			availableActions = append(availableActions, action)
 		}
 	}
@@ -433,4 +434,22 @@ func (h *Handler[T]) renderErrorPage(c fiber.Ctx, err error) error {
 
 	// Если компонент не настроен - простая ошибка
 	return c.Status(http.StatusInternalServerError).SendString("Internal Server Error")
+}
+
+// Preview filters legacy action metadata whose visibility was previously enforced
+// only by endpoint guards. Ordinary requests retain the existing callbacks.
+func (h *Handler[T]) previewActionAllowed(ctx context.Context, action string) bool {
+	if !integrationroles.RolePreviewActive(ctx) {
+		return true
+	}
+	domain := strings.Split(strings.Trim(h.config.RoutePath, "/"), "/")[0]
+	switch action {
+	case "view":
+		action = "read"
+	case "edit":
+		action = "update"
+	case "restore":
+		action = "delete"
+	}
+	return integrationroles.RolePreviewAllows(ctx, integrationroles.NewPermissionKey(integrationroles.PermissionDomain(domain), integrationroles.PermissionAction(action)))
 }
