@@ -2,7 +2,7 @@
   <Card v-if="filterableColumns.length > 0">
     <CardContent class="p-6">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-lg font-medium text-text-primary">Фильтры</h3>
+        <h3 class="text-lg font-medium text-text-primary">{{ t('Фильтры') }}</h3>
         <AppButton
           v-if="hasActiveFilters"
           @click="clearFilters"
@@ -10,7 +10,7 @@
           size="sm"
           class="text-text-tertiary hover:text-text-secondary"
         >
-          Очистить все
+          {{ t('Очистить все') }}
         </AppButton>
       </div>
 
@@ -20,7 +20,7 @@
             :for="`filter-${column.key}`"
             class="block text-sm font-medium text-text-primary mb-2"
           >
-            {{ column.label }}
+            {{ t(column.label) }}
           </label>
 
           <!-- Select фильтр -->
@@ -28,7 +28,7 @@
             v-if="column.type === 'select'"
             :id="`filter-${column.key}`"
             :model-value="getSelectValue(column.key)"
-            :placeholder="column.placeholder || 'Не выбрано'"
+            :placeholder="(column.placeholder ? t(column.placeholder) : '') || t('Не выбрано')"
             :options="column.options || []"
             @update:modelValue="handleFilterChange(column.key, $event)"
           />
@@ -41,7 +41,10 @@
             :inputmode="column.type === 'number' ? 'numeric' : undefined"
             :model-value="getInputValue(column.key)"
             @update:modelValue="handleFilterChange(column.key, $event)"
-            :placeholder="column.placeholder || `Фильтр по ${column.label.toLowerCase()}`"
+            :placeholder="
+              (column.placeholder ? t(column.placeholder) : '') ||
+              t('Фильтр по {label}', undefined, { label: t(column.label) })
+            "
           />
         </div>
       </div>
@@ -50,6 +53,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed } from 'vue'
 import type { AcceptableValue } from 'reka-ui'
 import { Card, CardContent } from '@/components/ui/card'

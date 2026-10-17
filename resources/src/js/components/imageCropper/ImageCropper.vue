@@ -2,12 +2,12 @@
   <div class="image-cropper-modal" @click="handleBackdropClick">
     <div class="modal-content" @click.stop>
       <div class="modal-header">
-        <h3 class="modal-title">Обрезать изображение</h3>
+        <h3 class="modal-title">{{ t('Обрезать изображение') }}</h3>
         <AppButton
           @click="closeModal"
           variant="ghost"
           size="icon-sm"
-          aria-label="Закрыть"
+          :aria-label="t('Закрыть')"
           :disabled="isProcessing"
           :class="{ 'opacity-60 cursor-not-allowed': isProcessing }"
         >
@@ -22,7 +22,7 @@
 
         <div class="crop-controls">
           <div class="control-group">
-            <label class="control-label">Соотношение сторон:</label>
+            <label class="control-label">{{ t('Соотношение сторон:') }}</label>
             <select
               v-model="aspectRatio"
               @change="updateAspectRatio"
@@ -40,7 +40,7 @@
           </div>
 
           <div class="control-group">
-            <label class="control-label">Качество JPEG:</label>
+            <label class="control-label">{{ t('Качество JPEG:') }}</label>
             <input
               v-model="jpegQuality"
               type="range"
@@ -57,21 +57,21 @@
 
       <div class="modal-footer">
         <AppButton @click="closeModal" variant="secondary" type="button" :disabled="isProcessing">
-          Отмена
+          {{ t('Отмена') }}
         </AppButton>
         <AppButton @click="cropImage" variant="primary" type="button" :disabled="isProcessing">
           <span v-if="isProcessing" class="inline-flex items-center gap-2">
             <Loader2 class="h-4 w-4 animate-spin" aria-hidden="true" />
-            Обработка...
+            {{ t('Обработка...') }}
           </span>
-          <span v-else>Обрезать</span>
+          <span v-else>{{ t('Обрезать') }}</span>
         </AppButton>
       </div>
 
       <div v-if="isProcessing" class="processing-overlay" role="status" aria-live="polite">
         <div class="processing-card">
           <span class="inline-spinner" aria-hidden="true"></span>
-          <span>Готовим изображение...</span>
+          <span>{{ t('Готовим изображение...') }}</span>
         </div>
       </div>
     </div>
@@ -79,6 +79,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import Cropper from 'cropperjs'

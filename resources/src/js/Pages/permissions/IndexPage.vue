@@ -11,6 +11,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed, ref } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AppHead from '@/components/layout/AppHead.vue'
@@ -63,7 +65,7 @@ function handleAction(actionId: string) {
 function handleDataAction(actionKey: string, item: Record<string, unknown>) {
   switch (actionKey) {
     case 'sync':
-      if (confirm('Синхронизировать разрешения с кодовой базой?')) {
+      if (confirm(t('Синхронизировать разрешения с кодовой базой?'))) {
         router.visit(`${apiUrl.value}/sync`, {
           method: 'post',
         })

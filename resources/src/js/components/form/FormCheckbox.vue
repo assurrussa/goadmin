@@ -17,7 +17,7 @@
       class="text-sm font-medium text-text-primary select-none cursor-pointer"
       :class="{ 'cursor-not-allowed opacity-60': disabled }"
     >
-      {{ label }}
+      {{ t(label) }}
       <span v-if="required" class="text-error ml-1">*</span>
     </label>
   </div>
@@ -35,7 +35,7 @@
         clip-rule="evenodd"
       />
     </svg>
-    <span>{{ Array.isArray(error) ? error[0] : error }}</span>
+    <span>{{ t((Array.isArray(error) ? error[0] : error) ?? '') }}</span>
   </p>
 
   <!-- Help text -->
@@ -45,6 +45,7 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
 import { computed, useId } from 'vue'
 import { Checkbox } from '@/components/ui/checkbox'
 

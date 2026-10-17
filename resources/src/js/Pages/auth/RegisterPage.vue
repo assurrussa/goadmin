@@ -2,11 +2,11 @@
   <AuthLayout>
     <AppHead :title="props.title" />
 
-    <template #title>Первый администратор</template>
+    <template #title>{{ t('Первый администратор') }}</template>
 
-    <template #subtitle
-      >Создайте первого администратора, после этого публичная регистрация закроется.</template
-    >
+    <template #subtitle>{{
+      t('Создайте первого администратора, после этого публичная регистрация закроется.')
+    }}</template>
 
     <AdminForm
       :form="form"
@@ -25,8 +25,8 @@
         v-model="form.name"
         name="name"
         type="text"
-        label="Имя"
-        placeholder="Администратор"
+        :label="t('Имя')"
+        :placeholder="t('Администратор')"
         required
         :error="form.errors.name"
       />
@@ -35,8 +35,8 @@
         v-model="form.lastName"
         name="lastName"
         type="text"
-        label="Фамилия"
-        placeholder="Фамилия"
+        :label="t('Фамилия')"
+        :placeholder="t('Фамилия')"
         :error="form.errors.lastName"
       />
 
@@ -44,7 +44,7 @@
         v-model="form.email"
         name="email"
         type="email"
-        label="Email адрес"
+        :label="t('Email адрес')"
         placeholder="admin@example.com"
         autocomplete="email"
         required
@@ -55,7 +55,7 @@
         v-model="form.username"
         name="username"
         type="text"
-        label="Логин"
+        :label="t('Логин')"
         placeholder="admin"
         autocomplete="username"
         :error="form.errors.username"
@@ -65,7 +65,7 @@
       <PasswordInput
         v-model="form.password"
         name="password"
-        label="Пароль"
+        :label="t('Пароль')"
         autocomplete="new-password"
         required
         :error="form.errors.password"
@@ -74,7 +74,7 @@
       <PasswordInput
         v-model="form.passwordConfirm"
         name="passwordConfirm"
-        label="Повтор пароля"
+        :label="t('Повтор пароля')"
         autocomplete="new-password"
         required
         :error="form.errors.passwordConfirm"
@@ -83,7 +83,7 @@
       <PasswordInput
         v-model="form.setupToken"
         name="setupToken"
-        label="Setup-токен"
+        :label="t('Setup-токен')"
         autocomplete="off"
         required
         :error="form.errors.setupToken"
@@ -95,20 +95,20 @@
         variant="primary"
         size="md"
         :loading="form.processing"
-        loading-text="Создание..."
+        :loading-text="t('Создание...')"
         full-width
         class="mt-6"
       >
-        Создать первого администратора
+        {{ t('Создать первого администратора') }}
       </FormButton>
     </AdminForm>
 
     <template #footer>
       <div class="text-center space-y-2">
-        <span class="text-sm text-text-secondary"> Уже есть администратор? </span>
+        <span class="text-sm text-text-secondary"> {{ t('Уже есть администратор?') }} </span>
         <div>
           <Link href="/auth/login" class="text-sm text-primary hover:text-primary-dark">
-            Вернуться ко входу
+            {{ t('Вернуться ко входу') }}
           </Link>
         </div>
       </div>
@@ -117,6 +117,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { Link, useForm, usePage } from '@inertiajs/vue3'
 import AuthLayout from '@/components/layout/AuthLayout.vue'
 import AppHead from '@/components/layout/AppHead.vue'

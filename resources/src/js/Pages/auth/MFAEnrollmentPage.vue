@@ -1,42 +1,56 @@
 <template>
   <AuthLayout>
-    <template #title>Настройте двухфакторную защиту</template>
-    <template #subtitle>Для входа в эту панель нужен код из приложения-аутентификатора.</template>
+    <template #title>{{ t('Настройте двухфакторную защиту') }}</template>
+    <template #subtitle>{{
+      t('Для входа в эту панель нужен код из приложения-аутентификатора.')
+    }}</template>
 
     <p v-if="error" role="alert" class="text-sm text-error">{{ error }}</p>
     <form v-if="enrollment" class="space-y-4" @submit.prevent="confirm">
-      <p>Добавьте этот ключ в приложение-аутентификатор, затем введите полученный код.</p>
-      <p class="font-mono break-all rounded border p-3" aria-label="Ключ настройки">
+      <p>
+        {{ t('Добавьте этот ключ в приложение-аутентификатор, затем введите полученный код.') }}
+      </p>
+      <p class="font-mono break-all rounded border p-3" :aria-label="t('Ключ настройки')">
         {{ enrollment.secret }}
       </p>
       <p>
-        Сохраните резервные коды в безопасном месте. Они станут действовать только после
-        подтверждения настройки.
+        {{
+          t(
+            'Сохраните резервные коды в безопасном месте. Они станут действовать только после подтверждения настройки.',
+          )
+        }}
       </p>
-      <ul class="font-mono text-sm space-y-1" aria-label="Резервные коды">
+      <ul class="font-mono text-sm space-y-1" :aria-label="t('Резервные коды')">
         <li v-for="recoveryCode in enrollment.recoveryCodes" :key="recoveryCode">
           {{ recoveryCode }}
         </li>
       </ul>
       <label class="flex items-center gap-2 text-sm">
         <input v-model="codesSaved" type="checkbox" />
-        Резервные коды сохранены
+        {{ t('Резервные коды сохранены') }}
       </label>
       <FormInput
         v-model="code"
         name="code"
-        label="Код подтверждения"
+        :label="t('Код подтверждения')"
         autocomplete="one-time-code"
         required
       />
-      <FormButton type="submit" :loading="busy" :disabled="busy || !code || !codesSaved" full-width
-        >Подтвердить и войти</FormButton
+      <FormButton
+        type="submit"
+        :loading="busy"
+        :disabled="busy || !code || !codesSaved"
+        full-width
+        >{{ t('Подтвердить и войти') }}</FormButton
       >
     </form>
     <div v-else class="space-y-4">
       <p>
-        До подтверждения настройки доступ к панели закрыт. Можно вернуться ко входу и продолжить
-        позже.
+        {{
+          t(
+            'До подтверждения настройки доступ к панели закрыт. Можно вернуться ко входу и продолжить позже.',
+          )
+        }}
       </p>
       <FormButton
         type="button"
@@ -44,17 +58,19 @@
         :disabled="busy || leaving"
         full-width
         @click="begin"
-        >Начать настройку</FormButton
+        >{{ t('Начать настройку') }}</FormButton
       >
     </div>
 
     <template #footer>
-      <Link href="/auth/login" @click="leave">Вернуться ко входу</Link>
+      <Link href="/auth/login" @click="leave">{{ t('Вернуться ко входу') }}</Link>
     </template>
   </AuthLayout>
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { onBeforeUnmount, ref } from 'vue'
 import { Link } from '@inertiajs/vue3'
 import axios from 'axios'
@@ -126,7 +142,7 @@ async function begin() {
     enrollment.value = response.data.enrollment
   } catch {
     if (isActive())
-      error.value = 'Не удалось начать настройку. Вернитесь ко входу и попробуйте снова.'
+      error.value = t('Не удалось начать настройку. Вернитесь ко входу и попробуйте снова.')
   } finally {
     if (isActive()) busy.value = false
   }
@@ -160,7 +176,7 @@ async function confirm() {
     window.location.assign(target.href)
   } catch {
     if (isActive())
-      error.value = 'Не удалось подтвердить настройку. Проверьте код или начните вход заново.'
+      error.value = t('Не удалось подтвердить настройку. Проверьте код или начните вход заново.')
   } finally {
     code.value = ''
     if (isActive()) busy.value = false

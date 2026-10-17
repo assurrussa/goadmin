@@ -10,7 +10,7 @@
             >
               <Checkbox
                 :model-value="allSelected"
-                aria-label="Выбрать все строки"
+                :aria-label="t('Выбрать все строки')"
                 class="absolute left-4 top-1/2 -mt-2 sm:left-6"
                 @update:model-value="$emit('toggle-select-all')"
               />
@@ -35,7 +35,7 @@
                 class="flex w-full items-center space-x-1 px-6 py-3 text-left uppercase tracking-wider hover:bg-surface-variant transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 @click="$emit('sort', column.key)"
               >
-                <span>{{ column.label }}</span>
+                <span>{{ t(column.label) }}</span>
                 <span
                   aria-hidden="true"
                   class="flex-none rounded text-text-tertiary group-hover:visible"
@@ -49,14 +49,14 @@
                   <ArrowUpDown v-else class="h-4 w-4 opacity-60" />
                 </span>
               </button>
-              <span v-else>{{ column.label }}</span>
+              <span v-else>{{ t(column.label) }}</span>
             </TableHead>
             <!-- Sticky Actions Column Header -->
             <TableHead
               v-if="hasAnyActions"
               class="relative px-6 py-3 sticky right-0 bg-surface z-20 whitespace-nowrap h-auto border-l border-border-primary shadow-[-12px_0_18px_-16px_rgba(15,23,42,0.35)]"
             >
-              <span class="sr-only">Действия</span>
+              <span class="sr-only">{{ t('Действия') }}</span>
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -98,7 +98,7 @@
               >
                 <CheckCircle2 v-if="getColumnValue(item, column.key)" class="h-4 w-4 mr-1" />
                 <XCircle v-else class="h-4 w-4 mr-1" />
-                {{ getColumnValue(item, column.key) ? 'Да' : 'Нет' }}
+                {{ getColumnValue(item, column.key) ? t('Да') : t('Нет') }}
               </span>
               <!-- Rich Text values -->
               <div
@@ -140,7 +140,7 @@
                     <Eye v-else-if="['show', 'view'].includes(action.key)" class="h-4 w-4" />
                     <Trash2 v-else-if="action.key === 'delete'" class="h-4 w-4 text-destructive" />
                     <component :is="action.icon" v-else-if="action.icon" class="h-4 w-4" />
-                    <span v-else class="sr-only">{{ action.label }}</span>
+                    <span v-else class="sr-only">{{ t(action.label) }}</span>
                   </AppButton>
                 </template>
 
@@ -152,12 +152,12 @@
                 >
                   <DropdownMenuTrigger as-child>
                     <AppButton variant="ghost" size="icon-sm" class="h-8 w-8 p-0">
-                      <span class="sr-only">Еще</span>
+                      <span class="sr-only">{{ t('Еще') }}</span>
                       <MoreHorizontal class="h-4 w-4" />
                     </AppButton>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Действия</DropdownMenuLabel>
+                    <DropdownMenuLabel>{{ t('Действия') }}</DropdownMenuLabel>
                     <template v-for="action in item.actions" :key="action.key">
                       <DropdownMenuItem
                         v-if="!['edit', 'show', 'view', 'delete'].includes(action.key)"
@@ -168,7 +168,7 @@
                             : ''
                         "
                       >
-                        {{ action.label }}
+                        {{ t(action.label) }}
                       </DropdownMenuItem>
                     </template>
                   </DropdownMenuContent>
@@ -183,6 +183,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import type { Config, Column, DataItem, DataItemValue } from '~/composables/useDataGrid.ts'
 import { computed } from 'vue'
 import {

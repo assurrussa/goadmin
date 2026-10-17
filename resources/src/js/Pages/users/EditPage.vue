@@ -1,6 +1,6 @@
 <template>
   <AppHead :title="props.title" />
-  <PageActionBar :back-href="basePath" label="Редактирование" />
+  <PageActionBar :back-href="basePath" :label="t('Редактирование')" />
 
   <AdminForm
     :form="form"
@@ -15,7 +15,7 @@
             v-model="form.name"
             name="name"
             type="text"
-            label="Имя"
+            :label="t('Имя')"
             required
             :error="form.errors.name"
           />
@@ -23,7 +23,7 @@
             v-model="form.lastName"
             name="lastName"
             type="text"
-            label="Фамилия"
+            :label="t('Фамилия')"
             :error="form.errors.lastName"
           />
           <FormInput
@@ -49,9 +49,9 @@
         <FormButton
           type="submit"
           :loading="form.processing"
-          loading-text="Сохранение..."
+          :loading-text="t('Сохранение...')"
           variant="primary"
-          >Сохранить</FormButton
+          >{{ t('Сохранить') }}</FormButton
         >
       </CardFooter>
     </Card>
@@ -59,6 +59,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { useForm, usePage } from '@inertiajs/vue3'
 import { watch } from 'vue'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'

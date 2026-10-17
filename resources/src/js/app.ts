@@ -1,3 +1,4 @@
+import { initLocale } from '@/i18n'
 import { createApp, h, defineComponent, Fragment, ref } from 'vue'
 import { createInertiaApp, router, usePage } from '@inertiajs/vue3'
 import { createPinia } from 'pinia'
@@ -19,6 +20,8 @@ import axios from 'axios'
 import type { AdminAuthUser } from '@/types/models'
 import { extensions } from '@/extensions'
 import { extensionPages } from '@admin-extensions-generated'
+
+initLocale()
 
 axios.defaults.withCredentials = true
 axios.defaults.xsrfCookieName = import.meta.env.VITE_ADMIN_CSRF_COOKIE_NAME?.trim() || 'csrf_token'

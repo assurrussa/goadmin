@@ -21,7 +21,7 @@
         @click="togglePasswordVisibility"
         class="rounded-sm text-text-tertiary hover:text-text-secondary transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         :disabled="readonly || disabled"
-        :aria-label="showPassword ? 'Скрыть пароль' : 'Показать пароль'"
+        :aria-label="showPassword ? t('Скрыть пароль') : t('Показать пароль')"
         :aria-pressed="showPassword"
       >
         <EyeIcon v-if="!showPassword" class="w-5 h-5" aria-hidden="true" />
@@ -32,6 +32,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { ref, computed } from 'vue'
 import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
 import FormInput from './FormInput.vue'

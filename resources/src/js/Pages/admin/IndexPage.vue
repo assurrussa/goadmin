@@ -12,6 +12,7 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
 import { computed, ref } from 'vue'
 import DataGrid from '@/components/datagrid/DataGrid.vue'
 import type { ApiResponse } from '@/composables/useDataGrid'
@@ -76,7 +77,11 @@ function handleDataAction(actionKey: string, item: Record<string, unknown>) {
       router.get(`${apiUrl.value}/${item.id}/edit`)
       break
     case 'delete':
-      if (confirm(`Вы уверены, что хотите удалить запись #${item.id}?`)) {
+      if (
+        confirm(
+          t('Вы уверены, что хотите удалить запись #{id}?', undefined, { id: String(item.id) }),
+        )
+      ) {
         router.delete(`${apiUrl.value}/${item.id}`)
       }
       break

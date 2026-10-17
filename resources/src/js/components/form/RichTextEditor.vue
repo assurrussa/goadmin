@@ -10,9 +10,9 @@
           @click="showMobileToolbar = !showMobileToolbar"
           :aria-expanded="showMobileToolbar"
           :aria-controls="toolbarContentId"
-          title="Показать или скрыть панель форматирования"
+          :title="t('Показать или скрыть панель форматирования')"
         >
-          {{ showMobileToolbar ? 'Скрыть форматирование' : 'Показать форматирование' }}
+          {{ showMobileToolbar ? t('Скрыть форматирование') : t('Показать форматирование') }}
         </AppButton>
       </div>
 
@@ -205,13 +205,13 @@
             v-if="canUseFeature('video') && allowFileUpload && !mediaPicker"
             class="ml-3 flex items-center gap-2 text-xs font-semibold transition duration-150 ease-out text-text-secondary hover:text-text-primary"
           >
-            <span>Без ужимания видео</span>
+            <span>{{ t('Без ужимания видео') }}</span>
             <Checkbox
               :checked="uploadVideoWithoutCompression"
               :title="
                 uploadVideoWithoutCompression
-                  ? 'Видео загрузится как есть'
-                  : 'Видео отправится в ресайзер'
+                  ? t('Видео загрузится как есть')
+                  : t('Видео отправится в ресайзер')
               "
               @update:checked="handleUploadVideoToggle"
             />
@@ -221,7 +221,7 @@
             variant="success"
             class="ml-2 uppercase tracking-wide text-xs font-semibold"
           >
-            Видео без сжатия
+            {{ t('Видео без сжатия') }}
           </AppBadge>
         </div>
 
@@ -473,7 +473,7 @@
       type="file"
       name="rich-text-media"
       :disabled="!isCurrentScope || !!uncertainUpload || isUploading || disabled || readonly"
-      aria-label="Добавить изображение или видео"
+      :aria-label="t('Добавить изображение или видео')"
       :accept="effectiveAcceptedFileTypes.join(',')"
       multiple
       @change="handleFileSelect"
@@ -492,6 +492,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 defineOptions({
   inheritAttrs: false,
 })
@@ -807,10 +809,10 @@ const uploadStatusMessage = computed(() => {
 
   const label =
     currentUploadType.value === 'video'
-      ? 'видео'
+      ? t('видео')
       : currentUploadType.value === 'image'
-        ? 'изображение'
-        : 'файл'
+        ? t('изображение')
+        : t('файл')
 
   switch (uploadStage.value) {
     case 'uploading':
@@ -1057,7 +1059,7 @@ const waitForTaskCompletion = async (
       } else if (eventStatus === 'failed' || eventStatus === 'error') {
         resolved = true
         cleanupTaskSubscription()
-        reject(new Error(event.error || 'Обработка файла завершилась с ошибкой'))
+        reject(new Error(event.error || t('Обработка файла завершилась с ошибкой')))
       }
     })
 
@@ -1084,14 +1086,14 @@ const waitForTaskCompletion = async (
         }
 
         if (effectiveStatus === 'failed' || effectiveStatus === 'error') {
-          throw new Error(task.error || 'Обработка файла завершилась с ошибкой')
+          throw new Error(task.error || t('Обработка файла завершилась с ошибкой'))
         }
 
         await sleep(interval)
       }
 
       if (!resolved) {
-        throw new Error('Превышено время ожидания обработки файла')
+        throw new Error(t('Превышено время ожидания обработки файла'))
       }
     } catch (error) {
       if (!resolved) {
@@ -1447,7 +1449,7 @@ const insertImageIntoEditor = (
   const src = resolveAbsoluteUrl(rawSrc)
 
   if (!src) {
-    emit('file-error', 'Не удалось определить URL вложения для вставки')
+    emit('file-error', t('Не удалось определить URL вложения для вставки'))
     return false
   }
 
@@ -1477,7 +1479,7 @@ const insertVideoIntoEditor = (
   const src = resolveAbsoluteUrl(rawSrc)
 
   if (!src) {
-    emit('file-error', 'Не удалось определить URL видео для вставки')
+    emit('file-error', t('Не удалось определить URL видео для вставки'))
     return false
   }
 
@@ -1512,7 +1514,7 @@ const resolveEntityId = (): number | null => {
 
 const insertAttachment = (payload: AttachmentPayload) => {
   if (!payload?.url && !payload?.publicUrl && !payload?.fullPath) {
-    emit('file-error', 'Не удалось определить URL вложения')
+    emit('file-error', t('Не удалось определить URL вложения'))
     return
   }
 
@@ -1521,11 +1523,11 @@ const insertAttachment = (payload: AttachmentPayload) => {
   const isVideo = mimeType.startsWith('video/')
 
   if (mimeType && !isImage && !isVideo) {
-    emit('file-error', 'Перетащить в редактор можно только изображения и видео')
+    emit('file-error', t('Перетащить в редактор можно только изображения и видео'))
     return
   }
   if ((isImage && !canUseFeature('image')) || (isVideo && !canUseFeature('video'))) {
-    emit('file-error', 'Этот тип media запрещён текущей rich-text policy')
+    emit('file-error', t('Этот тип media запрещён текущей rich-text policy'))
     return
   }
 
@@ -1580,9 +1582,9 @@ const handleFiles = async (files: File[], options: FileHandleOptions = {}) => {
     }
 
     if (isImageFile && !canUseFeature('image')) {
-      emit('file-error', 'Изображения запрещены текущей rich-text policy')
+      emit('file-error', t('Изображения запрещены текущей rich-text policy'))
     } else if (isVideoFile && !canUseFeature('video')) {
-      emit('file-error', 'Видео запрещено текущей rich-text policy')
+      emit('file-error', t('Видео запрещено текущей rich-text policy'))
     } else if (isImageFile) {
       console.log('🖼️ File identified as image, calling handleImageUpload')
       await handleImageUpload(preparedFile, options)
@@ -1609,7 +1611,7 @@ const uploadMediaToServer = async (
   if (pending && (!checkingCompletion || pending.file !== file)) {
     throw new Error('Check the unconfirmed upload before starting another.')
   }
-  const baseLabel = fileCategory === 'video' ? 'Загрузка видео' : 'Загрузка изображения'
+  const baseLabel = fileCategory === 'video' ? t('Загрузка видео') : t('Загрузка изображения')
   const filename = file?.name ?? pending?.completion.filename
   const uploadLabel = filename ? `${baseLabel}: ${filename}` : baseLabel
   let completion = pending?.completion
@@ -1621,7 +1623,7 @@ const uploadMediaToServer = async (
 
   try {
     if (!props.entityId) {
-      throw new Error('Нельзя загрузить файл без идентификатора сущности')
+      throw new Error(t('Нельзя загрузить файл без идентификатора сущности'))
     }
 
     uploadQueueId = uploadQueue.start(uploadLabel, 0)

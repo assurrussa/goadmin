@@ -50,7 +50,7 @@
         {{ description }}
       </span>
       <span v-if="error" class="label-text-alt text-error">
-        {{ error }}
+        {{ t(error) }}
       </span>
       <span v-if="hint && !error" class="label-text-alt text-text-tertiary">
         {{ hint }}
@@ -60,6 +60,7 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
 import { computed } from 'vue'
 import { RichTextEditor } from '@/components/form'
 import type {

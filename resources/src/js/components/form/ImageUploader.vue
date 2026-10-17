@@ -15,7 +15,7 @@
       :id="fileInputId"
       type="file"
       name="image-upload"
-      aria-label="Загрузить изображение"
+      :aria-label="t('Загрузить изображение')"
       :accept="acceptedFileTypes.join(',')"
       :disabled="!canInteract"
       class="hidden"
@@ -48,7 +48,7 @@
         >
           <span>&#x1F5D1;</span>
         </AppButton>
-        <span class="text-xs text-white/80 uppercase tracking-wide">Удалить</span>
+        <span class="text-xs text-white/80 uppercase tracking-wide">{{ t('Удалить') }}</span>
       </div>
 
       <!-- Success Indicator -->
@@ -147,9 +147,9 @@
         class="checkbox checkbox-sm"
         :disabled="!canInteract"
       />
-      <span class="font-medium text-text-primary">Обрезать изображение</span>
+      <span class="font-medium text-text-primary">{{ t('Обрезать изображение') }}</span>
     </label>
-    <span class="text-text-tertiary">Можно отключить перед загрузкой</span>
+    <span class="text-text-tertiary">{{ t('Можно отключить перед загрузкой') }}</span>
   </div>
   <ImageCropper
     v-if="showImageCropper && cropperImageUrl"
@@ -166,6 +166,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue'
 import axios from 'axios'
 import { useNotifications } from '@/composables/useNotifications'
@@ -616,7 +618,7 @@ const uploadFile = async (file: File | undefined, reconcile = false) => {
   if (currentUploadId.value) {
     uploadQueue.remove(currentUploadId.value)
   }
-  currentUploadId.value = uploadQueue.start(props.uploadLabel ?? 'Загрузка файла', 0)
+  currentUploadId.value = uploadQueue.start(props.uploadLabel ?? t('Загрузка файла'), 0)
 
   try {
     const response =
@@ -740,7 +742,7 @@ const uploadFile = async (file: File | undefined, reconcile = false) => {
           if (controller.signal.aborted) return
           const file = result.file ?? result.task.file
           if (result.status === 'completed' && !file?.url) {
-            throw new Error('Обработка файла завершена, но адрес изображения недоступен.')
+            throw new Error(t('Обработка файла завершена, но адрес изображения недоступен.'))
           }
           handleFileStatusEvent({
             eventId: `poll-${task.id}`,
@@ -769,7 +771,7 @@ const uploadFile = async (file: File | undefined, reconcile = false) => {
               taskId: task.id,
               status: 'failed',
               error:
-                reason instanceof Error ? reason.message : 'Не удалось проверить статус файла.',
+                reason instanceof Error ? reason.message : t('Не удалось проверить статус файла.'),
             },
             false,
           )
@@ -817,11 +819,11 @@ const removeImage = async () => {
     let deleteMessage: string | undefined
     if (props.deleteUrl) {
       const { data } = await axios.delete(props.deleteUrl)
-      deleteMessage = data?.message || (data?.status === 'deleted' ? 'Файл удалён' : undefined)
+      deleteMessage = data?.message || (data?.status === 'deleted' ? t('Файл удалён') : undefined)
     } else {
       const result = await deleteUploadedFile(currentFile.value.id)
       if (result.status === 'deleted') {
-        deleteMessage = 'Файл удалён'
+        deleteMessage = t('Файл удалён')
       }
     }
 
@@ -842,7 +844,7 @@ const removeImage = async () => {
       (e as { response?: { data?: { error?: string; message?: string } }; message?: string })
         ?.response?.data?.message ||
       (e as { message?: string })?.message ||
-      'Не удалось удалить файл.'
+      t('Не удалось удалить файл.')
     error.value = errorMessage
     emit('error', errorMessage)
     notifyError(errorMessage)

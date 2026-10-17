@@ -1,6 +1,6 @@
 <template>
   <AppHead :title="props.title" />
-  <PageActionBar :back-href="basePath" label="Просмотр" />
+  <PageActionBar :back-href="basePath" :label="t('Просмотр')" />
 
   <div class="max-w-4xl mx-auto space-y-8">
     <!-- Заголовок с основной информацией -->
@@ -45,7 +45,7 @@
               </div>
               <div class="flex items-center">
                 <Calendar class="h-4 w-4 mr-1.5" />
-                <span>Создан {{ formatDate(props.data.createdAt) }}</span>
+                <span>{{ t('Создан') }} {{ formatDate(props.data.createdAt) }}</span>
               </div>
             </div>
           </div>
@@ -55,7 +55,7 @@
             <AppButton asChild>
               <Link :href="`${basePath}/${props.data.id}/edit`">
                 <Pencil class="h-4 w-4 mr-2" />
-                Редактировать
+                {{ t('Редактировать') }}
               </Link>
             </AppButton>
           </div>
@@ -69,7 +69,9 @@
         <CardHeader class="border-b border-border-primary">
           <div class="flex items-center">
             <Mail class="h-5 w-5 text-primary mr-2" />
-            <h2 class="text-lg font-semibold text-text-primary">Контактная информация</h2>
+            <h2 class="text-lg font-semibold text-text-primary">
+              {{ t('Контактная информация') }}
+            </h2>
           </div>
         </CardHeader>
         <CardContent class="space-y-4 pt-6">
@@ -82,7 +84,7 @@
           </div>
 
           <div class="flex items-center justify-between">
-            <span class="text-text-secondary font-medium">Имя пользователя</span>
+            <span class="text-text-secondary font-medium">{{ t('Имя пользователя') }}</span>
             <div class="flex items-center">
               <AtSign class="h-4 w-4 text-text-tertiary mr-2" />
               <span class="text-text-primary">{{ props.data.username }}</span>
@@ -96,12 +98,14 @@
         <CardHeader class="border-b border-border-primary">
           <div class="flex items-center">
             <ShieldCheck class="h-5 w-5 text-primary mr-2" />
-            <h2 class="text-lg font-semibold text-text-primary">Информация об аккаунте</h2>
+            <h2 class="text-lg font-semibold text-text-primary">
+              {{ t('Информация об аккаунте') }}
+            </h2>
           </div>
         </CardHeader>
         <CardContent class="space-y-4 pt-6">
           <div class="flex items-center justify-between">
-            <span class="text-text-secondary font-medium">Роль</span>
+            <span class="text-text-secondary font-medium">{{ t('Роль') }}</span>
             <div class="flex flex-wrap justify-end gap-2 max-w-[65%]">
               <AppBadge v-for="role in rolesList" :key="role" variant="primary" class="gap-1">
                 <ShieldCheck class="h-3 w-3" />
@@ -111,7 +115,7 @@
           </div>
 
           <div class="flex items-center justify-between">
-            <span class="text-text-secondary font-medium">Статус</span>
+            <span class="text-text-secondary font-medium">{{ t('Статус') }}</span>
             <AppBadge :variant="accountStatusVariant" class="gap-1.5">
               <span
                 class="w-1.5 h-1.5 rounded-full"
@@ -124,12 +128,12 @@
           <div class="flex items-center justify-between">
             <span class="text-text-secondary font-medium">Email</span>
             <AppBadge :variant="emailConfirmed ? 'success' : 'warning'">
-              {{ emailConfirmed ? 'Подтверждён' : 'Не подтверждён' }}
+              {{ emailConfirmed ? t('Подтверждён') : t('Не подтверждён') }}
             </AppBadge>
           </div>
 
           <div class="flex items-center justify-between">
-            <span class="text-text-secondary font-medium">Уникальный ID</span>
+            <span class="text-text-secondary font-medium">{{ t('Уникальный ID') }}</span>
             <div class="flex items-center">
               <Hash class="h-4 w-4 text-text-tertiary mr-2" />
               <span class="text-text-primary font-mono">{{ props.data.id }}</span>
@@ -137,9 +141,9 @@
           </div>
 
           <div class="flex items-center justify-between">
-            <span class="text-text-secondary font-medium">Последний вход</span>
+            <span class="text-text-secondary font-medium">{{ t('Последний вход') }}</span>
             <span class="text-text-primary">
-              {{ lastLoginAt ? formatDateTime(lastLoginAt) : 'Нет данных' }}
+              {{ lastLoginAt ? formatDateTime(lastLoginAt) : t('Нет данных') }}
             </span>
           </div>
         </CardContent>
@@ -151,7 +155,7 @@
       <CardHeader class="border-b border-border-primary">
         <div class="flex items-center">
           <Clock class="h-5 w-5 text-primary mr-2" />
-          <h2 class="text-lg font-semibold text-text-primary">История изменений</h2>
+          <h2 class="text-lg font-semibold text-text-primary">{{ t('История изменений') }}</h2>
         </div>
       </CardHeader>
       <CardContent class="pt-6">
@@ -165,7 +169,7 @@
               </div>
             </div>
             <div class="flex-grow">
-              <p class="text-sm font-medium text-text-primary">Создан</p>
+              <p class="text-sm font-medium text-text-primary">{{ t('Создан') }}</p>
               <p class="text-sm text-text-secondary">{{ formatDateTime(props.data.createdAt) }}</p>
               <p class="text-xs text-text-tertiary mt-1">{{ timeAgo(props.data.createdAt) }}</p>
             </div>
@@ -180,7 +184,7 @@
               </div>
             </div>
             <div class="flex-grow">
-              <p class="text-sm font-medium text-text-primary">Последнее обновление</p>
+              <p class="text-sm font-medium text-text-primary">{{ t('Последнее обновление') }}</p>
               <p class="text-sm text-text-secondary">{{ formatDateTime(props.data.updatedAt) }}</p>
               <p class="text-xs text-text-tertiary mt-1">{{ timeAgo(props.data.updatedAt) }}</p>
             </div>
@@ -195,7 +199,7 @@
               </div>
             </div>
             <div class="flex-grow">
-              <p class="text-sm font-medium text-text-primary">Последний вход</p>
+              <p class="text-sm font-medium text-text-primary">{{ t('Последний вход') }}</p>
               <p class="text-sm text-text-secondary">{{ formatDateTime(lastLoginAt) }}</p>
               <p class="text-xs text-text-tertiary mt-1">{{ timeAgo(lastLoginAt) }}</p>
             </div>
@@ -210,7 +214,7 @@
               </div>
             </div>
             <div class="flex-grow">
-              <p class="text-sm font-medium text-text-primary">Email подтверждён</p>
+              <p class="text-sm font-medium text-text-primary">{{ t('Email подтверждён') }}</p>
               <p class="text-sm text-text-secondary">{{ formatDateTime(emailConfirmedAt) }}</p>
               <p class="text-xs text-text-tertiary mt-1">{{ timeAgo(emailConfirmedAt) }}</p>
             </div>
@@ -231,7 +235,7 @@
               </div>
             </div>
             <div class="flex-grow">
-              <p class="text-sm font-medium text-text-primary">Удален</p>
+              <p class="text-sm font-medium text-text-primary">{{ t('Удален') }}</p>
               <p class="text-sm text-text-secondary">
                 {{ formatDateTime(props.data.deletedAt.Time) }}
               </p>
@@ -249,13 +253,13 @@
       <AppButton asChild variant="secondary">
         <Link :href="basePath">
           <ArrowLeft class="h-4 w-4 mr-2" />
-          Назад к списку
+          {{ t('Назад к списку') }}
         </Link>
       </AppButton>
       <AppButton asChild>
         <Link :href="`${basePath}/${props.data.id}/edit`">
           <Pencil class="h-4 w-4 mr-2" />
-          Редактировать
+          {{ t('Редактировать') }}
         </Link>
       </AppButton>
     </div>
@@ -263,6 +267,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed } from 'vue'
 import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'
@@ -298,7 +304,7 @@ const props = defineProps({
 
 // Вычисляемые свойства
 const fullName = computed(() => {
-  return `${props.data.name || ''} ${props.data.lastName || ''}`.trim() || 'Без имени'
+  return `${props.data.name || ''} ${props.data.lastName || ''}`.trim() || t('Без имени')
 })
 
 const userInitials = computed(() => {
@@ -313,18 +319,20 @@ const userInitials = computed(() => {
 
 const rolesList = computed(() => {
   const roles = props.data?.data?.roles
-  return Array.isArray(roles) && roles.length > 0 ? roles : ['Без роли']
+  return Array.isArray(roles) && roles.length > 0 ? roles : [t('Без роли')]
 })
 
 const emailConfirmedAt = computed(() => props.data?.data?.emailConfirmedAt || '')
 const lastLoginAt = computed(() => props.data?.data?.lastLoginAt || '')
 const emailConfirmed = computed(() => Boolean(emailConfirmedAt.value))
-const accountStatusLabel = computed(() => (props.data?.deletedAt?.Valid ? 'Удалён' : 'Активен'))
+const accountStatusLabel = computed(() =>
+  props.data?.deletedAt?.Valid ? t('Удалён') : t('Активен'),
+)
 const accountStatusVariant = computed(() => (props.data?.deletedAt?.Valid ? 'danger' : 'success'))
 
 // Функции форматирования
 const formatDate = (dateString: string) => {
-  if (!dateString) return 'Не указано'
+  if (!dateString) return t('Не указано')
 
   const date = new Date(dateString)
   return date.toLocaleDateString('ru-RU', {
@@ -335,7 +343,7 @@ const formatDate = (dateString: string) => {
 }
 
 const formatDateTime = (dateString: string) => {
-  if (!dateString) return 'Не указано'
+  if (!dateString) return t('Не указано')
 
   const date = new Date(dateString)
   return date.toLocaleString('ru-RU', {
@@ -358,13 +366,13 @@ const timeAgo = (dateString: string) => {
   const diffMinutes = Math.floor(diffMs / (1000 * 60))
 
   if (diffDays > 0) {
-    return `${diffDays} ${diffDays === 1 ? 'день' : diffDays < 5 ? 'дня' : 'дней'} назад`
+    return `${diffDays} ${diffDays === 1 ? t('день') : diffDays < 5 ? t('дня') : t('дней')} назад`
   } else if (diffHours > 0) {
-    return `${diffHours} ${diffHours === 1 ? 'час' : diffHours < 5 ? 'часа' : 'часов'} назад`
+    return `${diffHours} ${diffHours === 1 ? t('час') : diffHours < 5 ? t('часа') : t('часов')} назад`
   } else if (diffMinutes > 0) {
-    return `${diffMinutes} ${diffMinutes === 1 ? 'минуту' : diffMinutes < 5 ? 'минуты' : 'минут'} назад`
+    return `${diffMinutes} ${diffMinutes === 1 ? t('минуту') : diffMinutes < 5 ? t('минуты') : t('минут')} назад`
   } else {
-    return 'Только что'
+    return t('Только что')
   }
 }
 </script>

@@ -1,6 +1,6 @@
 <template>
   <AppHead :title="props.title" />
-  <PageActionBar :back-href="basePath" label="Редактирование профиля" :use-history="false" />
+  <PageActionBar :back-href="basePath" :label="t('Редактирование профиля')" :use-history="false" />
 
   <AdminForm
     :form="form"
@@ -16,7 +16,7 @@
             v-model="form.name"
             name="name"
             type="text"
-            label="Имя"
+            :label="t('Имя')"
             autocomplete="given-name"
             required
             :error="form.errors.name"
@@ -27,7 +27,7 @@
             v-model="form.lastName"
             name="lastName"
             type="text"
-            label="Фамилия (необязательно)"
+            :label="t('Фамилия (необязательно)')"
             autocomplete="family-name"
             :error="form.errors.lastName"
           />
@@ -37,7 +37,7 @@
             v-model="form.username"
             name="username"
             type="text"
-            label="Имя пользователя (необязательно)"
+            :label="t('Имя пользователя (необязательно)')"
             autocomplete="username"
             help-text="Можно оставить пустым."
             :error="form.errors.username"
@@ -51,15 +51,15 @@
         class="bg-surface border-t border-border-primary flex justify-end gap-3 py-3 px-6"
       >
         <AppButton as-child variant="secondary">
-          <Link :href="basePath">Отмена</Link>
+          <Link :href="basePath">{{ t('Отмена') }}</Link>
         </AppButton>
         <FormButton
           type="submit"
           :loading="form.processing"
-          loading-text="Сохранение..."
+          :loading-text="t('Сохранение...')"
           variant="primary"
         >
-          Сохранить
+          {{ t('Сохранить') }}
         </FormButton>
       </CardFooter>
     </template>
@@ -67,6 +67,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { Link, useForm, usePage } from '@inertiajs/vue3'
 import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'

@@ -11,7 +11,7 @@
         :disabled="!pagination.prevPageUrl"
         @click="handlePageChange(pagination.prevPageUrl || null)"
       >
-        Назад
+        {{ t('Назад') }}
       </AppButton>
       <AppButton
         variant="secondary"
@@ -19,7 +19,7 @@
         :disabled="!pagination.nextPageUrl"
         @click="handlePageChange(pagination.nextPageUrl || null)"
       >
-        Вперед
+        {{ t('Вперед') }}
       </AppButton>
     </div>
 
@@ -27,13 +27,13 @@
     <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
       <div class="flex items-center space-x-4">
         <p class="text-sm text-text-secondary">
-          Показано
+          {{ t('Показано') }}
           <span class="font-medium">{{ pagination.from }}</span>
           -
           <span class="font-medium">{{ pagination.to }}</span>
-          из
+          {{ t('из') }}
           <span class="font-medium">{{ pagination.total }}</span>
-          записей
+          {{ t('записей') }}
         </p>
       </div>
 
@@ -63,6 +63,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import type { Pagination, PaginationLink } from '../../composables/useDataGrid.ts'
 import { Card } from '@/components/ui/card'
 import AppButton from '@/components/ui/AppButton.vue'

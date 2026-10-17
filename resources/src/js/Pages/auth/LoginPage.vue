@@ -2,9 +2,9 @@
   <AuthLayout>
     <AppHead :title="props.title" />
 
-    <template #title>Вход в систему</template>
+    <template #title>{{ t('Вход в систему') }}</template>
 
-    <template #subtitle> Войдите в административную панель </template>
+    <template #subtitle> {{ t('Войдите в административную панель') }} </template>
 
     <slot name="auth-providers" />
 
@@ -14,7 +14,7 @@
         v-model="form.email"
         name="email"
         type="email"
-        label="Email адрес"
+        :label="t('Email адрес')"
         placeholder="admin@example.com"
         autocomplete="email"
         required
@@ -31,8 +31,8 @@
         v-model="form.password"
         name="password"
         type="password"
-        label="Пароль"
-        placeholder="Введите пароль"
+        :label="t('Пароль')"
+        :placeholder="t('Введите пароль')"
         autocomplete="current-password"
         required
         :error="form.errors.password"
@@ -45,11 +45,11 @@
 
       <!-- Remember me and forgot password -->
       <div class="flex items-center justify-between px-2 py-2">
-        <FormCheckbox v-model="form.remember" label="Запомнить меня" size="sm" />
+        <FormCheckbox v-model="form.remember" :label="t('Запомнить меня')" size="sm" />
 
         <div v-if="authmail" class="text-sm">
           <Link href="/auth/forgot-password" class="text-sm text-primary hover:text-primary-dark">
-            Забыли пароль?
+            {{ t('Забыли пароль?') }}
           </Link>
         </div>
       </div>
@@ -60,21 +60,21 @@
         variant="primary"
         size="md"
         :loading="form.processing"
-        loading-text="Вход..."
+        :loading-text="t('Вход...')"
         full-width
         class="mt-6"
       >
         <template #leftIcon>
           <Lock class="w-5 h-5" />
         </template>
-        Войти
+        {{ t('Войти') }}
       </FormButton>
     </AdminForm>
 
     <template v-if="props.canRegisterFirstAdmin" #footer>
       <div class="text-center">
         <Link href="/auth/register" class="text-sm text-primary hover:text-primary-dark">
-          Зарегистрировать первого администратора
+          {{ t('Зарегистрировать первого администратора') }}
         </Link>
       </div>
     </template>
@@ -82,6 +82,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 import { Link, useForm, usePage } from '@inertiajs/vue3'
 import { Lock, Mail } from 'lucide-vue-next'

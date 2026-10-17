@@ -1,6 +1,6 @@
 <template>
   <AppHead :title="props.title" />
-  <PageActionBar back-href="/roles" label="Просмотр" />
+  <PageActionBar back-href="/roles" :label="t('Просмотр')" />
 
   <div class="space-y-6">
     <div class="bg-card border border-border-primary shadow-sm sm:rounded-lg overflow-hidden">
@@ -15,20 +15,20 @@
             <dd class="mt-0 text-sm text-text-primary col-span-2">{{ props.role.slug }}</dd>
           </div>
           <div class="py-4 grid grid-cols-3 gap-4">
-            <dt class="text-sm font-medium text-text-secondary">Название</dt>
+            <dt class="text-sm font-medium text-text-secondary">{{ t('Название') }}</dt>
             <dd class="mt-0 text-sm text-text-primary col-span-2">{{ props.role.name }}</dd>
           </div>
           <div class="py-4 grid grid-cols-3 gap-4">
-            <dt class="text-sm font-medium text-text-secondary">Описание</dt>
+            <dt class="text-sm font-medium text-text-secondary">{{ t('Описание') }}</dt>
             <dd class="mt-0 text-sm text-text-primary col-span-2">
               {{ props.role.description || '—' }}
             </dd>
           </div>
           <div class="py-4 grid grid-cols-3 gap-4">
-            <dt class="text-sm font-medium text-text-secondary">Тип</dt>
+            <dt class="text-sm font-medium text-text-secondary">{{ t('Тип') }}</dt>
             <dd class="mt-0 text-sm text-text-primary col-span-2">
               <AppBadge :variant="props.role.isSystem ? 'warning' : 'success'">
-                {{ props.role.isSystem ? 'Системная' : 'Пользовательская' }}
+                {{ props.role.isSystem ? t('Системная') : t('Пользовательская') }}
               </AppBadge>
             </dd>
           </div>
@@ -38,20 +38,31 @@
 
     <div class="bg-card border border-border-primary shadow-sm sm:rounded-2xl overflow-hidden">
       <div class="px-5 py-4 border-b border-border-secondary bg-surface-variant/40 space-y-1">
-        <p class="text-xs uppercase tracking-wide text-text-tertiary mb-1">Работа с ролью</p>
-        <h3 class="text-base font-semibold text-text-primary">Назначить роль администратору</h3>
+        <p class="text-xs uppercase tracking-wide text-text-tertiary mb-1">
+          {{ t('Работа с ролью') }}
+        </p>
+        <h3 class="text-base font-semibold text-text-primary">
+          {{ t('Назначить роль администратору') }}
+        </h3>
         <p class="text-sm text-text-secondary">
-          Админов немного, поэтому сразу доступны все, систему защищает ограничение на снятие роли у
-          себя.
+          {{
+            t(
+              'Админов немного, поэтому сразу доступны все, систему защищает ограничение на снятие роли у себя.',
+            )
+          }}
         </p>
       </div>
       <div class="px-5 py-5 space-y-5">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div class="flex-1 flex flex-col gap-2">
             <label class="text-xs font-medium uppercase tracking-wide text-text-tertiary">
-              Поиск администратора
+              {{ t('Поиск администратора') }}
             </label>
-            <AppInput v-model="searchQuery" type="text" placeholder="Имя, фамилия или email" />
+            <AppInput
+              v-model="searchQuery"
+              type="text"
+              :placeholder="t('Имя, фамилия или email')"
+            />
           </div>
           <AppButton
             variant="secondary"
@@ -61,7 +72,7 @@
             :disabled="searchLoading"
             @click="searchAdmins"
           >
-            {{ searchLoading ? 'Поиск…' : 'Фильтр' }}
+            {{ searchLoading ? t('Поиск…') : t('Фильтр') }}
           </AppButton>
         </div>
         <div class="space-y-3">
@@ -98,7 +109,7 @@
               </div>
               <div class="flex items-center gap-2 sm:w-44 sm:justify-end">
                 <span v-if="option.hasRole" class="text-xs font-medium text-text-tertiary">
-                  Уже назначено
+                  {{ t('Уже назначено') }}
                 </span>
                 <AppButton
                   variant="primary"
@@ -108,17 +119,17 @@
                   :disabled="option.hasRole || attachingAdminId === option.id"
                   @click="handleAttach(option)"
                 >
-                  {{ attachingAdminId === option.id ? 'Назначаем…' : 'Назначить' }}
+                  {{ attachingAdminId === option.id ? t('Назначаем…') : t('Назначить') }}
                 </AppButton>
               </div>
             </div>
           </div>
           <p v-else class="text-sm text-text-secondary">
-            Пока нечего показать — попробуйте уточнить поиск или обновите список.
+            {{ t('Пока нечего показать — попробуйте уточнить поиск или обновите список.') }}
           </p>
           <div class="space-y-1">
             <p class="text-xs text-text-tertiary">
-              Выбирайте админа и добавляйте роль прямо из списка — можно несколько.
+              {{ t('Выбирайте админа и добавляйте роль прямо из списка — можно несколько.') }}
             </p>
             <p v-if="attachForm.errors.adminId" class="text-sm text-error">
               {{ attachForm.errors.adminId }}
@@ -134,12 +145,14 @@
         class="px-5 py-4 border-b border-border-secondary flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between bg-surface-variant/40"
       >
         <div>
-          <h3 class="text-base font-semibold text-text-primary">Администраторы с этой ролью</h3>
+          <h3 class="text-base font-semibold text-text-primary">
+            {{ t('Администраторы с этой ролью') }}
+          </h3>
           <p class="text-sm text-text-secondary">
             {{
               assignedAdmins.length
-                ? 'Список администраторов'
-                : 'Роль пока не назначена ни одному администратору'
+                ? t('Список администраторов')
+                : t('Роль пока не назначена ни одному администратору')
             }}
           </p>
         </div>
@@ -151,7 +164,7 @@
           :disabled="refreshLoading"
           @click="refreshAdmins"
         >
-          {{ refreshLoading ? 'Обновляем…' : 'Обновить список' }}
+          {{ refreshLoading ? t('Обновляем…') : t('Обновить список') }}
         </AppButton>
       </div>
       <div class="px-5 py-5">
@@ -176,7 +189,9 @@
                 </span>
               </div>
               <div class="flex items-center justify-between border-t border-border-secondary pt-3">
-                <p class="text-xs text-text-tertiary">Права останутся, пока не удалите.</p>
+                <p class="text-xs text-text-tertiary">
+                  {{ t('Права останутся, пока не удалите.') }}
+                </p>
                 <AppButton
                   variant="danger"
                   size="sm"
@@ -184,13 +199,15 @@
                   :disabled="pendingAdminId === admin.id"
                   @click="handleDetach(admin)"
                 >
-                  {{ pendingAdminId === admin.id ? 'Удаляем…' : 'Убрать роль' }}
+                  {{ pendingAdminId === admin.id ? t('Удаляем…') : t('Убрать роль') }}
                 </AppButton>
               </div>
             </article>
           </div>
         </template>
-        <p v-else class="text-sm text-text-secondary">Нет назначенных администраторов.</p>
+        <p v-else class="text-sm text-text-secondary">
+          {{ t('Нет назначенных администраторов.') }}
+        </p>
       </div>
     </div>
 
@@ -198,7 +215,7 @@
       :permissions="props.role.permissions || []"
       :editable="false"
       variant="card"
-      title="Права"
+      :title="t('Права')"
       subtitle="Список разрешений, связанных с ролью"
       header-eyebrow="Доступы роли"
       :show-total="true"
@@ -207,6 +224,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed, onMounted, ref, watch } from 'vue'
 import { useForm } from '@inertiajs/vue3'
 import AppHead from '@/components/layout/AppHead.vue'
@@ -312,7 +331,7 @@ const loadAssignedAdmins = async () => {
     syncAdminOptionsWithAssigned()
   } catch (error) {
     console.error('Load assigned admins error', error)
-    attachError.value = 'Не удалось загрузить назначенных администраторов'
+    attachError.value = t('Не удалось загрузить назначенных администраторов')
   } finally {
     assignedLoading.value = false
   }
@@ -345,7 +364,7 @@ const searchAdmins = async () => {
     syncAdminOptionsWithAssigned()
   } catch (error) {
     console.error('Search admins error', error)
-    attachError.value = 'Не удалось загрузить администраторов'
+    attachError.value = t('Не удалось загрузить администраторов')
   } finally {
     searchLoading.value = false
   }
@@ -353,11 +372,11 @@ const searchAdmins = async () => {
 
 const handleAttach = (admin: AdminOption) => {
   if (!admin?.id) {
-    attachError.value = 'Не выбран администратор'
+    attachError.value = t('Не выбран администратор')
     return
   }
   if (admin.hasRole) {
-    attachError.value = 'Эта роль уже назначена выбранному администратору'
+    attachError.value = t('Эта роль уже назначена выбранному администратору')
     return
   }
 
@@ -369,7 +388,7 @@ const handleAttach = (admin: AdminOption) => {
     preserveScroll: true,
     preserveState: true,
     onError: (errors) => {
-      attachError.value = (errors.adminId as string) || 'Не удалось назначить роль'
+      attachError.value = (errors.adminId as string) || t('Не удалось назначить роль')
     },
     onSuccess: () => {
       void loadAssignedAdmins()
@@ -390,7 +409,7 @@ const handleDetach = (admin: RoleAssignedAdmin) => {
     preserveScroll: true,
     preserveState: true,
     onError: (errors) => {
-      attachError.value = (errors.adminId as string) || 'Не удалось убрать роль у администратора'
+      attachError.value = (errors.adminId as string) || t('Не удалось убрать роль у администратора')
     },
     onSuccess: () => {
       void loadAssignedAdmins()

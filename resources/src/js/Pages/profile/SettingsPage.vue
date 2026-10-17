@@ -2,33 +2,39 @@
   <AppHead :title="props.title" />
   <PageActionBar
     back-href="/auth/profile"
-    back-text="К профилю"
+    :back-text="t('К профилю')"
     :use-history="false"
-    label="Настройки"
+    :label="t('Настройки')"
   />
 
   <div class="space-y-8">
     <section v-if="authmail" aria-labelledby="profile-settings-title" class="space-y-4">
-      <h2 id="profile-settings-title" class="text-xl font-semibold">Профиль</h2>
+      <h2 id="profile-settings-title" class="text-xl font-semibold">{{ t('Профиль') }}</h2>
       <Card>
         <CardHeader class="border-b border-border-secondary bg-surface-variant/40">
-          <CardTitle>Смена email</CardTitle>
+          <CardTitle>{{ t('Смена email') }}</CardTitle>
           <CardDescription>
-            Для смены email мы отправим код подтверждения на новый адрес и уведомим старый.
+            {{
+              t('Для смены email мы отправим код подтверждения на новый адрес и уведомим старый.')
+            }}
           </CardDescription>
         </CardHeader>
         <CardContent class="space-y-6 pt-6">
-          <form aria-label="Запрос смены email" class="space-y-6" @submit.prevent="sendEmailCode">
+          <form
+            :aria-label="t('Запрос смены email')"
+            class="space-y-6"
+            @submit.prevent="sendEmailCode"
+          >
             <div class="flex flex-col gap-2 text-sm">
-              <span class="text-text-tertiary">Текущий email</span>
+              <span class="text-text-tertiary">{{ t('Текущий email') }}</span>
               <span class="text-text-primary font-medium">{{ props.data.email }}</span>
             </div>
 
             <PasswordInput
               v-model="emailRequestForm.currentPassword"
               name="currentPassword"
-              label="Текущий пароль"
-              placeholder="Введите текущий пароль"
+              :label="t('Текущий пароль')"
+              :placeholder="t('Введите текущий пароль')"
               autocomplete="current-password"
               :error="emailRequestForm.errors.currentPassword"
             />
@@ -38,7 +44,7 @@
                 v-model="emailRequestForm.email"
                 name="email"
                 type="email"
-                label="Новый email"
+                :label="t('Новый email')"
                 placeholder="name@example.com"
                 :error="emailRequestForm.errors.email"
               />
@@ -46,11 +52,11 @@
                 type="submit"
                 variant="secondary"
                 :loading="emailRequestForm.processing"
-                loading-text="Отправляем..."
+                :loading-text="t('Отправляем...')"
                 class="lg:mb-1"
                 :disabled="emailRequestForm.processing || emailConfirmForm.processing"
               >
-                Отправить код
+                {{ t('Отправить код') }}
               </FormButton>
             </div>
           </form>
@@ -59,18 +65,18 @@
             class="rounded-xl border border-border-secondary bg-surface px-4 py-3 text-sm text-text-secondary"
           >
             <p>
-              Код отправлен на
+              {{ t('Код отправлен на') }}
               <span class="font-medium text-text-primary">{{ pendingEmailChange.newEmail }}</span
-              >. Действует до {{ formatDateTime(pendingEmailChange.expiresAt) }}.
+              >{{ t('. Действует до') }} {{ formatDateTime(pendingEmailChange.expiresAt) }}.
             </p>
             <p v-if="emailCodeExpired" role="status" class="mt-2">
-              Срок действия кода истёк. Запросите новый код через форму выше.
+              {{ t('Срок действия кода истёк. Запросите новый код через форму выше.') }}
             </p>
           </div>
 
           <form
             v-if="pendingEmailChange && !emailCodeExpired"
-            aria-label="Подтверждение email"
+            :aria-label="t('Подтверждение email')"
             class="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end"
             @submit.prevent="confirmEmail"
           >
@@ -79,7 +85,7 @@
               name="code"
               autocomplete="one-time-code"
               inputmode="numeric"
-              label="Код подтверждения"
+              :label="t('Код подтверждения')"
               placeholder="123456"
               :error="emailConfirmForm.errors.code"
               help-text="Введите 6-значный код из письма"
@@ -88,11 +94,11 @@
               type="submit"
               variant="primary"
               :loading="emailConfirmForm.processing"
-              loading-text="Проверяем..."
+              :loading-text="t('Проверяем...')"
               class="lg:mb-1"
               :disabled="emailConfirmForm.processing || emailRequestForm.processing"
             >
-              Подтвердить email
+              {{ t('Подтвердить email') }}
             </FormButton>
           </form>
         </CardContent>
@@ -100,39 +106,47 @@
     </section>
 
     <section aria-labelledby="security-settings-title" class="space-y-4">
-      <h2 id="security-settings-title" class="text-xl font-semibold">Безопасность</h2>
-      <LocalMFASettings v-if="props.mfaAvailable" :enabled="props.mfaEnabled || false" />
+      <h2 id="security-settings-title" class="text-xl font-semibold">{{ t('Безопасность') }}</h2>
+      <LocalMFASettings
+        :state="
+          props.mfaState ||
+          (props.mfaAvailable ? (props.mfaEnabled ? 'enabled' : 'disabled') : 'unavailable')
+        "
+      />
       <Card>
         <CardHeader class="border-b border-border-secondary bg-surface-variant/40">
-          <CardTitle>Смена пароля</CardTitle>
+          <CardTitle>{{ t('Смена пароля') }}</CardTitle>
           <CardDescription>
-            Укажите текущий пароль и задайте новый. После смены пароля все сеансы завершатся, и
-            потребуется войти заново.
+            {{
+              t(
+                'Укажите текущий пароль и задайте новый. После смены пароля все сеансы завершатся, и потребуется войти заново.',
+              )
+            }}
           </CardDescription>
         </CardHeader>
         <CardContent class="pt-6">
-          <form aria-label="Смена пароля" class="space-y-6" @submit.prevent="changePassword">
+          <form :aria-label="t('Смена пароля')" class="space-y-6" @submit.prevent="changePassword">
             <PasswordInput
               v-model="passwordForm.currentPassword"
               name="currentPassword"
-              label="Текущий пароль"
-              placeholder="Введите текущий пароль"
+              :label="t('Текущий пароль')"
+              :placeholder="t('Введите текущий пароль')"
               autocomplete="current-password"
               :error="passwordForm.errors.currentPassword"
             />
             <PasswordInput
               v-model="passwordForm.password"
               name="password"
-              label="Новый пароль"
-              placeholder="Введите новый пароль"
+              :label="t('Новый пароль')"
+              :placeholder="t('Введите новый пароль')"
               autocomplete="new-password"
               :error="passwordForm.errors.password"
             />
             <PasswordInput
               v-model="passwordForm.passwordConfirmation"
               name="passwordConfirmation"
-              label="Подтвердите новый пароль"
-              placeholder="Повторите новый пароль"
+              :label="t('Подтвердите новый пароль')"
+              :placeholder="t('Повторите новый пароль')"
               autocomplete="new-password"
               :error="
                 passwordForm.errors.passwordConfirmation || passwordConfirmationError || undefined
@@ -146,10 +160,10 @@
                 type="submit"
                 variant="primary"
                 :loading="passwordForm.processing"
-                loading-text="Сохраняем..."
+                :loading-text="t('Сохраняем...')"
                 :disabled="!isPasswordFormValid || passwordForm.processing"
               >
-                Обновить пароль
+                {{ t('Обновить пароль') }}
               </FormButton>
             </div>
           </form>
@@ -160,6 +174,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import LocalMFASettings from '@/components/profile/LocalMFASettings.vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
@@ -178,6 +194,7 @@ interface PendingEmailChange {
 }
 
 interface SettingsProps {
+  mfaState?: 'unavailable' | 'unknown' | 'enabled' | 'disabled'
   mfaAvailable?: boolean
   mfaEnabled?: boolean
   title?: string
@@ -241,7 +258,7 @@ const passwordConfirmationError = computed(() => {
     passwordForm.passwordConfirmation &&
     passwordForm.password !== passwordForm.passwordConfirmation
   ) {
-    return 'Пароли не совпадают'
+    return t('Пароли не совпадают')
   }
   return null
 })

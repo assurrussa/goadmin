@@ -1,6 +1,6 @@
 <template>
   <AppHead :title="props.title" />
-  <PageActionBar :back-href="basePath" label="Создание" />
+  <PageActionBar :back-href="basePath" :label="t('Создание')" />
 
   <AdminForm
     :form="form"
@@ -15,7 +15,7 @@
             v-model="form.name"
             name="name"
             type="text"
-            label="Имя"
+            :label="t('Имя')"
             required
             :error="form.errors.name"
           />
@@ -25,7 +25,7 @@
             v-model="form.lastName"
             name="lastName"
             type="text"
-            label="Фамилия"
+            :label="t('Фамилия')"
             :error="form.errors.lastName"
           />
 
@@ -52,7 +52,7 @@
           <PasswordInput
             v-model="form.password"
             name="password"
-            label="Пароль"
+            :label="t('Пароль')"
             autocomplete="new-password"
             required
             :error="form.errors.password"
@@ -62,7 +62,7 @@
           <PasswordInput
             v-model="form.passwordConfirm"
             name="passwordConfirm"
-            label="Пароль"
+            :label="t('Пароль')"
             required
             :error="form.errors.passwordConfirm"
           />
@@ -73,10 +73,10 @@
         <FormButton
           type="submit"
           :loading="form.processing"
-          loading-text="Добавление..."
+          :loading-text="t('Добавление...')"
           variant="primary"
         >
-          Добавить
+          {{ t('Добавить') }}
         </FormButton>
       </div>
     </div>
@@ -84,6 +84,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { useForm, usePage } from '@inertiajs/vue3'
 import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'

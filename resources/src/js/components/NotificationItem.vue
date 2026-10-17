@@ -23,7 +23,7 @@
       <div v-if="notification.closable" class="ml-1 -my-3 -mr-3 flex-shrink-0">
         <button
           type="button"
-          aria-label="Закрыть уведомление"
+          :aria-label="t('Закрыть уведомление')"
           @click="$emit('close')"
           class="inline-flex h-11 w-11 items-center justify-center rounded-md text-text-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:text-text-primary transition ease-in-out duration-150"
         >
@@ -53,6 +53,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Notification } from '@/stores/notifications'
 import {

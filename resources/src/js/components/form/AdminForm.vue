@@ -8,11 +8,11 @@
       class="rounded-md bg-error/10 border border-error/30 p-3 my-2 mx-4"
     >
       <slot name="summary" :errors="summaryErrors">
-        <p class="mb-1 font-medium text-error">Исправьте ошибки формы:</p>
+        <p class="mb-1 font-medium text-error">{{ t('Исправьте ошибки формы:') }}</p>
         <ul class="list-disc list-inside text-error text-sm">
           <li v-for="(e, i) in summaryErrors" :key="`${e.field}-${i}`">
             <strong>{{ e.field }}</strong
-            >: {{ e.message }}
+            >: {{ t(e.message) }}
           </li>
         </ul>
       </slot>
@@ -23,6 +23,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 import FormLayout from '@/components/form/FormLayout.vue'
@@ -141,7 +143,7 @@ onMounted(() => {
     removeInertiaGuard = router.on('before', (event) => {
       if (!props.form.isDirty || props.form.processing || event.detail.visit.method !== 'get')
         return
-      return window.confirm('Есть несохранённые изменения. Покинуть страницу?')
+      return window.confirm(t('Есть несохранённые изменения. Покинуть страницу?'))
     })
   }
 })

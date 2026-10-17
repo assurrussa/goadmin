@@ -3,13 +3,15 @@
   <div class="space-y-4">
     <section
       class="rounded-xl border border-border-primary bg-card px-5 py-4 text-sm shadow-sm"
-      aria-label="Как работают роли"
+      :aria-label="t('Как работают роли')"
     >
-      <h2 class="font-semibold text-text-primary">Роли складываются по разрешениям</h2>
+      <h2 class="font-semibold text-text-primary">{{ t('Роли складываются по разрешениям') }}</h2>
       <p class="mt-1 max-w-4xl leading-6 text-text-secondary">
-        Если назначено несколько ролей, их разрешения складываются. Супер-администратор получает
-        весь объединённый каталог прав. Область доступа остальных ролей определяется назначенными
-        разрешениями.
+        {{
+          t(
+            'Если назначено несколько ролей, их разрешения складываются. Супер-администратор получает весь объединённый каталог прав. Область доступа остальных ролей определяется назначенными разрешениями.',
+          )
+        }}
       </p>
     </section>
     <DataGrid
@@ -25,6 +27,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed, ref } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AppHead from '@/components/layout/AppHead.vue'
@@ -91,7 +95,7 @@ function handleRowAction(actionKey: string, item: Record<string, unknown>) {
       router.get(`${apiUrl.value}/${roleId}/edit`)
       break
     case 'delete':
-      if (confirm(`Удалить роль #${roleId}?`)) {
+      if (confirm(t('Удалить роль #{id}?', undefined, { id: String(roleId) }))) {
         router.delete(`${apiUrl.value}/${roleId}`)
       }
       break

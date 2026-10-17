@@ -17,12 +17,13 @@
       v-if="label"
       class="ml-auto text-xs font-medium uppercase tracking-wide text-text-tertiary"
     >
-      {{ label }}
+      {{ t(label) }}
     </span>
   </div>
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
 import { ArrowLeft, ArrowUpRight } from 'lucide-vue-next'
 import BackPage from '@/components/layout/BackPage.vue'
 import AppButton from '@/components/ui/AppButton.vue'

@@ -34,10 +34,10 @@ test('keeps the rich-text toolbar visible while scrolling on desktop', () => {
 test('gives programmatic media inputs stable form identities', () => {
   assert.match(richText, /:id="fileInputId"/)
   assert.match(richText, /name="rich-text-media"/)
-  assert.match(richText, /aria-label="Добавить изображение или видео"/)
+  assert.match(richText, /:aria-label="t\('Добавить изображение или видео'\)"/)
   assert.match(imageUploader, /:id="fileInputId"/)
   assert.match(imageUploader, /name="image-upload"/)
-  assert.match(imageUploader, /aria-label="Загрузить изображение"/)
+  assert.match(imageUploader, /:aria-label="t\('Загрузить изображение'\)"/)
 })
 
 test('uses readable dark-theme semantic tokens', () => {
