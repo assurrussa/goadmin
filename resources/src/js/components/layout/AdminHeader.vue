@@ -1,7 +1,7 @@
 <template>
-  <header class="bg-card border-b border-border-primary shadow-sm">
+  <header class="box-border h-[68px] shrink-0 bg-card border-b border-border-primary shadow-sm">
     <div
-      class="flex items-center justify-between px-4 py-1 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full min-h-[68px]"
+      class="flex items-center justify-between px-4 py-1 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full h-full min-h-0"
     >
       <div class="flex items-center">
         <AppButton

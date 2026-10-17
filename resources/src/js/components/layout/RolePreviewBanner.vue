@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Eye } from 'lucide-vue-next'
+import { ChevronDown, Eye } from 'lucide-vue-next'
 import {
   Dialog,
   DialogContent,
@@ -111,17 +111,23 @@ async function change(roleId: number) {
         <form v-else class="space-y-5" @submit.prevent="change(Number(selected))">
           <label class="block space-y-2 text-sm font-medium">
             <span>{{ t('Выберите роль') }}</span>
-            <select
-              v-model="selected"
-              required
-              :disabled="busy"
-              class="w-full rounded-lg border border-border-primary bg-card px-3 py-2.5 text-text-primary focus:ring-2 focus:ring-primary"
-            >
-              <option value="" disabled>{{ t('Выберите роль') }}</option>
-              <option v-for="role in preview.roles" :key="role.id" :value="String(role.id)">
-                {{ role.name }}
-              </option>
-            </select>
+            <span class="relative block">
+              <select
+                v-model="selected"
+                required
+                :disabled="busy"
+                class="block w-full appearance-none rounded-lg border border-border-primary bg-card pl-3 pr-10 py-2.5 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="" disabled>{{ t('Выберите роль') }}</option>
+                <option v-for="role in preview.roles" :key="role.id" :value="String(role.id)">
+                  {{ role.name }}
+                </option>
+              </select>
+              <ChevronDown
+                class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
+                aria-hidden="true"
+              />
+            </span>
           </label>
           <DialogFooter class="gap-3">
             <DialogClose as-child

@@ -79,3 +79,15 @@ it('places only safe flat account links in the profile and keeps them out of the
   expect(sidebar.querySelector('a[href="/sso/account"]')).toBeNull()
   expect(sidebar.querySelector('a[href="/users"]')?.textContent).toContain('Sidebar only')
 })
+
+it('includes the border within the 68px header height', () => {
+  const root = document.createElement('div')
+  const app = createApp(AdminHeader).use(createPinia())
+  apps.push(app)
+  app.mount(root)
+  const header = root.querySelector('header')!
+  expect(header.classList.contains('box-border')).toBe(true)
+  expect(header.classList.contains('h-[68px]')).toBe(true)
+  expect(header.firstElementChild?.classList.contains('h-full')).toBe(true)
+  expect(header.firstElementChild?.classList.contains('min-h-[68px]')).toBe(false)
+})
