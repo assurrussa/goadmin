@@ -1,0 +1,12 @@
+{
+  "formatVersion": 1,
+  "extensions": [
+    {
+      "key": "example.shell-theme",
+      "apiVersion": 1,
+      "sourceRoot": "src",
+      "fingerprint": "sha256:f3e8e2a22a3a9d89fe13ad7a0fa7657b770f225c743ea5b1bcc15755c015b925",
+      "requires": ["goadmin.core"]
+    }
+  ]
+}

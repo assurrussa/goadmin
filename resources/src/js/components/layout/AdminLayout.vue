@@ -9,8 +9,10 @@
       :aria-modal="sidebarOpen ? true : undefined"
       :aria-label="t('Разделы')"
       :class="[
-        'fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border-primary shadow-lg overflow-x-hidden transform transition-[width,transform] duration-200 ease-in-out motion-reduce:transition-none',
-        sidebarCollapsed && !sidebarOpen ? 'lg:w-20' : 'lg:w-64',
+        'fixed inset-y-0 left-0 z-50 w-[var(--goadmin-sidebar-width,16rem)] bg-card border-r border-border-primary shadow-[var(--goadmin-sidebar-shadow,var(--goadmin-default-sidebar-shadow))] overflow-x-hidden transform transition-[width,transform] duration-200 ease-in-out motion-reduce:transition-none',
+        sidebarCollapsed && !sidebarOpen
+          ? 'lg:w-[var(--goadmin-sidebar-collapsed-width,5rem)]'
+          : 'lg:w-[var(--goadmin-sidebar-width,16rem)]',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
       ]"
     >
@@ -31,7 +33,11 @@
 
     <!-- Main content -->
     <div
-      :class="sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'"
+      :class="
+        sidebarCollapsed
+          ? 'lg:pl-[var(--goadmin-sidebar-collapsed-width,5rem)]'
+          : 'lg:pl-[var(--goadmin-sidebar-width,16rem)]'
+      "
       class="transition-[padding] duration-200 ease-in-out motion-reduce:transition-none"
     >
       <!-- Header -->
@@ -39,7 +45,9 @@
 
       <!-- Page content -->
       <main class="py-6">
-        <div class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 space-y-6">
+        <div
+          class="max-w-[var(--goadmin-content-max-width,80rem)] mx-auto w-full px-4 sm:px-6 lg:px-8 space-y-6"
+        >
           <AdminBreadcrumbs />
           <slot />
         </div>

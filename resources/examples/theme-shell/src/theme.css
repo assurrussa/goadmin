@@ -1,0 +1,13 @@
+/* Opt-in example. Not enabled in the default build. */
+:root {
+  --goadmin-header-height: 72px;
+  --goadmin-sidebar-width: 18rem;
+  --goadmin-sidebar-collapsed-width: 5rem;
+  --goadmin-content-max-width: 76rem;
+  --goadmin-menu-radius: 0.75rem;
+  --goadmin-header-shadow: none;
+  --goadmin-sidebar-shadow: none;
+  --hue-primary: 224;
+  --saturation-primary: 65%;
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+}
