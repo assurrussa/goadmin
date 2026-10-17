@@ -1051,13 +1051,8 @@ func (h *Handler) PostMFAManagement(action string) fiber.Handler {
 		}
 		result, err := actions.ManageLocalMFA(c, action, input)
 		if err != nil {
-			status := fiber.StatusBadRequest
-			if errors.Is(err, goauth.ErrOperationOutcomeUnknown) {
-				status = fiber.StatusServiceUnavailable
-			}
-			return c.Status(status).JSON(map[string]string{
-				"message": "Не удалось изменить двухфакторную защиту. Проверьте пароль и код.",
-			})
+			status, code, message := mfaManagementFailure(err)
+			return c.Status(status).JSON(map[string]string{"code": code, "message": message})
 		}
 		return c.JSON(result)
 	}

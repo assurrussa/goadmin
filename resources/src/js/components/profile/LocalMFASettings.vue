@@ -9,7 +9,7 @@
         )
       }}
     </p>
-    <p v-if="state === 'unavailable'">
+    <p v-if="state === 'unavailable' || operationUnavailable">
       {{
         t(
           'mfa.unavailable',
@@ -25,7 +25,7 @@
         )
       }}
     </p>
-    <p v-else-if="!signedOut">
+    <p v-else-if="!signedOut && !signinRequired">
       {{ enabled ? t('mfa.enabled', 'Защита включена') : t('mfa.disabled', 'Защита не включена') }}
     </p>
     <p v-if="message" role="status">{{ message }}</p>
@@ -90,7 +90,7 @@
         <li v-for="item in recoveryCodes" :key="item" class="select-all">{{ item }}</li>
       </ul>
     </template>
-    <a v-if="signedOut" href="/auth/login">{{ t('Войти заново') }}</a>
+    <a v-if="signedOut || signinRequired" href="/auth/login">{{ t('Войти заново') }}</a>
   </section>
 </template>
 <script setup lang="ts">
@@ -105,6 +105,13 @@ import FormButton from '@/components/form/FormButton.vue'
 registerTranslations({
   ru: {},
   en: {
+    'mfa.errorUnavailable': 'Local MFA management is unavailable. This does not mean protection is disabled.',
+    'mfa.errorSignin': 'Your session has ended or changed. Sign in again before another operation.',
+    'mfa.errorRate': 'Too many verification attempts. Wait before trying again.',
+    'mfa.errorProof': 'Check your current password and a fresh authenticator or unused recovery code.',
+    'mfa.errorRejected': 'Verification was rejected. Check fresh proof; if setup or session expired, sign in again.',
+    'mfa.errorUnknown': 'The service could not confirm the outcome. Sign in again and check protection before repeating.',
+
     'mfa.localTitle': 'Local account two-factor protection',
     'mfa.scope':
       'This setting protects local admin sign-in. SSO protection is managed separately by your provider.',
@@ -139,7 +146,9 @@ registerTranslations({
 const props = defineProps<{ state: 'unavailable' | 'unknown' | 'enabled' | 'disabled' }>()
 const { t } = useI18n()
 const enabled = computed(() => props.state === 'enabled')
-const manageable = computed(() => props.state === 'enabled' || props.state === 'disabled')
+const operationUnavailable = ref(false)
+const signinRequired = ref(false)
+const manageable = computed(() => !operationUnavailable.value && !signinRequired.value && (props.state === 'enabled' || props.state === 'disabled'))
 const uncertain = ref(false)
 const qr = ref('')
 const password = ref('')
@@ -201,14 +210,28 @@ async function run(action: string) {
         : t('Введите код нового приложения для подтверждения.')
   } catch (error) {
     if (lifecycle.isActive()) {
-      const status = axios.isAxiosError(error) ? error.response?.status : undefined
-      if (!status || status >= 500 || status === 401 || status === 403) {
+      const response = axios.isAxiosError(error) ? error.response : undefined
+      const status = response?.status
+      const reason = typeof response?.data?.code === 'string' ? response.data.code : ''
+      if (reason === 'mfa_unavailable') {
+        operationUnavailable.value = true
+        clearSecrets()
+        message.value = t('mfa.errorUnavailable', 'Локальная настройка MFA недоступна. Это не означает, что защита выключена.')
+      } else if (status === 401 || status === 403 || reason === 'signin_required') {
+        signinRequired.value = true
+        clearSecrets()
+        message.value = t('mfa.errorSignin', 'Сеанс завершён или изменился. Войдите заново перед следующей операцией.')
+      } else if (status === 429 && reason === 'rate_limited') {
+        message.value = t('mfa.errorRate', 'Слишком много попыток проверки. Подождите перед новой попыткой.')
+      } else if (status === 400 && reason === 'proof_invalid') {
+        message.value = t('mfa.errorProof', 'Проверьте текущий пароль и свежий код приложения или неиспользованный резервный код.')
+      } else if (status === 400 && reason === 'verification_rejected') {
+        message.value = t('mfa.errorRejected', 'Проверка отклонена. Проверьте свежие пароль и код; если настройка или сеанс истекли, войдите заново.')
+      } else {
         uncertain.value = true
         clearSecrets()
+        message.value = t('mfa.errorUnknown', 'Сервис не подтвердил результат. Войдите заново и проверьте защиту перед повторной операцией.')
       }
-      message.value = t(
-        'Не удалось выполнить операцию. Проверьте пароль и код. После потери ответа войдите заново и проверьте состояние защиты.',
-      )
     }
   } finally {
     password.value = ''

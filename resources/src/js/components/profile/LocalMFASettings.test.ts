@@ -89,3 +89,23 @@ it('late enrollment response after pagehide cannot restore secret or QR', async 
   expect(root.querySelector('img')).toBeNull()
   expect(root.textContent).not.toContain('late-secret')
 })
+
+it.each([
+ [400, 'proof_invalid', 'Проверьте текущий пароль', true],
+ [400, 'verification_rejected', 'Проверка отклонена', true],
+ [429, 'rate_limited', 'Слишком много попыток', true],
+ [401, 'signin_required', 'Сеанс завершён', false],
+ [503, 'mfa_unavailable', 'не означает, что защита выключена', false],
+ [503, 'service_unavailable', 'Сервис не подтвердил результат', false],
+ [503, 'outcome_unknown', 'Сервис не подтвердил результат', false],
+] as const)('classifies HTTP %s %s without treating operational failure as bad proof', async (status, code, text, canRetry) => {
+ const root = mount('enabled')
+ post.mockRejectedValueOnce({response:{status,data:{code}}})
+ button(root,'Заменить приложение').click()
+ await flush()
+ expect(root.textContent).toContain(text)
+ expect(Boolean(root.querySelector('input[name="mfaPassword"]'))).toBe(canRetry)
+ expect(root.textContent).not.toContain('Защита не включена')
+ if(code === 'signin_required') expect(root.querySelector('a[href="/auth/login"]')).not.toBeNull()
+ expect(post).toHaveBeenCalledTimes(1)
+})
