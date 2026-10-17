@@ -80,7 +80,7 @@ const extraClass = computed(() => {
   }
 
   if (props.size === 'xl') {
-    classes.push('h-11 px-6 text-base')
+    classes.push('h-[var(--goadmin-control-height-xl,2.75rem)] px-6 text-base')
   }
 
   // Add theme-aware classes for outline and ghost variants

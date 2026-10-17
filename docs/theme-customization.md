@@ -1,7 +1,8 @@
-# Theme customization: stage one
+# Theme customization: shell and shared controls
 
-The supported first-stage contract covers the administration shell. It does not
-promise arbitrary replacement of all forms or page layouts. Without a theme file,
+Stage one covers the administration shell. Stage two adds dimensions and radius
+for the shared components listed below. Neither stage promises arbitrary
+replacement or styling of every form or page layout. Without a theme file,
 geometry, shadows and radius retain their previous defaults. Auth, permissions,
 CSRF and navigation semantics are unchanged.
 
@@ -45,12 +46,41 @@ values. Keep status/error distinctions and visible focus. Size values must be
 valid CSS lengths and allow both languages, controls and mobile navigation to
 fit. Custom colors are not automatically contrast-certified.
 
+## Stage two: shared controls and cards
+
+| Variable | Previous default |
+| --- | --- |
+| `--goadmin-control-height-xs` | `1.75rem` (28px) |
+| `--goadmin-control-height-sm` | `2rem` (32px) |
+| `--goadmin-control-height` | `2.25rem` (36px), md/default and default icons |
+| `--goadmin-control-height-lg` | `2.5rem` (40px) |
+| `--goadmin-control-height-xl` | `2.75rem` (44px), AppButton xl |
+| `--goadmin-control-radius` | Existing `--radius-md` (currently 12px); final fallback `0.375rem` |
+| `--goadmin-control-radius-xs` | `0.25rem` (4px), xs buttons |
+| `--goadmin-textarea-min-height` | `60px` |
+| `--goadmin-card-radius` | Existing `--radius-xl` (currently 12px); final fallback `0.75rem` |
+| `--goadmin-card-padding` | `1.5rem` (24px) |
+
+This contract applies only to shared `Button`/`AppButton`, `Input`/`AppInput`/
+`FormInput`, `Textarea`, `SelectTrigger`, `Card`/`AppCard`, and
+`CardHeader`/`CardContent`/`CardFooter`. Handwritten HTML inputs, buttons, cards and
+page-specific layouts are outside this stage. Heights do not change font size,
+horizontal padding, colors, shadows, error/readonly/disabled states or transitions.
+
+FormInput icon/loading rows follow its selected sm/md/lg height. Icon buttons stay
+square. `AppButton rounded=true` remains a pill; explicit class overrides retain
+priority through the existing `cn`/Tailwind merge behavior. CardContent/Footer keep
+zero top padding, unless an explicit host class overrides it. Existing theme radius
+variables remain the fallback, rather than silently changing the current 12px
+controls to a literal 6px radius.
+
 ## Opt-in example
 
 [`resources/examples/theme-shell/extension.json`](../resources/examples/theme-shell/extension.json)
 is a complete source manifest with a verified source fingerprint. Its module
 imports only local CSS, demonstrates `72px`/`18rem`/`5rem`/`76rem` geometry,
-profile-trigger radius/shadows, branding hue and font. It is not enabled in the
+profile-trigger radius/shadows, branding hue/font and stage-two control/card
+overrides. It is not enabled in the
 default build.
 
 Add this manifest to the same existing `VITE_ADMIN_EXTENSION_MANIFESTS` input used
@@ -66,6 +96,6 @@ in its normal manifest list. Recompute the source fingerprint with
 using its existing `fingerprintSource(sourceRoot)` function. Do not copy a stale
 fingerprint or edit the generated bundle directly.
 
-This stage exposes shell radius/shadow overrides only, not every control or dialog.
-No preset switcher, component replacement, database setting or automatic consumer
-update is included.
+The contract remains limited to the shell and the listed shared controls/cards.
+No dialog-wide styling, preset switcher, component replacement, database setting or
+automatic consumer update is included.
