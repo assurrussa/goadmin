@@ -294,13 +294,12 @@ func (f *assistedRecoveryFeature) page(c fiber.Ctx, completion bool, nativeToken
 	c.Set("Referrer-Policy", "no-referrer")
 	c.Set("X-Frame-Options", "DENY")
 	c.Set("Content-Security-Policy",
-		"default-src 'none'; script-src 'nonce-"+csrf+"'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
-	if !completion {
-		c.Set("Content-Security-Policy", c.GetRespHeader("Content-Security-Policy")+"; connect-src 'self'")
-	}
+		"default-src 'none'; script-src 'nonce-"+csrf+"'; style-src 'nonce-"+csrf+
+			"'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
+	c.Set("Content-Security-Policy", c.GetRespHeader("Content-Security-Policy")+"; connect-src 'self'")
 	title, fields, action := "Initiate account recovery", recoveryInitiationFields, AssistedRecoveryAdminPath
 	if completion {
-		title, fields, action = "Complete account recovery", recoveryCompletionFields, c.Path()
+		title, fields, action = "Завершение восстановления доступа", recoveryCompletionFields, c.Path()
 	}
 	hidden, nativeAttribute := "", ""
 	if completion {
@@ -308,16 +307,17 @@ func (f *assistedRecoveryFeature) page(c fiber.Ctx, completion bool, nativeToken
 	} else {
 		nativeAttribute = " data-native-csrf='" + html.EscapeString(nativeToken) + "'"
 	}
-	body := "<!doctype html><html lang=en><meta charset=utf-8><meta name=viewport " +
+	body := "<!doctype html><html lang=ru><meta charset=utf-8><meta name=viewport " +
 		"content='width=device-width,initial-scale=1'><title>" +
 		title +
-		"</title><main><h1>" +
+		"</title><style nonce='" + csrf + "'>" + recoveryPageStyles + "</style><main><h1>" +
 		title +
 		"</h1><form method=post action='" +
 		action +
 		"'" + nativeAttribute + ">" + hidden +
 		fields +
-		"<button type=submit>Continue</button><p role=status></p></form></main>"
+		"<button type=submit>Продолжить</button><p role=status></p></form>" +
+		"<button type=button id=language>English / Русский</button></main>"
 	if completion {
 		body += "<script nonce='" +
 			csrf +
@@ -328,6 +328,8 @@ func (f *assistedRecoveryFeature) page(c fiber.Ctx, completion bool, nativeToken
 	}
 	if !completion {
 		body += "<script nonce='" + csrf + "'>" + recoveryInitiationScript + "</script>"
+	} else {
+		body += "<script nonce='" + csrf + "'>" + recoveryCompletionScript + "</script>"
 	}
 	body += "</html>"
 	c.Type("html")
@@ -336,14 +338,31 @@ func (f *assistedRecoveryFeature) page(c fiber.Ctx, completion bool, nativeToken
 
 func (f *assistedRecoveryFeature) initiationPage(app *App) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		if c.Get("X-Inertia") == "true" {
-			return f.page(c, false, "")
-		}
+		c.Set("Cache-Control", "no-store")
 		token, err := app.inner.NativeCSRFToken(c)
 		if err != nil {
 			return err
 		}
-		return f.page(c, false, token)
+		targets := []map[string]any{}
+		search := strings.TrimSpace(c.Query("search"))
+		if len(search) > 256 {
+			return fiber.ErrBadRequest
+		}
+		if search != "" {
+			account, err := app.inner.AdminAuth().FindRecoveryAccount(c, search)
+			if err != nil && !errors.Is(err, goauth.ErrAccountNotFound) && !errors.Is(err, goauth.ErrInvalidIdentifier) {
+				return fiber.ErrServiceUnavailable
+			}
+			if err == nil && !account.Subject.ID.IsZero() {
+				targets = append(targets, map[string]any{
+					"subject": account.Subject.ID.String(), "name": account.Profile.DisplayName,
+					"email": account.PrimaryEmail.DisplayValue,
+				})
+			}
+		}
+		return app.Render(c, "security/AssistedRecoveryPage", map[string]any{
+			"title": "Восстановление доступа", "nativeCSRF": token, "targets": targets, "search": search,
+		})
 	}
 }
 func (f *assistedRecoveryFeature) completionPage(c fiber.Ctx) error { return f.page(c, true, "") }
@@ -405,9 +424,66 @@ person's identity.</label></p>
 <p><label>Your authenticator or unused recovery code, if enrolled <input name=code autocomplete=off
 maxlength=128></label></p>`
 
-const recoveryCompletionFields = `<p>The invitation verifies your new mailbox. If MFA is enrolled, your
-existing authenticator or an unused recovery code is also required. Contact support separately if you lost MFA.</p>
+const recoveryPageStyles = `body{font:16px system-ui,sans-serif;background:#f3f4f6;color:#172033;margin:0;padding:3rem 1rem}
+main{max-width:36rem;margin:auto;background:white;padding:2rem;border-radius:1rem;box-shadow:0 8px 28px #0001}
+label{display:block}
+input:not([type=hidden]):not([type=checkbox]){display:block;box-sizing:border-box;width:100%;padding:.75rem;
+margin-top:.4rem;border:1px solid #9ca3af;border-radius:.5rem}
+button{padding:.75rem 1.5rem;background:#1d4ed8;color:white;border:0;border-radius:.5rem}p{line-height:1.5}`
+
+const recoveryCompletionFields = `<p>Приглашение подтверждает новый email. Если MFA включена, ` +
+	`потребуется существующий код приложения или неиспользованный резервный код. ` +
+	`При потере MFA обратитесь в поддержку отдельно.</p>
 <input name=token type=hidden>
-<p><label>New password <input name=password type=password required autocomplete=new-password></label></p>
-<p><label>Confirm password <input name=password_confirmation type=password required autocomplete=new-password></label></p>
-<p><label>Existing authenticator or unused recovery code <input name=code autocomplete=off maxlength=128></label></p>`
+<p><label>Новый пароль <input name=password type=password required autocomplete=new-password></label></p>
+<p><label>Подтвердите пароль <input name=password_confirmation type=password required autocomplete=new-password></label></p>
+<p><label>Существующий код приложения или резервный код <input name=code autocomplete=off maxlength=128></label></p>`
+
+const recoveryCompletionScript = `const form=document.querySelector('form');let pending=false;
+let lang='ru';try{lang=localStorage.getItem('goadmin.locale')==='en'?'en':'ru'}catch{}
+const introduction='Приглашение подтверждает новый email. Если MFA включена, '+
+ 'потребуется существующий код приложения или неиспользованный резервный код. '+
+ 'При потере MFA обратитесь в поддержку отдельно.';
+let outcome='';
+const outcomes={
+ unknown:{
+  en:'Outcome unknown. Do not repeat or request another invitation until the service owner reconciles this request.',
+  ru:'Результат неизвестен. Не повторяйте запрос и не запрашивайте новое приглашение до проверки владельцем сервиса.'},
+ success:{
+  en:'Recovery completed. Sign in with your new email and password. Your existing authenticator is unchanged.',
+  ru:'Доступ восстановлен. Войдите с новым email и паролем. Существующее приложение-аутентификатор не изменилось.'},
+ rejected:{
+  en:'Recovery was rejected. Check the invitation, password and existing MFA.',
+  ru:'Запрос отклонён. Проверьте приглашение, пароль и существующий код MFA.'}
+};
+function renderStatus(){if(outcome)form.querySelector('[role=status]').textContent=outcomes[outcome][lang]}
+const texts={
+ 'Завершение восстановления доступа':'Complete account recovery',
+ [introduction]:'The invitation verifies your new mailbox. If MFA is enabled, '+
+ 'your existing authenticator or an unused recovery code is also required. Contact support separately if you lost MFA.',
+ 'Новый пароль':'New password','Подтвердите пароль':'Confirm password',
+ 'Существующий код приложения или резервный код':'Existing authenticator or recovery code','Продолжить':'Continue'};
+const originals=[];const walker=document.createTreeWalker(document,NodeFilter.SHOW_TEXT);
+while(walker.nextNode()){
+ const node=walker.currentNode;const key=node.textContent.trim();if(texts[key])originals.push([node,key])
+}
+function render(){
+ document.documentElement.lang=lang;for(const [node,key] of originals)node.textContent=lang==='en'?texts[key]:key
+ renderStatus()
+}
+render();document.querySelector('#language').addEventListener('click',()=>{
+ lang=lang==='en'?'ru':'en';try{localStorage.setItem('goadmin.locale',lang)}catch{}render()
+});
+form.addEventListener('submit',async event=>{
+ event.preventDefault();if(pending)return;pending=true;form.querySelector('button').disabled=true;
+ try{
+  const response=await fetch(form.action,{
+   method:'POST',mode:'same-origin',credentials:'same-origin',redirect:'error',cache:'no-store',
+   headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(new FormData(form))
+  });
+  outcome=response.status>=500?'unknown':response.ok?'success':'rejected';
+ }catch{outcome='unknown'}finally{
+  renderStatus();
+  for(const name of ['token','password','password_confirmation','code'])form.elements[name].value=''
+ }
+});`

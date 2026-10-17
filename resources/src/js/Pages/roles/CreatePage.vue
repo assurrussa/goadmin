@@ -1,6 +1,6 @@
 <template>
   <AppHead :title="props.title" />
-  <PageActionBar back-href="/roles" label="Создание" />
+  <PageActionBar back-href="/roles" :label="t('Создание')" />
 
   <AdminForm :form="form" @submit="handleSubmit">
     <Card class="overflow-hidden">
@@ -17,8 +17,8 @@
           <FormInput
             v-model="form.name"
             name="name"
-            label="Название"
-            placeholder="Менеджер"
+            :label="t('Название')"
+            :placeholder="t('Менеджер')"
             required
             :error="form.errors.name"
           />
@@ -27,22 +27,22 @@
         <FormInput
           v-model="form.description"
           name="description"
-          label="Описание"
-          placeholder="Краткое описание роли"
+          :label="t('Описание')"
+          :placeholder="t('Краткое описание роли')"
           :error="form.errors.description"
         />
 
         <div class="flex items-center gap-3">
-          <FormCheckbox v-model="form.isSystem" label="Системная роль" />
+          <FormCheckbox v-model="form.isSystem" :label="t('Системная роль')" />
           <p class="text-sm text-text-secondary">
-            Системные роли защищены от удаления и используются платформой.
+            {{ t('Системные роли защищены от удаления и используются платформой.') }}
           </p>
         </div>
 
         <RolePermissionsSection
           v-model="form.permissions"
           :permissions="props.permissions"
-          title="Права доступа"
+          :title="t('Права доступа')"
           subtitle="Выберите действия для доменов, чтобы задать доступы роли."
           header-eyebrow="Доступы роли"
         />
@@ -55,10 +55,10 @@
         <FormButton
           type="submit"
           :loading="form.processing"
-          loading-text="Сохранение..."
+          :loading-text="t('Сохранение...')"
           variant="primary"
         >
-          Сохранить
+          {{ t('Сохранить') }}
         </FormButton>
       </CardFooter>
     </Card>
@@ -66,6 +66,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { useForm, usePage } from '@inertiajs/vue3'
 import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'

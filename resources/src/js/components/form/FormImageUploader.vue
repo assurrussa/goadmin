@@ -48,9 +48,9 @@
           class="checkbox checkbox-sm"
           :disabled="!canToggleCrop"
         />
-        <span class="font-medium text-text-primary">Обрезать изображение</span>
+        <span class="font-medium text-text-primary">{{ t('Обрезать изображение') }}</span>
       </label>
-      <span class="text-text-tertiary">Можно отключить перед загрузкой</span>
+      <span class="text-text-tertiary">{{ t('Можно отключить перед загрузкой') }}</span>
     </div>
 
     <label class="label" v-if="description || internalError || hint">
@@ -68,6 +68,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed, ref, watch } from 'vue'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 import ImageUploader, {

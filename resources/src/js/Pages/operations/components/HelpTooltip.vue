@@ -4,7 +4,7 @@
       <button
         type="button"
         class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border-secondary text-text-tertiary transition-colors hover:border-border-primary hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-        aria-label="Показать описание"
+        :aria-label="t('Показать описание')"
       >
         <CircleHelp class="h-3.5 w-3.5" />
       </button>
@@ -22,6 +22,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { CircleHelp } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 

@@ -1,6 +1,6 @@
 <template>
   <AppHead :title="props.title" />
-  <PageActionBar :back-href="basePath" label="Редактирование" />
+  <PageActionBar :back-href="basePath" :label="t('Редактирование')" />
 
   <AdminForm
     :form="form"
@@ -15,7 +15,7 @@
             v-model="form.name"
             name="name"
             type="text"
-            label="Имя"
+            :label="t('Имя')"
             required
             :error="form.errors.name"
           />
@@ -23,14 +23,14 @@
             v-model="form.lastName"
             name="lastName"
             type="text"
-            label="Фамилия"
+            :label="t('Фамилия')"
             :error="form.errors.lastName"
           />
           <FormInput
             v-model="form.email"
             name="email"
             type="email"
-            label="E-mail"
+            :label="t('core.ui.E-mail', 'E-mail')"
             required
             :error="form.errors.email"
             :readonly="!authmail"
@@ -39,7 +39,7 @@
             v-model="form.username"
             name="username"
             type="text"
-            label="Nickname"
+            :label="t('core.ui.Nickname', 'Nickname')"
             :error="form.errors.username"
           />
         </div>
@@ -49,9 +49,9 @@
         <FormButton
           type="submit"
           :loading="form.processing"
-          loading-text="Сохранение..."
+          :loading-text="t('Сохранение...')"
           variant="primary"
-          >Сохранить</FormButton
+          >{{ t('Сохранить') }}</FormButton
         >
       </CardFooter>
     </Card>
@@ -59,6 +59,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { useForm, usePage } from '@inertiajs/vue3'
 import { watch } from 'vue'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'

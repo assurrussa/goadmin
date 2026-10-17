@@ -1,3 +1,4 @@
+import { registerTranslations } from '@/i18n'
 import type { App } from 'vue'
 import type { AdminExtension } from '@/extensions/types'
 import type { AdminWebSocketHandler } from '@/websocket/types'
@@ -21,6 +22,7 @@ export const loadExtensions = (): LoadedExtensions => {
   return {
     install(app: App) {
       extensions.forEach((ext) => {
+        if (ext.translations) registerTranslations(ext.translations)
         ext.install?.(app)
       })
     },

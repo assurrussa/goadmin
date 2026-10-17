@@ -14,7 +14,7 @@
               <img
                 v-if="uploads && avatarUrl"
                 :src="avatarUrl"
-                alt="Аватар профиля"
+                :alt="t('Аватар профиля')"
                 class="h-full w-full object-cover"
               />
               <span v-else class="text-3xl font-bold text-primary-contrast">
@@ -47,7 +47,7 @@
               </div>
               <div class="flex items-center">
                 <Calendar class="h-4 w-4 mr-1.5" />
-                <span>Создан {{ formatDate(props.data.createdAt) }}</span>
+                <span>{{ t('Создан') }} {{ formatDate(props.data.createdAt) }}</span>
               </div>
             </div>
           </div>
@@ -57,13 +57,13 @@
             <AppButton asChild>
               <Link :href="`${basePath}/edit`">
                 <Pencil class="h-4 w-4 mr-2" />
-                Редактировать
+                {{ t('Редактировать') }}
               </Link>
             </AppButton>
             <AppButton as-child variant="secondary">
               <Link :href="`${basePath}/settings`">
                 <Settings class="h-4 w-4 mr-2" />
-                Настройки
+                {{ t('Настройки') }}
               </Link>
             </AppButton>
           </div>
@@ -77,16 +77,16 @@
       >
         <div class="flex items-center">
           <Pencil class="h-5 w-5 text-primary mr-2" />
-          <h2 class="text-lg font-semibold text-text-primary">Обновление аватара</h2>
+          <h2 class="text-lg font-semibold text-text-primary">{{ t('Обновление аватара') }}</h2>
         </div>
-        <span class="text-sm text-text-tertiary">Поддерживаются изображения до 5MB</span>
+        <span class="text-sm text-text-tertiary">{{ t('Поддерживаются изображения до 5MB') }}</span>
       </CardHeader>
       <CardContent class="pt-6">
         <FormImageUploader
           class="max-w-sm"
           :model-value="avatarFile"
-          label="Аватар администратора"
-          description="Загрузите квадратное изображение высокого качества"
+          :label="t('Аватар администратора')"
+          :description="t('Загрузите квадратное изображение высокого качества')"
           object-type="admin"
           :object-id="props.data.id"
           :upload-url="avatarUploadUrl"
@@ -111,24 +111,28 @@
         <CardHeader class="border-b border-border-primary">
           <div class="flex items-center">
             <Mail class="h-5 w-5 text-primary mr-2" />
-            <h2 class="text-lg font-semibold text-text-primary">Контактная информация</h2>
+            <h2 class="text-lg font-semibold text-text-primary">
+              {{ t('Контактная информация') }}
+            </h2>
           </div>
         </CardHeader>
         <CardContent class="space-y-4 pt-6">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <span class="text-text-secondary font-medium">Email</span>
+            <span class="text-text-secondary font-medium">{{ t('core.ui.Email', 'Email') }}</span>
             <div class="flex items-center">
               <Mail class="h-4 w-4 text-text-tertiary mr-2" />
-              <span class="break-all text-text-primary">{{ props.data.email || 'Не указан' }}</span>
+              <span class="break-all text-text-primary">{{
+                props.data.email || t('Не указан')
+              }}</span>
             </div>
           </div>
 
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <span class="text-text-secondary font-medium">Имя пользователя</span>
+            <span class="text-text-secondary font-medium">{{ t('Имя пользователя') }}</span>
             <div class="flex items-center">
               <AtSign class="h-4 w-4 text-text-tertiary mr-2" />
               <span class="break-all text-text-primary">{{
-                props.data.username || 'Не указано'
+                props.data.username || t('Не указано')
               }}</span>
             </div>
           </div>
@@ -140,25 +144,27 @@
         <CardHeader class="border-b border-border-primary">
           <div class="flex items-center">
             <ShieldCheck class="h-5 w-5 text-primary mr-2" />
-            <h2 class="text-lg font-semibold text-text-primary">Информация об аккаунте</h2>
+            <h2 class="text-lg font-semibold text-text-primary">
+              {{ t('Информация об аккаунте') }}
+            </h2>
           </div>
         </CardHeader>
         <CardContent class="space-y-4 pt-6">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <span class="text-text-secondary font-medium">Роль</span>
+            <span class="text-text-secondary font-medium">{{ t('Роль') }}</span>
             <div class="flex flex-wrap gap-2 justify-end max-w-xs">
               <AppBadge v-for="role in formattedRoles" :key="role" variant="primary" class="gap-1">
                 <ShieldCheck class="h-3 w-3" />
                 {{ role }}
               </AppBadge>
               <span v-if="formattedRoles.length === 0" class="text-xs text-text-tertiary">
-                Роль не назначена
+                {{ t('Роль не назначена') }}
               </span>
             </div>
           </div>
 
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <span class="text-text-secondary font-medium">Уникальный ID</span>
+            <span class="text-text-secondary font-medium">{{ t('Уникальный ID') }}</span>
             <div class="flex items-center">
               <Hash class="h-4 w-4 text-text-tertiary mr-2" />
               <span class="text-text-primary font-mono">{{ props.data.id }}</span>
@@ -171,6 +177,8 @@
 </template>
 
 <script setup lang="ts">
+import { t, locale } from '@/i18n'
+
 import { computed, ref, watch, type PropType } from 'vue'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 import AppHead from '@/components/layout/AppHead.vue'
@@ -304,7 +312,7 @@ watch(
 
 // Вычисляемые свойства
 const fullName = computed(() => {
-  return `${props.data.name || ''} ${props.data.lastName || ''}`.trim() || 'Без имени'
+  return `${props.data.name || ''} ${props.data.lastName || ''}`.trim() || t('Без имени')
 })
 
 const userInitials = computed(() => {
@@ -342,10 +350,10 @@ const primaryRoleLabel = computed(() => formattedRoles.value[0] ?? '')
 
 // Функции форматирования
 const formatDate = (dateString: string) => {
-  if (!dateString) return 'Не указано'
+  if (!dateString) return t('Не указано')
 
   const date = new Date(dateString)
-  return date.toLocaleDateString('ru-RU', {
+  return date.toLocaleDateString(locale.value === 'en' ? 'en-GB' : 'ru-RU', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

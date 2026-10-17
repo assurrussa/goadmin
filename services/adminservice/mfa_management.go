@@ -12,6 +12,8 @@ import (
 	sessioncore "github.com/assurrussa/goadmin/infrastructure/core/session"
 )
 
+var ErrLocalMFAUnavailable = errors.New("local MFA management unavailable")
+
 type mfaManagementRuntime interface {
 	MFAStatus(ctx context.Context, auth goauth.AuthContext) (bool, error)
 	BeginMFAEnrollment(ctx context.Context, request goauth.MFAEnrollmentRequest) (goauth.MFAEnrollment, error)
@@ -36,7 +38,10 @@ func (s *Service) currentMFAAuth(c fiber.Ctx) (goauth.AuthContext, [32]byte, err
 	}
 	defer sess.Release()
 	state, ok := sess.Get(sessioncore.AuthAdminKey.String()).(*browserSession)
-	if !ok || state == nil || state.External != nil {
+	if ok && state != nil && state.External != nil {
+		return goauth.AuthContext{}, binding, errors.Join(ErrLocalMFAUnavailable, goauth.ErrSessionRevoked)
+	}
+	if !ok || state == nil {
 		return goauth.AuthContext{}, binding, goauth.ErrSessionRevoked
 	}
 	active, err := s.loadBrowserAuthority(c, sess, state)
@@ -60,7 +65,7 @@ func (s *Service) currentMFAAuth(c fiber.Ctx) (goauth.AuthContext, [32]byte, err
 func (s *Service) LocalMFAStatus(c fiber.Ctx) (bool, error) {
 	rt, ok := s.runtime.(mfaManagementRuntime)
 	if !ok {
-		return false, errors.New("MFA management unavailable")
+		return false, ErrLocalMFAUnavailable
 	}
 	auth, _, err := s.currentMFAAuth(c)
 	if err != nil {
@@ -90,7 +95,7 @@ func (s *Service) ManageLocalMFA(c fiber.Ctx, action string, input MFAManagement
 	var result MFAManagementResult
 	rt, ok := s.runtime.(mfaManagementRuntime)
 	if !ok {
-		return result, errors.New("MFA management unavailable")
+		return result, ErrLocalMFAUnavailable
 	}
 	auth, binding, err := s.currentMFAAuth(c)
 	if err != nil {

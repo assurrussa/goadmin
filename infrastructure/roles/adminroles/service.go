@@ -76,7 +76,7 @@ func (s *Service) AdminGuardCheck(
 		return false
 	}
 
-	return s.subjectGuard.SubjectGuardCheck(ctx, subjectID, key, opts...)
+	return integrationroles.RolePreviewAllows(ctx, key) && s.subjectGuard.SubjectGuardCheck(ctx, subjectID, key, opts...)
 }
 
 func (s *Service) IsSuperAdmin(ctx context.Context, adminID int64) bool {

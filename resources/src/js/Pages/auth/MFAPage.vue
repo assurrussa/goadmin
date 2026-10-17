@@ -1,12 +1,12 @@
 <template>
   <AuthLayout>
-    <template #title>Подтверждение входа</template>
-    <template #subtitle>Введите код приложения или резервный код</template>
+    <template #title>{{ t('Подтверждение входа') }}</template>
+    <template #subtitle>{{ t('Введите код приложения или резервный код') }}</template>
     <AdminForm :form="form" :fields="['code']" @submit="submit">
       <FormInput
         v-model="form.code"
         name="code"
-        label="Код подтверждения"
+        :label="t('Код подтверждения')"
         autocomplete="one-time-code"
         required
         :error="form.errors.code"
@@ -16,13 +16,17 @@
         :loading="form.processing"
         :disabled="form.processing || !form.code"
         full-width
-        >Подтвердить</FormButton
+        >{{ t('Подтвердить') }}</FormButton
       >
     </AdminForm>
-    <template #footer><Link href="/auth/login">Вернуться ко входу</Link></template>
+    <template #footer
+      ><Link href="/auth/login">{{ t('Вернуться ко входу') }}</Link></template
+    >
   </AuthLayout>
 </template>
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { bindEphemeralAuthPage } from '@/lib/ephemeral-auth'
 import { onBeforeUnmount } from 'vue'
 import { Link, useForm } from '@inertiajs/vue3'

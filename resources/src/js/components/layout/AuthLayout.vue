@@ -1,10 +1,13 @@
 <template>
   <div class="min-h-screen bg-background flex flex-col justify-center">
-    <div class="absolute top-4 right-4 z-50">
+    <div class="absolute top-4 right-4 z-50 flex gap-2">
+      <LocaleSelect />
       <AppButton
         variant="ghost"
         size="icon-sm"
-        :title="themeStore.isDark ? 'Переключить на светлую тему' : 'Переключить на темную тему'"
+        :title="
+          themeStore.isDark ? t('Переключить на светлую тему') : t('Переключить на темную тему')
+        "
         @click="handleThemeToggle"
       >
         <Sun v-if="themeStore.isDark" class="h-5 w-5" />
@@ -17,7 +20,7 @@
         <span
           class="px-4 py-1.5 rounded-full border border-border-primary bg-card text-sm font-semibold text-text-primary"
         >
-          Админка
+          {{ t('Админка') }}
         </span>
       </div>
 
@@ -46,6 +49,9 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+import LocaleSelect from './LocaleSelect.vue'
+
 import AppButton from '@/components/ui/AppButton.vue'
 import { Moon, Sun } from 'lucide-vue-next'
 import { useThemeStore } from '@/stores/theme'

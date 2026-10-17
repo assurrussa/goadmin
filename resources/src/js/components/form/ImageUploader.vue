@@ -15,7 +15,7 @@
       :id="fileInputId"
       type="file"
       name="image-upload"
-      aria-label="Загрузить изображение"
+      :aria-label="t('Загрузить изображение')"
       :accept="acceptedFileTypes.join(',')"
       :disabled="!canInteract"
       class="hidden"
@@ -26,7 +26,11 @@
       v-if="previewUrl"
       class="image-preview group relative h-full w-full overflow-hidden rounded-md"
     >
-      <img :src="previewUrl" alt="Image Preview" class="h-full w-full object-cover" />
+      <img
+        :src="previewUrl"
+        :alt="t('core.ui.Image Preview', 'Image Preview')"
+        class="h-full w-full object-cover"
+      />
       <div
         class="image-overlay absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100"
       >
@@ -48,7 +52,7 @@
         >
           <span>&#x1F5D1;</span>
         </AppButton>
-        <span class="text-xs text-white/80 uppercase tracking-wide">Удалить</span>
+        <span class="text-xs text-white/80 uppercase tracking-wide">{{ t('Удалить') }}</span>
       </div>
 
       <!-- Success Indicator -->
@@ -82,8 +86,12 @@
         <div class="placeholder-content text-center">
           <!-- Replace with an icon -->
           <span class="text-4xl">&#x1F4F7;</span>
-          <p class="mt-2 text-sm text-text-secondary">Click to upload or drag & drop</p>
-          <p class="mt-1 text-xs text-text-tertiary">Max file size: {{ maxFileSize }}MB</p>
+          <p class="mt-2 text-sm text-text-secondary">
+            {{ t('core.ui.Click to upload or drag & drop', 'Click to upload or drag & drop') }}
+          </p>
+          <p class="mt-1 text-xs text-text-tertiary">
+            {{ t('core.ui.Max file size:', 'Max file size:') }} {{ maxFileSize }}MB
+          </p>
         </div>
       </slot>
     </div>
@@ -116,7 +124,12 @@
     </div>
   </div>
   <p v-if="uncertainUpload && !recoveredImage" class="mt-2 text-xs text-error" role="status">
-    Upload completion is unconfirmed. Check this upload before starting another.
+    {{
+      t(
+        'core.ui.Upload completion is unconfirmed. Check this upload before starting another.',
+        'Upload completion is unconfirmed. Check this upload before starting another.',
+      )
+    }}
   </p>
   <button
     v-if="uncertainUpload && !recoveredImage"
@@ -125,15 +138,20 @@
     :disabled="!canCheckUpload"
     @click="checkUpload"
   >
-    Check upload
+    {{ t('core.ui.Check upload', 'Check upload') }}
   </button>
   <div v-if="recoveredImage" role="status">
-    Upload confirmed. The original field is unknown.
+    {{
+      t(
+        'core.ui.Upload confirmed. The original field is unknown.',
+        'Upload confirmed. The original field is unknown.',
+      )
+    }}
     <button type="button" :disabled="!canAssignRecovered" @click="assignRecovered">
-      Use image in this field
+      {{ t('core.ui.Use image in this field', 'Use image in this field') }}
     </button>
     <button type="button" :disabled="!canAssignRecovered" @click="dismissRecovered">
-      Dismiss confirmed upload
+      {{ t('core.ui.Dismiss confirmed upload', 'Dismiss confirmed upload') }}
     </button>
   </div>
   <div
@@ -147,9 +165,9 @@
         class="checkbox checkbox-sm"
         :disabled="!canInteract"
       />
-      <span class="font-medium text-text-primary">Обрезать изображение</span>
+      <span class="font-medium text-text-primary">{{ t('Обрезать изображение') }}</span>
     </label>
-    <span class="text-text-tertiary">Можно отключить перед загрузкой</span>
+    <span class="text-text-tertiary">{{ t('Можно отключить перед загрузкой') }}</span>
   </div>
   <ImageCropper
     v-if="showImageCropper && cropperImageUrl"
@@ -166,6 +184,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue'
 import axios from 'axios'
 import { useNotifications } from '@/composables/useNotifications'
@@ -616,7 +636,7 @@ const uploadFile = async (file: File | undefined, reconcile = false) => {
   if (currentUploadId.value) {
     uploadQueue.remove(currentUploadId.value)
   }
-  currentUploadId.value = uploadQueue.start(props.uploadLabel ?? 'Загрузка файла', 0)
+  currentUploadId.value = uploadQueue.start(props.uploadLabel ?? t('Загрузка файла'), 0)
 
   try {
     const response =
@@ -740,7 +760,7 @@ const uploadFile = async (file: File | undefined, reconcile = false) => {
           if (controller.signal.aborted) return
           const file = result.file ?? result.task.file
           if (result.status === 'completed' && !file?.url) {
-            throw new Error('Обработка файла завершена, но адрес изображения недоступен.')
+            throw new Error(t('Обработка файла завершена, но адрес изображения недоступен.'))
           }
           handleFileStatusEvent({
             eventId: `poll-${task.id}`,
@@ -769,7 +789,7 @@ const uploadFile = async (file: File | undefined, reconcile = false) => {
               taskId: task.id,
               status: 'failed',
               error:
-                reason instanceof Error ? reason.message : 'Не удалось проверить статус файла.',
+                reason instanceof Error ? reason.message : t('Не удалось проверить статус файла.'),
             },
             false,
           )
@@ -817,11 +837,11 @@ const removeImage = async () => {
     let deleteMessage: string | undefined
     if (props.deleteUrl) {
       const { data } = await axios.delete(props.deleteUrl)
-      deleteMessage = data?.message || (data?.status === 'deleted' ? 'Файл удалён' : undefined)
+      deleteMessage = data?.message || (data?.status === 'deleted' ? t('Файл удалён') : undefined)
     } else {
       const result = await deleteUploadedFile(currentFile.value.id)
       if (result.status === 'deleted') {
-        deleteMessage = 'Файл удалён'
+        deleteMessage = t('Файл удалён')
       }
     }
 
@@ -842,7 +862,7 @@ const removeImage = async () => {
       (e as { response?: { data?: { error?: string; message?: string } }; message?: string })
         ?.response?.data?.message ||
       (e as { message?: string })?.message ||
-      'Не удалось удалить файл.'
+      t('Не удалось удалить файл.')
     error.value = errorMessage
     emit('error', errorMessage)
     notifyError(errorMessage)

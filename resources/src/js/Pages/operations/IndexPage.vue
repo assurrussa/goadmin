@@ -3,20 +3,21 @@
 
   <TooltipProvider :delay-duration="120">
     <div class="space-y-6">
-      <PageActionBar back-href="/" label="Операции" />
+      <PageActionBar back-href="/" :label="t('Операции')" />
 
       <section
         class="rounded-xl border border-info/35 bg-info/10 px-5 py-4 text-sm"
-        aria-label="Связь операций с CMS"
+        :aria-label="t('Связь операций с CMS')"
       >
         <h2 class="font-semibold text-text-primary">
-          Операции совместимы с CMS, но решают задачу хоста
+          {{ t('Операции совместимы с CMS, но решают задачу хоста') }}
         </h2>
         <p class="mt-1 max-w-5xl leading-6 text-text-secondary">
-          CMS управляет материалами, публикациями, меню, SEO и журналом изменений. Этот раздел
-          обслуживает публичную доставку сайта: пересобирает маршруты и sitemap либо запрашивает
-          redeploy фронтенда. Публикация CMS может пометить публичное состояние как требующее
-          обновления, а «Операции» выполняют такое обновление вручную.
+          {{
+            t(
+              'CMS управляет материалами, публикациями, меню, SEO и журналом изменений. Этот раздел обслуживает публичную доставку сайта: пересобирает маршруты и sitemap либо запрашивает redeploy фронтенда. Публикация CMS может пометить публичное состояние как требующее обновления, а «Операции» выполняют такое обновление вручную.',
+            )
+          }}
         </p>
       </section>
 
@@ -26,11 +27,14 @@
         <Card class="border-border-primary bg-surface">
           <CardHeader class="gap-y-2 pb-4">
             <CardTitle class="text-base font-semibold text-text-primary md:text-lg">
-              Ручные действия
+              {{ t('Ручные действия') }}
             </CardTitle>
             <CardDescription class="max-w-2xl text-sm leading-6 text-text-secondary">
-              Используйте эти операции, когда нужно принудительно обновить публичные артефакты или
-              запросить redeploy фронтенда.
+              {{
+                t(
+                  'Используйте эти операции, когда нужно принудительно обновить публичные артефакты или запросить redeploy фронтенда.',
+                )
+              }}
             </CardDescription>
           </CardHeader>
           <CardContent class="space-y-3 pt-0">
@@ -39,9 +43,15 @@
                 class="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-4"
               >
                 <div class="min-w-0 space-y-1">
-                  <p class="text-sm font-medium text-text-primary">Routes Front</p>
+                  <p class="text-sm font-medium text-text-primary">
+                    {{ t('core.ui.Routes Front', 'Routes Front') }}
+                  </p>
                   <p class="text-sm leading-6 text-text-secondary">
-                    Синхронно пересобирает `routes-front` и обновляет локальный кэш маршрутов.
+                    {{
+                      t(
+                        'Синхронно пересобирает `routes-front` и обновляет локальный кэш маршрутов.',
+                      )
+                    }}
                   </p>
                 </div>
                 <AppButton
@@ -50,7 +60,7 @@
                   class="w-full sm:w-auto lg:self-center"
                   @click="runAction('/operations/routes/regenerate')"
                 >
-                  Regenerate routes
+                  {{ t('core.ui.Regenerate routes', 'Regenerate routes') }}
                 </AppButton>
               </div>
             </div>
@@ -60,9 +70,11 @@
                 class="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-4"
               >
                 <div class="min-w-0 space-y-1">
-                  <p class="text-sm font-medium text-text-primary">Sitemap</p>
+                  <p class="text-sm font-medium text-text-primary">
+                    {{ t('core.ui.Sitemap', 'Sitemap') }}
+                  </p>
                   <p class="text-sm leading-6 text-text-secondary">
-                    Пересобирает sitemap index и sitemap files в backend runtime.
+                    {{ t('Пересобирает sitemap index и sitemap files в backend runtime.') }}
                   </p>
                 </div>
                 <AppButton
@@ -72,7 +84,7 @@
                   class="w-full sm:w-auto lg:self-center"
                   @click="runAction('/operations/sitemap/regenerate')"
                 >
-                  Regenerate sitemap
+                  {{ t('core.ui.Regenerate sitemap', 'Regenerate sitemap') }}
                 </AppButton>
               </div>
             </div>
@@ -82,13 +94,22 @@
                 class="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-4"
               >
                 <div class="min-w-0 space-y-1">
-                  <p class="text-sm font-medium text-text-primary">Frontend Redeploy</p>
+                  <p class="text-sm font-medium text-text-primary">
+                    {{ t('core.ui.Frontend Redeploy', 'Frontend Redeploy') }}
+                  </p>
                   <p class="text-sm leading-6 text-text-secondary">
-                    Отправляет ручной запрос на frontend rebuild/redeploy через настроенный trigger.
+                    {{
+                      t(
+                        'Отправляет ручной запрос на frontend rebuild/redeploy через настроенный trigger.',
+                      )
+                    }}
                   </p>
                   <p v-if="!canRedeploy" class="pt-0.5 text-xs leading-5 text-warning">
-                    Trigger недоступен: проверьте `FRONTEND_REBUILD_ENABLE`, `DOKPLOY_*` или hook
-                    config.
+                    {{
+                      t(
+                        'Trigger недоступен: проверьте `FRONTEND_REBUILD_ENABLE`, `DOKPLOY_*` или hook config.',
+                      )
+                    }}
                   </p>
                 </div>
                 <AppButton
@@ -99,7 +120,7 @@
                   class="w-full sm:w-auto lg:self-center"
                   @click="runAction('/operations/frontend/redeploy')"
                 >
-                  Redeploy frontend
+                  {{ t('core.ui.Redeploy frontend', 'Redeploy frontend') }}
                 </AppButton>
               </div>
             </div>
@@ -109,16 +130,16 @@
         <Card class="border-border-primary bg-surface">
           <CardHeader class="gap-y-2 pb-4">
             <CardTitle class="text-base font-semibold text-text-primary md:text-lg">
-              Frontend Build State
+              {{ t('core.ui.Frontend Build State', 'Frontend Build State') }}
             </CardTitle>
             <CardDescription class="text-sm leading-6 text-text-secondary">
-              Текущее состояние очереди пересборки публичного фронтенда.
+              {{ t('Текущее состояние очереди пересборки публичного фронтенда.') }}
             </CardDescription>
           </CardHeader>
           <CardContent class="space-y-3 pt-0">
             <div class="rounded-xl border border-border-secondary bg-card px-4 py-3.5">
               <p class="text-[11px] uppercase tracking-[0.14em] text-text-tertiary">
-                Итоговое состояние
+                {{ t('Итоговое состояние') }}
               </p>
               <div
                 class="mt-1.5 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between"
@@ -175,6 +196,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AppHead from '@/components/layout/AppHead.vue'
@@ -223,7 +246,7 @@ const props = defineProps<{
   frontendRebuild: FrontendRebuild
 }>()
 
-const pageTitle = computed(() => props.title ?? 'Операции')
+const pageTitle = computed(() => props.title ?? t('Операции'))
 const canRedeploy = computed(() => props.frontendRebuild?.canTrigger ?? false)
 
 const triggerStatus = computed(() => {
@@ -290,8 +313,10 @@ const stateRows = computed<StateRow[]>(() => [
     label: 'Запись состояния в БД',
     description: props.frontendState.exists
       ? `Строка состояния существует для scope \`${props.frontendState.scope || 'frontend'}\`. По ней backend понимает, нужен ли rebuild и действует ли lock.`
-      : 'Строка состояния еще не создана. Это значит, что очередь пересборки пока не инициализировалась или еще ни разу не использовалась.',
-    value: props.frontendState.exists ? 'Есть запись' : 'Запись отсутствует',
+      : t(
+          'Строка состояния еще не создана. Это значит, что очередь пересборки пока не инициализировалась или еще ни разу не использовалась.',
+        ),
+    value: props.frontendState.exists ? t('Есть запись') : t('Запись отсутствует'),
     badge: {
       label: props.frontendState.exists ? 'Present' : 'Missing',
       variant: props.frontendState.exists ? 'info' : 'warning',
@@ -302,9 +327,15 @@ const stateRows = computed<StateRow[]>(() => [
     eyebrow: 'Dirty Flag',
     label: 'Нужна ли пересборка',
     description: props.frontendState.dirty
-      ? 'Флаг `dirty = true` означает, что после последней публичной контентной мутации фронтенд нужно заново пересобрать или redeploy-нуть.'
-      : 'Флаг `dirty = false` означает, что новых публичных изменений после последней синхронизации сейчас нет.',
-    value: props.frontendState.dirty ? 'Да, есть непримененные изменения' : 'Нет, очередь чистая',
+      ? t(
+          'Флаг `dirty = true` означает, что после последней публичной контентной мутации фронтенд нужно заново пересобрать или redeploy-нуть.',
+        )
+      : t(
+          'Флаг `dirty = false` означает, что новых публичных изменений после последней синхронизации сейчас нет.',
+        ),
+    value: props.frontendState.dirty
+      ? t('Да, есть непримененные изменения')
+      : t('Нет, очередь чистая'),
     badge: {
       label: props.frontendState.dirty ? 'Dirty' : 'Clean',
       variant: props.frontendState.dirty ? 'warning' : 'success',
@@ -327,8 +358,10 @@ const stateRows = computed<StateRow[]>(() => [
     eyebrow: 'Last Mutation',
     label: 'Последняя контентная мутация',
     description: props.frontendState.lastMutationAt
-      ? 'Когда backend в последний раз пометил публичный фронтенд как измененный из-за publish/update/unpublish или другой публичной мутации.'
-      : 'Публичных мутаций, влияющих на rebuild state, пока не зафиксировано.',
+      ? t(
+          'Когда backend в последний раз пометил публичный фронтенд как измененный из-за publish/update/unpublish или другой публичной мутации.',
+        )
+      : t('Публичных мутаций, влияющих на rebuild state, пока не зафиксировано.'),
     value: props.frontendState.lastMutationAt || '—',
     valueClass: 'font-mono text-[13px]',
   },
@@ -337,8 +370,10 @@ const stateRows = computed<StateRow[]>(() => [
     eyebrow: 'Last Rebuild Request',
     label: 'Последний запрос на rebuild',
     description: props.frontendState.lastRebuildRequestAt
-      ? 'Когда backend в последний раз отправлял запрос на frontend rebuild/redeploy: автоматически или из раздела Operations.'
-      : 'Запрос на rebuild/redeploy еще не отправлялся или пока не записан в state.',
+      ? t(
+          'Когда backend в последний раз отправлял запрос на frontend rebuild/redeploy: автоматически или из раздела Operations.',
+        )
+      : t('Запрос на rebuild/redeploy еще не отправлялся или пока не записан в state.'),
     value: props.frontendState.lastRebuildRequestAt || '—',
     valueClass: 'font-mono text-[13px]',
   },
@@ -347,8 +382,10 @@ const stateRows = computed<StateRow[]>(() => [
     eyebrow: 'Build Lock',
     label: 'Блокировка повторного trigger',
     description: props.frontendState.buildLockUntil
-      ? 'До этого времени повторный trigger будет отклоняться, чтобы не запускать несколько frontend redeploy подряд.'
-      : 'Сейчас активного lock нет: повторный trigger не блокируется по времени.',
+      ? t(
+          'До этого времени повторный trigger будет отклоняться, чтобы не запускать несколько frontend redeploy подряд.',
+        )
+      : t('Сейчас активного lock нет: повторный trigger не блокируется по времени.'),
     value: props.frontendState.buildLockUntil || '—',
     valueClass: props.frontendState.buildLockUntil ? 'font-mono text-[13px]' : '',
     badge: props.frontendState.buildLockUntil
@@ -366,8 +403,10 @@ const stateRows = computed<StateRow[]>(() => [
     eyebrow: 'Updated At',
     label: 'Последнее обновление строки состояния',
     description: props.frontendState.updatedAt
-      ? 'Когда backend последний раз переписывал саму строку состояния в БД: dirty flag, revision, lock или timestamp rebuild request.'
-      : 'Строка состояния еще не обновлялась или не создана.',
+      ? t(
+          'Когда backend последний раз переписывал саму строку состояния в БД: dirty flag, revision, lock или timestamp rebuild request.',
+        )
+      : t('Строка состояния еще не обновлялась или не создана.'),
     value: props.frontendState.updatedAt || '—',
     valueClass: 'font-mono text-[13px]',
   },

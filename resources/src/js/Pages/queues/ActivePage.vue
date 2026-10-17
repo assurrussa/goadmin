@@ -21,17 +21,21 @@
     <Card class="p-6 space-y-4">
       <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-widest text-primary">Очереди</p>
+          <p class="text-xs font-semibold uppercase tracking-widest text-primary">
+            {{ t('Очереди') }}
+          </p>
           <h1 class="text-2xl font-bold text-text-primary">{{ pageTitle }}</h1>
-          <p class="text-text-secondary mt-2">Зарезервированные и ожидающие обработки задачи.</p>
+          <p class="text-text-secondary mt-2">
+            {{ t('Зарезервированные и ожидающие обработки задачи.') }}
+          </p>
         </div>
         <div class="flex gap-3">
           <div class="px-4 py-3 rounded-lg bg-card border border-border-primary shadow-sm">
-            <p class="text-xs text-text-tertiary">В очереди</p>
+            <p class="text-xs text-text-tertiary">{{ t('В очереди') }}</p>
             <p class="text-2xl font-semibold text-text-primary">{{ counters.jobs }}</p>
           </div>
           <div class="px-4 py-3 rounded-lg bg-danger/10 border border-danger/30 shadow-sm">
-            <p class="text-xs text-danger">С ошибкой</p>
+            <p class="text-xs text-danger">{{ t('С ошибкой') }}</p>
             <p class="text-2xl font-semibold text-danger">{{ counters.failed }}</p>
           </div>
         </div>
@@ -49,6 +53,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed, reactive, ref } from 'vue'
 import { Link, router, usePage } from '@inertiajs/vue3'
 import AppHead from '@/components/layout/AppHead.vue'
@@ -88,7 +94,7 @@ const counters = reactive({
   failed: Number(props.failedCount ?? 0),
 })
 
-const pageTitle = computed(() => props.title || 'Активные задачи')
+const pageTitle = computed(() => props.title || t('Активные задачи'))
 const jobsApi = computed(() => props.jobsApiUrl || '/queues/jobs')
 const isActive = (href: string) => {
   if (href === '/queues') {
@@ -125,7 +131,7 @@ function handleRowAction(actionKey: string, item: Record<string, unknown>) {
   if (!id) return
 
   if (actionKey === 'delete') {
-    if (!confirm(`Удалить задачу #${id} из очереди?`)) return
+    if (!confirm(t('Удалить задачу #{id} из очереди?', undefined, { id: id }))) return
 
     router.delete(`${jobsApi.value}/${encodeURIComponent(String(id))}`, {
       preserveScroll: true,

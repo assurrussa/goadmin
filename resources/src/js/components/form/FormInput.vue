@@ -2,7 +2,7 @@
   <div class="space-y-1">
     <!-- Label -->
     <label v-if="label" :for="inputId" class="block text-sm font-medium text-text-primary">
-      {{ label }}
+      {{ t(label) }}
       <span v-if="required" class="text-error ml-1">*</span>
     </label>
 
@@ -14,7 +14,7 @@
         :aria-describedby="error ? `${inputId}-error` : helpText ? `${inputId}-help` : undefined"
         :model-value="modelValue"
         :type="type"
-        :placeholder="placeholder"
+        :placeholder="placeholder ? t(placeholder) : undefined"
         :required="required"
         :readonly="readonly"
         :disabled="disabled"
@@ -77,17 +77,18 @@
           clip-rule="evenodd"
         />
       </svg>
-      <span>{{ Array.isArray(error) ? error[0] : error }}</span>
+      <span>{{ t((Array.isArray(error) ? error[0] : error) ?? '') }}</span>
     </p>
 
     <!-- Help text -->
     <p v-if="helpText && !error" :id="`${inputId}-help`" class="text-sm text-text-secondary">
-      {{ helpText }}
+      {{ t(helpText) }}
     </p>
   </div>
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
 import { computed, useId, useSlots } from 'vue'
 import AppInput from '@/components/ui/AppInput.vue'
 

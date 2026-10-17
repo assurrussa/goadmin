@@ -1,3 +1,4 @@
+import { t } from '@/i18n'
 import { watch, nextTick, onUnmounted } from 'vue'
 import { usePage, router } from '@inertiajs/vue3'
 import { useNotifications } from './useNotifications'
@@ -43,19 +44,19 @@ export function useFlashMessages() {
     globalFlashState.lastProcessedFlash = flashHash
 
     if (flash.success) {
-      success(flash.success)
+      success(t(flash.success))
     }
 
     if (flash.error) {
-      error(flash.error)
+      error(t(flash.error))
     }
 
     if (flash.info) {
-      info(flash.info)
+      info(t(flash.info))
     }
 
     if (flash.warning) {
-      warning(flash.warning)
+      warning(t(flash.warning))
     }
 
     setTimeout(() => {
@@ -120,7 +121,7 @@ export function useFlashMessagesManual() {
 
     if (!flashMessage) return
 
-    flashHandlers[type]?.(flashMessage)
+    flashHandlers[type]?.(t(flashMessage))
   }
 
   const getFlashMessage = (type: string): string | undefined => {

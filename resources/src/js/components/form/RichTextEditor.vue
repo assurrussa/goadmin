@@ -10,9 +10,9 @@
           @click="showMobileToolbar = !showMobileToolbar"
           :aria-expanded="showMobileToolbar"
           :aria-controls="toolbarContentId"
-          title="Показать или скрыть панель форматирования"
+          :title="t('Показать или скрыть панель форматирования')"
         >
-          {{ showMobileToolbar ? 'Скрыть форматирование' : 'Показать форматирование' }}
+          {{ showMobileToolbar ? t('Скрыть форматирование') : t('Показать форматирование') }}
         </AppButton>
       </div>
 
@@ -36,7 +36,7 @@
               size="icon-sm"
               :class="{ 'bg-surface-variant text-primary': editor?.isActive('bold') }"
               @click="editor?.chain().focus().toggleBold().run()"
-              title="Bold (Ctrl+B)"
+              :title="t('core.ui.Bold (Ctrl+B)', 'Bold (Ctrl+B)')"
             >
               <strong>B</strong>
             </AppButton>
@@ -46,7 +46,7 @@
               size="icon-sm"
               :class="{ 'bg-surface-variant text-primary': editor?.isActive('italic') }"
               @click="editor?.chain().focus().toggleItalic().run()"
-              title="Italic (Ctrl+I)"
+              :title="t('core.ui.Italic (Ctrl+I)', 'Italic (Ctrl+I)')"
             >
               <em>I</em>
             </AppButton>
@@ -56,7 +56,7 @@
               size="icon-sm"
               :class="{ 'bg-surface-variant text-primary': editor?.isActive('underline') }"
               @click="editor?.chain().focus().toggleUnderline().run()"
-              title="Underline (Ctrl+U)"
+              :title="t('core.ui.Underline (Ctrl+U)', 'Underline (Ctrl+U)')"
             >
               <u>U</u>
             </AppButton>
@@ -66,7 +66,7 @@
               size="icon-sm"
               :class="{ 'bg-surface-variant text-primary': editor?.isActive('strike') }"
               @click="editor?.chain().focus().toggleStrike().run()"
-              title="Strikethrough"
+              :title="t('core.ui.Strikethrough', 'Strikethrough')"
             >
               <s>S</s>
             </AppButton>
@@ -85,7 +85,7 @@
                 'bg-surface-variant text-primary': editor?.isActive('heading', { level: 2 }),
               }"
               @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()"
-              title="Heading 2"
+              :title="t('core.ui.Heading 2', 'Heading 2')"
             >
               H2
             </AppButton>
@@ -96,7 +96,7 @@
                 'bg-surface-variant text-primary': editor?.isActive('heading', { level: 3 }),
               }"
               @click="editor?.chain().focus().toggleHeading({ level: 3 }).run()"
-              title="Heading 3"
+              :title="t('core.ui.Heading 3', 'Heading 3')"
             >
               H3
             </AppButton>
@@ -107,7 +107,7 @@
                 'bg-surface-variant text-primary': editor?.isActive('heading', { level: 4 }),
               }"
               @click="editor?.chain().focus().toggleHeading({ level: 4 }).run()"
-              title="Heading 4"
+              :title="t('core.ui.Heading 4', 'Heading 4')"
             >
               H4
             </AppButton>
@@ -128,7 +128,7 @@
               size="icon-sm"
               :class="{ 'bg-surface-variant text-primary': editor?.isActive('bulletList') }"
               @click="editor?.chain().focus().toggleBulletList().run()"
-              title="Bullet List"
+              :title="t('core.ui.Bullet List', 'Bullet List')"
             >
               •
             </AppButton>
@@ -138,7 +138,7 @@
               size="icon-sm"
               :class="{ 'bg-surface-variant text-primary': editor?.isActive('orderedList') }"
               @click="editor?.chain().focus().toggleOrderedList().run()"
-              title="Numbered List"
+              :title="t('core.ui.Numbered List', 'Numbered List')"
             >
               1.
             </AppButton>
@@ -148,7 +148,7 @@
               size="icon-sm"
               :class="{ 'bg-surface-variant text-primary': editor?.isActive('taskList') }"
               @click="editor?.chain().focus().toggleTaskList().run()"
-              title="Task List"
+              :title="t('core.ui.Task List', 'Task List')"
             >
               ☐
             </AppButton>
@@ -168,7 +168,7 @@
               variant="ghost"
               size="icon-sm"
               @click="addImage"
-              title="Add Image"
+              :title="t('core.ui.Add Image', 'Add Image')"
             >
               🖼️
             </AppButton>
@@ -177,7 +177,7 @@
               variant="ghost"
               size="icon-sm"
               @click="addVideo"
-              title="Add Video"
+              :title="t('core.ui.Add Video', 'Add Video')"
             >
               🎥
             </AppButton>
@@ -186,7 +186,7 @@
               variant="ghost"
               size="icon-sm"
               @click="addFileLink"
-              title="Add file link"
+              :title="t('core.ui.Add file link', 'Add file link')"
             >
               📎
             </AppButton>
@@ -196,7 +196,7 @@
               size="icon-sm"
               :class="{ 'bg-surface-variant text-primary': editor?.isActive('link') }"
               @click="addLink"
-              title="Add Link"
+              :title="t('core.ui.Add Link', 'Add Link')"
             >
               🔗
             </AppButton>
@@ -205,13 +205,13 @@
             v-if="canUseFeature('video') && allowFileUpload && !mediaPicker"
             class="ml-3 flex items-center gap-2 text-xs font-semibold transition duration-150 ease-out text-text-secondary hover:text-text-primary"
           >
-            <span>Без ужимания видео</span>
+            <span>{{ t('Без ужимания видео') }}</span>
             <Checkbox
               :checked="uploadVideoWithoutCompression"
               :title="
                 uploadVideoWithoutCompression
-                  ? 'Видео загрузится как есть'
-                  : 'Видео отправится в ресайзер'
+                  ? t('Видео загрузится как есть')
+                  : t('Видео отправится в ресайзер')
               "
               @update:checked="handleUploadVideoToggle"
             />
@@ -221,7 +221,7 @@
             variant="success"
             class="ml-2 uppercase tracking-wide text-xs font-semibold"
           >
-            Видео без сжатия
+            {{ t('Видео без сжатия') }}
           </AppBadge>
         </div>
 
@@ -236,7 +236,7 @@
               @click="
                 editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
               "
-              title="Insert table"
+              :title="t('core.ui.Insert table', 'Insert table')"
             >
               ▦
             </AppButton>
@@ -245,7 +245,7 @@
               size="icon-sm"
               :disabled="!editor?.isActive('table')"
               @click="editor?.chain().focus().addRowAfter().run()"
-              title="Add row"
+              :title="t('core.ui.Add row', 'Add row')"
             >
               +↕
             </AppButton>
@@ -254,7 +254,7 @@
               size="icon-sm"
               :disabled="!editor?.isActive('table')"
               @click="editor?.chain().focus().addColumnAfter().run()"
-              title="Add column"
+              :title="t('core.ui.Add column', 'Add column')"
             >
               +↔
             </AppButton>
@@ -263,7 +263,7 @@
               size="icon-sm"
               :disabled="!editor?.isActive('table')"
               @click="editor?.chain().focus().deleteTable().run()"
-              title="Delete table"
+              :title="t('core.ui.Delete table', 'Delete table')"
             >
               ⌫
             </AppButton>
@@ -284,7 +284,7 @@
               size="icon-sm"
               :class="{ 'bg-surface-variant text-primary': editor?.isActive('blockquote') }"
               @click="editor?.chain().focus().toggleBlockquote().run()"
-              title="Quote"
+              :title="t('core.ui.Quote', 'Quote')"
             >
               "
             </AppButton>
@@ -294,7 +294,7 @@
               size="icon-sm"
               :class="{ 'bg-surface-variant text-primary': editor?.isActive('codeBlock') }"
               @click="editor?.chain().focus().toggleCodeBlock().run()"
-              title="Code Block"
+              :title="t('core.ui.Code Block', 'Code Block')"
             >
               { }
             </AppButton>
@@ -303,7 +303,7 @@
               variant="ghost"
               size="icon-sm"
               @click="addHorizontalRule"
-              title="Horizontal Line"
+              :title="t('core.ui.Horizontal Line', 'Horizontal Line')"
             >
               ―
             </AppButton>
@@ -320,7 +320,7 @@
               size="icon-sm"
               @click="editor?.chain().focus().undo().run()"
               :disabled="!editor?.can().undo()"
-              title="Undo (Ctrl+Z)"
+              :title="t('core.ui.Undo (Ctrl+Z)', 'Undo (Ctrl+Z)')"
             >
               ↺
             </AppButton>
@@ -329,7 +329,7 @@
               size="icon-sm"
               @click="editor?.chain().focus().redo().run()"
               :disabled="!editor?.can().redo()"
-              title="Redo (Ctrl+Y)"
+              :title="t('core.ui.Redo (Ctrl+Y)', 'Redo (Ctrl+Y)')"
             >
               ↻
             </AppButton>
@@ -389,7 +389,9 @@
         >
           <div class="upload-message">
             <div class="upload-icon">📁</div>
-            <div class="upload-text">Drop images or videos here</div>
+            <div class="upload-text">
+              {{ t('core.ui.Drop images or videos here', 'Drop images or videos here') }}
+            </div>
           </div>
         </div>
       </div>
@@ -397,19 +399,28 @@
       <!-- Raw JSON Editor -->
       <div v-else class="json-editor">
         <div class="json-editor-header">
-          <h4 class="text-sm font-semibold text-text-secondary">Raw JSON Editor</h4>
-          <AppButton variant="ghost" size="xs" @click="formatJSON" title="Format JSON">
-            🎨 Format
+          <h4 class="text-sm font-semibold text-text-secondary">
+            {{ t('core.ui.Raw JSON Editor', 'Raw JSON Editor') }}
+          </h4>
+          <AppButton
+            variant="ghost"
+            size="xs"
+            @click="formatJSON"
+            :title="t('core.ui.Format JSON', 'Format JSON')"
+          >
+            {{ t('core.ui.🎨 Format', '🎨 Format') }}
           </AppButton>
         </div>
         <textarea
           v-model="rawJSON"
           @input="updateFromRawJSON"
           class="json-textarea"
-          placeholder="Edit raw JSON content..."
+          :placeholder="t('core.ui.Edit raw JSON content...', 'Edit raw JSON content...')"
           :class="{ 'json-error': jsonError }"
         ></textarea>
-        <div v-if="jsonError" class="json-error-message">❌ Invalid JSON: {{ jsonError }}</div>
+        <div v-if="jsonError" class="json-error-message">
+          {{ t('core.ui.❌ Invalid JSON:', '❌ Invalid JSON:') }} {{ jsonError }}
+        </div>
       </div>
     </div>
 
@@ -420,33 +431,40 @@
         <div v-if="showCharacterCount && characterCount !== null" class="character-count">
           <span class="count-current">{{ characterCount }}</span>
           <span v-if="maxCharacters" class="count-max">/ {{ maxCharacters }}</span>
-          <span class="count-label">characters</span>
+          <span class="count-label">{{ t('core.ui.characters', 'characters') }}</span>
           <span v-if="maxCharacters && characterCount > maxCharacters" class="count-warning">
-            ({{ characterCount - maxCharacters }} over limit)
+            ({{ characterCount - maxCharacters }} {{ t('core.ui.over limit)', 'over limit)') }}
           </span>
         </div>
 
         <!-- Word Count -->
         <div v-if="showWordCount && wordCount !== null" class="word-count">
           <span class="count-current">{{ wordCount }}</span>
-          <span class="count-label">words</span>
+          <span class="count-label">{{ t('core.ui.words', 'words') }}</span>
         </div>
       </div>
 
       <div class="status-right">
         <div v-if="uncertainUpload && !recoveredForInsertion" role="status">
-          Upload completion is unconfirmed. Check this upload before starting another.
+          {{
+            t(
+              'core.ui.Upload completion is unconfirmed. Check this upload before starting another.',
+              'Upload completion is unconfirmed. Check this upload before starting another.',
+            )
+          }}
           <button type="button" :disabled="!canCheckUpload" @click="checkUpload">
-            Check upload
+            {{ t('core.ui.Check upload', 'Check upload') }}
           </button>
         </div>
         <div v-if="recoveredForInsertion" role="status">
-          Upload confirmed: {{ recoveredForInsertion.filename }}. The original field is unknown.
+          {{ t('core.ui.Upload confirmed:', 'Upload confirmed:') }}
+          {{ recoveredForInsertion.filename
+          }}{{ t('core.ui.. The original field is unknown.', '. The original field is unknown.') }}
           <button type="button" :disabled="!canInsertRecovered" @click="insertRecovered">
-            Insert into this field
+            {{ t('core.ui.Insert into this field', 'Insert into this field') }}
           </button>
           <button type="button" :disabled="!canInsertRecovered" @click="dismissRecovered">
-            Dismiss confirmed upload
+            {{ t('core.ui.Dismiss confirmed upload', 'Dismiss confirmed upload') }}
           </button>
         </div>
         <!-- Upload Status -->
@@ -473,7 +491,7 @@
       type="file"
       name="rich-text-media"
       :disabled="!isCurrentScope || !!uncertainUpload || isUploading || disabled || readonly"
-      aria-label="Добавить изображение или видео"
+      :aria-label="t('Добавить изображение или видео')"
       :accept="effectiveAcceptedFileTypes.join(',')"
       multiple
       @change="handleFileSelect"
@@ -492,6 +510,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 defineOptions({
   inheritAttrs: false,
 })
@@ -807,10 +827,10 @@ const uploadStatusMessage = computed(() => {
 
   const label =
     currentUploadType.value === 'video'
-      ? 'видео'
+      ? t('видео')
       : currentUploadType.value === 'image'
-        ? 'изображение'
-        : 'файл'
+        ? t('изображение')
+        : t('файл')
 
   switch (uploadStage.value) {
     case 'uploading':
@@ -1057,7 +1077,7 @@ const waitForTaskCompletion = async (
       } else if (eventStatus === 'failed' || eventStatus === 'error') {
         resolved = true
         cleanupTaskSubscription()
-        reject(new Error(event.error || 'Обработка файла завершилась с ошибкой'))
+        reject(new Error(event.error || t('Обработка файла завершилась с ошибкой')))
       }
     })
 
@@ -1084,14 +1104,14 @@ const waitForTaskCompletion = async (
         }
 
         if (effectiveStatus === 'failed' || effectiveStatus === 'error') {
-          throw new Error(task.error || 'Обработка файла завершилась с ошибкой')
+          throw new Error(task.error || t('Обработка файла завершилась с ошибкой'))
         }
 
         await sleep(interval)
       }
 
       if (!resolved) {
-        throw new Error('Превышено время ожидания обработки файла')
+        throw new Error(t('Превышено время ожидания обработки файла'))
       }
     } catch (error) {
       if (!resolved) {
@@ -1447,7 +1467,7 @@ const insertImageIntoEditor = (
   const src = resolveAbsoluteUrl(rawSrc)
 
   if (!src) {
-    emit('file-error', 'Не удалось определить URL вложения для вставки')
+    emit('file-error', t('Не удалось определить URL вложения для вставки'))
     return false
   }
 
@@ -1477,7 +1497,7 @@ const insertVideoIntoEditor = (
   const src = resolveAbsoluteUrl(rawSrc)
 
   if (!src) {
-    emit('file-error', 'Не удалось определить URL видео для вставки')
+    emit('file-error', t('Не удалось определить URL видео для вставки'))
     return false
   }
 
@@ -1512,7 +1532,7 @@ const resolveEntityId = (): number | null => {
 
 const insertAttachment = (payload: AttachmentPayload) => {
   if (!payload?.url && !payload?.publicUrl && !payload?.fullPath) {
-    emit('file-error', 'Не удалось определить URL вложения')
+    emit('file-error', t('Не удалось определить URL вложения'))
     return
   }
 
@@ -1521,11 +1541,11 @@ const insertAttachment = (payload: AttachmentPayload) => {
   const isVideo = mimeType.startsWith('video/')
 
   if (mimeType && !isImage && !isVideo) {
-    emit('file-error', 'Перетащить в редактор можно только изображения и видео')
+    emit('file-error', t('Перетащить в редактор можно только изображения и видео'))
     return
   }
   if ((isImage && !canUseFeature('image')) || (isVideo && !canUseFeature('video'))) {
-    emit('file-error', 'Этот тип media запрещён текущей rich-text policy')
+    emit('file-error', t('Этот тип media запрещён текущей rich-text policy'))
     return
   }
 
@@ -1580,9 +1600,9 @@ const handleFiles = async (files: File[], options: FileHandleOptions = {}) => {
     }
 
     if (isImageFile && !canUseFeature('image')) {
-      emit('file-error', 'Изображения запрещены текущей rich-text policy')
+      emit('file-error', t('Изображения запрещены текущей rich-text policy'))
     } else if (isVideoFile && !canUseFeature('video')) {
-      emit('file-error', 'Видео запрещено текущей rich-text policy')
+      emit('file-error', t('Видео запрещено текущей rich-text policy'))
     } else if (isImageFile) {
       console.log('🖼️ File identified as image, calling handleImageUpload')
       await handleImageUpload(preparedFile, options)
@@ -1609,7 +1629,7 @@ const uploadMediaToServer = async (
   if (pending && (!checkingCompletion || pending.file !== file)) {
     throw new Error('Check the unconfirmed upload before starting another.')
   }
-  const baseLabel = fileCategory === 'video' ? 'Загрузка видео' : 'Загрузка изображения'
+  const baseLabel = fileCategory === 'video' ? t('Загрузка видео') : t('Загрузка изображения')
   const filename = file?.name ?? pending?.completion.filename
   const uploadLabel = filename ? `${baseLabel}: ${filename}` : baseLabel
   let completion = pending?.completion
@@ -1621,7 +1641,7 @@ const uploadMediaToServer = async (
 
   try {
     if (!props.entityId) {
-      throw new Error('Нельзя загрузить файл без идентификатора сущности')
+      throw new Error(t('Нельзя загрузить файл без идентификатора сущности'))
     }
 
     uploadQueueId = uploadQueue.start(uploadLabel, 0)

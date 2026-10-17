@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import type { PaginationFirstProps } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
 import type { ButtonVariants } from '@/components/ui/button'
@@ -32,7 +34,7 @@ const forwarded = useForwardProps(delegatedProps)
   >
     <slot>
       <ChevronLeftIcon />
-      <span class="hidden sm:block">First</span>
+      <span class="hidden sm:block">{{ t('core.ui.First', 'First') }}</span>
     </slot>
   </PaginationFirst>
 </template>

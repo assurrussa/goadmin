@@ -2,7 +2,7 @@
   <AuthLayout>
     <template #title>{{ props.title }}</template>
 
-    <template #subtitle> Укажите email, чтобы запросить восстановление пароля </template>
+    <template #subtitle> {{ t('Укажите email, чтобы запросить восстановление пароля') }} </template>
 
     <AdminForm :form="form" :fields="['email']" @submit="handleReset" class="space-y-6">
       <!-- Email -->
@@ -10,7 +10,7 @@
         v-model="form.email"
         name="email"
         type="email"
-        label="Email адрес"
+        :label="t('Email адрес')"
         placeholder="admin@example.com"
         autocomplete="email"
         required
@@ -29,27 +29,27 @@
         variant="primary"
         size="md"
         :loading="form.processing"
-        loading-text="Обрабатываем запрос..."
+        :loading-text="t('Обрабатываем запрос...')"
         full-width
         class="mt-6"
       >
         <template #leftIcon>
           <Mail class="w-5 h-5" />
         </template>
-        Запросить восстановление
+        {{ t('Запросить восстановление') }}
       </FormButton>
     </AdminForm>
 
     <template #footer>
       <div class="text-center space-y-2">
         <div>
-          <span class="text-sm text-text-secondary"> Вспомнили пароль? </span>
+          <span class="text-sm text-text-secondary"> {{ t('Вспомнили пароль?') }} </span>
           <a
             v-if="props.loginURL"
             :href="props.loginURL"
             class="text-sm text-primary hover:text-primary-dark"
           >
-            Войти
+            {{ t('Войти') }}
           </a>
         </div>
       </div>
@@ -58,6 +58,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { useForm, usePage } from '@inertiajs/vue3'
 import { Mail } from 'lucide-vue-next'
 import AuthLayout from '@/components/layout/AuthLayout.vue'

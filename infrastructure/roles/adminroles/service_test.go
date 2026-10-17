@@ -226,3 +226,20 @@ func (disabledCacheStub) SubjectRoles(string) []integrationroles.Role { return n
 func (disabledCacheStub) AllRolePermissions([]integrationroles.Role) map[int64]map[int64]integrationroles.Permission {
 	return nil
 }
+
+func TestRolePreviewIntersectsActualAuthority(t *testing.T) {
+	subject := integrationroles.NewSubjectID()
+	permissions := &permissionUseCaseStub{allowed: true}
+	roles := &rolesUseCaseRecorder{roles: []integrationroles.Role{{ID: 11, Slug: "manager"}}}
+	admins := adminRepoStub{byID: map[int64]models.Admin{7: {ID: 7, SubjectID: subject}}}
+	svc := newTestServiceWithPermission(t, roles, admins, permissions)
+	key := integrationroles.NewPermissionKey("users", "read")
+	denied := integrationroles.WithRolePreview(t.Context(), map[integrationroles.PermissionKey]bool{})
+	require.False(t, svc.AdminGuardCheck(denied, 7, key))
+	allowed := integrationroles.WithRolePreview(t.Context(), map[integrationroles.PermissionKey]bool{key: true})
+	require.True(t, svc.AdminGuardCheck(allowed, 7, key))
+	permissions.allowed = false
+	require.False(t, svc.AdminGuardCheck(allowed, 7, key), "preview cannot grant actual missing permission")
+	systemPreview := integrationroles.WithSuperRolePreview(t.Context())
+	require.False(t, svc.AdminGuardCheck(systemPreview, 7, key), "system-role preview cannot grant missing actual permission")
+}

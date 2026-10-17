@@ -5,11 +5,11 @@
         <p v-if="headerEyebrow" class="text-xs uppercase tracking-wide text-text-tertiary mb-1">
           {{ headerEyebrow }}
         </p>
-        <h3 class="text-base font-semibold text-text-primary">{{ title }}</h3>
-        <p v-if="subtitle" class="text-sm text-text-secondary">{{ subtitle }}</p>
+        <h3 class="text-base font-semibold text-text-primary">{{ t(title) }}</h3>
+        <p v-if="subtitle" class="text-sm text-text-secondary">{{ t(subtitle) }}</p>
       </div>
       <div v-if="showTotal" class="flex items-center gap-2 text-sm text-text-tertiary">
-        <span class="text-xs uppercase tracking-wide">Всего</span>
+        <span class="text-xs uppercase tracking-wide">{{ t('Всего') }}</span>
         <AppBadge variant="info">{{ permissionCount }}</AppBadge>
       </div>
     </div>
@@ -18,17 +18,17 @@
       <div v-for="domain in groupedKeys" :key="domain" :class="domainCardClass(domain)">
         <div :class="domainHeaderClass(domain)">
           <div>
-            <p class="text-xs uppercase tracking-widest text-text-tertiary">Домен</p>
+            <p class="text-xs uppercase tracking-widest text-text-tertiary">{{ t('Домен') }}</p>
             <p class="text-base font-semibold text-text-primary">{{ domain }}</p>
             <p v-if="domainHint" class="text-xs text-text-secondary mt-0.5">{{ domainHint }}</p>
           </div>
           <div class="flex flex-wrap items-center justify-end gap-2">
             <AppBadge variant="secondary">
               {{ groupedPermissions[domain].length }}
-              {{ groupedPermissions[domain].length === 1 ? 'право' : 'права' }}
+              {{ groupedPermissions[domain].length === 1 ? t('право') : t('права') }}
             </AppBadge>
             <AppBadge :variant="domainSelectionBadgeVariant(domain)">
-              {{ selectedCount(domain) }}/{{ groupedPermissions[domain].length }} выбрано
+              {{ selectedCount(domain) }}/{{ groupedPermissions[domain].length }} {{ t('выбрано') }}
             </AppBadge>
             <AppButton
               v-if="isEditable"
@@ -37,7 +37,7 @@
               size="xs"
               @click="toggleDomain(domain)"
             >
-              {{ isDomainSelected(domain) ? 'Снять все' : 'Выбрать все' }}
+              {{ isDomainSelected(domain) ? t('Снять все') : t('Выбрать все') }}
             </AppButton>
           </div>
         </div>
@@ -68,14 +68,14 @@
                     isPermissionSelected(perm.key) ? 'text-text-primary' : 'text-text-secondary',
                   ]"
                 >
-                  {{ perm.description || 'Описание отсутствует' }}
+                  {{ perm.description || t('Описание отсутствует') }}
                 </span>
               </span>
               <AppBadge
                 :variant="isPermissionSelected(perm.key) ? 'success' : 'outline'"
                 class="self-start whitespace-nowrap"
               >
-                {{ isPermissionSelected(perm.key) ? 'Активно' : 'Не выбрано' }}
+                {{ isPermissionSelected(perm.key) ? t('Активно') : t('Не выбрано') }}
               </AppBadge>
             </label>
           </template>
@@ -100,14 +100,14 @@
                     isPermissionSelected(perm.key) ? 'text-text-primary' : 'text-text-secondary',
                   ]"
                 >
-                  {{ perm.description || 'Описание отсутствует' }}
+                  {{ perm.description || t('Описание отсутствует') }}
                 </span>
               </span>
               <AppBadge
                 :variant="isPermissionSelected(perm.key) ? 'success' : 'outline'"
                 class="self-start whitespace-nowrap"
               >
-                {{ isPermissionSelected(perm.key) ? 'Назначено' : 'Не выбрано' }}
+                {{ isPermissionSelected(perm.key) ? t('Назначено') : t('Не выбрано') }}
               </AppBadge>
             </div>
           </template>
@@ -119,6 +119,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed } from 'vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppButton from '@/components/ui/AppButton.vue'

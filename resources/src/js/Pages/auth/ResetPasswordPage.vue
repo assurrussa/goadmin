@@ -5,7 +5,7 @@
     <template #title>{{ props.title }}</template>
 
     <template #subtitle>
-      Введите ваш новый пароль для завершения процедуры восстановления
+      {{ t('Введите ваш новый пароль для завершения процедуры восстановления') }}
     </template>
 
     <AdminForm :form="form" :fields="['password', 'password_confirmation']" @submit="handleReset">
@@ -13,7 +13,7 @@
       <FormInput
         v-model="form.email"
         type="email"
-        label="Email адрес"
+        :label="t('Email адрес')"
         :disabled="true"
         size="md"
         class="opacity-75"
@@ -27,7 +27,7 @@
       <FormInput
         v-model="form.token"
         type="text"
-        label="Токен сброса"
+        :label="t('Токен сброса')"
         :disabled="true"
         size="md"
         class="opacity-75"
@@ -42,8 +42,8 @@
       <PasswordInput
         v-model="form.password"
         name="password"
-        label="Новый пароль"
-        placeholder="Введите новый пароль"
+        :label="t('Новый пароль')"
+        :placeholder="t('Введите новый пароль')"
         autocomplete="new-password"
         required
         :error="form.errors.password"
@@ -59,8 +59,8 @@
       <PasswordInput
         v-model="form.passwordConfirmation"
         name="passwordConfirmation"
-        label="Подтверждение пароля"
-        placeholder="Повторите новый пароль"
+        :label="t('Подтверждение пароля')"
+        :placeholder="t('Повторите новый пароль')"
         autocomplete="new-password"
         required
         :error="form.errors.passwordConfirmation || passwordConfirmationError || undefined"
@@ -82,26 +82,26 @@
         size="md"
         :loading="form.processing"
         :disabled="!isFormValid"
-        loading-text="Сброс пароля..."
+        :loading-text="t('Сброс пароля...')"
         full-width
         class="mt-6"
       >
         <template #leftIcon>
           <KeyRound class="w-5 h-5" />
         </template>
-        Сбросить пароль
+        {{ t('Сбросить пароль') }}
       </FormButton>
     </AdminForm>
 
     <template #footer>
       <div class="text-center">
-        <span class="text-sm text-text-secondary"> Вспомнили пароль? </span>
+        <span class="text-sm text-text-secondary"> {{ t('Вспомнили пароль?') }} </span>
         <a
           v-if="props.loginURL"
           :href="props.loginURL"
           class="text-sm text-primary hover:text-primary-dark"
         >
-          Войти
+          {{ t('Войти') }}
         </a>
       </div>
     </template>
@@ -109,6 +109,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { useForm } from '@inertiajs/vue3'
 import { KeyRound, Mail } from 'lucide-vue-next'
 import { computed } from 'vue'
@@ -144,7 +146,7 @@ const form = useForm({
 // Валидация подтверждения пароля
 const passwordConfirmationError = computed(() => {
   if (form.passwordConfirmation && form.password !== form.passwordConfirmation) {
-    return 'Пароли не совпадают'
+    return t('Пароли не совпадают')
   }
   return null
 })

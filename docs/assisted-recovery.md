@@ -53,3 +53,12 @@ automatic retry; an uncertain network outcome requires reconciliation.
 Anonymous public completion cannot depend on an authenticated admin session. It
 retains its separate exact-Origin, recovery-cookie and hidden-token contract;
 the emailed one-time recovery token and existing MFA requirements are unchanged.
+
+The operator screen is now an Inertia page inside the ordinary admin layout.
+Search uses the established account email through canonical `FindAccount`, then
+presents the resolved account for selection. It does not require an optional
+users-management screen or accept an email in the canonical subject field.
+The page uses the shared Russian/English locale. Public completion remains
+anonymous, styled, and self-contained; its locale preference uses the same
+`goadmin.locale` key and no external scripts or QR services. Both forms retain
+a single-attempt fence after submission and explain uncertain outcomes.

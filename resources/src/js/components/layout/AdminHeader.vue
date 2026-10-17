@@ -8,7 +8,9 @@
           variant="ghost"
           size="icon-sm"
           class="lg:hidden"
-          aria-label="Открыть меню"
+          :aria-label="t('Открыть меню')"
+          :aria-expanded="sidebarOpen"
+          aria-controls="admin-sidebar"
           @click="$emit('toggle-sidebar')"
         >
           <Menu class="h-5 w-5" />
@@ -16,13 +18,16 @@
       </div>
 
       <div class="flex items-center gap-2 sm:gap-3">
+        <LocaleSelect />
         <AppButton
           variant="ghost"
           size="icon-sm"
           :aria-label="
-            themeStore.isDark ? 'Переключить на светлую тему' : 'Переключить на темную тему'
+            themeStore.isDark ? t('Переключить на светлую тему') : t('Переключить на темную тему')
           "
-          :title="themeStore.isDark ? 'Переключить на светлую тему' : 'Переключить на темную тему'"
+          :title="
+            themeStore.isDark ? t('Переключить на светлую тему') : t('Переключить на темную тему')
+          "
           @click="handleThemeToggle"
         >
           <Sun v-if="themeStore.isDark" class="h-5 w-5" />
@@ -30,7 +35,7 @@
         </AppButton>
 
         <Link v-if="notifications" href="/notifications" class="relative">
-          <AppButton variant="ghost" size="icon-sm" aria-label="Открыть уведомления">
+          <AppButton variant="ghost" size="icon-sm" :aria-label="t('Открыть уведомления')">
             <Bell class="h-5 w-5" />
           </AppButton>
           <Badge
@@ -52,7 +57,7 @@
               <img
                 v-if="avatarUrl"
                 :src="avatarUrl"
-                alt="Аватар администратора"
+                :alt="t('Аватар администратора')"
                 class="h-full w-full object-cover"
               />
               <span v-else class="text-sm font-medium text-primary-contrast">
@@ -61,7 +66,7 @@
             </div>
             <div class="hidden sm:block text-left">
               <p class="text-sm font-medium text-text-primary">
-                {{ authuser?.name ?? 'Пользователь' }}
+                {{ authuser?.name ?? t('Пользователь') }}
               </p>
               <p class="text-xs text-text-secondary">
                 {{ authuser?.email }}
@@ -80,19 +85,19 @@
             <DropdownMenuItem as-child>
               <Link href="/auth/profile" class="flex items-center">
                 <User class="mr-3 h-4 w-4" />
-                Профиль
+                {{ t('Профиль') }}
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem as-child>
               <Link href="/auth/profile/settings" class="flex items-center">
                 <Settings class="mr-3 h-4 w-4" />
-                Настройки
+                {{ t('Настройки') }}
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem class="text-error focus:text-error" @click="handleLogout">
               <LogOut class="mr-3 h-4 w-4" />
-              Выйти
+              {{ t('Выйти') }}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -102,6 +107,9 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+import LocaleSelect from './LocaleSelect.vue'
+
 import { computed } from 'vue'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 import { Link, router, usePage } from '@inertiajs/vue3'
@@ -119,6 +127,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useAuthUserStore } from '@/stores/authUser'
 import type { AdminAuthUser } from '@/types/models.ts'
 
+defineProps<{ sidebarOpen?: boolean }>()
 const { notifications } = useAdminCapabilities()
 const authUserStore = useAuthUserStore()
 const authuser = computed<AdminAuthUser | null>(() => authUserStore.authUser)

@@ -22,50 +22,52 @@
       <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <p class="text-xs font-semibold uppercase tracking-widest text-primary">
-            Мониторинг очередей
+            {{ t('Мониторинг очередей') }}
           </p>
           <h1 class="text-2xl font-bold text-text-primary mt-1">{{ pageTitle }}</h1>
           <p class="text-text-secondary mt-2 max-w-2xl">
-            Отслеживайте текущие задачи и быстро возвращайте в работу упавшие джобы.
+            {{ t('Отслеживайте текущие задачи и быстро возвращайте в работу упавшие джобы.') }}
           </p>
         </div>
         <div class="flex gap-3">
           <div class="px-4 py-3 rounded-lg bg-card border border-border-primary shadow-sm">
-            <p class="text-xs text-text-tertiary">В очереди</p>
+            <p class="text-xs text-text-tertiary">{{ t('В очереди') }}</p>
             <p class="text-2xl font-semibold text-text-primary">{{ counters.jobs }}</p>
-            <Link class="text-sm text-primary hover:text-primary-dark" href="/queues/jobs"
-              >Смотреть</Link
-            >
+            <Link class="text-sm text-primary hover:text-primary-dark" href="/queues/jobs">{{
+              t('Смотреть')
+            }}</Link>
           </div>
           <div class="px-4 py-3 rounded-lg bg-danger/10 border border-danger/30 shadow-sm">
-            <p class="text-xs text-danger">С ошибкой</p>
+            <p class="text-xs text-danger">{{ t('С ошибкой') }}</p>
             <p class="text-2xl font-semibold text-danger">{{ counters.failed }}</p>
-            <Link class="text-sm text-danger hover:text-danger/80" href="/queues/jobs-failed"
-              >Смотреть</Link
-            >
+            <Link class="text-sm text-danger hover:text-danger/80" href="/queues/jobs-failed">{{
+              t('Смотреть')
+            }}</Link>
           </div>
         </div>
       </div>
     </Card>
 
     <Card class="p-6 space-y-4">
-      <h2 class="text-lg font-semibold text-text-primary">Быстрые действия</h2>
+      <h2 class="text-lg font-semibold text-text-primary">{{ t('Быстрые действия') }}</h2>
       <div class="flex flex-wrap gap-3">
         <AppButton asChild variant="primary">
-          <Link href="/queues/jobs">Открыть активные задачи</Link>
+          <Link href="/queues/jobs">{{ t('Открыть активные задачи') }}</Link>
         </AppButton>
         <AppButton asChild variant="secondary">
-          <Link href="/queues/jobs-failed">Открыть DLQ / Ошибки</Link>
+          <Link href="/queues/jobs-failed">{{ t('Открыть DLQ / Ошибки') }}</Link>
         </AppButton>
       </div>
       <p class="text-text-secondary text-sm">
-        Используйте разделы выше для детального управления задачами очередей.
+        {{ t('Используйте разделы выше для детального управления задачами очередей.') }}
       </p>
     </Card>
   </div>
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed, reactive } from 'vue'
 import { Link, usePage } from '@inertiajs/vue3'
 import AppHead from '@/components/layout/AppHead.vue'
@@ -101,7 +103,7 @@ const counters = reactive({
   failed: Number(props.stats?.failed ?? 0),
 })
 
-const pageTitle = computed(() => props.title || 'Очереди задач')
+const pageTitle = computed(() => props.title || t('Очереди задач'))
 const isActive = (href: string) => {
   if (href === '/queues') {
     return page.url === '/queues'

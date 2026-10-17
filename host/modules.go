@@ -242,7 +242,7 @@ func validateModules(modules []Module) (map[string]bool, []Module, error) {
 			"GET /auth/profile/settings", "POST /auth/profile/settings/password",
 			"POST /auth/profile/settings/mfa/begin", "POST /auth/profile/settings/mfa/confirm",
 			"POST /auth/profile/settings/mfa/cancel", "POST /auth/profile/settings/mfa/disable",
-			"POST /auth/profile/settings/mfa/recovery",
+			"POST /auth/profile/settings/mfa/recovery", "POST /auth/role-preview",
 		},
 		// Reserve development pages in every environment to keep ownership stable.
 		RouteNamespaces: []string{"/public", "/test"},

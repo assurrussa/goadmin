@@ -119,6 +119,7 @@ test('validation and navigation synchronize auth from the live Inertia page', as
       setAdminCapabilities() {},
     },
     '@/plugins/theme': {},
+    '@/i18n': { initLocale() {} },
     '@/auth/browserAuthFailures': authModule.exports,
     '@/auth/browserAuthRecovery': {
       recoverBrowserAuthentication: async () => {

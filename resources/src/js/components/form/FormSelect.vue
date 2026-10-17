@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-1">
     <label v-if="label" :for="selectId" class="block text-sm font-medium text-text-primary">
-      {{ label }}
+      {{ t(label) }}
       <span v-if="required" class="text-error ml-1">*</span>
     </label>
 
@@ -31,16 +31,17 @@
           clip-rule="evenodd"
         />
       </svg>
-      <span>{{ Array.isArray(error) ? error[0] : error }}</span>
+      <span>{{ t((Array.isArray(error) ? error[0] : error) ?? '') }}</span>
     </p>
 
     <p v-if="helpText && !error" :id="`${selectId}-help`" class="text-sm text-text-secondary">
-      {{ helpText }}
+      {{ t(helpText) }}
     </p>
   </div>
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
 import { computed, useId } from 'vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 

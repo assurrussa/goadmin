@@ -1,6 +1,6 @@
 <template>
   <div v-if="password" class="space-y-2">
-    <div class="text-sm font-medium text-text-primary">Надежность пароля:</div>
+    <div class="text-sm font-medium text-text-primary">{{ t('Надежность пароля:') }}</div>
     <div class="flex space-x-1">
       <div
         v-for="i in 4"
@@ -16,6 +16,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed } from 'vue'
 
 interface Props {
@@ -52,13 +54,13 @@ const strengthText = computed(() => {
   switch (strength.value) {
     case 0:
     case 1:
-      return 'Слабый пароль'
+      return t('Слабый пароль')
     case 2:
-      return 'Средний пароль'
+      return t('Средний пароль')
     case 3:
-      return 'Хороший пароль'
+      return t('Хороший пароль')
     case 4:
-      return 'Отличный пароль'
+      return t('Отличный пароль')
     default:
       return ''
   }

@@ -1,7 +1,7 @@
 <template>
   <AppHead :title="pageTitle" />
 
-  <p v-if="!notificationsEnabled" class="text-text-secondary">Уведомления недоступны.</p>
+  <p v-if="!notificationsEnabled" class="text-text-secondary">{{ t('Уведомления недоступны.') }}</p>
 
   <Card
     v-if="notificationsEnabled"
@@ -11,15 +11,17 @@
       class="p-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-border-secondary"
     >
       <div>
-        <h1 class="text-xl font-semibold text-text-primary">Центр уведомлений</h1>
-        <p class="text-sm text-text-secondary">Все события, адресованные вам, собираются здесь.</p>
+        <h1 class="text-xl font-semibold text-text-primary">{{ t('Центр уведомлений') }}</h1>
+        <p class="text-sm text-text-secondary">
+          {{ t('Все события, адресованные вам, собираются здесь.') }}
+        </p>
       </div>
       <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
         <div class="grid grid-cols-2 gap-3 sm:flex sm:items-center">
           <div
             class="text-center px-3 py-2 rounded-lg bg-surface/70 border border-border-secondary min-w-[96px]"
           >
-            <p class="text-xs uppercase text-text-tertiary">Всего</p>
+            <p class="text-xs uppercase text-text-tertiary">{{ t('Всего') }}</p>
             <p class="text-lg font-semibold text-text-primary">{{ meta.total }}</p>
           </div>
           <div
@@ -30,7 +32,7 @@
                 : 'bg-surface/70 border-border-secondary'
             "
           >
-            <p class="text-xs uppercase text-text-tertiary">Непрочитанных</p>
+            <p class="text-xs uppercase text-text-tertiary">{{ t('Непрочитанных') }}</p>
             <p
               class="text-lg font-semibold"
               :class="unreadCount > 0 ? 'text-warning' : 'text-text-primary'"
@@ -46,7 +48,7 @@
           :disabled="unreadCount === 0 || markAllForm.processing"
           @click="markAllRead"
         >
-          {{ markAllForm.processing ? 'Отмечаем…' : 'Прочитать всё' }}
+          {{ markAllForm.processing ? t('Отмечаем…') : t('Прочитать всё') }}
         </AppButton>
       </div>
     </div>
@@ -74,9 +76,9 @@
         </AppButton>
       </div>
       <div class="flex items-center gap-2 text-sm text-text-secondary">
-        <label for="perPage" class="text-xs uppercase tracking-wide text-text-tertiary"
-          >На странице</label
-        >
+        <label for="perPage" class="text-xs uppercase tracking-wide text-text-tertiary">{{
+          t('На странице')
+        }}</label>
         <AppSelect
           id="perPage"
           :model-value="filterForm.perPage"
@@ -140,7 +142,7 @@
                     rel="noopener noreferrer"
                     class="inline-flex items-center gap-1 text-sm text-primary hover:underline font-medium"
                   >
-                    {{ notification.payload?.ctaText ?? 'Перейти' }}
+                    {{ notification.payload?.ctaText ?? t('Перейти') }}
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       class="h-4 w-4"
@@ -184,8 +186,8 @@
                   pendingNotificationId === notification.id
                     ? '...'
                     : notification.isRead
-                      ? 'Прочитано'
-                      : 'Отметить'
+                      ? t('Прочитано')
+                      : t('Отметить')
                 }}
               </AppButton>
             </div>
@@ -193,9 +195,9 @@
         </div>
       </template>
       <div v-else class="py-16 text-center space-y-3">
-        <p class="text-lg font-semibold text-text-primary">Нет уведомлений</p>
+        <p class="text-lg font-semibold text-text-primary">{{ t('Нет уведомлений') }}</p>
         <p class="text-sm text-text-secondary">
-          Когда появятся события для вас, они отобразятся здесь.
+          {{ t('Когда появятся события для вас, они отобразятся здесь.') }}
         </p>
       </div>
     </div>
@@ -204,7 +206,9 @@
       v-if="meta.totalPages > 1"
       class="px-5 pb-5 flex items-center justify-between flex-wrap gap-3 border-t border-border-secondary pt-4"
     >
-      <p class="text-sm text-text-secondary">Страница {{ meta.page }} из {{ meta.totalPages }}</p>
+      <p class="text-sm text-text-secondary">
+        {{ t('Страница') }} {{ meta.page }} {{ t('из') }} {{ meta.totalPages }}
+      </p>
       <div class="flex items-center gap-2">
         <AppButton
           variant="secondary"
@@ -212,7 +216,7 @@
           :disabled="meta.page <= 1"
           @click="goToPage(meta.page - 1)"
         >
-          Назад
+          {{ t('Назад') }}
         </AppButton>
         <AppButton
           variant="secondary"
@@ -220,7 +224,7 @@
           :disabled="meta.page >= meta.totalPages"
           @click="goToPage(meta.page + 1)"
         >
-          Вперёд
+          {{ t('Вперёд') }}
         </AppButton>
       </div>
     </div>
@@ -228,6 +232,8 @@
 </template>
 
 <script setup lang="ts">
+import { t, locale } from '@/i18n'
+
 import { computed, type PropType, ref } from 'vue'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 import { router, useForm } from '@inertiajs/vue3'
@@ -285,7 +291,7 @@ const props = defineProps({
   },
 })
 
-const pageTitle = computed(() => props.title || 'Уведомления')
+const pageTitle = computed(() => props.title || t('Уведомления'))
 const meta = computed<Meta>(
   () =>
     props.meta ?? { total: 0, unreadCount: 0, page: 1, perPage: 10, totalPages: 1, hasMore: false },
@@ -375,7 +381,7 @@ const formatDateTime = (dateString: string) => {
   if (Number.isNaN(date.getTime())) {
     return dateString
   }
-  return date.toLocaleString('ru-RU', {
+  return date.toLocaleString(locale.value === 'en' ? 'en-GB' : 'ru-RU', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',

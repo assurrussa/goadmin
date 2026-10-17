@@ -147,6 +147,10 @@ func BuildAdminMenu(ctx context.Context, admin *models.SessionAdmin, checker Per
 		allowAll = true
 	}
 
+	if integrationroles.RolePreviewActive(ctx) {
+		allowAll = false
+	}
+
 	menu := ModuleMenu(map[string]bool{}).Merge(extra)
 	filteredSections := make([]Section, 0, len(menu.Sections))
 	for _, section := range menu.Sections {

@@ -32,11 +32,15 @@
                 class="flex h-full w-full flex-col items-center justify-center gap-1 text-primary"
               >
                 <span class="text-lg">🎬</span>
-                <span class="text-[10px] uppercase tracking-wide text-text-tertiary">video</span>
+                <span class="text-[10px] uppercase tracking-wide text-text-tertiary">{{
+                  t('core.ui.video', 'video')
+                }}</span>
               </div>
             </template>
             <template v-else>
-              <span class="text-xs text-text-tertiary">no preview</span>
+              <span class="text-xs text-text-tertiary">{{
+                t('core.ui.no preview', 'no preview')
+              }}</span>
             </template>
           </div>
 
@@ -48,13 +52,13 @@
               ID: {{ file.id }} · {{ file.mimeType || 'unknown' }} · {{ formatFileSize(file.size) }}
             </p>
             <p v-if="file.createdAt" class="text-xs text-text-tertiary">
-              Загружено: {{ formatDateTime(file.createdAt) }}
+              {{ t('Загружено:') }} {{ formatDateTime(file.createdAt) }}
             </p>
           </div>
 
           <div class="flex flex-col items-end gap-1">
             <AppBadge v-if="isAttached(file.id)" variant="success" class="text-[11px]">
-              В тексте
+              {{ t('В тексте') }}
             </AppBadge>
             <AppButton
               v-if="allowDeleteUnattached && !isAttached(file.id)"
@@ -64,8 +68,8 @@
               :disabled="deletingIds.has(file.id)"
               @click="() => handleDelete(file)"
             >
-              <span v-if="deletingIds.has(file.id)">Удаление…</span>
-              <span v-else>Удалить</span>
+              <span v-if="deletingIds.has(file.id)">{{ t('Удаление…') }}</span>
+              <span v-else>{{ t('Удалить') }}</span>
             </AppButton>
           </div>
         </div>
@@ -95,12 +99,14 @@
       v-else
       class="border border-dashed border-border-primary rounded-md px-4 py-6 text-center text-sm text-text-tertiary"
     >
-      Файлы пока не прикреплены
+      {{ t('Файлы пока не прикреплены') }}
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed, ref } from 'vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -240,7 +246,7 @@ const handleDelete = async (file: RichTextAttachmentFile) => {
     return
   }
 
-  const confirmed = window.confirm('Удалить файл?')
+  const confirmed = window.confirm(t('Удалить файл?'))
   if (!confirmed) {
     return
   }
@@ -252,7 +258,7 @@ const handleDelete = async (file: RichTextAttachmentFile) => {
     emit('removed', file.id)
   } catch (error) {
     console.error('RichTextAttachmentList: failed to delete file', error)
-    alert('Не удалось удалить файл. Проверьте консоль для подробностей.')
+    alert(t('Не удалось удалить файл. Проверьте консоль для подробностей.'))
   } finally {
     deletingIds.value.delete(file.id)
   }

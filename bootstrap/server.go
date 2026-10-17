@@ -297,6 +297,7 @@ func buildRegisteredHandler(
 			adminmiddleware.IsNotAuthAdminMiddleware(staticFiles.publicAuthPaths...),
 			app.HTTPManager().Middleware(),
 			adminHistoryMiddleware(app.HTTPManager()),
+			rolePreviewMiddleware(deps),
 		)
 		for _, transport := range opts.uploadTransports {
 			store := transport.TusStore

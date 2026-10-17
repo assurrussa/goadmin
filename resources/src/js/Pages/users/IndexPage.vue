@@ -12,6 +12,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed, onUnmounted, ref } from 'vue'
 import DataGrid from '@/components/datagrid/DataGrid.vue'
 import type { ApiResponse } from '@/composables/useDataGrid'
@@ -68,13 +70,13 @@ async function exportUsers() {
     )
     if (truncated && !controller.signal.aborted) {
       notifications.warning(
-        'Экспорт содержит первые 10 000 пользователей. Уточните фильтры для полного результата.',
+        t('Экспорт содержит первые 10 000 пользователей. Уточните фильтры для полного результата.'),
       )
     }
   } catch (error) {
     if (!controller.signal.aborted) {
       notifications.error(
-        error instanceof Error ? error.message : 'Не удалось экспортировать пользователей.',
+        error instanceof Error ? error.message : t('Не удалось экспортировать пользователей.'),
       )
     }
   } finally {
@@ -110,12 +112,22 @@ function handleDataAction(actionKey: string, item: Record<string, unknown>) {
       router.get(`${apiUrl.value}/${item.id}/edit`)
       break
     case 'delete':
-      if (confirm(`Вы уверены, что хотите удалить запись #${item.id}?`)) {
+      if (
+        confirm(
+          t('Вы уверены, что хотите удалить запись #{id}?', undefined, { id: String(item.id) }),
+        )
+      ) {
         router.delete(`${apiUrl.value}/${item.id}`)
       }
       break
     case 'restore':
-      if (confirm(`Вы уверены, что хотите восстановить запись #${item.id}?`)) {
+      if (
+        confirm(
+          t('Вы уверены, что хотите восстановить запись #{id}?', undefined, {
+            id: String(item.id),
+          }),
+        )
+      ) {
         router.post(`${apiUrl.value}/${item.id}/restore`, {})
       }
       break

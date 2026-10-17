@@ -22,11 +22,11 @@
       role="alert"
       class="rounded-md border border-error/30 bg-error/10 p-4 text-error"
     >
-      <p>{{ loadError }}</p>
-      <p v-if="items.length" class="mt-1 text-sm">Показаны ранее загруженные данные.</p>
-      <AppButton type="button" variant="outline" class="mt-3" @click="retryLoad()"
-        >Повторить</AppButton
-      >
+      <p>{{ t(loadError) }}</p>
+      <p v-if="items.length" class="mt-1 text-sm">{{ t('Показаны ранее загруженные данные.') }}</p>
+      <AppButton type="button" variant="outline" class="mt-3" @click="retryLoad()">{{
+        t('Повторить')
+      }}</AppButton>
     </div>
 
     <DataGridTable
@@ -61,13 +61,13 @@
         <Inbox class="h-24 w-24" />
       </div>
       <h3 class="text-lg font-medium text-text-primary mb-2">
-        {{ searchQuery || hasActiveFilters ? 'Ничего не найдено' : 'Нет данных' }}
+        {{ searchQuery || hasActiveFilters ? t('Ничего не найдено') : t('Нет данных') }}
       </h3>
       <p class="text-text-secondary mb-6">
         {{
           searchQuery || hasActiveFilters
-            ? 'Измените поиск или фильтры и попробуйте снова.'
-            : config.ui?.emptyMessage || 'Нет данных для отображения'
+            ? t('Измените поиск или фильтры и попробуйте снова.')
+            : config.ui?.emptyMessage || t('Нет данных для отображения')
         }}
       </p>
       <AppButton
@@ -75,7 +75,7 @@
         @click="handleCreate"
       >
         <Plus class="-ml-1 mr-2 h-4 w-4" />
-        {{ config.ui?.createButtonText || 'Создать' }}
+        {{ config.ui?.createButtonText || t('Создать') }}
       </AppButton>
     </div>
 
@@ -83,13 +83,15 @@
     <div v-if="loading" class="text-center py-16" role="status" aria-live="polite">
       <div class="inline-flex items-center">
         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mr-3"></div>
-        <span class="text-text-secondary text-lg">Загрузка...</span>
+        <span class="text-text-secondary text-lg">{{ t('Загрузка...') }}</span>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import { computed, onMounted, onUnmounted, watch } from 'vue'
 import {
   type ApiResponse,

@@ -2,7 +2,7 @@
   <Card class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-5 py-4">
     <div class="mb-4 sm:mb-0">
       <h1 class="text-2xl font-bold text-text-primary">
-        {{ props.meta?.title || 'Данные' }}
+        {{ (props.meta?.title ? t(props.meta.title) : '') || t('Данные') }}
       </h1>
       <p v-if="props.meta?.description" class="mt-1 text-sm text-text-secondary">
         {{ props.meta?.description }}
@@ -18,7 +18,7 @@
         <AppInput
           :model-value="searchQuery"
           @update:modelValue="$emit('search', String($event))"
-          placeholder="Поиск..."
+          :placeholder="t('Поиск...')"
           class="pl-9"
         />
       </div>
@@ -33,7 +33,7 @@
           @click="$emit('refresh')"
         >
           <RefreshCcw class="-ml-1 mr-2 h-4 w-4" />
-          Обновить
+          {{ t('Обновить') }}
         </AppButton>
 
         <!-- Кнопка экспорта -->
@@ -45,13 +45,13 @@
           @click="$emit('export')"
         >
           <Download class="-ml-1 mr-2 h-4 w-4" />
-          Экспорт
+          {{ t('Экспорт') }}
         </AppButton>
 
         <!-- Кнопка создания -->
         <AppButton v-if="config.behaviour?.creatable" @click="$emit('create')" size="sm">
           <Plus class="-ml-1 mr-2 h-4 w-4" />
-          {{ config.ui?.createButtonText || 'Создать' }}
+          {{ config.ui?.createButtonText || t('Создать') }}
         </AppButton>
       </div>
     </div>
@@ -59,6 +59,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import type { Config, Meta } from '@/composables/useDataGrid.ts'
 import { Card } from '@/components/ui/card'
 import { Download, Plus, RefreshCcw, Search } from 'lucide-vue-next'

@@ -1,8 +1,8 @@
 <template>
   <div class="flex flex-col h-full">
     <!-- Logo -->
-    <div class="flex items-center justify-between px-5 py-4 border-b border-border-primary">
-      <div class="flex items-center space-x-3">
+    <div class="flex items-center justify-between px-2 py-4 border-b border-border-primary">
+      <div :class="collapsed ? 'hidden' : 'flex items-center space-x-3'">
         <div
           class="h-9 w-9 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center"
         >
@@ -10,18 +10,30 @@
             >A</span
           >
         </div>
-        <div>
-          <p class="text-sm font-semibold text-text-primary uppercase tracking-wider">Админка</p>
-          <p class="text-xs text-text-tertiary">Панель управления</p>
+        <div :class="collapsed ? 'sr-only' : ''">
+          <p class="text-sm font-semibold text-text-primary uppercase tracking-wider">
+            {{ t('Админка') }}
+          </p>
+          <p class="text-xs text-text-tertiary">{{ t('Панель управления') }}</p>
         </div>
       </div>
 
+      <AppButton
+        variant="ghost"
+        size="icon-sm"
+        class="hidden lg:inline-flex"
+        :aria-label="collapsed ? t('Развернуть') : t('Свернуть')"
+        :title="collapsed ? t('Развернуть') : t('Свернуть')"
+        :aria-expanded="!collapsed"
+        @click="$emit('toggle-collapse')"
+        ><PanelLeft class="h-5 w-5"
+      /></AppButton>
       <!-- Close button for mobile -->
       <AppButton
         variant="ghost"
         size="icon-sm"
         class="lg:hidden"
-        aria-label="Закрыть меню"
+        :aria-label="t('Закрыть меню')"
         @click="$emit('close')"
       >
         <X class="h-5 w-5" />
@@ -32,14 +44,15 @@
     <nav class="flex-1 min-h-0 px-0 py-4 space-y-1 overflow-y-auto">
       <template v-for="(section, index) in sections" :key="section.key">
         <div class="space-y-1 px-2">
-          <div v-if="section.title" class="px-2 py-2">
+          <div v-if="section.title" :class="collapsed ? 'sr-only' : 'px-2 py-2'">
             <h3 class="text-[11px] font-semibold text-text-tertiary uppercase tracking-widest">
-              {{ section.title }}
+              {{ t(section.title) }}
             </h3>
           </div>
           <SidebarMenuItems
             :items="section.items"
             :depth="0"
+            :collapsed="collapsed"
             :is-active="isActive"
             :resolve-icon="resolveIcon"
           />
@@ -50,34 +63,41 @@
     </nav>
 
     <!-- Footer -->
-    <footer class="shrink-0 border-t border-border-primary p-4">
-      <p class="text-xs font-medium text-text-secondary">Об админке</p>
-      <p class="mt-1 text-xs text-text-tertiary break-words">GoAdmin · версия {{ adminVersion }}</p>
+    <footer :class="collapsed ? 'sr-only' : 'shrink-0 border-t border-border-primary p-4'">
+      <p class="text-xs font-medium text-text-secondary">{{ t('Об админке') }}</p>
+      <p class="mt-1 text-xs text-text-tertiary break-words">
+        {{ t('GoAdmin · версия') }} {{ adminVersion }}
+      </p>
     </footer>
   </div>
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 // Computed и другие импорты
 import { computed } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import AppButton from '@/components/ui/AppButton.vue'
-import { Bell, BookOpen, Home, ListTodo, ShieldCheck, Users, X } from 'lucide-vue-next'
+import { Bell, BookOpen, Home, ListTodo, ShieldCheck, Users, X, PanelLeft } from 'lucide-vue-next'
 import SidebarMenuItems from './SidebarMenuItems.vue'
 import type { Component } from 'vue'
 
 // Emits
 defineEmits<{
   close: []
+  'toggle-collapse': []
 }>()
+
+defineProps<{ collapsed?: boolean }>()
 
 // Current page
 const page = usePage()
 
 const adminVersion = computed(() => {
   const info = page.props.adminInfo as { version?: string } | undefined
-  if (info?.version === 'dev') return 'разработка'
-  return info?.version || 'неизвестна'
+  if (info?.version === 'dev') return t('разработка')
+  return info?.version || t('неизвестна')
 })
 
 // Navigation items
@@ -138,7 +158,7 @@ const resolveIcon = (icon: MenuIcon) => {
 
 // Check if route is active
 const isActive = (href: string) => {
-  const currentUrl = page.url
+  const currentUrl = page.url.split('?')[0] ?? '/'
 
   if (currentUrl === href) {
     return true
@@ -148,6 +168,6 @@ const isActive = (href: string) => {
     return false
   }
 
-  return currentUrl.startsWith(href)
+  return currentUrl.startsWith(href.replace(/\/$/, '') + '/')
 }
 </script>

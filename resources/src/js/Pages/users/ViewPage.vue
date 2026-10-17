@@ -1,6 +1,6 @@
 <template>
   <AppHead :title="props.title" />
-  <PageActionBar :back-href="basePath" label="Просмотр" />
+  <PageActionBar :back-href="basePath" :label="t('Просмотр')" />
 
   <div class="max-w-4xl mx-auto space-y-8">
     <Card class="overflow-hidden">
@@ -31,16 +31,16 @@
               </div>
               <div class="flex items-center">
                 <Calendar class="h-4 w-4 mr-1.5" />
-                <span>Создан {{ formatDate(props.data.createdAt) }}</span>
+                <span>{{ t('Создан') }} {{ formatDate(props.data.createdAt) }}</span>
               </div>
             </div>
           </div>
 
           <div class="flex-shrink-0">
-            <AppButton asChild>
+            <AppButton v-if="canEditInPreview" asChild>
               <Link :href="`${basePath}/${props.data.id}/edit`">
                 <Pencil class="h-4 w-4 mr-2" />
-                Редактировать
+                {{ t('Редактировать') }}
               </Link>
             </AppButton>
           </div>
@@ -53,19 +53,19 @@
         <CardHeader class="border-b border-border-primary">
           <div class="flex items-center">
             <Mail class="h-5 w-5 text-primary mr-2" />
-            <h2 class="text-lg font-semibold text-text-primary">Контакты</h2>
+            <h2 class="text-lg font-semibold text-text-primary">{{ t('Контакты') }}</h2>
           </div>
         </CardHeader>
         <CardContent class="space-y-4 pt-6">
           <div class="flex items-center justify-between">
-            <span class="text-text-secondary font-medium">Email</span>
+            <span class="text-text-secondary font-medium">{{ t('core.ui.Email', 'Email') }}</span>
             <div class="flex items-center">
               <Mail class="h-4 w-4 text-text-tertiary mr-2" />
               <span class="text-text-primary">{{ props.data.email }}</span>
             </div>
           </div>
           <div class="flex items-center justify-between">
-            <span class="text-text-secondary font-medium">Телефон</span>
+            <span class="text-text-secondary font-medium">{{ t('Телефон') }}</span>
             <div class="flex items-center">
               <span class="text-text-primary">{{ props.data.phone ?? '—' }}</span>
             </div>
@@ -77,26 +77,26 @@
         <CardHeader class="border-b border-border-primary">
           <div class="flex items-center">
             <ShieldCheck class="h-5 w-5 text-primary mr-2" />
-            <h2 class="text-lg font-semibold text-text-primary">Подтверждения</h2>
+            <h2 class="text-lg font-semibold text-text-primary">{{ t('Подтверждения') }}</h2>
           </div>
         </CardHeader>
         <CardContent class="space-y-4 pt-6">
           <div class="flex items-center justify-between">
-            <span class="text-text-secondary font-medium">Email</span>
+            <span class="text-text-secondary font-medium">{{ t('core.ui.Email', 'Email') }}</span>
             <span
               class="text-sm"
               :class="props.data.confirmedEmailAt?.Valid ? 'text-success' : 'text-error'"
             >
-              {{ props.data.confirmedEmailAt?.Valid ? 'Подтвержден' : 'Не подтвержден' }}
+              {{ props.data.confirmedEmailAt?.Valid ? t('Подтвержден') : t('Не подтвержден') }}
             </span>
           </div>
           <div class="flex items-center justify-between">
-            <span class="text-text-secondary font-medium">Телефон</span>
+            <span class="text-text-secondary font-medium">{{ t('Телефон') }}</span>
             <span
               class="text-sm"
               :class="props.data.confirmedPhoneAt?.Valid ? 'text-success' : 'text-error'"
             >
-              {{ props.data.confirmedPhoneAt?.Valid ? 'Подтвержден' : 'Не подтвержден' }}
+              {{ props.data.confirmedPhoneAt?.Valid ? t('Подтвержден') : t('Не подтвержден') }}
             </span>
           </div>
         </CardContent>
@@ -107,16 +107,16 @@
       <CardHeader class="border-b border-border-primary">
         <div class="flex items-center">
           <Clock class="h-5 w-5 text-primary mr-2" />
-          <h2 class="text-lg font-semibold text-text-primary">История</h2>
+          <h2 class="text-lg font-semibold text-text-primary">{{ t('История') }}</h2>
         </div>
       </CardHeader>
       <CardContent class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
         <div>
-          <p class="text-sm font-medium text-text-primary">Создан</p>
+          <p class="text-sm font-medium text-text-primary">{{ t('Создан') }}</p>
           <p class="text-sm text-text-secondary">{{ formatDateTime(props.data.createdAt) }}</p>
         </div>
         <div>
-          <p class="text-sm font-medium text-text-primary">Обновлен</p>
+          <p class="text-sm font-medium text-text-primary">{{ t('Обновлен') }}</p>
           <p class="text-sm text-text-secondary">{{ formatDateTime(props.data.updatedAt) }}</p>
         </div>
       </CardContent>
@@ -126,13 +126,13 @@
       <AppButton asChild variant="secondary">
         <Link :href="basePath">
           <ArrowLeft class="h-4 w-4 mr-2" />
-          Назад к списку
+          {{ t('Назад к списку') }}
         </Link>
       </AppButton>
-      <AppButton asChild>
+      <AppButton v-if="canEditInPreview" asChild>
         <Link :href="`${basePath}/${props.data.id}/edit`">
           <Pencil class="h-4 w-4 mr-2" />
-          Редактировать
+          {{ t('Редактировать') }}
         </Link>
       </AppButton>
     </div>
@@ -140,7 +140,10 @@
 </template>
 
 <script setup lang="ts">
+import { t, locale } from '@/i18n'
+
 import { computed } from 'vue'
+import { useRolePreviewAction } from '@/composables/useRolePreviewAction'
 import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -148,6 +151,7 @@ import { Link } from '@inertiajs/vue3'
 import { ArrowLeft, Calendar, Clock, Hash, Mail, Pencil, ShieldCheck, User } from 'lucide-vue-next'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 
+const canEditInPreview = useRolePreviewAction('users', 'update')
 const basePath = '/users'
 const props = defineProps({
   title: { type: [String], default: undefined },
@@ -155,7 +159,7 @@ const props = defineProps({
 })
 
 const fullName = computed(
-  () => `${props.data.name || ''} ${props.data.lastName || ''}`.trim() || 'Без имени',
+  () => `${props.data.name || ''} ${props.data.lastName || ''}`.trim() || t('Без имени'),
 )
 const userInitials = computed(() => {
   const name = props.data.name || ''
@@ -165,11 +169,15 @@ const userInitials = computed(() => {
 
 const formatDate = (s: string) =>
   s
-    ? new Date(s).toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric' })
+    ? new Date(s).toLocaleDateString(locale.value === 'en' ? 'en-GB' : 'ru-RU', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
     : '—'
 const formatDateTime = (s: string) =>
   s
-    ? new Date(s).toLocaleString('ru-RU', {
+    ? new Date(s).toLocaleString(locale.value === 'en' ? 'en-GB' : 'ru-RU', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
