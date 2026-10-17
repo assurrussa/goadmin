@@ -4,11 +4,10 @@ package host //nolint:testpackage // Exercises the complete authenticated host m
 
 import (
 	"context"
-	"html"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -87,16 +86,22 @@ func TestAssistedRecoveryAssembledNativeCSRF(t *testing.T) {
 	get := func(jar map[string]*http.Cookie) string {
 		t.Helper()
 		request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, recoveryCSRFOrigin+AssistedRecoveryAdminPath, nil)
+		request.Header.Set("X-Inertia", "true")
 		response, body := assemblyRequest(t, runtime, request, jar)
 		require.Equal(t, http.StatusOK, response.StatusCode, string(body))
-		require.Contains(t, response.Header.Get("Content-Security-Policy"), "connect-src 'self'")
 		require.NotContains(t, string(body), "name=csrf")
 		require.NotContains(t, response.Header.Get("Set-Cookie"), "goadmin_recovery")
-		match := regexp.MustCompile(`data-native-csrf='([^']+)'`).FindSubmatch(body)
-		require.Len(t, match, 2)
-		token := html.UnescapeString(string(match[1]))
+		var page struct {
+			Component string `json:"component"`
+			Props     struct {
+				NativeCSRF string `json:"nativeCSRF"`
+			} `json:"props"`
+		}
+		require.NoError(t, json.Unmarshal(body, &page))
+		require.Equal(t, "security/AssistedRecoveryPage", page.Component)
+		token := page.Props.NativeCSRF
+		require.NotEmpty(t, token)
 		require.Equal(t, jar["csrf_token"].Value, token)
-		require.Contains(t, string(body), "'X-CSRF-Token':form.dataset.nativeCsrf")
 		return token
 	}
 	token := get(cookies) // Direct GET refreshes the post-login session-bound token.
