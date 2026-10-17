@@ -26,8 +26,18 @@ Custom senders must support `assisted_recovery` with `Data["url"]` and the secre
 existing encrypted queue; keep the notification worker running. Starter email
 templates for both events are included. Never log bodies, tokens or raw notices.
 
-The source adds focused CSRF, fragment, permission-catalog and mail tests. They
-are unexecuted in the source-editing environment because a Go toolchain and a
-writable build/test environment are unavailable. Format, resolve candidate
-dependency sums, run aggregate checks and isolated integration tests before
-review/release/deployment. No automatic CI trigger is added.
+Local macOS validation (2026-10-17, Go 1.27.2) passed `make check`
+(including 570 frontend unit tests), `go build -mod=readonly ./...`, the
+integration package suite against disposable PostgreSQL/Redis, and
+`make security-negative-check`. The anonymous public-dependency consumer passed
+with the Go 1.27.2 binary explicitly selected; GoAuth is pinned to the published
+candidate ref in `go.mod`, without a dependency replacement.
+
+Recovery-specific PostgreSQL regressions prove that ordinary account-update
+permission is insufficient, the dedicated grant is required, self-initiation is
+denied, and multiple active owners reject CLI recovery. The sole-owner
+transaction locks subjects as well as roles and memberships, so a disabled
+second owner cannot activate between verification and invitation issuance.
+The regression reproduces that race before the lock and verifies it is blocked
+afterward. Affected host race tests and lint passed after the fix. Independent
+review and release/deployment remain separate gates; no CI trigger was added.
