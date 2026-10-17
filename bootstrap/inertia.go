@@ -31,7 +31,7 @@ func initInertia(
 	deps Dependencies,
 	menuExtra menu.Menu,
 	opts ...goinertia.Option,
-) (*goinertia.Inertia, error) {
+) (*goinertia.Inertia, goinertia.CSRFTokenProvider, error) {
 	log := deps.System.Logger
 	if log == nil {
 		log = logger.Discard()
@@ -71,18 +71,14 @@ func initInertia(
 	optsInertia = append(optsInertia, goinertia.WithCSRFTokenCheckProvider(
 		newCheckCSRFTokenProvider(sessStore, deps.System.CSRF, cfg), //nolint:contextcheck // provider uses request context from fiber
 	))
-	optsInertia = append(optsInertia, goinertia.WithCSRFTokenProvider(
-		newCSRFTokenProvider( //nolint:contextcheck // provider uses request context from fiber
-			deps.System.AdminAuthService,
-			sessStore,
-			deps.System.CSRF,
-			cfg,
-		),
-	))
+	//nolint:contextcheck // provider uses the incoming Fiber request context
+	provider := newCSRFTokenProvider(deps.System.AdminAuthService, sessStore, deps.System.CSRF, cfg)
+	optsInertia = append(optsInertia, goinertia.WithCSRFTokenProvider(provider))
 
 	optsInertia = append(optsInertia, opts...)
 
-	return goinertia.NewWithValidation(cfg.DomainURL, optsInertia...)
+	manager, err := goinertia.NewWithValidation(cfg.DomainURL, optsInertia...)
+	return manager, provider, err
 }
 
 func sharedProps(

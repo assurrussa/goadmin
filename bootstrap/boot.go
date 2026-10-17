@@ -129,7 +129,7 @@ func Run(
 		}
 	}
 
-	inertiaManager, err := initInertia(ctx, adminCfg, deps, options.menu, inertiaOpts...)
+	inertiaManager, csrfProvider, err := initInertia(ctx, adminCfg, deps, options.menu, inertiaOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("init inertia: %w", err)
 	}
@@ -156,6 +156,7 @@ func Run(
 	if err != nil {
 		return nil, fmt.Errorf("bootstrap: new admin app: %w", err)
 	}
+	app.SetNativeCSRFTokenProvider(csrfProvider)
 	app.SetCapabilities(cfg.Capabilities)
 	app.SetCommandTransaction(deps.System.CommandTransaction)
 	app.SetPermissionDefinitions(options.permissionDefinitions)

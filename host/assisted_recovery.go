@@ -183,7 +183,8 @@ func (f *assistedRecoveryFeature) Build(_ Menu) ExtensionBuilder {
 				server.Post(AssistedRecoveryOwnerCompletePath, f.complete)
 			}
 		}).WithRegister(func(server *fiber.App) {
-			server.Get(AssistedRecoveryAdminPath, app.Guard(PermissionDomainAccountRecovery, PermissionActionCreate), f.initiationPage)
+			server.Get(AssistedRecoveryAdminPath,
+				app.Guard(PermissionDomainAccountRecovery, PermissionActionCreate), f.initiationPage(app))
 			server.Post(AssistedRecoveryAdminPath, app.Guard(PermissionDomainAccountRecovery, PermissionActionCreate), f.initiate(app))
 		}), nil
 	}
@@ -191,7 +192,7 @@ func (f *assistedRecoveryFeature) Build(_ Menu) ExtensionBuilder {
 
 func (f *assistedRecoveryFeature) initiate(app *App) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		values, err := f.form(c, []string{"csrf", "subject", "email", "password", "code", "reason", "evidence", "identity_verified"})
+		values, err := f.parseForm(c, []string{"subject", "email", "password", "code", "reason", "evidence", "identity_verified"})
 		if err != nil || values.Get("identity_verified") != "yes" {
 			return fiber.ErrBadRequest
 		}
@@ -230,7 +231,7 @@ func (f *assistedRecoveryFeature) cookieName() string {
 	return "goadmin_recovery"
 }
 
-func (f *assistedRecoveryFeature) form(c fiber.Ctx, allowed []string) (url.Values, error) {
+func (f *assistedRecoveryFeature) parseForm(c fiber.Ctx, allowed []string) (url.Values, error) {
 	c.Set("Cache-Control", "no-store")
 	if c.Get("Origin") != f.cfg.Origin || len(c.Body()) > 16*1024 {
 		return nil, fiber.ErrBadRequest
@@ -254,6 +255,16 @@ func (f *assistedRecoveryFeature) form(c fiber.Ctx, allowed []string) (url.Value
 			return nil, fiber.ErrBadRequest
 		}
 	}
+	return values, nil
+}
+
+// Public completion has no authenticated native admin session; preserve its
+// existing exact-Origin and recovery-cookie contract separately.
+func (f *assistedRecoveryFeature) form(c fiber.Ctx, allowed []string) (url.Values, error) {
+	values, err := f.parseForm(c, allowed)
+	if err != nil {
+		return nil, err
+	}
 	want, got := c.Cookies(f.cookieName()), values.Get("csrf")
 	if len(want) != 43 || len(got) != 43 || subtle.ConstantTimeCompare([]byte(want), []byte(got)) != 1 {
 		return nil, fiber.ErrForbidden
@@ -261,7 +272,7 @@ func (f *assistedRecoveryFeature) form(c fiber.Ctx, allowed []string) (url.Value
 	return values, nil
 }
 
-func (f *assistedRecoveryFeature) page(c fiber.Ctx, completion bool) error {
+func (f *assistedRecoveryFeature) page(c fiber.Ctx, completion bool, nativeToken string) error {
 	c.Set("Cache-Control", "no-store")
 	if c.Get("X-Inertia") == "true" {
 		c.Set("X-Inertia-Location", c.Path())
@@ -272,19 +283,30 @@ func (f *assistedRecoveryFeature) page(c fiber.Ctx, completion bool) error {
 		return fiber.ErrServiceUnavailable
 	}
 	csrf := base64.RawURLEncoding.EncodeToString(raw)
-	c.Cookie(&fiber.Cookie{
-		Name:  f.cookieName(),
-		Value: csrf, Path: "/", HTTPOnly: true, Secure: strings.HasPrefix(f.cfg.Origin, "https://"),
-		SameSite: "Strict", MaxAge: 900, Expires: time.Now().Add(15 * time.Minute),
-	})
+	if completion {
+		c.Cookie(&fiber.Cookie{
+			Name:  f.cookieName(),
+			Value: csrf, Path: "/", HTTPOnly: true, Secure: strings.HasPrefix(f.cfg.Origin, "https://"),
+			SameSite: "Strict", MaxAge: 900, Expires: time.Now().Add(15 * time.Minute),
+		})
+	}
 	c.Set("Cache-Control", "no-store")
 	c.Set("Referrer-Policy", "no-referrer")
 	c.Set("X-Frame-Options", "DENY")
 	c.Set("Content-Security-Policy",
 		"default-src 'none'; script-src 'nonce-"+csrf+"'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
+	if !completion {
+		c.Set("Content-Security-Policy", c.GetRespHeader("Content-Security-Policy")+"; connect-src 'self'")
+	}
 	title, fields, action := "Initiate account recovery", recoveryInitiationFields, AssistedRecoveryAdminPath
 	if completion {
 		title, fields, action = "Complete account recovery", recoveryCompletionFields, c.Path()
+	}
+	hidden, nativeAttribute := "", ""
+	if completion {
+		hidden = "<input type=hidden name=csrf value='" + html.EscapeString(csrf) + "'>"
+	} else {
+		nativeAttribute = " data-native-csrf='" + html.EscapeString(nativeToken) + "'"
 	}
 	body := "<!doctype html><html lang=en><meta charset=utf-8><meta name=viewport " +
 		"content='width=device-width,initial-scale=1'><title>" +
@@ -293,11 +315,9 @@ func (f *assistedRecoveryFeature) page(c fiber.Ctx, completion bool) error {
 		title +
 		"</h1><form method=post action='" +
 		action +
-		"'><input type=hidden name=csrf value='" +
-		html.EscapeString(csrf) +
-		"'>" +
+		"'" + nativeAttribute + ">" + hidden +
 		fields +
-		"<button type=submit>Continue</button></form></main>"
+		"<button type=submit>Continue</button><p role=status></p></form></main>"
 	if completion {
 		body += "<script nonce='" +
 			csrf +
@@ -306,13 +326,38 @@ func (f *assistedRecoveryFeature) page(c fiber.Ctx, completion bool) error {
 			"]').value=p.get('token')||'';history.replaceState(null,'',location.pathname" +
 			");</script>"
 	}
+	if !completion {
+		body += "<script nonce='" + csrf + "'>" + recoveryInitiationScript + "</script>"
+	}
 	body += "</html>"
 	c.Type("html")
 	return c.SendString(body)
 }
 
-func (f *assistedRecoveryFeature) initiationPage(c fiber.Ctx) error { return f.page(c, false) }
-func (f *assistedRecoveryFeature) completionPage(c fiber.Ctx) error { return f.page(c, true) }
+func (f *assistedRecoveryFeature) initiationPage(app *App) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		if c.Get("X-Inertia") == "true" {
+			return f.page(c, false, "")
+		}
+		token, err := app.inner.NativeCSRFToken(c)
+		if err != nil {
+			return err
+		}
+		return f.page(c, false, token)
+	}
+}
+func (f *assistedRecoveryFeature) completionPage(c fiber.Ctx) error { return f.page(c, true, "") }
+
+const recoveryInitiationScript = `const form=document.querySelector('form');let pending=false;
+form.addEventListener('submit',async event=>{event.preventDefault();if(pending)return;pending=true;
+const button=form.querySelector('button');const status=form.querySelector('[role=status]');button.disabled=true;
+try{const response=await fetch(form.action,{method:'POST',mode:'same-origin',credentials:'same-origin',
+redirect:'error',cache:'no-store',headers:{'Content-Type':'application/x-www-form-urlencoded',
+'X-CSRF-Token':form.dataset.nativeCsrf},body:new URLSearchParams(new FormData(form))});
+status.textContent=response.ok?'An invitation was queued. Account credentials change only after successful completion.':
+'Recovery was rejected. Reload this page and recheck permission, identity verification and fresh credentials.';
+form.elements.password.value='';form.elements.code.value='';
+}catch{status.textContent='Recovery outcome is unknown. Do not repeat automatically; contact the service owner.';}});`
 
 func (f *assistedRecoveryFeature) complete(c fiber.Ctx) error {
 	values, err := f.form(c, []string{"csrf", "token", "password", "password_confirmation", "code"})

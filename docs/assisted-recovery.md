@@ -16,7 +16,7 @@ human verification procedure.
 Initiation is `/account-recovery`; completion is `/auth/assisted-recovery`.
 Optional owner completion is isolated at `/auth/assisted-recovery/owner` and never
 exposes an owner-initiation HTTP method. Forms use exact-origin checks, strict
-single-valued input, a Secure HttpOnly SameSite CSRF cookie, no-store responses,
+single-valued input, the CSRF contracts described below, no-store responses,
 no-referrer and a restrictive CSP. Invitation secrets are read from fragments
 and removed from browser history before submission. External SSO admin bindings
 cannot be used as local password authority.
@@ -41,3 +41,15 @@ second owner cannot activate between verification and invitation issuance.
 The regression reproduces that race before the lock and verifies it is blocked
 afterward. Affected host race tests and lint passed after the fix. Independent
 review and release/deployment remain separate gates; no CI trigger was added.
+
+Authenticated initiation uses the normal GoAdmin session-bound CSRF provider and
+checker. Its page obtains the native token for the current session; same-origin
+JavaScript submits it in `X-CSRF-Token` with the native cookie. There is no
+recovery-specific CSRF cookie or hidden token on this authenticated form. Auth
+and permission middleware remain in place, and a missing, invalid, or other
+session's token is rejected before the recovery command runs. Submission has no
+automatic retry; an uncertain network outcome requires reconciliation.
+
+Anonymous public completion cannot depend on an authenticated admin session. It
+retains its separate exact-Origin, recovery-cookie and hidden-token contract;
+the emailed one-time recovery token and existing MFA requirements are unchanged.
