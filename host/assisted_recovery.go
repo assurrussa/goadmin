@@ -444,6 +444,19 @@ let lang='ru';try{lang=localStorage.getItem('goadmin.locale')==='en'?'en':'ru'}c
 const introduction='Приглашение подтверждает новый email. Если MFA включена, '+
  'потребуется существующий код приложения или неиспользованный резервный код. '+
  'При потере MFA обратитесь в поддержку отдельно.';
+let outcome='';
+const outcomes={
+ unknown:{
+  en:'Outcome unknown. Do not repeat or request another invitation until the service owner reconciles this request.',
+  ru:'Результат неизвестен. Не повторяйте запрос и не запрашивайте новое приглашение до проверки владельцем сервиса.'},
+ success:{
+  en:'Recovery completed. Sign in with your new email and password. Your existing authenticator is unchanged.',
+  ru:'Доступ восстановлен. Войдите с новым email и паролем. Существующее приложение-аутентификатор не изменилось.'},
+ rejected:{
+  en:'Recovery was rejected. Check the invitation, password and existing MFA.',
+  ru:'Запрос отклонён. Проверьте приглашение, пароль и существующий код MFA.'}
+};
+function renderStatus(){if(outcome)form.querySelector('[role=status]').textContent=outcomes[outcome][lang]}
 const texts={
  'Завершение восстановления доступа':'Complete account recovery',
  [introduction]:'The invitation verifies your new mailbox. If MFA is enabled, '+
@@ -456,27 +469,21 @@ while(walker.nextNode()){
 }
 function render(){
  document.documentElement.lang=lang;for(const [node,key] of originals)node.textContent=lang==='en'?texts[key]:key
+ renderStatus()
 }
 render();document.querySelector('#language').addEventListener('click',()=>{
  lang=lang==='en'?'ru':'en';try{localStorage.setItem('goadmin.locale',lang)}catch{}render()
 });
 form.addEventListener('submit',async event=>{
  event.preventDefault();if(pending)return;pending=true;form.querySelector('button').disabled=true;
- const status=form.querySelector('[role=status]');
- const unknown=()=>lang==='en'?
- 'Outcome unknown. Do not repeat or request another invitation until the service owner reconciles this request.':
- 'Результат неизвестен. Не повторяйте запрос и не запрашивайте новое приглашение до проверки владельцем сервиса.';
  try{
   const response=await fetch(form.action,{
    method:'POST',mode:'same-origin',credentials:'same-origin',redirect:'error',cache:'no-store',
    headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(new FormData(form))
   });
-  status.textContent=response.status>=500?unknown():response.ok?(lang==='en'?
-   'Recovery completed. Sign in with your new email and password. Your existing authenticator is unchanged.':
-   'Доступ восстановлен. Войдите с новым email и паролем. Существующее приложение-аутентификатор не изменилось.'):(lang==='en'?
-   'Recovery was rejected. Check the invitation, password and existing MFA.':
-   'Запрос отклонён. Проверьте приглашение, пароль и существующий код MFA.');
- }catch{status.textContent=unknown()}finally{
+  outcome=response.status>=500?'unknown':response.ok?'success':'rejected';
+ }catch{outcome='unknown'}finally{
+  renderStatus();
   for(const name of ['token','password','password_confirmation','code'])form.elements[name].value=''
  }
 });`
