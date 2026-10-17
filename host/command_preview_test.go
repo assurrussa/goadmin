@@ -1,13 +1,15 @@
 package host //nolint:testpackage // Exercises request-local preview command fence.
 
 import (
-	"github.com/assurrussa/goadmin/adminapp/adminappt"
-	integrationroles "github.com/assurrussa/goadmin/internal/auth"
-	"github.com/gofiber/fiber/v3"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/gofiber/fiber/v3"
+	"github.com/stretchr/testify/require"
+
+	"github.com/assurrussa/goadmin/adminapp/adminappt"
+	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 )
 
 func TestRolePreviewDeniesCommandOnGETBeforeBindingOrExecution(t *testing.T) {
@@ -20,10 +22,11 @@ func TestRolePreviewDeniesCommandOnGETBeforeBindingOrExecution(t *testing.T) {
 		return c.Next()
 	})
 	calls := 0
-	app.Get("/command", Command(WrapApp(fixture.App), key, func(c fiber.Ctx, _ Actor, _ struct{ Value string }) error {
+	handlers := Command(WrapApp(fixture.App), key, func(c fiber.Ctx, _ Actor, _ struct{ Value string }) error {
 		calls++
 		return c.SendStatus(204)
-	})...)
+	})
+	app.Get("/command", handlers[0], handlers[1])
 	response, err := app.Test(httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/command", nil))
 	require.NoError(t, err)
 	require.NoError(t, response.Body.Close())
