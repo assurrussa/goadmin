@@ -8,8 +8,13 @@ import (
 )
 
 func TestRolePreviewFiltersLegacyGridActionsAndCreation(t *testing.T) {
-	grid := NewHandler(FilterConfig[int]{RoutePath: "/users", Actions: []Action[int]{{Key: "view"}, {Key: "edit"}, {Key: "delete"}, {Key: "restore"}}}, logger.Discard())
-	ctx := integrationroles.WithRolePreview(t.Context(), map[integrationroles.PermissionKey]bool{integrationroles.NewPermissionKey("users", "read"): true})
+	grid := NewHandler(FilterConfig[int]{
+		RoutePath: "/users",
+		Actions:   []Action[int]{{Key: "view"}, {Key: "edit"}, {Key: "delete"}, {Key: "restore"}},
+	}, logger.Discard())
+	ctx := integrationroles.WithRolePreview(t.Context(), map[integrationroles.PermissionKey]bool{
+		integrationroles.NewPermissionKey("users", "read"): true,
+	})
 	actions := grid.availableActions(ctx, 1)
 	require.Len(t, actions, 1)
 	require.Equal(t, "view", actions[0].Key)

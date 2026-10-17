@@ -11,7 +11,9 @@ import (
 func TestFindRecoveryAccountUsesCanonicalAccountWithoutUserProjection(t *testing.T) {
 	fixture, err := testkit.NewRuntime()
 	require.NoError(t, err)
-	account, err := fixture.Runtime.ProvisionTrustedLocalAccount(t.Context(), goauth.RegisterRequest{Email: "recovery-target@example.test", Password: "Synthetic-Password-42"})
+	account, err := fixture.Runtime.ProvisionTrustedLocalAccount(t.Context(), goauth.RegisterRequest{
+		Email: "recovery-target@example.test", Password: "Synthetic-Password-42",
+	})
 	require.NoError(t, err)
 	service := NewService(nil, nil, WithRuntime(fixture.Runtime, adminRepositoryStub{}))
 	found, err := service.FindRecoveryAccount(t.Context(), "recovery-target@example.test")

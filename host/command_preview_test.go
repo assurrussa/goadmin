@@ -20,7 +20,10 @@ func TestRolePreviewDeniesCommandOnGETBeforeBindingOrExecution(t *testing.T) {
 		return c.Next()
 	})
 	calls := 0
-	app.Get("/command", Command(WrapApp(fixture.App), key, func(c fiber.Ctx, _ Actor, _ struct{ Value string }) error { calls++; return c.SendStatus(204) })...)
+	app.Get("/command", Command(WrapApp(fixture.App), key, func(c fiber.Ctx, _ Actor, _ struct{ Value string }) error {
+		calls++
+		return c.SendStatus(204)
+	})...)
 	response, err := app.Test(httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/command", nil))
 	require.NoError(t, err)
 	require.NoError(t, response.Body.Close())

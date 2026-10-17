@@ -93,7 +93,9 @@ func rolePreviewMiddleware(deps Dependencies) fiber.Handler {
 			}
 		}
 		if owner && deps.Repos.RolesManager != nil {
-			roles, err := deps.Repos.RolesManager.ListRoles(c, integrationroles.RoleFilter{IncludeSys: true, Pagination: integrationroles.Pagination{Limit: 1000}})
+			roles, err := deps.Repos.RolesManager.ListRoles(c, integrationroles.RoleFilter{
+				IncludeSys: true, Pagination: integrationroles.Pagination{Limit: 1000},
+			})
 			if err != nil {
 				return fiber.ErrServiceUnavailable
 			}
