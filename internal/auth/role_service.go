@@ -363,6 +363,9 @@ func (s *GuardService) SubjectGuardCheck(
 	key PermissionKey,
 	options ...PermissionGuardOption,
 ) bool {
+	if !RolePreviewAllows(ctx, key) {
+		return false
+	}
 	roles, err := s.GetRolesSubject(ctx, subjectID)
 	if err != nil {
 		return false

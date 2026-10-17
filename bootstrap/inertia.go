@@ -92,6 +92,12 @@ func sharedProps(
 	publicDomainURL string,
 ) map[string]any {
 	return map[string]any{
+		"rolePreview": goinertia.LazyProp{Key: "rolePreview", Fn: func(ctx context.Context) (any, error) {
+			if c, ok := ctx.(fiber.Ctx); ok {
+				return c.Locals("goadmin.rolePreview"), nil
+			}
+			return nil, nil
+		}},
 		"adminInfo": map[string]string{
 			"version": adminVersion(),
 		},
