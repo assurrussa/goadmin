@@ -476,6 +476,12 @@ The default `migrations.Migrate` remains unchanged and manages uploads itself.
 Do not switch an existing canonical upload ledger to host management without a
 separate reviewed ownership transition. This API itself moves no data or history.
 
+### Account menu placement
+
+Set `Section.Placement` to `"account"` for flat links in the profile dropdown.
+Empty or `"sidebar"` keeps the default sidebar. Existing permission filtering
+applies to both placements; account links must have safe root-relative hrefs.
+
 ### Menu visibility with any permission
 
 A host page that supports several separately guarded actions can expose one menu

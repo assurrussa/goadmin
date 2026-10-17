@@ -8,7 +8,7 @@ registerTranslations({
   ru: {},
   en: {
     'Восстановление доступа': 'Account recovery',
-    'Найти пользователя': 'Find a user',
+    'Найти по текущему email': 'Find by current email',
     Поиск: 'Search',
     'Выберите пользователя': 'Select a user',
     'Новый email': 'New email',
@@ -27,7 +27,11 @@ registerTranslations({
       'Outcome unknown. Do not send another invitation until the service owner reconciles this request.',
     'Запрос отклонён. Проверьте разрешение, независимую проверку личности и свежие пароль и MFA.':
       'Request rejected. Check permission, independent identity verification, and fresh password and MFA.',
-    'Пользователи не найдены. Уточните поиск.': 'No users found. Refine your search.',
+    'Учётная запись с таким email не найдена.': 'No account found with this email.',
+    'Введите полный текущий email. Поиск по логину не поддерживается.':
+      'Enter the full current email. Username search is not supported.',
+    'Здесь можно начать восстановление другого пользователя. Это не список поданных заявок.':
+      'Start recovery for another user here. This is not a list of submitted requests.',
     'Введите существующий email учётной записи.': 'Enter the account’s existing email address.',
   },
 })
@@ -35,6 +39,7 @@ const props = defineProps<{
   title: string
   nativeCSRF: string
   search: string
+  searchInvalid?: boolean
   targets: { subject: string; name: string; email: string }[]
 }>()
 const { t } = useI18n()
@@ -106,15 +111,29 @@ async function submit(event: Event) {
     <p>{{ t('Введите существующий email учётной записи.') }}</p>
     <form class="flex gap-3" @submit.prevent="searchTargets">
       <label class="flex-1"
-        >{{ t('Найти пользователя')
-        }}<input v-model="query" maxlength="256" class="block w-full rounded border p-2"
+        >{{ t('Найти по текущему email')
+        }}<input
+          v-model="query"
+          type="email"
+          required
+          placeholder="name@example.com"
+          maxlength="256"
+          class="block w-full rounded border p-2"
       /></label>
       <button type="submit" :disabled="locked" class="underline">{{ t('Поиск') }}</button>
     </form>
-    <p v-if="props.search && !targets.length">
-      {{ t('Пользователи не найдены. Уточните поиск.') }}
+    <p>
+      {{
+        t('Здесь можно начать восстановление другого пользователя. Это не список поданных заявок.')
+      }}
     </p>
-    <form class="space-y-4" @submit.prevent="submit">
+    <p v-if="props.searchInvalid">
+      {{ t('Введите полный текущий email. Поиск по логину не поддерживается.') }}
+    </p>
+    <p v-else-if="props.search && !targets.length">
+      {{ t('Учётная запись с таким email не найдена.') }}
+    </p>
+    <form v-if="targets.length > 0" class="space-y-4" @submit.prevent="submit">
       <fieldset :disabled="locked" class="space-y-4">
         <label class="block"
           >{{ t('Выберите пользователя')

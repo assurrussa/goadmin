@@ -18,6 +18,7 @@
       </div>
 
       <div class="flex items-center gap-2 sm:gap-3">
+        <RolePreviewBanner v-model:open="rolePreviewOpen" />
         <LocaleSelect />
         <AppButton
           variant="ghost"
@@ -49,6 +50,7 @@
 
         <DropdownMenu>
           <DropdownMenuTrigger
+            data-profile-menu-trigger
             class="menu-trigger flex items-center cursor-pointer gap-3 rounded-2xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
           >
             <div
@@ -81,7 +83,7 @@
             <ChevronDown class="h-4 w-4 text-text-tertiary" />
           </DropdownMenuTrigger>
 
-          <DropdownMenuContent class="w-56">
+          <DropdownMenuContent class="w-56" @close-auto-focus="onMenuCloseAutoFocus">
             <DropdownMenuItem as-child>
               <Link href="/auth/profile" class="flex items-center">
                 <User class="mr-3 h-4 w-4" />
@@ -93,6 +95,16 @@
                 <Settings class="mr-3 h-4 w-4" />
                 {{ t('Настройки') }}
               </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem v-for="item in accountMenuItems" :key="item.href" as-child>
+              <Link :href="item.href" class="flex items-center">
+                <Link2 class="mr-3 h-4 w-4" />
+                {{ t(item.name) }}
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem v-if="canPreviewRole" @select="rolePreviewOpen = true">
+              <Eye class="mr-3 h-4 w-4" />
+              {{ t('Предпросмотр роли') }}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem class="text-error focus:text-error" @click="handleLogout">
@@ -110,7 +122,8 @@
 import { t } from '@/i18n'
 import LocaleSelect from './LocaleSelect.vue'
 
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import RolePreviewBanner from './RolePreviewBanner.vue'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 import { Link, router, usePage } from '@inertiajs/vue3'
 import {
@@ -122,7 +135,18 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import AppButton from '@/components/ui/AppButton.vue'
-import { Bell, ChevronDown, LogOut, Menu, Moon, Settings, Sun, User } from 'lucide-vue-next'
+import {
+  Bell,
+  ChevronDown,
+  Eye,
+  Link2,
+  LogOut,
+  Menu,
+  Moon,
+  Settings,
+  Sun,
+  User,
+} from 'lucide-vue-next'
 import { useThemeStore } from '@/stores/theme'
 import { useAuthUserStore } from '@/stores/authUser'
 import type { AdminAuthUser } from '@/types/models.ts'
@@ -131,7 +155,33 @@ defineProps<{ sidebarOpen?: boolean }>()
 const { notifications } = useAdminCapabilities()
 const authUserStore = useAuthUserStore()
 const authuser = computed<AdminAuthUser | null>(() => authUserStore.authUser)
-const page = usePage<{ notificationsSummary?: { unread?: number } }>()
+const page = usePage<{
+  notificationsSummary?: { unread?: number }
+  rolePreview?: { available: boolean; active: boolean }
+}>()
+type AccountMenuItem = { name: string; href?: string }
+const accountMenuItems = computed(() => {
+  const menu = page.props.adminMenu as
+    | { sections?: { placement?: string; items?: AccountMenuItem[] }[] }
+    | undefined
+  return (menu?.sections ?? [])
+    .filter((section) => section.placement === 'account')
+    .flatMap((section) => section.items ?? [])
+    .filter(
+      (item): item is AccountMenuItem & { href: string } =>
+        typeof item.href === 'string' &&
+        item.href.startsWith('/') &&
+        !item.href.startsWith('//') &&
+        !/[\\\x00-\x1f\x7f]/.test(item.href),
+    )
+})
+const rolePreviewOpen = ref(false)
+const canPreviewRole = computed(() =>
+  Boolean(page.props.rolePreview?.available || page.props.rolePreview?.active),
+)
+function onMenuCloseAutoFocus(event: Event) {
+  if (rolePreviewOpen.value) event.preventDefault()
+}
 
 defineEmits<{
   'toggle-sidebar': []

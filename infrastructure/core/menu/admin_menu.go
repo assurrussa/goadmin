@@ -50,10 +50,13 @@ type Badge struct {
 // reserved keys main (10), access (20), and system (40), even without their core
 // module. Nonzero orders override placement; ties retain current relative order.
 type Section struct {
-	Key   string `json:"key"`
-	Title string `json:"title,omitempty"`
-	Order int    `json:"order,omitempty"`
-	Items []Item `json:"items"`
+	// Placement is empty or "sidebar" for sidebar navigation (default), or
+	// "account" for flat links in the profile dropdown.
+	Placement string `json:"placement,omitempty"`
+	Key       string `json:"key"`
+	Title     string `json:"title,omitempty"`
+	Order     int    `json:"order,omitempty"`
+	Items     []Item `json:"items"`
 }
 
 type Menu struct {
@@ -73,6 +76,9 @@ func (m Menu) Merge(other Menu) Menu {
 			return
 		}
 		if existing, ok := merged[sec.Key]; ok {
+			if existing.Placement == "" && sec.Placement == "account" {
+				existing.Placement = sec.Placement
+			}
 			if sec.Title != "" {
 				existing.Title = sec.Title
 			}
