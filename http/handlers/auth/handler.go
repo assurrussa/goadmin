@@ -551,13 +551,24 @@ func (h *Handler) ProfileSettings(c fiber.Ctx) error {
 
 	mfaEnabled := false
 	mfaAvailable := false
+	mfaState := "unavailable"
 	if actions, ok := h.sessionStoreActions.(mfaManagementActions); ok {
 		var err error
 		mfaEnabled, err = actions.LocalMFAStatus(c)
 		mfaAvailable = err == nil
+		switch {
+		case err == nil && mfaEnabled:
+			mfaState = "enabled"
+		case err == nil:
+			mfaState = "disabled"
+		case errors.Is(err, adminservice.ErrLocalMFAUnavailable), errors.Is(err, goauth.ErrMFAUnavailable):
+			mfaState = "unavailable"
+		default:
+			mfaState = "unknown"
+		}
 	}
 	return h.adminApp.HTTPManager().Render(c, "profile/SettingsPage", map[string]any{
-		"mfaAvailable": mfaAvailable, "mfaEnabled": mfaEnabled,
+		"mfaAvailable": mfaAvailable, "mfaEnabled": mfaEnabled, "mfaState": mfaState,
 		"title":              "Настройки",
 		"data":               adminUser,
 		"pendingEmailChange": profilePendingEmailChange(pending),
@@ -1040,7 +1051,11 @@ func (h *Handler) PostMFAManagement(action string) fiber.Handler {
 		}
 		result, err := actions.ManageLocalMFA(c, action, input)
 		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(map[string]string{
+			status := fiber.StatusBadRequest
+			if errors.Is(err, goauth.ErrOperationOutcomeUnknown) {
+				status = fiber.StatusServiceUnavailable
+			}
+			return c.Status(status).JSON(map[string]string{
 				"message": "Не удалось изменить двухфакторную защиту. Проверьте пароль и код.",
 			})
 		}
