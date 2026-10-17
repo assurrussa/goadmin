@@ -26,7 +26,11 @@
       v-if="previewUrl"
       class="image-preview group relative h-full w-full overflow-hidden rounded-md"
     >
-      <img :src="previewUrl" alt="Image Preview" class="h-full w-full object-cover" />
+      <img
+        :src="previewUrl"
+        :alt="t('core.ui.Image Preview', 'Image Preview')"
+        class="h-full w-full object-cover"
+      />
       <div
         class="image-overlay absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100"
       >
@@ -82,8 +86,12 @@
         <div class="placeholder-content text-center">
           <!-- Replace with an icon -->
           <span class="text-4xl">&#x1F4F7;</span>
-          <p class="mt-2 text-sm text-text-secondary">Click to upload or drag & drop</p>
-          <p class="mt-1 text-xs text-text-tertiary">Max file size: {{ maxFileSize }}MB</p>
+          <p class="mt-2 text-sm text-text-secondary">
+            {{ t('core.ui.Click to upload or drag & drop', 'Click to upload or drag & drop') }}
+          </p>
+          <p class="mt-1 text-xs text-text-tertiary">
+            {{ t('core.ui.Max file size:', 'Max file size:') }} {{ maxFileSize }}MB
+          </p>
         </div>
       </slot>
     </div>
@@ -116,7 +124,12 @@
     </div>
   </div>
   <p v-if="uncertainUpload && !recoveredImage" class="mt-2 text-xs text-error" role="status">
-    Upload completion is unconfirmed. Check this upload before starting another.
+    {{
+      t(
+        'core.ui.Upload completion is unconfirmed. Check this upload before starting another.',
+        'Upload completion is unconfirmed. Check this upload before starting another.',
+      )
+    }}
   </p>
   <button
     v-if="uncertainUpload && !recoveredImage"
@@ -125,15 +138,20 @@
     :disabled="!canCheckUpload"
     @click="checkUpload"
   >
-    Check upload
+    {{ t('core.ui.Check upload', 'Check upload') }}
   </button>
   <div v-if="recoveredImage" role="status">
-    Upload confirmed. The original field is unknown.
+    {{
+      t(
+        'core.ui.Upload confirmed. The original field is unknown.',
+        'Upload confirmed. The original field is unknown.',
+      )
+    }}
     <button type="button" :disabled="!canAssignRecovered" @click="assignRecovered">
-      Use image in this field
+      {{ t('core.ui.Use image in this field', 'Use image in this field') }}
     </button>
     <button type="button" :disabled="!canAssignRecovered" @click="dismissRecovered">
-      Dismiss confirmed upload
+      {{ t('core.ui.Dismiss confirmed upload', 'Dismiss confirmed upload') }}
     </button>
   </div>
   <div

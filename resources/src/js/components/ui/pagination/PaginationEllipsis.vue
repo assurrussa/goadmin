@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import type { PaginationEllipsisProps } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
 import { reactiveOmit } from '@vueuse/core'
@@ -19,7 +21,7 @@ const delegatedProps = reactiveOmit(props, 'class')
   >
     <slot>
       <MoreHorizontal class="size-4" />
-      <span class="sr-only">More pages</span>
+      <span class="sr-only">{{ t('core.ui.More pages', 'More pages') }}</span>
     </slot>
   </PaginationEllipsis>
 </template>

@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { setLocale } from '@/i18n'
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
 import { createApp, h, nextTick, reactive } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { useAuthUserStore } from '@/stores/authUser'
@@ -657,3 +658,7 @@ describe('image upload capabilities', () => {
     },
   )
 })
+
+// Existing English control selectors run under the explicit English UI locale.
+beforeEach(() => setLocale('en'))
+afterEach(() => setLocale('ru'))

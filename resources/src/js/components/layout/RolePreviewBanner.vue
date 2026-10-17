@@ -31,16 +31,17 @@ const preview = computed(
 )
 const selected = ref('')
 const busy = ref(false)
-const error = ref('')
+const error = ref<(() => string) | null>(null)
 async function change(roleId: number) {
   if (busy.value) return
   busy.value = true
-  error.value = ''
+  error.value = null
   try {
     await axios.post('/auth/role-preview', { roleId })
     router.visit('/auth/profile', { replace: true })
   } catch {
-    error.value = t('Не удалось изменить предпросмотр. Обновите страницу и проверьте состояние.')
+    error.value = () =>
+      t('Не удалось изменить предпросмотр. Обновите страницу и проверьте состояние.')
   } finally {
     busy.value = false
   }
@@ -77,6 +78,6 @@ async function change(roleId: number) {
         {{ t('Открыть предпросмотр') }}
       </button>
     </form>
-    <p v-if="error" role="alert">{{ error }}</p>
+    <p v-if="error" role="alert">{{ error?.() }}</p>
   </aside>
 </template>

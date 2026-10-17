@@ -55,3 +55,59 @@ describe('admin locale', () => {
     expect(t('Сохранить')).toBe('Save')
   })
 })
+
+describe('native constraint labels', () => {
+  it('relabels required errors without changing values or constraints and preserves consumer custom validity', () => {
+    initLocale()
+    const input = document.createElement('input')
+    input.required = true
+    document.body.append(input)
+    expect(input.checkValidity()).toBe(false)
+    expect(input.validationMessage).toBe('Заполните это поле.')
+    setLocale('en')
+    expect(input.validationMessage).toBe('Fill in this field.')
+    expect(input.required).toBe(true)
+    expect(input.value).toBe('')
+    input.value = 'Профиль'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(input.checkValidity()).toBe(true)
+    expect(input.value).toBe('Профиль')
+    input.setCustomValidity('Consumer validation')
+    expect(input.checkValidity()).toBe(false)
+    setLocale('ru')
+    expect(input.validationMessage).toBe('Consumer validation')
+    input.remove()
+  })
+})
+
+it('relinquishes native-error ownership when a consumer installs a validation rule', () => {
+  initLocale()
+  const input = document.createElement('input')
+  input.required = true
+  document.body.append(input)
+  expect(input.checkValidity()).toBe(false)
+  input.value = 'synthetic'
+  input.setCustomValidity('Consumer business rule')
+  setLocale('en')
+  expect(input.validationMessage).toBe('Consumer business rule')
+  expect(input.checkValidity()).toBe(false)
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  expect(input.validationMessage).toBe('Consumer business rule')
+  expect(input.checkValidity()).toBe(false)
+  input.remove()
+})
+
+it('switches explicit core UI messages without translating consumer values', () => {
+  for (const [key, ru, en] of [
+    ['core.ui.Email', 'Электронная почта', 'Email'],
+    ['core.ui.Next', 'Следующая', 'Next'],
+    ['core.ui.Add Image', 'Добавить изображение', 'Add Image'],
+    ['core.ui.Check upload', 'Проверить загрузку', 'Check upload'],
+  ]) {
+    setLocale('ru')
+    expect(t(key!, en)).toBe(ru)
+    setLocale('en')
+    expect(t(key!, en)).toBe(en)
+  }
+  expect(t('Name')).toBe('Name')
+})

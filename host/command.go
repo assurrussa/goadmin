@@ -1,8 +1,9 @@
 package host
 
 import (
-	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 	"github.com/gofiber/fiber/v3"
+
+	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 )
 
 // Command binds a typed body after current RBAC authorization and supplies only

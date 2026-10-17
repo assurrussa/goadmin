@@ -118,7 +118,7 @@
         </CardHeader>
         <CardContent class="space-y-4 pt-6">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <span class="text-text-secondary font-medium">Email</span>
+            <span class="text-text-secondary font-medium">{{ t('core.ui.Email', 'Email') }}</span>
             <div class="flex items-center">
               <Mail class="h-4 w-4 text-text-tertiary mr-2" />
               <span class="break-all text-text-primary">{{
@@ -177,7 +177,7 @@
 </template>
 
 <script setup lang="ts">
-import { t } from '@/i18n'
+import { t, locale } from '@/i18n'
 
 import { computed, ref, watch, type PropType } from 'vue'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
@@ -353,7 +353,7 @@ const formatDate = (dateString: string) => {
   if (!dateString) return t('Не указано')
 
   const date = new Date(dateString)
-  return date.toLocaleDateString('ru-RU', {
+  return date.toLocaleDateString(locale.value === 'en' ? 'en-GB' : 'ru-RU', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

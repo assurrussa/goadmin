@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import type { PaginationNextProps } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
 import type { ButtonVariants } from '@/components/ui/button'
@@ -31,7 +33,7 @@ const forwarded = useForwardProps(delegatedProps)
     v-bind="forwarded"
   >
     <slot>
-      <span class="hidden sm:block">Next</span>
+      <span class="hidden sm:block">{{ t('core.ui.Next', 'Next') }}</span>
       <ChevronRightIcon />
     </slot>
   </PaginationNext>

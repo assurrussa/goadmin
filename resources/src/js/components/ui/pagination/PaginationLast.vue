@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from '@/i18n'
+
 import type { PaginationLastProps } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
 import type { ButtonVariants } from '@/components/ui/button'
@@ -31,7 +33,7 @@ const forwarded = useForwardProps(delegatedProps)
     v-bind="forwarded"
   >
     <slot>
-      <span class="hidden sm:block">Last</span>
+      <span class="hidden sm:block">{{ t('core.ui.Last', 'Last') }}</span>
       <ChevronRightIcon />
     </slot>
   </PaginationLast>

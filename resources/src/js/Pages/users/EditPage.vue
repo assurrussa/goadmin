@@ -30,7 +30,7 @@
             v-model="form.email"
             name="email"
             type="email"
-            label="E-mail"
+            :label="t('core.ui.E-mail', 'E-mail')"
             required
             :error="form.errors.email"
             :readonly="!authmail"
@@ -39,7 +39,7 @@
             v-model="form.username"
             name="username"
             type="text"
-            label="Nickname"
+            :label="t('core.ui.Nickname', 'Nickname')"
             :error="form.errors.username"
           />
         </div>

@@ -43,7 +43,7 @@ const subject = ref('')
 const password = ref('')
 const code = ref('')
 const locked = ref(false)
-const message = ref('')
+const message = ref<(() => string) | null>(null)
 const lifecycle = bindEphemeralAuthPage(() => {
   password.value = ''
   code.value = ''
@@ -70,7 +70,7 @@ async function submit(event: Event) {
       body: new URLSearchParams(new FormData(form) as unknown as Record<string, string>),
     })
     if (!lifecycle.isActive()) return
-    message.value =
+    message.value = () =>
       response.status >= 500
         ? t(
             'Результат неизвестен. Не отправляйте новое приглашение до проверки владельцем сервиса.',
@@ -84,9 +84,8 @@ async function submit(event: Event) {
             )
   } catch {
     if (lifecycle.isActive())
-      message.value = t(
-        'Результат неизвестен. Не отправляйте новое приглашение до проверки владельцем сервиса.',
-      )
+      message.value = () =>
+        t('Результат неизвестен. Не отправляйте новое приглашение до проверки владельцем сервиса.')
   } finally {
     password.value = ''
     code.value = ''
@@ -175,7 +174,7 @@ async function submit(event: Event) {
           {{ t('Отправить приглашение') }}
         </button>
       </fieldset>
-      <p role="status">{{ message }}</p>
+      <p role="status">{{ message?.() }}</p>
     </form>
   </section>
 </template>

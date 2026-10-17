@@ -76,7 +76,7 @@
         </CardHeader>
         <CardContent class="space-y-4 pt-6">
           <div class="flex items-center justify-between">
-            <span class="text-text-secondary font-medium">Email</span>
+            <span class="text-text-secondary font-medium">{{ t('core.ui.Email', 'Email') }}</span>
             <div class="flex items-center">
               <Mail class="h-4 w-4 text-text-tertiary mr-2" />
               <span class="text-text-primary">{{ props.data.email }}</span>
@@ -126,7 +126,7 @@
           </div>
 
           <div class="flex items-center justify-between">
-            <span class="text-text-secondary font-medium">Email</span>
+            <span class="text-text-secondary font-medium">{{ t('core.ui.Email', 'Email') }}</span>
             <AppBadge :variant="emailConfirmed ? 'success' : 'warning'">
               {{ emailConfirmed ? t('Подтверждён') : t('Не подтверждён') }}
             </AppBadge>
@@ -267,7 +267,7 @@
 </template>
 
 <script setup lang="ts">
-import { t } from '@/i18n'
+import { t, locale } from '@/i18n'
 
 import { computed } from 'vue'
 import { useRolePreviewAction } from '@/composables/useRolePreviewAction'
@@ -337,7 +337,7 @@ const formatDate = (dateString: string) => {
   if (!dateString) return t('Не указано')
 
   const date = new Date(dateString)
-  return date.toLocaleDateString('ru-RU', {
+  return date.toLocaleDateString(locale.value === 'en' ? 'en-GB' : 'ru-RU', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -348,7 +348,7 @@ const formatDateTime = (dateString: string) => {
   if (!dateString) return t('Не указано')
 
   const date = new Date(dateString)
-  return date.toLocaleString('ru-RU', {
+  return date.toLocaleString(locale.value === 'en' ? 'en-GB' : 'ru-RU', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -368,11 +368,14 @@ const timeAgo = (dateString: string) => {
   const diffMinutes = Math.floor(diffMs / (1000 * 60))
 
   if (diffDays > 0) {
-    return `${diffDays} ${diffDays === 1 ? t('день') : diffDays < 5 ? t('дня') : t('дней')} назад`
+    return new Intl.RelativeTimeFormat(locale.value, { numeric: 'auto' }).format(-diffDays, 'day')
   } else if (diffHours > 0) {
-    return `${diffHours} ${diffHours === 1 ? t('час') : diffHours < 5 ? t('часа') : t('часов')} назад`
+    return new Intl.RelativeTimeFormat(locale.value, { numeric: 'auto' }).format(-diffHours, 'hour')
   } else if (diffMinutes > 0) {
-    return `${diffMinutes} ${diffMinutes === 1 ? t('минуту') : diffMinutes < 5 ? t('минуты') : t('минут')} назад`
+    return new Intl.RelativeTimeFormat(locale.value, { numeric: 'auto' }).format(
+      -diffMinutes,
+      'minute',
+    )
   } else {
     return t('Только что')
   }

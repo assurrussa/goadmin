@@ -2,10 +2,12 @@ package auth //nolint:testpackage // Verifies safe HTTP error classification.
 
 import (
 	"errors"
-	"github.com/assurrussa/goadmin/services/adminservice"
+	"testing"
+
 	"github.com/assurrussa/goauth"
 	"github.com/stretchr/testify/require"
-	"testing"
+
+	"github.com/assurrussa/goadmin/services/adminservice"
 )
 
 func TestMFAManagementFailureSeparatesOperationalAndVerificationErrors(t *testing.T) {

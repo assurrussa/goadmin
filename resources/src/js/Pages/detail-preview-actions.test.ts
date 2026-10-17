@@ -31,7 +31,8 @@ it.each([
   async ({ component, domain }) => {
     fixture.page = reactive({ props: {} as Record<string, unknown> })
     const root = document.createElement('div')
-    app = createApp(component, { data: { id: 7, name: 'Synthetic', deletedAt: { Valid: false } } })
+    const props = { data: { id: 7, name: 'Synthetic', deletedAt: { Valid: false } } }
+    app = createApp(component, props)
     app.mount(root)
     const links = () => root.querySelectorAll(`a[href="/${domain}/7/edit"]`)
     expect(links()).toHaveLength(2)

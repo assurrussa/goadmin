@@ -1,3 +1,4 @@
+import { setLocale } from '@/i18n'
 import { afterEach, expect, it, vi } from 'vitest'
 import { createApp, nextTick } from 'vue'
 import LocalMFASettings from './LocalMFASettings.vue'
@@ -13,6 +14,7 @@ vi.mock('qrcode', () => ({
 }))
 let app: ReturnType<typeof createApp> | undefined
 afterEach(() => {
+  setLocale('ru')
   app?.unmount()
   post.mockReset()
 })
@@ -64,6 +66,11 @@ it('uncertain mutation clears secrets and prevents automatic or manual replay', 
   post.mockRejectedValueOnce(new Error('lost response'))
   button(root, 'Заменить приложение').click()
   await flush()
+  setLocale('en')
+  await nextTick()
+  expect(root.textContent).toContain('The service could not confirm the outcome')
+  setLocale('ru')
+  await nextTick()
   expect(post).toHaveBeenCalledTimes(1)
   expect(root.querySelector('input')).toBeNull()
   expect(root.textContent).toContain('Состояние защиты неизвестно')
@@ -91,21 +98,25 @@ it('late enrollment response after pagehide cannot restore secret or QR', async 
 })
 
 it.each([
- [400, 'proof_invalid', 'Проверьте текущий пароль', true],
- [400, 'verification_rejected', 'Проверка отклонена', true],
- [429, 'rate_limited', 'Слишком много попыток', true],
- [401, 'signin_required', 'Сеанс завершён', false],
- [503, 'mfa_unavailable', 'не означает, что защита выключена', false],
- [503, 'service_unavailable', 'Сервис не подтвердил результат', false],
- [503, 'outcome_unknown', 'Сервис не подтвердил результат', false],
-] as const)('classifies HTTP %s %s without treating operational failure as bad proof', async (status, code, text, canRetry) => {
- const root = mount('enabled')
- post.mockRejectedValueOnce({response:{status,data:{code}}})
- button(root,'Заменить приложение').click()
- await flush()
- expect(root.textContent).toContain(text)
- expect(Boolean(root.querySelector('input[name="mfaPassword"]'))).toBe(canRetry)
- expect(root.textContent).not.toContain('Защита не включена')
- if(code === 'signin_required') expect(root.querySelector('a[href="/auth/login"]')).not.toBeNull()
- expect(post).toHaveBeenCalledTimes(1)
-})
+  [400, 'proof_invalid', 'Проверьте текущий пароль', true],
+  [400, 'verification_rejected', 'Проверка отклонена', true],
+  [429, 'rate_limited', 'Слишком много попыток', true],
+  [401, 'signin_required', 'Сеанс завершён', false],
+  [503, 'mfa_unavailable', 'не означает, что защита выключена', false],
+  [503, 'service_unavailable', 'Сервис не подтвердил результат', false],
+  [503, 'outcome_unknown', 'Сервис не подтвердил результат', false],
+] as const)(
+  'classifies HTTP %s %s without treating operational failure as bad proof',
+  async (status, code, text, canRetry) => {
+    const root = mount('enabled')
+    post.mockRejectedValueOnce({ response: { status, data: { code } } })
+    button(root, 'Заменить приложение').click()
+    await flush()
+    expect(root.textContent).toContain(text)
+    expect(Boolean(root.querySelector('input[name="mfaPassword"]'))).toBe(canRetry)
+    expect(root.textContent).not.toContain('Защита не включена')
+    if (code === 'signin_required')
+      expect(root.querySelector('a[href="/auth/login"]')).not.toBeNull()
+    expect(post).toHaveBeenCalledTimes(1)
+  },
+)

@@ -70,3 +70,32 @@ describe('sidebar navigation', () => {
     },
   )
 })
+
+it('shows a meaningful initial and accessible group toggle for collapsed groups without a destination', async () => {
+  container = document.createElement('div')
+  document.body.append(container)
+  app = createApp({
+    render: () =>
+      h(SidebarMenuItems, {
+        items: [
+          {
+            name: 'Пользователи',
+            href: '',
+            children: [{ name: 'Профиль', href: '/auth/profile' }],
+          },
+        ],
+        depth: 0,
+        collapsed: true,
+        isActive: () => false,
+        resolveIcon: () => undefined,
+      }),
+  })
+  app.mount(container)
+  const label = container.querySelector('[title="Пользователи"]')!
+  expect(label.querySelector('[aria-hidden="true"]')?.textContent).toBe('П')
+  const button = container.querySelector('button')!
+  expect(button.getAttribute('aria-label')).toBe('Развернуть Пользователи')
+  button.click()
+  await nextTick()
+  expect(container.querySelector('a[href="/auth/profile"]')).not.toBeNull()
+})

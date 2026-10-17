@@ -43,13 +43,23 @@
         </Link>
         <span
           v-else
-          :class="
-            collapsed
-              ? 'sr-only'
-              : 'min-w-0 flex-1 px-3 py-2 text-xs font-semibold text-text-tertiary'
-          "
-          >{{ t(item.name) }}</span
+          class="flex min-w-0 flex-1 items-center px-2 py-2 text-xs font-semibold text-text-tertiary"
+          :title="collapsed ? t(item.name) : undefined"
         >
+          <component
+            v-if="collapsed && resolveIcon(item.icon)"
+            :is="resolveIcon(item.icon)"
+            class="h-5 w-5 shrink-0"
+            aria-hidden="true"
+          />
+          <span
+            v-else-if="collapsed"
+            class="flex h-5 w-5 items-center justify-center"
+            aria-hidden="true"
+            >{{ Array.from(t(item.name))[0]?.toUpperCase() }}</span
+          >
+          <span :class="collapsed ? 'sr-only' : 'truncate'">{{ t(item.name) }}</span>
+        </span>
         <button
           v-if="hasChildren(item)"
           type="button"

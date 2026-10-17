@@ -82,7 +82,7 @@
 
     <!-- Help text -->
     <p v-if="helpText && !error" :id="`${inputId}-help`" class="text-sm text-text-secondary">
-      {{ helpText }}
+      {{ t(helpText) }}
     </p>
   </div>
 </template>

@@ -183,7 +183,7 @@
 </template>
 
 <script setup lang="ts">
-import { t } from '@/i18n'
+import { t, locale } from '@/i18n'
 
 import type { Config, Column, DataItem, DataItemValue } from '~/composables/useDataGrid.ts'
 import { computed } from 'vue'
@@ -293,7 +293,7 @@ const formatValue = (value: unknown, column: Column): string => {
     if (value === '') return ''
     const date = new Date(value)
     if (Number.isNaN(date.getTime())) return ''
-    return date.toLocaleDateString('ru-RU', {
+    return date.toLocaleDateString(locale.value === 'en' ? 'en-GB' : 'ru-RU', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',

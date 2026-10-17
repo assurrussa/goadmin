@@ -32,11 +32,15 @@
                 class="flex h-full w-full flex-col items-center justify-center gap-1 text-primary"
               >
                 <span class="text-lg">🎬</span>
-                <span class="text-[10px] uppercase tracking-wide text-text-tertiary">video</span>
+                <span class="text-[10px] uppercase tracking-wide text-text-tertiary">{{
+                  t('core.ui.video', 'video')
+                }}</span>
               </div>
             </template>
             <template v-else>
-              <span class="text-xs text-text-tertiary">no preview</span>
+              <span class="text-xs text-text-tertiary">{{
+                t('core.ui.no preview', 'no preview')
+              }}</span>
             </template>
           </div>
 

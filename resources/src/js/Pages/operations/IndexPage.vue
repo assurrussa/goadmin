@@ -43,7 +43,9 @@
                 class="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-4"
               >
                 <div class="min-w-0 space-y-1">
-                  <p class="text-sm font-medium text-text-primary">Routes Front</p>
+                  <p class="text-sm font-medium text-text-primary">
+                    {{ t('core.ui.Routes Front', 'Routes Front') }}
+                  </p>
                   <p class="text-sm leading-6 text-text-secondary">
                     {{
                       t(
@@ -58,7 +60,7 @@
                   class="w-full sm:w-auto lg:self-center"
                   @click="runAction('/operations/routes/regenerate')"
                 >
-                  Regenerate routes
+                  {{ t('core.ui.Regenerate routes', 'Regenerate routes') }}
                 </AppButton>
               </div>
             </div>
@@ -68,7 +70,9 @@
                 class="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-4"
               >
                 <div class="min-w-0 space-y-1">
-                  <p class="text-sm font-medium text-text-primary">Sitemap</p>
+                  <p class="text-sm font-medium text-text-primary">
+                    {{ t('core.ui.Sitemap', 'Sitemap') }}
+                  </p>
                   <p class="text-sm leading-6 text-text-secondary">
                     {{ t('Пересобирает sitemap index и sitemap files в backend runtime.') }}
                   </p>
@@ -80,7 +84,7 @@
                   class="w-full sm:w-auto lg:self-center"
                   @click="runAction('/operations/sitemap/regenerate')"
                 >
-                  Regenerate sitemap
+                  {{ t('core.ui.Regenerate sitemap', 'Regenerate sitemap') }}
                 </AppButton>
               </div>
             </div>
@@ -90,7 +94,9 @@
                 class="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-4"
               >
                 <div class="min-w-0 space-y-1">
-                  <p class="text-sm font-medium text-text-primary">Frontend Redeploy</p>
+                  <p class="text-sm font-medium text-text-primary">
+                    {{ t('core.ui.Frontend Redeploy', 'Frontend Redeploy') }}
+                  </p>
                   <p class="text-sm leading-6 text-text-secondary">
                     {{
                       t(
@@ -114,7 +120,7 @@
                   class="w-full sm:w-auto lg:self-center"
                   @click="runAction('/operations/frontend/redeploy')"
                 >
-                  Redeploy frontend
+                  {{ t('core.ui.Redeploy frontend', 'Redeploy frontend') }}
                 </AppButton>
               </div>
             </div>
@@ -124,7 +130,7 @@
         <Card class="border-border-primary bg-surface">
           <CardHeader class="gap-y-2 pb-4">
             <CardTitle class="text-base font-semibold text-text-primary md:text-lg">
-              Frontend Build State
+              {{ t('core.ui.Frontend Build State', 'Frontend Build State') }}
             </CardTitle>
             <CardDescription class="text-sm leading-6 text-text-secondary">
               {{ t('Текущее состояние очереди пересборки публичного фронтенда.') }}

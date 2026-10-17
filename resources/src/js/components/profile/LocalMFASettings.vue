@@ -28,7 +28,7 @@
     <p v-else-if="!signedOut && !signinRequired">
       {{ enabled ? t('mfa.enabled', 'Защита включена') : t('mfa.disabled', 'Защита не включена') }}
     </p>
-    <p v-if="message" role="status">{{ message }}</p>
+    <p v-if="message" role="status">{{ message?.() }}</p>
     <template v-if="manageable && !signedOut && !uncertain">
       <PasswordInput
         v-model="password"
@@ -105,12 +105,16 @@ import FormButton from '@/components/form/FormButton.vue'
 registerTranslations({
   ru: {},
   en: {
-    'mfa.errorUnavailable': 'Local MFA management is unavailable. This does not mean protection is disabled.',
+    'mfa.errorUnavailable':
+      'Local MFA management is unavailable. This does not mean protection is disabled.',
     'mfa.errorSignin': 'Your session has ended or changed. Sign in again before another operation.',
     'mfa.errorRate': 'Too many verification attempts. Wait before trying again.',
-    'mfa.errorProof': 'Check your current password and a fresh authenticator or unused recovery code.',
-    'mfa.errorRejected': 'Verification was rejected. Check fresh proof; if setup or session expired, sign in again.',
-    'mfa.errorUnknown': 'The service could not confirm the outcome. Sign in again and check protection before repeating.',
+    'mfa.errorProof':
+      'Check your current password and a fresh authenticator or unused recovery code.',
+    'mfa.errorRejected':
+      'Verification was rejected. Check fresh proof; if setup or session expired, sign in again.',
+    'mfa.errorUnknown':
+      'The service could not confirm the outcome. Sign in again and check protection before repeating.',
 
     'mfa.localTitle': 'Local account two-factor protection',
     'mfa.scope':
@@ -148,13 +152,18 @@ const { t } = useI18n()
 const enabled = computed(() => props.state === 'enabled')
 const operationUnavailable = ref(false)
 const signinRequired = ref(false)
-const manageable = computed(() => !operationUnavailable.value && !signinRequired.value && (props.state === 'enabled' || props.state === 'disabled'))
+const manageable = computed(
+  () =>
+    !operationUnavailable.value &&
+    !signinRequired.value &&
+    (props.state === 'enabled' || props.state === 'disabled'),
+)
 const uncertain = ref(false)
 const qr = ref('')
 const password = ref('')
 const code = ref('')
 const busy = ref(false)
-const message = ref('')
+const message = ref<(() => string) | null>(null)
 const signedOut = ref(false)
 const enrollment = ref<{ id: string; secret: string; url: string } | null>(null)
 const recoveryCodes = ref<string[]>([])
@@ -170,7 +179,7 @@ onBeforeUnmount(lifecycle.dispose)
 async function run(action: string) {
   if (!lifecycle.isActive() || busy.value || uncertain.value || !manageable.value) return
   busy.value = true
-  message.value = ''
+  message.value = null
   try {
     const { data } = await axios.post('/auth/profile/settings/mfa/' + action, {
       password: password.value,
@@ -203,11 +212,12 @@ async function run(action: string) {
     enrollment.value = data.enrollment || null
     recoveryCodes.value = data.recoveryCodes || []
     signedOut.value = Boolean(data.signedOut)
-    message.value = signedOut.value
-      ? t('Настройки сохранены. Все сеансы завершены.')
-      : action === 'cancel'
-        ? t('Настройка отменена.')
-        : t('Введите код нового приложения для подтверждения.')
+    message.value = () =>
+      signedOut.value
+        ? t('Настройки сохранены. Все сеансы завершены.')
+        : action === 'cancel'
+          ? t('Настройка отменена.')
+          : t('Введите код нового приложения для подтверждения.')
   } catch (error) {
     if (lifecycle.isActive()) {
       const response = axios.isAxiosError(error) ? error.response : undefined
@@ -216,21 +226,42 @@ async function run(action: string) {
       if (reason === 'mfa_unavailable') {
         operationUnavailable.value = true
         clearSecrets()
-        message.value = t('mfa.errorUnavailable', 'Локальная настройка MFA недоступна. Это не означает, что защита выключена.')
+        message.value = () =>
+          t(
+            'mfa.errorUnavailable',
+            'Локальная настройка MFA недоступна. Это не означает, что защита выключена.',
+          )
       } else if (status === 401 || status === 403 || reason === 'signin_required') {
         signinRequired.value = true
         clearSecrets()
-        message.value = t('mfa.errorSignin', 'Сеанс завершён или изменился. Войдите заново перед следующей операцией.')
+        message.value = () =>
+          t(
+            'mfa.errorSignin',
+            'Сеанс завершён или изменился. Войдите заново перед следующей операцией.',
+          )
       } else if (status === 429 && reason === 'rate_limited') {
-        message.value = t('mfa.errorRate', 'Слишком много попыток проверки. Подождите перед новой попыткой.')
+        message.value = () =>
+          t('mfa.errorRate', 'Слишком много попыток проверки. Подождите перед новой попыткой.')
       } else if (status === 400 && reason === 'proof_invalid') {
-        message.value = t('mfa.errorProof', 'Проверьте текущий пароль и свежий код приложения или неиспользованный резервный код.')
+        message.value = () =>
+          t(
+            'mfa.errorProof',
+            'Проверьте текущий пароль и свежий код приложения или неиспользованный резервный код.',
+          )
       } else if (status === 400 && reason === 'verification_rejected') {
-        message.value = t('mfa.errorRejected', 'Проверка отклонена. Проверьте свежие пароль и код; если настройка или сеанс истекли, войдите заново.')
+        message.value = () =>
+          t(
+            'mfa.errorRejected',
+            'Проверка отклонена. Проверьте свежие пароль и код; если настройка или сеанс истекли, войдите заново.',
+          )
       } else {
         uncertain.value = true
         clearSecrets()
-        message.value = t('mfa.errorUnknown', 'Сервис не подтвердил результат. Войдите заново и проверьте защиту перед повторной операцией.')
+        message.value = () =>
+          t(
+            'mfa.errorUnknown',
+            'Сервис не подтвердил результат. Войдите заново и проверьте защиту перед повторной операцией.',
+          )
       }
     }
   } finally {

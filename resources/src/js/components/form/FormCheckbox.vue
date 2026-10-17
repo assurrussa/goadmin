@@ -40,7 +40,7 @@
 
   <!-- Help text -->
   <p v-if="helpText && !error" :id="`${inputId}-help`" class="mt-1 text-sm text-text-secondary">
-    {{ helpText }}
+    {{ t(helpText) }}
   </p>
 </template>
 

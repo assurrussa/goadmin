@@ -174,7 +174,7 @@
 </template>
 
 <script setup lang="ts">
-import { t } from '@/i18n'
+import { t, locale } from '@/i18n'
 
 import LocalMFASettings from '@/components/profile/LocalMFASettings.vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -318,7 +318,7 @@ const changePassword = () => {
 const formatDateTime = (value: string) => {
   if (!value) return '—'
   const date = new Date(value)
-  return date.toLocaleString('ru-RU', {
+  return date.toLocaleString(locale.value === 'en' ? 'en-GB' : 'ru-RU', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',

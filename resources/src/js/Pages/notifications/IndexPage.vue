@@ -232,7 +232,7 @@
 </template>
 
 <script setup lang="ts">
-import { t } from '@/i18n'
+import { t, locale } from '@/i18n'
 
 import { computed, type PropType, ref } from 'vue'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
@@ -381,7 +381,7 @@ const formatDateTime = (dateString: string) => {
   if (Number.isNaN(date.getTime())) {
     return dateString
   }
-  return date.toLocaleString('ru-RU', {
+  return date.toLocaleString(locale.value === 'en' ? 'en-GB' : 'ru-RU', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',

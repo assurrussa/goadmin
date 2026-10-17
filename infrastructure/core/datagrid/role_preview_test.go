@@ -1,10 +1,12 @@
 package datagrid //nolint:testpackage // Exercises visibility metadata without a renderer or DB.
 
 import (
-	integrationroles "github.com/assurrussa/goadmin/internal/auth"
+	"testing"
+
 	logger "github.com/assurrussa/gologger"
 	"github.com/stretchr/testify/require"
-	"testing"
+
+	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 )
 
 func TestRolePreviewFiltersLegacyGridActionsAndCreation(t *testing.T) {
