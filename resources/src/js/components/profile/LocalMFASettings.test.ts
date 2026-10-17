@@ -39,6 +39,7 @@ it.each(['unavailable', 'unknown'] as const)(
 )
 it('shows local QR and secret only during unconfirmed enrollment, cancellation clears both', async () => {
   const root = mount('disabled')
+  expect(root.querySelector('input[name="mfaCode"]')).toBeNull()
   post.mockResolvedValueOnce({
     data: {
       signedOut: false,
@@ -48,12 +49,14 @@ it('shows local QR and secret only during unconfirmed enrollment, cancellation c
   button(root, 'Включить защиту').click()
   await flush()
   expect(root.querySelector('img')?.getAttribute('src')).toBe('data:image/png;base64,synthetic')
+  expect(root.querySelector('input[name="mfaCode"]')).not.toBeNull()
   expect(root.textContent).toContain('synthetic-secret')
   expect(root.textContent).toContain('До подтверждения защита не меняется')
   post.mockResolvedValueOnce({ data: { signedOut: false } })
   button(root, 'Отмена').click()
   await flush()
   expect(root.querySelector('img')).toBeNull()
+  expect(root.querySelector('input[name="mfaCode"]')).toBeNull()
   expect(root.textContent).not.toContain('synthetic-secret')
 })
 it('uncertain mutation clears secrets and prevents automatic or manual replay', async () => {

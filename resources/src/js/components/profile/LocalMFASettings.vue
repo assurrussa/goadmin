@@ -37,6 +37,7 @@
         autocomplete="current-password"
       />
       <FormInput
+        v-if="enabled || enrollment"
         v-model="code"
         name="mfaCode"
         :label="t('Код приложения или резервный код')"
