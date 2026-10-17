@@ -103,4 +103,19 @@ describe('compact role preview', () => {
     expect(mocks.post).toHaveBeenCalledWith('/auth/role-preview', { roleId: 0 })
     expect(mocks.visit).toHaveBeenCalledWith('/auth/profile', { replace: true })
   })
+  it('keeps the required native select with one noninteractive decorative chevron', () => {
+    const { root } = mount(
+      { active: false, available: true, roles: [{ id: 7, name: 'Editor' }] },
+      true,
+    )
+    const select = root.querySelector('select')!
+    expect(select.required).toBe(true)
+    expect(select.classList.contains('appearance-none')).toBe(true)
+    expect(select.classList.contains('focus:outline-none')).toBe(true)
+    expect(select.classList.contains('pr-10')).toBe(true)
+    const icons = select.parentElement!.querySelectorAll('svg')
+    expect(icons).toHaveLength(1)
+    expect(icons[0]?.getAttribute('aria-hidden')).toBe('true')
+    expect(icons[0]?.classList.contains('pointer-events-none')).toBe(true)
+  })
 })
