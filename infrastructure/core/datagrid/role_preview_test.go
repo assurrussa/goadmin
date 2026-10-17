@@ -15,5 +15,6 @@ func TestRolePreviewFiltersLegacyGridActionsAndCreation(t *testing.T) {
 	require.Equal(t, "view", actions[0].Key)
 	require.False(t, grid.previewActionAllowed(ctx, "create"))
 	require.Len(t, grid.availableActions(t.Context(), 1), 4, "ordinary action callbacks are unchanged")
+	require.False(t, grid.previewActionAllowed(ctx, "custom-run"), "custom grants are never inferred from labels")
 	require.True(t, grid.previewActionAllowed(integrationroles.WithSuperRolePreview(t.Context()), "create"))
 }

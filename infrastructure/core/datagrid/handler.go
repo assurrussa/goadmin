@@ -450,6 +450,11 @@ func (h *Handler[T]) previewActionAllowed(ctx context.Context, action string) bo
 		action = "update"
 	case "restore":
 		action = "delete"
+	case "create", "read", "update", "delete":
+		// These keys already name canonical actions.
+	default:
+		// Custom action keys do not declare a canonical permission contract.
+		return false
 	}
 	return integrationroles.RolePreviewAllows(ctx, integrationroles.NewPermissionKey(integrationroles.PermissionDomain(domain), integrationroles.PermissionAction(action)))
 }
