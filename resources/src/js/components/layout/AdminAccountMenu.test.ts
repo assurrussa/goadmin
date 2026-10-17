@@ -80,14 +80,31 @@ it('places only safe flat account links in the profile and keeps them out of the
   expect(sidebar.querySelector('a[href="/users"]')?.textContent).toContain('Sidebar only')
 })
 
-it('includes the border within the 68px header height', () => {
+it('shares shell height/content tokens while preserving the original defaults', () => {
   const root = document.createElement('div')
   const app = createApp(AdminHeader).use(createPinia())
   apps.push(app)
   app.mount(root)
   const header = root.querySelector('header')!
   expect(header.classList.contains('box-border')).toBe(true)
-  expect(header.classList.contains('h-[68px]')).toBe(true)
+  const sidebarRoot = document.createElement('div')
+  const sidebarApp = createApp(AdminSidebar).use(createPinia())
+  apps.push(sidebarApp)
+  sidebarApp.mount(sidebarRoot)
+  expect(
+    sidebarRoot.firstElementChild?.firstElementChild?.classList.contains(
+      'h-[var(--goadmin-header-height,68px)]',
+    ),
+  ).toBe(true)
+  expect(
+    header.firstElementChild?.classList.contains('max-w-[var(--goadmin-content-max-width,80rem)]'),
+  ).toBe(true)
+  expect(
+    header
+      .querySelector('[data-profile-menu-trigger]')
+      ?.classList.contains('rounded-[var(--goadmin-menu-radius,1rem)]'),
+  ).toBe(true)
+  expect(header.classList.contains('h-[var(--goadmin-header-height,68px)]')).toBe(true)
   expect(header.firstElementChild?.classList.contains('h-full')).toBe(true)
   expect(header.firstElementChild?.classList.contains('min-h-[68px]')).toBe(false)
 })

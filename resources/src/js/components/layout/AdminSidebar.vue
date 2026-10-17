@@ -2,7 +2,7 @@
   <div class="flex flex-col h-full">
     <!-- Logo -->
     <div
-      class="flex h-[68px] shrink-0 items-center gap-2 px-3 border-b border-border-primary"
+      class="flex h-[var(--goadmin-header-height,68px)] shrink-0 items-center gap-2 px-3 border-b border-border-primary"
       :class="collapsed ? 'justify-center' : 'justify-between'"
     >
       <div :class="collapsed ? 'hidden' : 'flex min-w-0 items-center space-x-3 whitespace-nowrap'">

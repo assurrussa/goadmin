@@ -171,3 +171,19 @@ test('rejects invalid dependency graphs and fingerprint drift', (t) => {
     /fingerprint mismatch/,
   )
 })
+
+test('materializes the opt-in CSS-only shell theme with its verified fingerprint', (t) => {
+  const generatedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'goadmin-shell-theme-'))
+  t.after(() => fs.rmSync(generatedRoot, { recursive: true, force: true }))
+  const exampleRoot = path.resolve(__dirname, '../examples/theme-shell')
+  const manifestPath = path.join(exampleRoot, 'extension.json')
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')).extensions[0]
+  assert.equal(manifest.fingerprint, fingerprintSource(path.join(exampleRoot, 'src')))
+  const result = materializeAdminExtensions({ generatedRoot, manifestPaths: [manifestPath] })
+  assert.equal(result.bundleManifest.extensions.length, 1)
+  assert.equal(result.bundleManifest.extensions[0].key, 'example.shell-theme')
+  assert.match(fs.readFileSync(result.generatedModulePath, 'utf8'), /import \* as extension0.*extensions\/theme\.ts/)
+  const source = fs.readFileSync(path.join(exampleRoot, 'src/extensions/theme.ts'), 'utf8')
+  assert.match(source, /import '\.\.\/theme\.css'/)
+  assert.match(source, /export default \{\}/)
+})
