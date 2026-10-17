@@ -92,11 +92,12 @@ type Options struct {
 
 type App struct {
 	Options
-	permissionDefinitions []integrationroles.PermissionDefinition
-	commandTransaction    func(context.Context, func(context.Context) error) error
-	capabilities          map[string]bool
-	users                 UserRepo
-	userSubjects          SubjectEmailStore
+	nativeCSRFTokenProvider goinertia.CSRFTokenProvider
+	permissionDefinitions   []integrationroles.PermissionDefinition
+	commandTransaction      func(context.Context, func(context.Context) error) error
+	capabilities            map[string]bool
+	users                   UserRepo
+	userSubjects            SubjectEmailStore
 }
 
 func Must(opts Options) *App {
@@ -213,4 +214,18 @@ func (a *App) InTransaction(ctx context.Context, fn func(context.Context) error)
 		return errors.New("managed admin transaction is required")
 	}
 	return a.commandTransaction(ctx, fn)
+}
+
+// SetNativeCSRFTokenProvider binds the same provider used by Inertia rendering.
+func (a *App) SetNativeCSRFTokenProvider(provider goinertia.CSRFTokenProvider) {
+	a.nativeCSRFTokenProvider = provider
+}
+
+// NativeCSRFToken issues or refreshes native session-bound CSRF for standalone
+// authenticated pages. The ordinary Inertia write middleware still validates it.
+func (a *App) NativeCSRFToken(c fiber.Ctx) (string, error) {
+	if a == nil || a.nativeCSRFTokenProvider == nil {
+		return "", errors.New("native CSRF provider unavailable")
+	}
+	return a.nativeCSRFTokenProvider(c)
 }
