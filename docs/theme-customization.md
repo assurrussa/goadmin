@@ -99,3 +99,36 @@ fingerprint or edit the generated bundle directly.
 The contract remains limited to the shell and the listed shared controls/cards.
 No dialog-wide styling, preset switcher, component replacement, database setting or
 automatic consumer update is included.
+
+## Stage three: optional density presets
+
+Two local CSS presets use only the documented shell/control variables:
+
+- [Compact](../resources/examples/theme-compact/extension.json): 64px header,
+  15rem sidebar, 32px default controls, 16px card padding, tighter corners.
+- [Comfortable](../resources/examples/theme-comfortable/extension.json): 72px header,
+  17rem sidebar, 44px default controls, 28px card padding, softer corners.
+
+Both preserve the existing semantic colors, focus styles, light/dark preference,
+fonts and behavior. Neither is enabled by default. Without either manifest,
+existing styling remains unchanged. On viewports below 768px or coarse-pointer
+devices, shared controls have at least 44px height and card padding is 16px.
+This is not a claim that every custom control has a 44px touch target.
+
+Choose one preset manifest in your existing extension manifest list:
+
+```sh
+VITE_ADMIN_EXTENSION_MANIFESTS=examples/theme-compact/extension.json npm run build-only
+# Or choose examples/theme-comfortable/extension.json instead.
+```
+
+Preserve your project's other extension manifests. Do not combine both density
+presets or the earlier theme-shell example: their root variables overlap and
+CSS import order is not a preset-selection contract. To customize, copy the
+chosen example to your project's extension source, edit the CSS and regenerate
+its source fingerprint. Standard styling is restored by removing the preset
+manifest and rebuilding. Existing explicit component class overrides still win.
+
+These are build-time examples, not a runtime theme selector or profile setting.
+They do not change AuthHub/NotifyHub dependencies or deploy a consumer. Handwritten
+controls and page-specific layouts remain outside the shared-component contract.
