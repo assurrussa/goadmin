@@ -1,0 +1,30 @@
+/* Opt-in compact preset. Shared shell/controls only; semantic colors stay unchanged. */
+:root {
+  --goadmin-header-height: 64px;
+  --goadmin-sidebar-width: 15rem;
+  --goadmin-sidebar-collapsed-width: 5rem;
+  --goadmin-content-max-width: 88rem;
+  --goadmin-menu-radius: 0.5rem;
+  --goadmin-control-height-xs: 28px;
+  --goadmin-control-height-sm: 32px;
+  --goadmin-control-height: 32px;
+  --goadmin-control-height-lg: 36px;
+  --goadmin-control-height-xl: 40px;
+  --goadmin-control-radius: 6px;
+  --goadmin-control-radius-xs: 4px;
+  --goadmin-textarea-min-height: 60px;
+  --goadmin-card-radius: 8px;
+  --goadmin-card-padding: 16px;
+}
+
+/* Keep shared touch controls comfortable on narrow or coarse-pointer devices. */
+@media (max-width: 767px), (pointer: coarse) {
+  :root {
+    --goadmin-control-height-xs: 44px;
+    --goadmin-control-height-sm: 44px;
+    --goadmin-control-height: 44px;
+    --goadmin-control-height-lg: 48px;
+    --goadmin-control-height-xl: 52px;
+    --goadmin-card-padding: 16px;
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "formatVersion": 1,
+  "extensions": [
+    {
+      "key": "example.comfortable-theme",
+      "apiVersion": 1,
+      "sourceRoot": "src",
+      "fingerprint": "sha256:2ccc98a2a54d838ee71eaa8a43f72b0658b3a8daca30950ec26009810837e438",
+      "requires": [
+        "goadmin.core"
+      ]
+    }
+  ]
+}
