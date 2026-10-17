@@ -13,7 +13,10 @@ const props = defineProps<Props>()
 <template>
   <Card
     :class="
-      cn('rounded-xl border border-border bg-card text-card-foreground shadow-sm', props.class)
+      cn(
+        'rounded-[var(--goadmin-card-radius,var(--radius-xl,0.75rem))] border border-border bg-card text-card-foreground shadow-sm',
+        props.class,
+      )
     "
   >
     <slot />

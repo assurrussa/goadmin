@@ -7,6 +7,17 @@
   --goadmin-menu-radius: 0.75rem;
   --goadmin-header-shadow: none;
   --goadmin-sidebar-shadow: none;
+  /* Stage two: common controls/cards only. */
+  --goadmin-control-height-xs: 24px;
+  --goadmin-control-height-sm: 36px;
+  --goadmin-control-height: 44px;
+  --goadmin-control-height-lg: 48px;
+  --goadmin-control-height-xl: 56px;
+  --goadmin-control-radius: 8px;
+  --goadmin-control-radius-xs: 3px;
+  --goadmin-textarea-min-height: 96px;
+  --goadmin-card-radius: 20px;
+  --goadmin-card-padding: 20px;
   --hue-primary: 224;
   --saturation-primary: 65%;
   --font-sans: ui-sans-serif, system-ui, sans-serif;

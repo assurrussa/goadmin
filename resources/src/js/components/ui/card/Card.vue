@@ -8,7 +8,14 @@ const props = defineProps<{
 </script>
 
 <template>
-  <div :class="cn('rounded-xl border bg-card text-card-foreground shadow', props.class)">
+  <div
+    :class="
+      cn(
+        'rounded-[var(--goadmin-card-radius,var(--radius-xl,0.75rem))] border bg-card text-card-foreground shadow',
+        props.class,
+      )
+    "
+  >
     <slot />
   </div>
 </template>

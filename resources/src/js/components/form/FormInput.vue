@@ -131,9 +131,9 @@ const inputId = computed(() => props.id || useId())
 
 // Keep icons on the input row even when a host appends a policy hint here.
 const inputHeightClass = computed(() => {
-  if (props.size === 'sm') return 'h-8'
-  if (props.size === 'lg') return 'h-10'
-  return 'h-9'
+  if (props.size === 'sm') return 'h-[var(--goadmin-control-height-sm,2rem)]'
+  if (props.size === 'lg') return 'h-[var(--goadmin-control-height-lg,2.5rem)]'
+  return 'h-[var(--goadmin-control-height,2.25rem)]'
 })
 
 // Computed classes for input styling

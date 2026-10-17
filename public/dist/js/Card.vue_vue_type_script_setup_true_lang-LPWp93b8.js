@@ -1,1 +1,0 @@
-import{I as s}from"./app.js";import{d as o,P as n,a0 as t,a7 as c,z as l,O as d}from"./editor-DHCvUJ8n.js";const f=o({__name:"Card",props:{class:{type:[Boolean,null,String,Object,Array]}},setup(r){const a=r;return(e,p)=>(n(),t("div",{class:c(l(s)("rounded-xl border bg-card text-card-foreground shadow",a.class))},[d(e.$slots,"default")],2))}});export{f as _};
