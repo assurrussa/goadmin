@@ -62,10 +62,12 @@
           }}
         </p>
         <div class="flex flex-wrap items-center gap-3" data-mfa-actions>
-        <FormButton :disabled="busy" @click="run('confirm')">{{
-          t('Подтвердить новый код')
-        }}</FormButton>
-        <FormButton variant="secondary" :disabled="busy" @click="run('cancel')">{{ t('Отмена') }}</FormButton>
+          <FormButton :disabled="busy" @click="run('confirm')">{{
+            t('Подтвердить новый код')
+          }}</FormButton>
+          <FormButton variant="secondary" :disabled="busy" @click="run('cancel')">{{
+            t('Отмена')
+          }}</FormButton>
         </div>
       </template>
       <div v-else class="flex flex-wrap items-center gap-3" data-mfa-actions>

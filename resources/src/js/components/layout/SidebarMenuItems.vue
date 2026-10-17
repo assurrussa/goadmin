@@ -13,10 +13,11 @@
             paddingRight: collapsed ? '0.5rem' : '0.75rem',
           }"
           class="group flex min-w-0 flex-1 items-center rounded-lg py-2 text-sm focus-visible:ring-2 focus-visible:ring-primary"
-          :class="[collapsed ? 'justify-center' : '',
+          :class="[
+            collapsed ? 'justify-center' : '',
             isGroupActive(item)
               ? 'bg-primary/10 text-primary font-semibold'
-              : 'text-text-secondary hover:bg-surface-variant'
+              : 'text-text-secondary hover:bg-surface-variant',
           ]"
         >
           <component

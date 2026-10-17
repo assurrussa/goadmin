@@ -211,6 +211,10 @@ pipeline. No media editor/player contract changes are included.
 
 ## Admin client bundle
 
+Menu sections accept `Placement`: empty or `sidebar` keeps sidebar navigation;
+`account` renders flat root-relative links in the profile dropdown. Both use the
+existing permission-filtered menu. Routes still enforce their own permissions.
+
 The sidebar footer shows GoAdmin's version through the shared `adminInfo.version`
 prop. It reads the GoAdmin module's Go build metadata, independently of the
 host application's version. Local source replacements and builds without a

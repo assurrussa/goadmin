@@ -344,12 +344,14 @@ func (f *assistedRecoveryFeature) initiationPage(app *App) fiber.Handler {
 			return err
 		}
 		targets := []map[string]any{}
+		searchInvalid := false
 		search := strings.TrimSpace(c.Query("search"))
 		if len(search) > 256 {
 			return fiber.ErrBadRequest
 		}
 		if search != "" {
 			account, err := app.inner.AdminAuth().FindRecoveryAccount(c, search)
+			searchInvalid = errors.Is(err, goauth.ErrInvalidIdentifier)
 			if err != nil && !errors.Is(err, goauth.ErrAccountNotFound) && !errors.Is(err, goauth.ErrInvalidIdentifier) {
 				return fiber.ErrServiceUnavailable
 			}
@@ -361,7 +363,7 @@ func (f *assistedRecoveryFeature) initiationPage(app *App) fiber.Handler {
 			}
 		}
 		return app.Render(c, "security/AssistedRecoveryPage", map[string]any{
-			"title": "Восстановление доступа", "nativeCSRF": token, "targets": targets, "search": search,
+			"title": "Восстановление доступа", "nativeCSRF": token, "targets": targets, "search": search, "searchInvalid": searchInvalid,
 		})
 	}
 }

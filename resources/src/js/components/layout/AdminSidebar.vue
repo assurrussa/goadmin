@@ -1,7 +1,10 @@
 <template>
   <div class="flex flex-col h-full">
     <!-- Logo -->
-    <div class="flex h-[68px] shrink-0 items-center gap-2 px-3 border-b border-border-primary" :class="collapsed ? 'justify-center' : 'justify-between'">
+    <div
+      class="flex h-[68px] shrink-0 items-center gap-2 px-3 border-b border-border-primary"
+      :class="collapsed ? 'justify-center' : 'justify-between'"
+    >
       <div :class="collapsed ? 'hidden' : 'flex min-w-0 items-center space-x-3 whitespace-nowrap'">
         <div
           class="h-9 w-9 shrink-0 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center"
@@ -58,7 +61,11 @@
           />
         </div>
 
-        <div v-if="index < sections.length - 1" class="border-t border-border-primary" :class="collapsed ? 'my-2' : 'my-4'"></div>
+        <div
+          v-if="index < sections.length - 1"
+          class="border-t border-border-primary"
+          :class="collapsed ? 'my-2' : 'my-4'"
+        ></div>
       </template>
     </nav>
 
@@ -79,7 +86,22 @@ import { t } from '@/i18n'
 import { computed } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import AppButton from '@/components/ui/AppButton.vue'
-import { Bell, BookOpen, Home, ListTodo, ShieldCheck, Users, X, PanelLeft, FolderKey, KeyRound, Monitor, LifeBuoy, Mail, RotateCcw } from 'lucide-vue-next'
+import {
+  Bell,
+  BookOpen,
+  Home,
+  ListTodo,
+  ShieldCheck,
+  Users,
+  X,
+  PanelLeft,
+  FolderKey,
+  KeyRound,
+  Monitor,
+  LifeBuoy,
+  Mail,
+  RotateCcw,
+} from 'lucide-vue-next'
 import SidebarMenuItems from './SidebarMenuItems.vue'
 import type { Component } from 'vue'
 
@@ -119,6 +141,7 @@ type AdminMenuItem = {
 }
 
 type AdminMenuSection = {
+  placement?: string
   key: string
   title?: string
   order?: number
@@ -149,7 +172,9 @@ const iconMap: Record<string, Component> = {
 const sections = computed(() => {
   const propsMenu = (page.props as { adminMenu?: Partial<AdminMenu> }).adminMenu
   if (!Array.isArray(propsMenu?.sections)) return []
-  return propsMenu.sections.filter((section) => section.items?.length > 0)
+  return propsMenu.sections.filter(
+    (section) => section.placement !== 'account' && section.items?.length > 0,
+  )
 })
 
 const resolveIcon = (icon: MenuIcon) => {

@@ -118,3 +118,20 @@ func TestRolePreviewDisablesSessionSuperAdminMenuBypass(t *testing.T) {
 		}
 	}
 }
+
+func TestAccountPlacementMergePreservesPermissionFiltering(t *testing.T) {
+	key := integrationroles.NewPermissionKey(integrationroles.PermissionDomainAdmins, integrationroles.PermissionActionRead)
+	original := menu.Menu{Sections: []menu.Section{{Key: "account", Items: []menu.Item{{Name: "Account", Href: "/sso/account", PermissionKey: key}}}}}
+	merged := original.Merge(menu.Menu{Sections: []menu.Section{{Key: "account", Placement: "account"}}})
+	require.Equal(t, "account", merged.Sections[0].Placement)
+	require.Empty(t, original.Sections[0].Placement)
+	merged = merged.Merge(menu.Menu{Sections: []menu.Section{{Key: "account", Placement: "sidebar"}}})
+	require.Equal(t, "account", merged.Sections[0].Placement)
+	admin := &models.SessionAdmin{ID: 7}
+	denied := menu.BuildAdminMenu(context.Background(), admin, domainChecker{}, merged)
+	require.Empty(t, denied.Sections)
+	allowed := menu.BuildAdminMenu(context.Background(), admin, domainChecker{allowed: map[integrationroles.PermissionDomain]bool{integrationroles.PermissionDomainAdmins: true}}, merged)
+	require.Len(t, allowed.Sections, 1)
+	require.Equal(t, "account", allowed.Sections[0].Placement)
+	require.Equal(t, "/sso/account", allowed.Sections[0].Items[0].Href)
+}
