@@ -7,29 +7,38 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/assurrussa/goadmin/adminapp"
-	integrationroles "github.com/assurrussa/goadmin/internal/auth"
-	"github.com/assurrussa/goadmin/models"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/session"
 	"github.com/stretchr/testify/require"
+
+	"github.com/assurrussa/goadmin/adminapp"
+	integrationroles "github.com/assurrussa/goadmin/internal/auth"
+	"github.com/assurrussa/goadmin/models"
 )
 
 type previewOwner struct {
 	adminapp.RolesService
-	owner bool
+	owner       bool
+	allowUpdate bool
 }
 
 func (s *previewOwner) IsSuperAdmin(context.Context, int64) bool { return s.owner }
+func (s *previewOwner) AdminGuardCheck(ctx context.Context, _ int64, key integrationroles.PermissionKey,
+	_ ...integrationroles.PermissionGuardOption,
+) bool {
+	return s.allowUpdate && integrationroles.RolePreviewAllows(ctx, key)
+}
 
 type previewRoles struct{ RolesService }
 
 func (*previewRoles) GetRole(context.Context, int64) (*integrationroles.Role, error) {
 	return &integrationroles.Role{ID: 2, Name: "Viewer"}, nil
 }
+
 func (*previewRoles) ListRoles(context.Context, integrationroles.RoleFilter) ([]integrationroles.Role, error) {
 	return []integrationroles.Role{{ID: 2, Name: "Viewer"}}, nil
 }
+
 func (*previewRoles) ListRolePermissions(context.Context, int64) ([]integrationroles.Permission, error) {
 	return []integrationroles.Permission{{Domain: "users", Action: "read"}}, nil
 }
@@ -86,4 +95,38 @@ func TestRolePreviewPersistsReadOnlyPolicyAndRequiresCurrentOwner(t *testing.T) 
 	require.Equal(t, 1, writes)
 	owner.owner = false
 	require.Equal(t, 403, request("POST", rolePreviewPath, `{"roleId":2}`))
+}
+
+func TestRolePreviewActionPresentationIntersectsCurrentGuard(t *testing.T) {
+	for _, test := range []struct {
+		name                                string
+		selectedUpdate, actualUpdate, super bool
+		want                                bool
+	}{
+		{name: "viewer", actualUpdate: true},
+		{name: "selected editor without actual grant", selectedUpdate: true},
+		{name: "selected editor", selectedUpdate: true, actualUpdate: true, want: true},
+		{name: "selected super role", actualUpdate: true, super: true, want: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			deps := Dependencies{}
+			deps.Repos.RolesService = &previewOwner{allowUpdate: test.actualUpdate}
+			app := fiber.New()
+			app.Get("/actions", func(c fiber.Ctx) error {
+				c.Locals("sess_admin", &models.SessionAdmin{ID: 1})
+				key := integrationroles.NewPermissionKey("admins", "update")
+				c.SetContext(integrationroles.WithRolePreview(c.Context(), map[integrationroles.PermissionKey]bool{key: test.selectedUpdate}))
+				if test.super {
+					c.SetContext(integrationroles.WithSuperRolePreview(c.Context()))
+				}
+				actions := rolePreviewActionPresentation(c, deps)
+				require.Equal(t, test.want, actions["admins:update"])
+				return c.SendStatus(204)
+			})
+			response, err := app.Test(httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/actions", nil))
+			require.NoError(t, err)
+			require.NoError(t, response.Body.Close())
+			require.Equal(t, http.StatusNoContent, response.StatusCode)
+		})
+	}
 }

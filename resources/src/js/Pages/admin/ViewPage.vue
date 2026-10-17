@@ -52,7 +52,7 @@
 
           <!-- Кнопка редактирования -->
           <div class="flex-shrink-0">
-            <AppButton asChild>
+            <AppButton v-if="canEditInPreview" asChild>
               <Link :href="`${basePath}/${props.data.id}/edit`">
                 <Pencil class="h-4 w-4 mr-2" />
                 {{ t('Редактировать') }}
@@ -256,7 +256,7 @@
           {{ t('Назад к списку') }}
         </Link>
       </AppButton>
-      <AppButton asChild>
+      <AppButton v-if="canEditInPreview" asChild>
         <Link :href="`${basePath}/${props.data.id}/edit`">
           <Pencil class="h-4 w-4 mr-2" />
           {{ t('Редактировать') }}
@@ -270,6 +270,7 @@
 import { t } from '@/i18n'
 
 import { computed } from 'vue'
+import { useRolePreviewAction } from '@/composables/useRolePreviewAction'
 import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
@@ -290,6 +291,7 @@ import {
 } from 'lucide-vue-next'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 
+const canEditInPreview = useRolePreviewAction('admins', 'update')
 const basePath = '/admins'
 const props = defineProps({
   title: {

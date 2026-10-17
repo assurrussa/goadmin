@@ -37,7 +37,7 @@
           </div>
 
           <div class="flex-shrink-0">
-            <AppButton asChild>
+            <AppButton v-if="canEditInPreview" asChild>
               <Link :href="`${basePath}/${props.data.id}/edit`">
                 <Pencil class="h-4 w-4 mr-2" />
                 {{ t('Редактировать') }}
@@ -129,7 +129,7 @@
           {{ t('Назад к списку') }}
         </Link>
       </AppButton>
-      <AppButton asChild>
+      <AppButton v-if="canEditInPreview" asChild>
         <Link :href="`${basePath}/${props.data.id}/edit`">
           <Pencil class="h-4 w-4 mr-2" />
           {{ t('Редактировать') }}
@@ -143,6 +143,7 @@
 import { t } from '@/i18n'
 
 import { computed } from 'vue'
+import { useRolePreviewAction } from '@/composables/useRolePreviewAction'
 import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -150,6 +151,7 @@ import { Link } from '@inertiajs/vue3'
 import { ArrowLeft, Calendar, Clock, Hash, Mail, Pencil, ShieldCheck, User } from 'lucide-vue-next'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 
+const canEditInPreview = useRolePreviewAction('users', 'update')
 const basePath = '/users'
 const props = defineProps({
   title: { type: [String], default: undefined },

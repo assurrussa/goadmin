@@ -119,6 +119,7 @@ func applyRolePreview(c fiber.Ctx, deps Dependencies, owner bool, id int64, stat
 	}
 	state["roleName"] = role.Name
 	state["roleId"] = strconv.FormatInt(id, 10)
+	state["actions"] = rolePreviewActionPresentation(c, deps)
 	return nil
 }
 
@@ -134,4 +135,23 @@ func rolePreviewOptions(c fiber.Ctx, deps Dependencies) ([]fiber.Map, error) {
 		options = append(options, fiber.Map{"id": role.ID, "name": role.Name})
 	}
 	return options, nil
+}
+
+// Detail pages consume only fresh guard decisions, never browser role claims.
+func rolePreviewActionPresentation(c fiber.Ctx, deps Dependencies) map[string]bool {
+	actions := make(map[string]bool)
+	actor := adminmiddleware.GetAdminAuth(c)
+	if actor == nil || deps.Repos.RolesService == nil {
+		return actions
+	}
+	keys := []integrationroles.PermissionKey{
+		integrationroles.NewPermissionKey(integrationroles.PermissionDomainAdmins, integrationroles.PermissionActionUpdate),
+		integrationroles.NewPermissionKey(integrationroles.PermissionDomainUsers, integrationroles.PermissionActionUpdate),
+		integrationroles.NewPermissionKey(integrationroles.PermissionDomainRoles, integrationroles.PermissionActionUpdate),
+		integrationroles.NewPermissionKey(integrationroles.PermissionDomainRoles, integrationroles.PermissionActionAssign),
+	}
+	for _, key := range keys {
+		actions[key.String()] = deps.Repos.RolesService.AdminGuardCheck(c, actor.ID, key)
+	}
+	return actions
 }

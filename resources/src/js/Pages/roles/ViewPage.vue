@@ -36,7 +36,10 @@
       </div>
     </div>
 
-    <div class="bg-card border border-border-primary shadow-sm sm:rounded-2xl overflow-hidden">
+    <div
+      v-if="canAssignInPreview"
+      class="bg-card border border-border-primary shadow-sm sm:rounded-2xl overflow-hidden"
+    >
       <div class="px-5 py-4 border-b border-border-secondary bg-surface-variant/40 space-y-1">
         <p class="text-xs uppercase tracking-wide text-text-tertiary mb-1">
           {{ t('Работа с ролью') }}
@@ -193,6 +196,7 @@
                   {{ t('Права останутся, пока не удалите.') }}
                 </p>
                 <AppButton
+                  v-if="canAssignInPreview"
                   variant="danger"
                   size="sm"
                   type="button"
@@ -225,6 +229,8 @@
 
 <script setup lang="ts">
 import { t } from '@/i18n'
+import { useRolePreviewAction } from '@/composables/useRolePreviewAction'
+const canAssignInPreview = useRolePreviewAction('roles', 'assign')
 
 import { computed, onMounted, ref, watch } from 'vue'
 import { useForm } from '@inertiajs/vue3'
