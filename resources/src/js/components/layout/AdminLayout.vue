@@ -9,7 +9,7 @@
       :aria-modal="sidebarOpen ? true : undefined"
       :aria-label="t('Разделы')"
       :class="[
-        'fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border-primary shadow-lg transform transition-transform duration-300 ease-in-out',
+        'fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border-primary shadow-lg overflow-x-hidden transform transition-[width,transform] duration-200 ease-in-out motion-reduce:transition-none',
         sidebarCollapsed && !sidebarOpen ? 'lg:w-20' : 'lg:w-64',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
       ]"
@@ -32,7 +32,7 @@
     <!-- Main content -->
     <div
       :class="sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'"
-      class="transition-[padding] duration-300"
+      class="transition-[padding] duration-200 ease-in-out motion-reduce:transition-none"
     >
       <!-- Header -->
       <AdminHeader :sidebar-open="sidebarOpen" @toggle-sidebar="toggleSidebar" />
@@ -41,7 +41,6 @@
       <main class="py-6">
         <div class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 space-y-6">
           <AdminBreadcrumbs />
-          <RolePreviewBanner />
           <slot />
         </div>
       </main>
@@ -56,7 +55,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { t } from '@/i18n'
-import RolePreviewBanner from './RolePreviewBanner.vue'
 import { router } from '@inertiajs/vue3'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 import AdminHeader from './AdminHeader.vue'

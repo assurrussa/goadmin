@@ -61,12 +61,14 @@
             )
           }}
         </p>
+        <div class="flex flex-wrap items-center gap-3" data-mfa-actions>
         <FormButton :disabled="busy" @click="run('confirm')">{{
           t('Подтвердить новый код')
         }}</FormButton>
-        <FormButton :disabled="busy" @click="run('cancel')">{{ t('Отмена') }}</FormButton>
+        <FormButton variant="secondary" :disabled="busy" @click="run('cancel')">{{ t('Отмена') }}</FormButton>
+        </div>
       </template>
-      <template v-else>
+      <div v-else class="flex flex-wrap items-center gap-3" data-mfa-actions>
         <FormButton :disabled="busy" @click="run('begin')">{{
           enabled ? t('Заменить приложение') : t('Включить защиту')
         }}</FormButton>
@@ -76,7 +78,7 @@
         <FormButton v-if="enabled" :disabled="busy" @click="run('disable')">{{
           t('Отключить защиту')
         }}</FormButton>
-      </template>
+      </div>
     </template>
     <template v-if="recoveryCodes.length">
       <p>

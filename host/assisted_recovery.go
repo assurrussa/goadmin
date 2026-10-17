@@ -154,7 +154,7 @@ func (f *assistedRecoveryFeature) Descriptor() FeatureDescriptor {
 		},
 		Menu: Menu{
 			Sections: []Section{{Key: "account-recovery", Title: "Security", Items: []Item{{
-				Name: "Account recovery", Href: AssistedRecoveryAdminPath, PermissionKey: key,
+				Name: "Account recovery", Href: AssistedRecoveryAdminPath, Icon: "recovery", PermissionKey: key,
 			}}}},
 		},
 	}
