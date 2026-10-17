@@ -7,10 +7,11 @@ import (
 	"net/http"
 	"strings"
 
-	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 	logger "github.com/assurrussa/gologger"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v3"
+
+	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 )
 
 // Handler универсальный обработчик для DataGrid - МАКСИМАЛЬНО ПРОСТОЙ.
@@ -456,5 +457,8 @@ func (h *Handler[T]) previewActionAllowed(ctx context.Context, action string) bo
 		// Custom action keys do not declare a canonical permission contract.
 		return false
 	}
-	return integrationroles.RolePreviewAllows(ctx, integrationroles.NewPermissionKey(integrationroles.PermissionDomain(domain), integrationroles.PermissionAction(action)))
+	key := integrationroles.NewPermissionKey(
+		integrationroles.PermissionDomain(domain), integrationroles.PermissionAction(action),
+	)
+	return integrationroles.RolePreviewAllows(ctx, key)
 }

@@ -2,12 +2,14 @@ package auth
 
 import (
 	"errors"
-	"github.com/assurrussa/goadmin/services/adminservice"
+
 	"github.com/assurrussa/goauth"
 	"github.com/gofiber/fiber/v3"
+
+	"github.com/assurrussa/goadmin/services/adminservice"
 )
 
-func mfaManagementFailure(err error) (int, string, string) {
+func mfaManagementFailure(err error) (status int, code string, message string) {
 	switch {
 	case errors.Is(err, goauth.ErrOperationOutcomeUnknown):
 		return fiber.StatusServiceUnavailable, "outcome_unknown", "The operation outcome is unknown. " +

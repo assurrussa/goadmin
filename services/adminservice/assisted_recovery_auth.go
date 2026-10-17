@@ -2,6 +2,7 @@ package adminservice
 
 import (
 	"context"
+
 	"github.com/assurrussa/goauth"
 	"github.com/gofiber/fiber/v3"
 )
@@ -17,7 +18,7 @@ func (s *Service) CurrentLocalAuth(c fiber.Ctx) (goauth.AuthContext, error) {
 // optional users/admin projection screens. Callers must enforce recovery permission.
 func (s *Service) FindRecoveryAccount(ctx context.Context, email string) (goauth.Account, error) {
 	finder, ok := s.runtime.(interface {
-		FindAccount(context.Context, goauth.IdentifierInput) (goauth.Account, error)
+		FindAccount(ctx context.Context, identifier goauth.IdentifierInput) (goauth.Account, error)
 	})
 	if !ok {
 		return goauth.Account{}, goauth.ErrAssistedRecoveryUnavailable

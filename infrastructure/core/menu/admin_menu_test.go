@@ -108,7 +108,10 @@ func TestBuildAdminMenu_DeduplicatesMainMenuForSuperAdmin(t *testing.T) {
 func TestRolePreviewDisablesSessionSuperAdminMenuBypass(t *testing.T) {
 	ctx := integrationroles.WithRolePreview(context.Background(), map[integrationroles.PermissionKey]bool{})
 	admin := &models.SessionAdmin{ID: 1, Roles: []string{integrationroles.SuperAdminRole}}
-	result := menu.BuildAdminMenu(ctx, admin, domainChecker{}, menu.Menu{Sections: []menu.Section{{Key: "preview", Items: []menu.Item{{Name: "Protected", Href: "/protected", PermissionKey: integrationroles.NewPermissionKey("denied", "read")}}}}})
+	extra := menu.Menu{Sections: []menu.Section{{Key: "preview", Items: []menu.Item{{
+		Name: "Protected", Href: "/protected", PermissionKey: integrationroles.NewPermissionKey("denied", "read"),
+	}}}}}
+	result := menu.BuildAdminMenu(ctx, admin, domainChecker{}, extra)
 	for _, section := range result.Sections {
 		for _, item := range section.Items {
 			require.NotEqual(t, "/protected", item.Href)
