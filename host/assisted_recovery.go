@@ -349,15 +349,18 @@ func (f *assistedRecoveryFeature) initiationPage(app *App) fiber.Handler {
 func (f *assistedRecoveryFeature) completionPage(c fiber.Ctx) error { return f.page(c, true, "") }
 
 const recoveryInitiationScript = `const form=document.querySelector('form');let pending=false;
+const unknown='Recovery outcome is unknown. Do not issue another invitation until '+
+ 'the service owner has reconciled this request.';
 form.addEventListener('submit',async event=>{event.preventDefault();if(pending)return;pending=true;
 const button=form.querySelector('button');const status=form.querySelector('[role=status]');button.disabled=true;
 try{const response=await fetch(form.action,{method:'POST',mode:'same-origin',credentials:'same-origin',
 redirect:'error',cache:'no-store',headers:{'Content-Type':'application/x-www-form-urlencoded',
 'X-CSRF-Token':form.dataset.nativeCsrf},body:new URLSearchParams(new FormData(form))});
-status.textContent=response.ok?'An invitation was queued. Account credentials change only after successful completion.':
+status.textContent=response.status>=500?unknown:response.ok?
+'An invitation was queued. Account credentials change only after successful completion.':
 'Recovery was rejected. Reload this page and recheck permission, identity verification and fresh credentials.';
 form.elements.password.value='';form.elements.code.value='';
-}catch{status.textContent='Recovery outcome is unknown. Do not repeat automatically; contact the service owner.';}});`
+}catch{status.textContent=unknown;}});`
 
 func (f *assistedRecoveryFeature) complete(c fiber.Ctx) error {
 	values, err := f.form(c, []string{"csrf", "token", "password", "password_confirmation", "code"})
