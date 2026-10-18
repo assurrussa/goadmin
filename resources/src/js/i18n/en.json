@@ -1,4 +1,5 @@
 {
+  "SSO access": "SSO access",
   ". Действует до": ". Valid until",
   "1:1 (квадрат)": "1:1 (square)",
   "Backend может отправлять ручной и автоматический запрос на rebuild/redeploy публичного фронтенда.": "The backend can request manual and automatic rebuilds or redeployment of the public frontend.",

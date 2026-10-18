@@ -46,6 +46,7 @@ Stable reusable feature packages:
 
 - `github.com/assurrussa/goadmin/features/operations`
 - `github.com/assurrussa/goadmin/features/access`
+- `github.com/assurrussa/goadmin/features/admission`
 - `github.com/assurrussa/goadmin/features/jobs`
 - `github.com/assurrussa/goadmin/features/uploads`
 - `github.com/assurrussa/goadmin/features/queues`
@@ -596,3 +597,7 @@ A successful configured reset always returns to its same-origin `ForgotPath`;
 `LoginURL` is used only by an ordinary navigation link, including when the
 trusted login service has a different origin. An empty `LoginURL` hides that
 link. The default configuration retains the original routes.
+
+## Optional SSO admission candidate
+
+See [sso-admission.md](sso-admission.md). Off by default; exact issuer/subject and project grant precede scoped pending enrollment or a single-use invitation. No email autolink or local password. Explicit per-role grant permissions are checked transactionally. Existing native admission remains mandatory; source-mode GoAuth dependency support is required before enabling this candidate.

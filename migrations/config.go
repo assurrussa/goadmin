@@ -95,6 +95,9 @@ func Reset(
 
 func resetAuthProjections(ctx context.Context, db *sql.DB) error {
 	const statement = `
+DROP TABLE IF EXISTS admin_admission_events;
+DROP TABLE IF EXISTS admin_admission_invitations;
+DROP TABLE IF EXISTS admin_admissions;
 DROP TABLE IF EXISTS goadmin_browser_sessions CASCADE;
 DROP TABLE IF EXISTS goadmin_browser_auth_state CASCADE;
 DROP TABLE IF EXISTS admin_notifications CASCADE;

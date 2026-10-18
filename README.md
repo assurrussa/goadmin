@@ -17,8 +17,11 @@ A five-minute observation of two deployed host applications on 2026-10-18
 (07:06:54–07:11:54 UTC, 20 samples per application at 15-second intervals)
 recorded the following whole-application Docker working-set memory:
 
-- TSOP: 15.85 MiB median, 15.85–15.98 MiB range; median CPU 0.35%.
-- NotifyHub: 22.78 MiB median, 22.78–22.81 MiB range; median CPU 0.425%.
+- Per-application median memory: 15.85–22.78 MiB.
+- Observed memory range across both applications: 15.85–22.81 MiB.
+- Per-application median CPU: 0.35–0.425% of one logical core.
+
+These are ranges of two application-level medians, not a pooled median.
 
 CPU 100% represents one logical core. Database and messaging containers are
 excluded. These are observational examples without generated load, not a load
@@ -150,6 +153,7 @@ must not rewrite another namespace into `/public` after compression selection.
 - `github.com/assurrussa/goadmin/hosttest`
 - `github.com/assurrussa/goadmin/features/operations`
 - `github.com/assurrussa/goadmin/features/access`
+- `github.com/assurrussa/goadmin/features/admission`
 - `github.com/assurrussa/goadmin/features/jobs`
 - `github.com/assurrussa/goadmin/features/uploads`
 - `github.com/assurrussa/goadmin/features/queues`
@@ -246,7 +250,7 @@ Verification is local by default. Hosted CI is manual-only, with no automatic
 push or pull-request runs. See [local checks and manual CI](docs/ci.md) for
 tool versions, disposable PostgreSQL/Redis setup, and the proven CI baseline.
 
-This checkout pins published `goauth v0.11.0` and `gonotify v0.6.0`, including
+This checkout pins published `goauth v0.12.0` and `gonotify v0.6.0`, including
 the shared transaction and optional-delivery API. Uploads resolve
 `gouploads v0.13.0` and WebSockets resolve `gowebsocket v0.2.1`. Outbox core and
 its PostgreSQL backend both resolve `v0.17.0`, and GoCache resolves `v0.2.2`.
@@ -546,3 +550,6 @@ the pinned GoAuth API, adds no public package/import path, and does not enable a
 host SSO mode. Real RP consumer and end-to-end SSO
 acceptance follow using released dependencies and remain required before
 application release. Library publication does not establish that acceptance.
+
+Optional SSO enrollment is described in [the admission contract](docs/sso-admission.md).
+This candidate needs the matching strict GoAuth provisioning API before activation.

@@ -52,6 +52,7 @@ published support. Host projects should integrate only through:
 - `github.com/assurrussa/goadmin/hosttest`
 - `github.com/assurrussa/goadmin/features/operations`
 - `github.com/assurrussa/goadmin/features/access`
+- `github.com/assurrussa/goadmin/features/admission`
 - `github.com/assurrussa/goadmin/features/jobs`
 - `github.com/assurrussa/goadmin/features/uploads`
 - `github.com/assurrussa/goadmin/features/queues`
@@ -132,7 +133,7 @@ batch; do not repeat `test`, `test-race`, or `cover-html` on the same tree.
 Do not rewrite existing tags. If `make` changes generated Go files, admin UI
 outputs, `go.mod`, or `go.sum`, commit those changes and publish a new semver
 tag. The clean-history baseline is `v0.7.0`; old tags remain in the private
-history archive. The root `go.mod` pins GoAuth v0.11.0 and GoNotify v0.6.0 without local
+history archive. The root `go.mod` pins GoAuth v0.12.0 and GoNotify v0.6.0 without local
 replacements. The nested starter's overrides belong to explicit source mode.
 Verify remote tags and dependency availability before claiming public readiness.
 

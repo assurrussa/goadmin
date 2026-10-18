@@ -133,6 +133,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	_ "github.com/assurrussa/goadmin/features/access"
+	_ "github.com/assurrussa/goadmin/features/admission"
 	_ "github.com/assurrussa/goadmin/features/authmail"
 	_ "github.com/assurrussa/goadmin/features/jobs"
 	adminuploads "github.com/assurrussa/goadmin/features/uploads"

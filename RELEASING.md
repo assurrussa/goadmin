@@ -4,13 +4,13 @@ This module is published as `github.com/assurrussa/goadmin`.
 
 ## Current Baseline
 
-- The latest published baseline is [v0.12.3](https://github.com/assurrussa/goadmin/releases/tag/v0.12.3).
-  The selected next candidate is `v0.13.0`; selection does not claim release
+- The latest published baseline is [v0.13.0](https://github.com/assurrussa/goadmin/releases/tag/v0.13.0).
+  The selected next candidate is `v0.14.0`; selection does not claim release
   readiness, publication, host acceptance or deployment.
 
 - Go 1.27.2 is the minimum. Modular host assembly is a breaking source API:
   migrate hosts to `host.New`, explicit modules and `host.AdminConfig`.
-- The current root module pins published GoAuth `v0.11.0` (schema 14), including the
+- The current root module pins published GoAuth `v0.12.0` (schema 14), including the
   companion MFA and assisted-recovery APIs, without a sibling replacement. Verify the resulting
   natural dependency graph with the release gates below.
 - GoNotify v0.5.0 changes `host.NotificationManager` to
@@ -27,7 +27,7 @@ This module is published as `github.com/assurrussa/goadmin`.
 - The clean-history baseline was published as v0.7.0.
   Old history, PRs and tags remain in the private history archive; do not move
   or rewrite them. Verify the new remote tag and public module independently.
-- Current `go.mod` pins GoAuth v0.11.0 and GoNotify v0.6.0.
+- Current `go.mod` pins GoAuth v0.12.0 and GoNotify v0.6.0.
   GoInertia v0.11.1 retains protocol v2 by default, matching the embedded v2 frontend. GoCache
   resolves v0.2.2. GoDI and GoLogger retain their existing compatible pins.
 - `VERSION` is intentionally unset by default. Pass the exact planned or
@@ -47,7 +47,28 @@ This module is published as `github.com/assurrussa/goadmin`.
 - The frontend advisory gate and its remaining moderate findings are reviewed
   in [docs/dependency-advisory-review.md](docs/dependency-advisory-review.md).
 
-## v0.13.0 candidate
+## v0.14.0 candidate
+
+- Adds the explicit, optional `features/admission` component. Hosts choose
+  invitation-only or project-pending mode; no existing host enables it automatically.
+- The trusted callback must verify issuer, subject, project and client. Pending
+  canonical accounts receive no native admin membership, role or local password.
+- Role grants require explicit current operator authority and per-role permission.
+  Activation rechecks the grant and role snapshot inside the canonical transaction.
+- Adds `20261018100000_create_admin_admissions.sql` to the normal GoAdmin
+  migration runner. It creates enrollment, invitation and append-only audit tables;
+  it does not modify existing accounts or enable SSO admission. Preserve a
+  restorable backup and allow ordinary PostgreSQL DDL locks during migration.
+- Requires the strict provisioning API selected for GoAuth `v0.12.0` (schema 14).
+  Publication and the final dependency pin must be verified before this release.
+  A local candidate replacement is development evidence only.
+- See [SSO admission](docs/sso-admission.md) for the host-owned proof adapter,
+  moderation, invitation binding and off-mode contract. Actual host enrollment
+  acceptance is separate from synthetic component tests.
+- Use `make publish-readiness VERSION=v0.14.0`, followed by the exact published
+  consumer gate. Do not claim deployment from this library release.
+
+## v0.13.0 historical scope
 
 - Opt-in assisted account recovery with independently verified identity, a
   dedicated canonical permission, fresh operator proof and encrypted delivery.
@@ -141,6 +162,7 @@ The supported embedding surface is intentionally narrow:
 - `github.com/assurrussa/goadmin/hosttest`
 - `github.com/assurrussa/goadmin/features/operations`
 - `github.com/assurrussa/goadmin/features/access`
+- `github.com/assurrussa/goadmin/features/admission`
 - `github.com/assurrussa/goadmin/features/jobs`
 - `github.com/assurrussa/goadmin/features/uploads`
 - `github.com/assurrussa/goadmin/features/queues`
@@ -401,3 +423,6 @@ publish-readiness, agreed browser acceptance, and final review pass. Verify the
 published tag with release-readiness. Real RP consumer and end-to-end SSO
 acceptance follow in consuming projects using the released libraries; library
 publication does not establish that acceptance.
+
+Optional SSO enrollment is described in [the admission contract](docs/sso-admission.md).
+This candidate needs the matching strict GoAuth provisioning API before activation.

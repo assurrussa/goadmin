@@ -1,0 +1,50 @@
+package admission //nolint:testpackage // White-box tests cover unmounted guards and transaction ordering.
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"testing"
+
+	"github.com/assurrussa/goauth"
+	"github.com/gofiber/fiber/v3"
+	"github.com/stretchr/testify/require"
+
+	"github.com/assurrussa/goadmin/host"
+)
+
+func TestUnmountedComponentCannotProvision(t *testing.T) {
+	c := &Component{}
+	_, err := c.Complete(context.Background(), "arbitrary-reference", "")
+	require.Error(t, err)
+}
+
+func TestComponentHasExplicitRoutesAndAccessDependency(t *testing.T) {
+	c := &Component{}
+	d := c.Module().Descriptor()
+	require.Equal(t, "admission", d.Key)
+	require.Equal(t, []string{"access"}, d.Requires)
+	require.Equal(t, []string{"/admissions"}, d.RouteNamespaces)
+	require.Equal(t, []string{"GET /auth/admission"}, d.Routes)
+}
+
+func TestComponentMissingTrustDependenciesFails(t *testing.T) {
+	_, err := New(context.Background(), Config{})
+	require.Error(t, err)
+}
+
+func TestGrantPermissionUsesImmutableRoleID(t *testing.T) {
+	key, err := GrantRolePermission("20000000-0000-4000-8000-000000000001")
+	require.NoError(t, err)
+	require.Equal(t, host.NewPermissionKey("admission", "grant-20000000-0000-4000-8000-000000000001"), key)
+	for _, value := range []string{"", "super_admin", "../roles", "arbitrary:permission"} {
+		_, err := GrantRolePermission(value)
+		require.Error(t, err)
+	}
+}
+
+func TestRevokedProofIsUnauthorizedButInfrastructureFailsClosed(t *testing.T) {
+	require.ErrorIs(t, httpError(goauth.ErrSessionRevoked), fiber.ErrUnauthorized)
+	require.ErrorIs(t, httpError(fmt.Errorf("verify: %w", goauth.ErrSessionRevoked)), fiber.ErrUnauthorized)
+	require.ErrorIs(t, httpError(errors.New("provider unavailable")), fiber.ErrServiceUnavailable)
+}
