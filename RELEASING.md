@@ -426,3 +426,11 @@ publication does not establish that acceptance.
 
 Optional SSO enrollment is described in [the admission contract](docs/sso-admission.md).
 This candidate needs the matching strict GoAuth provisioning API before activation.
+
+## Optional profile presentation candidate
+
+The supported `github.com/assurrussa/goadmin/features/profile` package adds
+explicit per-field SSO presentation, local by default, and a manual-refresh
+contract. It is an unreleased candidate; no release readiness is claimed.
+See [profile presentation](docs/profile-presentation.md) for source pins,
+privacy, migration and host callback/native-login sequencing.

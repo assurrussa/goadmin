@@ -4,6 +4,7 @@ import { createPinia } from 'pinia'
 import ProfileEdit from './EditPage.vue'
 import AdminEdit from '../admin/EditPage.vue'
 import ProfileView from './ViewPage.vue'
+import ProfileSource from './SourcePage.vue'
 import { setAdminCapabilities } from '@/composables/useAdminCapabilities'
 
 const state = vi.hoisted(() => ({
@@ -137,4 +138,65 @@ it('remounts the self-profile form from canonical GET props after success', () =
   expect(state.forms[0].post).toHaveBeenCalledWith('/auth/profile/edit', {
     preserveState: 'errors',
   })
+})
+
+it('keeps profile source local by default and refreshes only on an explicit click', () => {
+  const root = document.createElement('div')
+  const sourceProps = {
+    presentation: { version: '9007199254740993', updatedAt: '', fields: { name: false, login: false, avatar: false } },
+    avatarAvailable: false,
+  }
+  const app = createApp(ProfileSource, sourceProps)
+  apps.push(app)
+  app.mount(root)
+  expect(root.querySelectorAll('input[type="checkbox"]')).toHaveLength(2)
+  expect([...root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].every(input => !input.checked)).toBe(true)
+  expect(root.querySelector('img')).toBeNull()
+  expect(root.textContent).toContain('Внешние аватары отключены')
+  expect(root.textContent).toContain('Локальные значения сохраняются')
+  expect(state.forms[0].version).toBe('9007199254740993')
+  expect(state.forms[0].post).not.toHaveBeenCalled()
+  const refresh = [...root.querySelectorAll('button')].find(button => button.textContent?.includes('Обновить из SSO'))
+  refresh?.click()
+  expect(state.forms[0].post).toHaveBeenCalledWith('/profile-source/refresh', { preserveState: 'errors' })
+})
+
+it('overlays only selected display fields and does not edit the local source form', () => {
+  setAdminCapabilities({ props: { adminCapabilities: { uploads: false } } })
+  state.pageProps = { authuser: { profilePresentation: {
+    enabled: true, available: true, name: 'SSO Name', login: 'sso-label',
+    avatarUrl: 'https://images.example.test/avatar.png',
+    fields: { name: true, login: true, avatar: true },
+  } } }
+  const root = document.createElement('div')
+  const app = createApp(ProfileView, { data })
+  apps.push(app)
+  app.use(createPinia()).mount(root)
+  expect(root.querySelector('h1')?.textContent).toContain('SSO Name')
+  expect(root.textContent).toContain('@sso-label')
+  expect(root.querySelector('img')?.getAttribute('src')).toBe('https://images.example.test/avatar.png')
+  expect(root.querySelector('img')?.getAttribute('referrerpolicy')).toBe('no-referrer')
+  expect(root.textContent).toContain(data.email)
+  expect(root.querySelector('a[href="/profile-source"]')).not.toBeNull()
+  const editRoot = document.createElement('div')
+  const edit = createApp(ProfileEdit, { data })
+  apps.push(edit)
+  edit.mount(editRoot)
+  expect(editRoot.querySelector<HTMLInputElement>('input[name="name"]')?.value).toBe(data.name)
+  expect(editRoot.querySelector<HTMLInputElement>('input[name="username"]')?.value).toBe(data.username)
+})
+
+it('falls back locally for unavailable or unselected source snapshots', () => {
+  state.pageProps = { authuser: { profilePresentation: {
+    enabled: true, available: false, name: 'Stale SSO Name', login: 'stale-label',
+    avatarUrl: 'https://images.example.test/avatar.png',
+    fields: { name: true, login: true, avatar: true },
+  } } }
+  const root = document.createElement('div')
+  const app = createApp(ProfileView, { data })
+  apps.push(app)
+  app.use(createPinia()).mount(root)
+  expect(root.querySelector('h1')?.textContent).toContain(data.name)
+  expect(root.textContent).not.toContain('Stale SSO Name')
+  expect(root.querySelector('img[src^="https://images.example.test"]')).toBeNull()
 })
