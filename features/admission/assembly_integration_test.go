@@ -24,7 +24,10 @@ import (
 	"github.com/assurrussa/goadmin/tests"
 )
 
-const origin = "https://admission.example.test"
+const (
+	origin          = "https://admission.example.test"
+	admissionDomain = "admission.example.test"
+)
 
 type authority struct{ identity admission.VerifiedIdentity }
 
@@ -46,7 +49,10 @@ func (a *authority) Revalidate(ctx context.Context, ref string, i admission.Veri
 	return nil
 }
 
-func request(t *testing.T, r *host.Runtime, method, path, body string, cookies map[string]*http.Cookie, csrf, requestOrigin string) (int, []byte) {
+func request(
+	t *testing.T, r *host.Runtime, method, path, body string,
+	cookies map[string]*http.Cookie, csrf, requestOrigin string,
+) (int, []byte) {
 	t.Helper()
 	req := httptest.NewRequestWithContext(t.Context(), method, origin+path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -76,14 +82,16 @@ func TestAdmissionAssemblyOffModeAndProtectedWaitingIdentity(t *testing.T) {
 	t.Cleanup(func() { cleanup(context.Background()) })
 	cfg := host.Config{
 		Admin: host.AdminConfig{
-			Env: "staging", Domain: "admission.example.test", DomainURL: origin,
-			BaseDomain: "admission.example.test", BaseDomainURL: origin, Addr: "127.0.0.1:12345",
+			Env: "staging", Domain: admissionDomain, DomainURL: origin,
+			BaseDomain: admissionDomain, BaseDomainURL: origin, Addr: "127.0.0.1:12345",
 			SessionName: "admission_session", SessionTTL: time.Hour, SessionInactiveTTL: time.Minute,
 			CSRFTokenName: "csrf_token", CSRFTokenTTL: time.Hour, CanonicalSessionBackend: "pgsql",
 		},
 		Server: host.ServerConfig{Addr: "127.0.0.1:12345", AllowOrigins: []string{origin}, DisableStartupMessage: true},
 		Auth:   tests.AuthRuntimeConfig(t),
-		CSRF:   host.CSRFConfig{AppDomain: "admission.example.test", SecretKey: strings.Repeat("s", 32), AllowedOrigins: []string{origin}},
+		CSRF:   host.CSRFConfig{
+			AppDomain: admissionDomain, SecretKey: strings.Repeat("s", 32), AllowedOrigins: []string{origin},
+		},
 	}
 	cfg.Auth.NotificationDelivery = goauth.NotificationDeliveryDisabled
 	auth, err := host.NewAuthAdapter(host.AuthAdapterConfig{Database: db, TxManager: host.NewTxManager(db), Runtime: cfg.Auth})
@@ -150,7 +158,8 @@ func TestAdmissionAssemblyOffModeAndProtectedWaitingIdentity(t *testing.T) {
 		Email: "operator@example.test", Password: "Synthetic-Admission-Operator-2026!",
 	})
 	require.NoError(t, err)
-	_, err = auth.Runtime().Database().ExecContext(t.Context(), "INSERT INTO administrations(subject_id,uuid) VALUES($1,$2)", operator.Subject.ID, uuid.NewString())
+	_, err = auth.Runtime().Database().ExecContext(t.Context(),
+		"INSERT INTO administrations(subject_id,uuid) VALUES($1,$2)", operator.Subject.ID, uuid.NewString())
 	require.NoError(t, err)
 	roles, err := auth.Runtime().RBAC(nil)
 	require.NoError(t, err)
@@ -164,7 +173,8 @@ func TestAdmissionAssemblyOffModeAndProtectedWaitingIdentity(t *testing.T) {
 	require.Equal(t, http.StatusOK, status)
 	require.NotNil(t, cookies["csrf_token"])
 	status, _ = request(t, on, "POST", "/auth/login",
-		`{"email":"operator@example.test","password":"Synthetic-Admission-Operator-2026!"}`, cookies, cookies["csrf_token"].Value, origin)
+		`{"email":"operator@example.test","password":"Synthetic-Admission-Operator-2026!"}`,
+		cookies, cookies["csrf_token"].Value, origin)
 	require.Contains(t, []int{302, 303}, status)
 	// Complete the normal post-login navigation: session rotation changes the
 	// CSRF binding. Fetch the authenticated profile to obtain its fresh token.
@@ -175,7 +185,8 @@ func TestAdmissionAssemblyOffModeAndProtectedWaitingIdentity(t *testing.T) {
 	assertPending := func() {
 		t.Helper()
 		var state string
-		require.NoError(t, auth.Runtime().Database().QueryRowContext(t.Context(), "SELECT status FROM admin_admissions WHERE subject_id=$1", result.LocalSubject).Scan(&state))
+		require.NoError(t, auth.Runtime().Database().QueryRowContext(t.Context(),
+			"SELECT status FROM admin_admissions WHERE subject_id=$1", result.LocalSubject).Scan(&state))
 		require.Equal(t, "pending", state)
 	}
 	// Inertia v2 renders command errors as redirects with flash errors.
@@ -183,13 +194,15 @@ func TestAdmissionAssemblyOffModeAndProtectedWaitingIdentity(t *testing.T) {
 	status, _ = request(t, on, "POST", "/admissions/reject", body, cookies, "", origin)
 	require.Equal(t, http.StatusSeeOther, status)
 	assertPending()
-	status, _ = request(t, on, "POST", "/admissions/reject", body, cookies, cookies["csrf_token"].Value, "https://foreign.example.test")
+	status, _ = request(t, on, "POST", "/admissions/reject", body,
+		cookies, cookies["csrf_token"].Value, "https://foreign.example.test")
 	require.Equal(t, http.StatusSeeOther, status)
 	assertPending()
 	// Positive control: this same actor and route can mutate with valid CSRF.
 	status, _ = request(t, on, "POST", "/admissions/reject", body, cookies, cookies["csrf_token"].Value, origin)
 	require.Equal(t, http.StatusSeeOther, status)
 	var state string
-	require.NoError(t, auth.Runtime().Database().QueryRowContext(t.Context(), "SELECT status FROM admin_admissions WHERE subject_id=$1", result.LocalSubject).Scan(&state))
+	require.NoError(t, auth.Runtime().Database().QueryRowContext(t.Context(),
+		"SELECT status FROM admin_admissions WHERE subject_id=$1", result.LocalSubject).Scan(&state))
 	require.Equal(t, "rejected", state)
 }

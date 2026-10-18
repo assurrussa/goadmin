@@ -2,9 +2,11 @@
 
 // Run only through TestAdmissionRealBrowser: configuration and SQL snapshots use
 // private pipes. No credentials, fixture references or database URL are logged.
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS Node runner uses an explicitly configured installed Playwright module. */
 const assert = require('node:assert/strict')
 const readline = require('node:readline')
 const { chromium } = require(process.env.GOADMIN_PLAYWRIGHT_MODULE)
+/* eslint-enable @typescript-eslint/no-require-imports */
 const input = readline.createInterface({ input: process.stdin })
 const lines = input[Symbol.asyncIterator]()
 async function receive() {
@@ -24,16 +26,30 @@ async function snapshot() {
   process.stdout.write(JSON.stringify({ op: 'snapshot' }) + '\n')
   return receive()
 }
-function record(s, subject = 'alice') { return s.records.find(r => r.subject === subject) }
+function record(s, subject = 'alice') {
+  return s.records.find((r) => r.subject === subject)
+}
 // datetime-local has no zone suffix. Build its wall-clock value in the same
 // browser zone that Vue's new Date(value) uses when preparing expiresAt.
 function browserLocalExpiry(epochMillis) {
   const date = new Date(epochMillis)
-  const pad = value => String(value).padStart(2, '0')
-  const value = date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) +
-    'T' + pad(date.getHours()) + ':' + pad(date.getMinutes())
-  return { value, roundTrip: new Date(value).getTime(), now: Date.now(),
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }
+  const pad = (value) => String(value).padStart(2, '0')
+  const value =
+    date.getFullYear() +
+    '-' +
+    pad(date.getMonth() + 1) +
+    '-' +
+    pad(date.getDate()) +
+    'T' +
+    pad(date.getHours()) +
+    ':' +
+    pad(date.getMinutes())
+  return {
+    value,
+    roundTrip: new Date(value).getTime(),
+    now: Date.now(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  }
 }
 async function main() {
   const cfg = await receive()
@@ -200,7 +216,7 @@ async function main() {
     const receipts = (await observations()).slice(observationCount)
     assert.equal(receipts.length, 1, 'foreign-origin POST must reach the native host')
     assert.equal(receipts[0].origin, foreignOrigin, 'server must observe the real foreign Origin')
-    assert.equal(receipts[0].hasCSRF, true, 'foreign request must carry valid token')
+    assert.equal(receipts[0].hasCsrf, true, 'foreign request must carry valid token')
     assert.equal(receipts[0].hasSession, true, 'foreign request must carry native session cookie')
     assert.ok(foreignResult.corsBlocked || foreignResult.status >= 400, 'foreign request must be denied')
     assert.deepEqual(await snapshot(), before, 'received foreign-origin approval persisted a mutation')
