@@ -54,7 +54,7 @@ type Component struct {
 	registered atomic.Bool
 }
 func New(ctx context.Context,cfg Config)(*Component,error){
-	if cfg.Reference==nil || cfg.Verifier==nil || cfg.Runtime==nil{return nil,policy.ErrInvalid}
+	if ctx==nil || cfg.Reference==nil || cfg.Verifier==nil || cfg.Runtime==nil || cfg.Runtime.Runtime==nil || cfg.Runtime.Database()==nil{return nil,policy.ErrInvalid}
 	if cfg.Now==nil{cfg.Now=time.Now}
 	u,err:=url.Parse(cfg.SignInPath)
 	if err!=nil || !strings.HasPrefix(cfg.SignInPath,"/") || strings.HasPrefix(cfg.SignInPath,"//") ||
