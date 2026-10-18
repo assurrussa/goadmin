@@ -17,8 +17,11 @@ A five-minute observation of two deployed host applications on 2026-10-18
 (07:06:54–07:11:54 UTC, 20 samples per application at 15-second intervals)
 recorded the following whole-application Docker working-set memory:
 
-- TSOP: 15.85 MiB median, 15.85–15.98 MiB range; median CPU 0.35%.
-- NotifyHub: 22.78 MiB median, 22.78–22.81 MiB range; median CPU 0.425%.
+- Per-application median memory: 15.85–22.78 MiB.
+- Observed memory range across both applications: 15.85–22.81 MiB.
+- Per-application median CPU: 0.35–0.425% of one logical core.
+
+These are ranges of two application-level medians, not a pooled median.
 
 CPU 100% represents one logical core. Database and messaging containers are
 excluded. These are observational examples without generated load, not a load
