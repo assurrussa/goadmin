@@ -1,4 +1,4 @@
-package admission
+package admission //nolint:testpackage // White-box tests cover unmounted guards and transaction ordering.
 
 import (
 	"context"
@@ -176,7 +176,10 @@ func fixture(t *testing.T, mode Mode) (*Service, *fixtureStore, *fixtureVerifier
 	t.Helper()
 	now := time.Date(2026, 10, 18, 0, 0, 0, 0, time.UTC)
 	scope := Scope{Issuer: "https://issuer.example.test", Project: "project", Client: "client"}
-	v := &fixtureVerifier{identity: Identity{Scope: scope, Subject: "alice", Email: "alice@example.test", EmailVerified: true, ExpiresAt: now.Add(time.Hour)}}
+	v := &fixtureVerifier{identity: Identity{
+		Scope: scope, Subject: "alice", Email: "alice@example.test",
+		EmailVerified: true, ExpiresAt: now.Add(time.Hour),
+	}}
 	db := &fixtureStore{state: fixtureTx{
 		records: map[string]Record{}, invites: map[string]Invitation{},
 		identities: map[string]string{}, members: map[string]bool{}, blocked: map[string]bool{},
@@ -237,7 +240,9 @@ func TestPendingDoesNotCreateMembershipAndApprovalRequiresFreshAdmission(t *test
 }
 
 func TestInvitationRechecksIdentityExpiryRevocationAndGrant(t *testing.T) {
-	for _, name := range []string{"wrong-subject", "expired", "revoked", "grant-revoked", "role-expanded", "wrong-project", "blocked"} {
+	for _, name := range []string{
+		"wrong-subject", "expired", "revoked", "grant-revoked", "role-expanded", "wrong-project", "blocked",
+	} {
 		t.Run(name, func(t *testing.T) {
 			s, db, v, now := fixture(t, InvitationOnly)
 			i, err := s.Invite(context.Background(), "operator", "alice", []int64{1}, now.Add(time.Minute))
@@ -346,7 +351,8 @@ func TestUnknownCommitNeverReturnsSuccess(t *testing.T) {
 
 func TestActorWithoutExplicitPermissionCannotInvite(t *testing.T) {
 	s, db, _, now := fixture(t, InvitationOnly)
-	if _, err := s.Invite(context.Background(), "super-role-without-grant", "alice", []int64{1}, now.Add(time.Hour)); !errors.Is(err, ErrDenied) {
+	_, err := s.Invite(context.Background(), "super-role-without-grant", "alice", []int64{1}, now.Add(time.Hour))
+	if !errors.Is(err, ErrDenied) {
 		t.Fatal(err)
 	}
 	if len(db.state.invites) != 0 {
