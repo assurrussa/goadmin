@@ -50,9 +50,9 @@ type (
 )
 
 type Role struct {
-	ID       int64  `json:"ID"` //nolint:tagliatelle // Keep persisted/UI field names.
+	ID       int64  `json:"ID"`       //nolint:tagliatelle // Keep persisted/UI field names.
 	PublicID string `json:"PublicID"` //nolint:tagliatelle // Keep persisted/UI field names.
-	Name     string `json:"Name"` //nolint:tagliatelle // Keep persisted/UI field names.
+	Name     string `json:"Name"`     //nolint:tagliatelle // Keep persisted/UI field names.
 	// Fingerprint pins the exact role permission set at authorization time.
 	Fingerprint string `json:"Fingerprint"` //nolint:tagliatelle // Keep persisted/UI field names.
 }
