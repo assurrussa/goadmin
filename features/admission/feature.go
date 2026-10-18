@@ -125,10 +125,17 @@ func (h *handler) RegisterGroupRoutes(router fiber.Router,_ ...fiber.Handler){
 	g:=router.Group("/admissions")
 	g.Use(func(c fiber.Ctx)error{if len(c.Body())>16384{return fiber.ErrRequestEntityTooLarge};return c.Next()})
 	g.Get("",h.app.Guard("admission","read"),h.Index)
-	g.Post("/invitations",host.Command(h.app,host.NewPermissionKey("admission","invite"),h.Invite)...)
-	g.Post("/approve",host.Command(h.app,host.NewPermissionKey("admission","approve"),h.Approve)...)
-	g.Post("/reject",host.Command(h.app,host.NewPermissionKey("admission","reject"),h.Reject)...)
-	g.Post("/revoke",host.Command(h.app,host.NewPermissionKey("admission","invite"),h.Revoke)...)
+	// Fiber v3 requires an explicit first handler and variadic any handlers.
+	// Keep every Command middleware in its original authorization/binding order.
+	postCommand := func(path string, handlers []fiber.Handler) {
+		rest := make([]any, len(handlers)-1)
+		for i, handler := range handlers[1:] { rest[i] = handler }
+		g.Post(path, handlers[0], rest...)
+	}
+	postCommand("/invitations",host.Command(h.app,host.NewPermissionKey("admission","invite"),h.Invite))
+	postCommand("/approve",host.Command(h.app,host.NewPermissionKey("admission","approve"),h.Approve))
+	postCommand("/reject",host.Command(h.app,host.NewPermissionKey("admission","reject"),h.Reject))
+	postCommand("/revoke",host.Command(h.app,host.NewPermissionKey("admission","invite"),h.Revoke))
 	h.component.registered.Store(true)
 }
 func httpError(err error)error{
