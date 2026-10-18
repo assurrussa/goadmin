@@ -115,6 +115,11 @@ func TestAdmissionAssemblyOffModeAndProtectedWaitingIdentity(t *testing.T){
 	status,_=request(t,on,"POST","/auth/login",
 		`{"email":"operator@example.test","password":"Synthetic-Admission-Operator-2026!"}`,cookies,cookies["csrf_token"].Value,origin)
 	require.Contains(t,[]int{302,303},status)
+	// Complete the normal post-login navigation: session rotation changes the
+	// CSRF binding. Fetch the authenticated profile to obtain its fresh token.
+	status,profileBody:=request(t,on,"GET","/auth/profile","",cookies,"","")
+	require.Equal(t,http.StatusOK,status,"authenticated profile: %s",profileBody)
+	require.NotNil(t,cookies["csrf_token"])
 	body:=`{"subject":"pending-person","version":1}`
 	assertPending:=func(){
 		t.Helper()
