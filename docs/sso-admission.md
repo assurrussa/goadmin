@@ -77,12 +77,12 @@ canonical membership/RBAC and the existing external proof/revocation rules.
 
 ## Candidate verification and release
 
-The component requires GoAuth's strict provisioning addition from
-feat/explicit-sso-admission-20261018; v0.11.0 does not yet expose it.
-Construction fails closed on an older Runtime. Source-mode tests must explicitly
-use the matching GoAuth checkout via a temporary modfile, never a master replace.
-Before release, publish and verify GoAuth, pin its immutable public version,
-regenerate the embedded admin assets, and run the clean consumer gate.
+The component requires GoAuth v0.12.0 or newer for strict provisioning.
+This branch pins the published v0.12.0 module without local replacements.
+Construction fails closed on an older Runtime. Candidate source comparisons may
+use an explicitly selected temporary modfile; they are not publication evidence.
+Before release, verify the embedded admin assets and run the clean consumer gate
+against the declared public dependency graph.
 
 Required checks: package/unit tests, public surface and assembly/off-mode tests,
 PostgreSQL atomicity/concurrency/audit rollback, exact role grants, stale/revoked
