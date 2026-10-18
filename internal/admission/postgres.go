@@ -232,6 +232,28 @@ func (t *pgTx) CheckActive(ctx context.Context, id string) error {
 	return err
 }
 
+// Keep a deterministic order for overlapping role sets. Do not hold a table
+// lock while waiting for row locks acquired by the canonical RBAC editor.
+func (t *pgTx) lockGrantRoles(ctx context.Context, actor string, ids []int64) error {
+	rows, err := t.sql.QueryContext(ctx, `SELECT r.id FROM auth_roles r
+ WHERE r.id IN (SELECT role_id FROM auth_subject_roles WHERE subject_id=$1)
+ OR r.id=ANY($2::bigint[]) ORDER BY r.id FOR SHARE OF r`, actor, ids)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	return rows.Close()
+}
+
 func (t *pgTx) Authorize(ctx context.Context, actor, action string, ids []int64) ([]Role, error) {
 	switch action {
 	case "read", actionInvite, actionApprove, "reject":
@@ -241,11 +263,12 @@ func (t *pgTx) Authorize(ctx context.Context, actor, action string, ids []int64)
 	if err := t.CheckActive(ctx, actor); err != nil {
 		return nil, err
 	}
-	// Serialize the narrow enrollment grant against all ordinary RBAC writers.
-	// This closes deletion/permission-set/issuer-right races, including updates
-	// through existing role-management screens. The lock lives only until commit.
-	if _, err := t.sql.ExecContext(ctx, `LOCK TABLE auth_roles,auth_permissions,auth_role_permissions,auth_subject_roles
- IN SHARE ROW EXCLUSIVE MODE`); err != nil {
+	// Pin grantor and requested role definitions before reading permission sets.
+	// Canonical role editors take FOR UPDATE before changing roles/permissions;
+	// FOR SHARE blocks those edits while remaining compatible with activation's
+	// foreign-key checks. CheckActive's subject lock also fences canonical role
+	// assignment/replacement for this grantor. Unrelated role edits stay free.
+	if err := t.lockGrantRoles(ctx, actor, ids); err != nil {
 		return nil, err
 	}
 	subject, err := goauth.ParseSubjectID(actor)
