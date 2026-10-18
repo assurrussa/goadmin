@@ -141,6 +141,7 @@ func (h *handler) RegisterGroupRoutes(router fiber.Router,_ ...fiber.Handler){
 func httpError(err error)error{
 	switch{
 	case err==nil:return nil
+	case errors.Is(err,goauth.ErrSessionRevoked):return fiber.ErrUnauthorized
 	case errors.Is(err,policy.ErrDenied),errors.Is(err,goauth.ErrAccountUnavailable),errors.Is(err,goauth.ErrMembershipDenied):return fiber.ErrForbidden
 	case errors.Is(err,goauth.ErrExplicitIdentityLink),errors.Is(err,goauth.ErrIdentifierAlreadyExists),errors.Is(err,goauth.ErrIdentityLinkConflict):return fiber.ErrConflict
 	case errors.Is(err,policy.ErrInvalid),errors.Is(err,goauth.ErrInvalidIdentifier):return fiber.ErrBadRequest
@@ -184,7 +185,7 @@ func (h *handler) Revoke(c fiber.Ctx,a host.Actor,in revokeInput)error{
 }
 func (h *handler) Waiting(c fiber.Ctx)error{
 	c.Set("Cache-Control","no-store")
-	reference,err:=h.component.cfg.Reference(c);if err!=nil{return fiber.ErrUnauthorized}
+	reference,err:=h.component.cfg.Reference(c);if err!=nil || reference==""{return fiber.ErrUnauthorized}
 	r,err:=h.component.service.View(c,reference);if err!=nil{return httpError(err)}
 	// No identities, role assignments or credentials are emitted to this page.
 	return h.app.Render(c,"auth/AdmissionWaitingPage",map[string]any{
