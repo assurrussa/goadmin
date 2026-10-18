@@ -20,6 +20,11 @@ import (
 	policy "github.com/assurrussa/goadmin/internal/admission"
 )
 
+const (
+	componentKey = "admission"
+	componentTitle = "SSO access"
+)
+
 type (
 	Mode             = policy.Mode
 	Scope            = policy.Scope
@@ -60,7 +65,8 @@ type Component struct {
 }
 
 func New(ctx context.Context, cfg Config) (*Component, error) {
-	if ctx == nil || cfg.Reference == nil || cfg.Verifier == nil || cfg.Runtime == nil || cfg.Runtime.Runtime == nil || cfg.Runtime.Database() == nil {
+	if ctx == nil || cfg.Reference == nil || cfg.Verifier == nil || cfg.Runtime == nil ||
+		cfg.Runtime.Runtime == nil || cfg.Runtime.Database() == nil {
 		return nil, policy.ErrInvalid
 	}
 	if cfg.Now == nil {
@@ -91,7 +97,9 @@ func New(ctx context.Context, cfg Config) (*Component, error) {
 	if err != nil {
 		return nil, err
 	}
-	service, err := policy.New(policy.Config{Mode: cfg.Mode, Scope: cfg.Scope, Now: cfg.Now, NewID: uuid.NewString}, store, cfg.Verifier)
+	service, err := policy.New(policy.Config{
+		Mode: cfg.Mode, Scope: cfg.Scope, Now: cfg.Now, NewID: uuid.NewString,
+	}, store, cfg.Verifier)
 	if err != nil {
 		return nil, err
 	}
@@ -102,26 +110,27 @@ func New(ctx context.Context, cfg Config) (*Component, error) {
 	defs := make([]host.PermissionDefinition, 0, len(permissions))
 	for _, p := range permissions {
 		d, a, _ := strings.Cut(string(p.Key), ":")
-		defs = append(defs, host.NewPermissionDefinition(host.NewPermissionKey(host.PermissionDomain(d), host.PermissionAction(a)), p.Description))
+		key := host.NewPermissionKey(host.PermissionDomain(d), host.PermissionAction(a))
+		defs = append(defs, host.NewPermissionDefinition(key, p.Description))
 	}
 	return &Component{cfg: cfg, service: service, store: store, definitions: defs}, nil
 }
 
 func (c *Component) Module() host.Module {
 	return host.DefinedFeatureModule(host.ModuleDescriptor{
-		Key: "admission", Requires: []string{"access"},
+		Key: componentKey, Requires: []string{"access"},
 		RouteNamespaces: []string{"/admissions"}, Routes: []string{"GET /auth/admission"},
 	}, c)
 }
 
 func (c *Component) Descriptor() host.FeatureDescriptor {
 	return host.FeatureDescriptor{
-		Key: "admission", PermissionDefinitions: append([]host.PermissionDefinition(nil), c.definitions...),
+		Key: componentKey, PermissionDefinitions: append([]host.PermissionDefinition(nil), c.definitions...),
 		Menu: host.Menu{Sections: []host.Section{{
-			Key: "admission", Title: "SSO access", Order: 80,
+			Key: componentKey, Title: componentTitle, Order: 80,
 			Items: []host.Item{{
-				Name: "SSO access", Href: "/admissions", Icon: "users",
-				PermissionKey: host.NewPermissionKey("admission", "read"),
+				Name: componentTitle, Href: "/admissions", Icon: "users",
+				PermissionKey: host.NewPermissionKey(componentKey, "read"),
 			}},
 		}}},
 	}
@@ -180,7 +189,7 @@ func (h *handler) RegisterGroupRoutes(router fiber.Router, _ ...fiber.Handler) {
 		}
 		return c.Next()
 	})
-	g.Get("", h.app.Guard("admission", "read"), h.Index)
+	g.Get("", h.app.Guard(componentKey, "read"), h.Index)
 	// Fiber v3 requires an explicit first handler and variadic any handlers.
 	// Keep every Command middleware in its original authorization/binding order.
 	postCommand := func(path string, handlers []fiber.Handler) {
@@ -190,10 +199,10 @@ func (h *handler) RegisterGroupRoutes(router fiber.Router, _ ...fiber.Handler) {
 		}
 		g.Post(path, handlers[0], rest...)
 	}
-	postCommand("/invitations", host.Command(h.app, host.NewPermissionKey("admission", "invite"), h.Invite))
-	postCommand("/approve", host.Command(h.app, host.NewPermissionKey("admission", "approve"), h.Approve))
-	postCommand("/reject", host.Command(h.app, host.NewPermissionKey("admission", "reject"), h.Reject))
-	postCommand("/revoke", host.Command(h.app, host.NewPermissionKey("admission", "invite"), h.Revoke))
+	postCommand("/invitations", host.Command(h.app, host.NewPermissionKey(componentKey, "invite"), h.Invite))
+	postCommand("/approve", host.Command(h.app, host.NewPermissionKey(componentKey, "approve"), h.Approve))
+	postCommand("/reject", host.Command(h.app, host.NewPermissionKey(componentKey, "reject"), h.Reject))
+	postCommand("/revoke", host.Command(h.app, host.NewPermissionKey(componentKey, "invite"), h.Revoke))
 	h.component.registered.Store(true)
 }
 
@@ -205,7 +214,8 @@ func httpError(err error) error {
 		return fiber.ErrUnauthorized
 	case errors.Is(err, policy.ErrDenied), errors.Is(err, goauth.ErrAccountUnavailable), errors.Is(err, goauth.ErrMembershipDenied):
 		return fiber.ErrForbidden
-	case errors.Is(err, goauth.ErrExplicitIdentityLink), errors.Is(err, goauth.ErrIdentifierAlreadyExists), errors.Is(err, goauth.ErrIdentityLinkConflict):
+	case errors.Is(err, goauth.ErrExplicitIdentityLink), errors.Is(err, goauth.ErrIdentifierAlreadyExists),
+		errors.Is(err, goauth.ErrIdentityLinkConflict):
 		return fiber.ErrConflict
 	case errors.Is(err, policy.ErrInvalid), errors.Is(err, goauth.ErrInvalidIdentifier):
 		return fiber.ErrBadRequest
@@ -248,7 +258,7 @@ func (h *handler) Index(c fiber.Ctx) error {
 		return httpError(err)
 	}
 	return h.app.Render(c, "admission/IndexPage", map[string]any{
-		"title": "SSO access", "records": rows, "invitations": invites, "inviteRoles": inviteRoles, "approveRoles": approveRoles,
+		"title": componentTitle, "records": rows, "invitations": invites, "inviteRoles": inviteRoles, "approveRoles": approveRoles,
 		"scope": h.component.cfg.Scope, "maxDisplayed": 100, "canInvite": canInvite, "canReject": canReject,
 	})
 }
@@ -303,7 +313,7 @@ func (h *handler) Waiting(c fiber.Ctx) error {
 	}
 	// No identities, role assignments or credentials are emitted to this page.
 	return h.app.Render(c, "auth/AdmissionWaitingPage", map[string]any{
-		"title": "SSO access", "admissionStatus": r.Status, "signInPath": h.component.cfg.SignInPath,
+		"title": componentTitle, "admissionStatus": r.Status, "signInPath": h.component.cfg.SignInPath,
 	})
 }
 
