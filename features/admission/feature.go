@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/assurrussa/goauth"
 	"github.com/assurrussa/goauth/postgres"
 	"github.com/assurrussa/goadmin/host"
 	policy "github.com/assurrussa/goadmin/internal/admission"
@@ -126,7 +127,8 @@ func (h *handler) RegisterGroupRoutes(router fiber.Router,_ ...fiber.Handler){
 func httpError(err error)error{
 	switch{
 	case err==nil:return nil
-	case errors.Is(err,policy.ErrDenied):return fiber.ErrForbidden
+	case errors.Is(err,policy.ErrDenied),errors.Is(err,goauth.ErrAccountUnavailable),errors.Is(err,goauth.ErrMembershipDenied):return fiber.ErrForbidden
+	case errors.Is(err,goauth.ErrExplicitIdentityLink),errors.Is(err,goauth.ErrIdentifierAlreadyExists),errors.Is(err,goauth.ErrIdentityLinkConflict):return fiber.ErrConflict
 	case errors.Is(err,policy.ErrInvalid):return fiber.ErrBadRequest
 	case errors.Is(err,policy.ErrNotFound):return fiber.ErrNotFound
 	case errors.Is(err,policy.ErrConflict):return fiber.ErrConflict
