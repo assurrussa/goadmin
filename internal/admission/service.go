@@ -49,7 +49,7 @@ type Record struct {
 	ExternalSubject, LocalSubject string
 	Status Status
 	Version int64
-	ApprovedBy string
+	ApprovedBy, GrantAction string
 	Roles []Role
 	ExpiresAt time.Time
 }
@@ -156,6 +156,9 @@ func (s *Service) Admit(ctx context.Context, reference, invitationID string) (Re
 		current, err := tx.Find(txCtx, identity.Scope, identity.Subject)
 		if err != nil && !errors.Is(err, ErrNotFound) { return err }
 		if err == nil {
+			local, checkErr := tx.Provision(txCtx, identity)
+			if checkErr != nil { return checkErr }
+			if local != current.LocalSubject { return ErrConflict }
 			switch current.Status {
 			case Rejected:
 				return ErrDenied
@@ -195,6 +198,7 @@ func (s *Service) Admit(ctx context.Context, reference, invitationID string) (Re
 		if invite.ID != "" {
 			current.Status = Approved
 			current.ApprovedBy = invite.IssuedBy
+			current.GrantAction = "invite"
 			current.Roles = slices.Clone(invite.Roles)
 			current.ExpiresAt = invite.ExpiresAt
 		}
@@ -214,7 +218,8 @@ func (s *Service) Admit(ctx context.Context, reference, invitationID string) (Re
 
 func (s *Service) activate(ctx context.Context, tx Tx, record Record, identity Identity, result *Record) error {
 	if !s.validIdentity(identity) || !s.cfg.Now().Before(record.ExpiresAt) { return ErrDenied }
-	roles, err := tx.Authorize(ctx, record.ApprovedBy, "approve", roleIDs(record.Roles))
+	if record.GrantAction != "approve" && record.GrantAction != "invite" { return ErrDenied }
+	roles, err := tx.Authorize(ctx, record.ApprovedBy, record.GrantAction, roleIDs(record.Roles))
 	if err != nil { return err }
 	if !sameRoles(roles, record.Roles) { return ErrConflict }
 	local, err := tx.Provision(ctx, identity)
@@ -263,6 +268,7 @@ func (s *Service) Approve(ctx context.Context, actor, subject string, version in
 		if err != nil { return err }
 		if !s.cfg.Now().Before(until) { return ErrDenied }
 		current.Status, current.ApprovedBy, current.Roles, current.ExpiresAt = Approved, actor, roles, until
+		current.GrantAction = "approve"
 		if _, err := tx.Save(ctx, current, version); err != nil { return err }
 		return tx.Audit(ctx, actor, "admission.approved", current.ID)
 	})
