@@ -122,11 +122,15 @@ func TestPendingIntentExactPinsTTLAndNoReplayAuthority(t *testing.T) {
 
 func TestRefreshCookieRejectsDuplicateWithoutAcceptingIdentityJSON(t *testing.T) {
 	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "https://app.example.test/callback", nil)
-	request.AddCookie(&http.Cookie{Name: refreshCookie, Value: testSelector})
+	request.AddCookie(&http.Cookie{
+		Name: refreshCookie, Value: testSelector, Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode,
+	})
 	value, err := RequestSelector(request)
 	require.NoError(t, err)
 	require.Equal(t, testSelector, value)
-	request.AddCookie(&http.Cookie{Name: refreshCookie, Value: "other"})
+	request.AddCookie(&http.Cookie{
+		Name: refreshCookie, Value: "other", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode,
+	})
 	_, err = RequestSelector(request)
 	require.ErrorIs(t, err, ErrDenied)
 }

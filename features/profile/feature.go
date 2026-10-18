@@ -48,12 +48,11 @@ func New(ctx context.Context, cfg Config) (*Component, error) {
 		ValidateAvatarHosts(cfg.AvatarHosts) != nil {
 		return nil, ErrInvalid
 	}
-	rows, err := cfg.Runtime.Database().QueryContext(ctx, "SELECT "+columns+" FROM admin_profile_presentations LIMIT 0")
+	var installed bool
+	err = cfg.Runtime.Database().QueryRowContext(ctx,
+		"SELECT EXISTS(SELECT "+columns+" FROM admin_profile_presentations WHERE false)").Scan(&installed)
 	if err != nil {
 		return nil, errors.New("profile presentation schema is not ready")
-	}
-	if err = rows.Close(); err != nil {
-		return nil, err
 	}
 	cfg.AvatarHosts = slices.Clone(cfg.AvatarHosts)
 	return &Component{cfg: cfg, avatars: avatarPolicy{hosts: cfg.AvatarHosts}}, nil
@@ -83,7 +82,7 @@ func (c *Component) Build(host.Menu) host.ExtensionBuilder {
 			presentation.Set(ctx, func() (View, error) {
 				_, binding, err := c.current(ctx, app)
 				if err != nil {
-					return View{Enabled: true}, nil
+					return View{Enabled: true}, err
 				}
 				return c.read(ctx, binding)
 			})
