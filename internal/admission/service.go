@@ -292,10 +292,12 @@ func (s *Service) Reject(ctx context.Context, actor, subject string, version int
 }
 func (s *Service) Revoke(ctx context.Context, actor, id string) error {
 	return s.store.Owned(ctx, func(ctx context.Context, tx Tx) error {
-		if _, err := tx.Authorize(ctx, actor, "invite", nil); err != nil { return err }
+		// Match acceptance lock order: invitation row before grant authority.
+		// The reverse order can deadlock concurrent acceptance and revocation.
 		invite, err := tx.Invitation(ctx, id)
 		if err != nil { return err }
 		if invite.Scope != s.cfg.Scope || invite.AcceptedSubject != "" { return ErrDenied }
+		if _, err := tx.Authorize(ctx, actor, "invite", nil); err != nil { return err }
 		if err := tx.RevokeInvitation(ctx, id); err != nil { return err }
 		return tx.Audit(ctx, actor, "admission.invitation-revoked", id)
 	})
