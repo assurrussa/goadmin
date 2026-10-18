@@ -1,7 +1,7 @@
 <template>
   <ul class="space-y-1" :aria-label="depth === 0 ? t('Разделы') : undefined">
     <li v-for="(item, index) in items" :key="itemKey(item, index)">
-      <div class="flex items-center gap-0.5" :class="!collapsed && depth > 0 ? 'pl-3' : ''">
+      <div class="flex items-center gap-0.5">
         <Link
           v-if="item.href"
           :href="item.href"
@@ -15,9 +15,11 @@
           class="group flex min-w-0 flex-1 items-center rounded-lg py-2 text-sm focus-visible:ring-2 focus-visible:ring-primary"
           :class="[
             collapsed ? 'justify-center' : '',
-            isGroupActive(item)
+            isActive(item.href)
               ? 'bg-primary/10 text-primary font-semibold'
-              : 'text-text-secondary hover:bg-surface-variant',
+              : isGroupActive(item)
+                ? 'text-primary font-medium hover:bg-surface-variant'
+                : 'text-text-secondary hover:bg-surface-variant',
           ]"
         >
           <component
@@ -81,6 +83,7 @@
       <div
         v-if="hasChildren(item) && isOpen(item, index)"
         :id="groupID(index)"
+        class="mt-1"
         :class="
           collapsed ? 'border-l border-border-primary' : 'ml-4 pl-3 border-l border-border-primary'
         "
