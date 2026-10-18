@@ -17,8 +17,10 @@ import (
 	"github.com/google/uuid"
 )
 
+const ownerRoleSlug = "super_admin"
+
 type strictProvisioner interface {
-	ProvisionExternalIdentity(context.Context, goauth.ExternalIdentity) (goauth.Account, error)
+	ProvisionExternalIdentity(ctx context.Context, identity goauth.ExternalIdentity) (goauth.Account, error)
 }
 type Postgres struct {
 	runtime     *postgres.Runtime
@@ -68,9 +70,10 @@ func (t *pgTx) LockIdentity(ctx context.Context, scope Scope, subject string) er
 	return err
 }
 
-const recordColumns = "id::text,issuer,project_id,client_id,external_subject,subject_id::text,status,version,COALESCE(approved_by::text,''),grant_action,roles,expires_at"
+const recordColumns = "id::text,issuer,project_id,client_id,external_subject,subject_id::text,status,version," +
+	"COALESCE(approved_by::text,''),grant_action,roles,expires_at"
 
-type scanner interface{ Scan(...any) error }
+type scanner interface{ Scan(dest ...any) error }
 
 func scanRecord(row scanner) (Record, error) {
 	var r Record
@@ -221,7 +224,8 @@ func (t *pgTx) CheckActive(ctx context.Context, id string) error {
 		return err
 	}
 	var admin int64
-	err := t.sql.QueryRowContext(ctx, "SELECT id FROM administrations WHERE subject_id=$1 AND deleted_at IS NULL FOR UPDATE", id).Scan(&admin)
+	err := t.sql.QueryRowContext(ctx,
+		"SELECT id FROM administrations WHERE subject_id=$1 AND deleted_at IS NULL FOR UPDATE", id).Scan(&admin)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrDenied
 	}
@@ -230,7 +234,7 @@ func (t *pgTx) CheckActive(ctx context.Context, id string) error {
 
 func (t *pgTx) Authorize(ctx context.Context, actor, action string, ids []int64) ([]Role, error) {
 	switch action {
-	case "read", "invite", "approve", "reject":
+	case "read", actionInvite, actionApprove, "reject":
 	default:
 		return nil, ErrDenied
 	}
@@ -240,7 +244,8 @@ func (t *pgTx) Authorize(ctx context.Context, actor, action string, ids []int64)
 	// Serialize the narrow enrollment grant against all ordinary RBAC writers.
 	// This closes deletion/permission-set/issuer-right races, including updates
 	// through existing role-management screens. The lock lives only until commit.
-	if _, err := t.sql.ExecContext(ctx, `LOCK TABLE auth_roles,auth_permissions,auth_role_permissions,auth_subject_roles IN SHARE ROW EXCLUSIVE MODE`); err != nil {
+	if _, err := t.sql.ExecContext(ctx, `LOCK TABLE auth_roles,auth_permissions,auth_role_permissions,auth_subject_roles
+ IN SHARE ROW EXCLUSIVE MODE`); err != nil {
 		return nil, err
 	}
 	subject, err := goauth.ParseSubjectID(actor)
@@ -278,7 +283,7 @@ func (t *pgTx) Authorize(ctx context.Context, actor, action string, ids []int64)
 			return nil, err
 		}
 		// Owner/bootstrap identities are never provisioned by this component.
-		if role.Slug == "super_admin" {
+		if role.Slug == ownerRoleSlug {
 			return nil, ErrDenied
 		}
 		grant, err := GrantPermission(role.PublicID)
@@ -370,7 +375,9 @@ func (s *Postgres) List(ctx context.Context, actor string, scope Scope) ([]Recor
 		if _, err := tx.Authorize(ctx, actor, "read", nil); err != nil {
 			return err
 		}
-		db := tx.(*pgTx).sql
+		pg, ok := tx.(*pgTx)
+		if !ok { return ErrInvalid }
+		db := pg.sql
 		rows, err := db.QueryContext(ctx, "SELECT "+recordColumns+` FROM admin_admissions
  WHERE issuer=$1 AND project_id=$2 AND client_id=$3 ORDER BY created_at DESC,id DESC LIMIT 100`,
 			scope.Issuer, scope.Project, scope.Client)
@@ -404,7 +411,7 @@ func (s *Postgres) GrantableRoles(ctx context.Context, actor, action string) ([]
 			return err
 		}
 		for _, role := range all {
-			if role.Slug == "super_admin" {
+			if role.Slug == ownerRoleSlug {
 				continue
 			}
 			grants, err := tx.Authorize(ctx, actor, action, []int64{role.ID})
@@ -445,7 +452,7 @@ func (t *pgTx) CheckIdentity(ctx context.Context, i Identity, id string) error {
 
 func (s *Postgres) Permissions(ctx context.Context) ([]rbac.Permission, error) {
 	result := []rbac.Permission{}
-	for _, action := range []string{"read", "invite", "approve", "reject"} {
+	for _, action := range []string{"read", actionInvite, actionApprove, "reject"} {
 		key, err := rbac.NewPermissionKey("admission", action)
 		if err != nil {
 			return nil, err
@@ -457,7 +464,7 @@ func (s *Postgres) Permissions(ctx context.Context) ([]rbac.Permission, error) {
 		return nil, err
 	}
 	for _, role := range roles {
-		if role.Slug == "super_admin" {
+		if role.Slug == ownerRoleSlug {
 			continue
 		}
 		key, err := GrantPermission(role.PublicID)
@@ -475,7 +482,9 @@ func (s *Postgres) Invitations(ctx context.Context, actor string, scope Scope) (
 		if _, err := tx.Authorize(ctx, actor, "read", nil); err != nil {
 			return err
 		}
-		rows, err := tx.(*pgTx).sql.QueryContext(ctx, `SELECT id::text,external_subject,issued_by::text,roles,expires_at,revoked,
+		pg, ok := tx.(*pgTx)
+		if !ok { return ErrInvalid }
+		rows, err := pg.sql.QueryContext(ctx, `SELECT id::text,external_subject,issued_by::text,roles,expires_at,revoked,
  COALESCE(accepted_subject::text,'') FROM admin_admission_invitations
  WHERE issuer=$1 AND project_id=$2 AND client_id=$3 ORDER BY created_at DESC,id DESC LIMIT 100`,
 			scope.Issuer, scope.Project, scope.Client)
