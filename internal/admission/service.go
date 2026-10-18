@@ -18,7 +18,7 @@ const (
 )
 
 const (
-	actionInvite = "invite"
+	actionInvite  = "invite"
 	actionApprove = "approve"
 )
 
@@ -50,7 +50,7 @@ type (
 )
 
 type Role struct {
-	ID       int64 `json:"ID"`
+	ID       int64  `json:"ID"`
 	PublicID string `json:"PublicID"`
 	Name     string `json:"Name"`
 	// Fingerprint pins the exact role permission set at authorization time.
@@ -188,39 +188,61 @@ func normalizedIDs(ids []int64) ([]int64, error) {
 // session credentials; an Active result must still traverse LoginExternalAdmin.
 func (s *Service) Admit(ctx context.Context, reference, invitationID string) (Record, error) {
 	identity, err := s.verifier.Verify(ctx, reference)
-	if err != nil { return Record{}, err }
-	if !s.validIdentity(identity) { return Record{}, ErrDenied }
+	if err != nil {
+		return Record{}, err
+	}
+	if !s.validIdentity(identity) {
+		return Record{}, ErrDenied
+	}
 	var result Record
 	err = s.store.Owned(ctx, func(txCtx context.Context, tx Tx) error {
 		var admissionErr error
 		result, admissionErr = s.admitTransaction(txCtx, tx, identity, reference, invitationID)
 		return admissionErr
 	})
-	if err != nil { return Record{}, err }
+	if err != nil {
+		return Record{}, err
+	}
 	return result, nil
 }
 
 func (s *Service) checkProof(ctx context.Context, reference string, identity Identity) error {
-	if !s.validIdentity(identity) { return ErrDenied }
+	if !s.validIdentity(identity) {
+		return ErrDenied
+	}
 	return s.verifier.Revalidate(ctx, reference, identity)
 }
 
 func (s *Service) admitTransaction(
 	ctx context.Context, tx Tx, identity Identity, reference, invitationID string,
 ) (Record, error) {
-	if err := tx.LockIdentity(ctx, identity.Scope, identity.Subject); err != nil { return Record{}, err }
-	if err := s.checkProof(ctx, reference, identity); err != nil { return Record{}, err }
+	if err := tx.LockIdentity(ctx, identity.Scope, identity.Subject); err != nil {
+		return Record{}, err
+	}
+	if err := s.checkProof(ctx, reference, identity); err != nil {
+		return Record{}, err
+	}
 	current, err := tx.Find(ctx, identity.Scope, identity.Subject)
-	if err != nil && !errors.Is(err, ErrNotFound) { return Record{}, err }
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return Record{}, err
+	}
 	if err == nil {
 		result, handled, existingErr := s.existingAdmission(ctx, tx, current, identity, invitationID)
-		if handled || existingErr != nil { return result, existingErr }
+		if handled || existingErr != nil {
+			return result, existingErr
+		}
 	}
 	invite, err := s.checkedInvitation(ctx, tx, identity, invitationID)
-	if err != nil { return Record{}, err }
+	if err != nil {
+		return Record{}, err
+	}
 	local, err := tx.Provision(ctx, identity)
-	if err != nil { return Record{}, err }
-	if err := s.checkProof(ctx, reference, identity); err != nil { return Record{}, err }
+	if err != nil {
+		return Record{}, err
+	}
+	if err := s.checkProof(ctx, reference, identity); err != nil {
+		return Record{}, err
+	}
 	return s.saveAdmission(ctx, tx, current, identity, invite, local)
 }
 
@@ -228,20 +250,28 @@ func (s *Service) existingAdmission(
 	ctx context.Context, tx Tx, current Record, identity Identity, invitationID string,
 ) (Record, bool, error) {
 	local, err := tx.Provision(ctx, identity)
-	if err != nil { return Record{}, true, err }
-	if local != current.LocalSubject { return Record{}, true, ErrConflict }
+	if err != nil {
+		return Record{}, true, err
+	}
+	if local != current.LocalSubject {
+		return Record{}, true, ErrConflict
+	}
 	switch current.Status {
 	case Rejected:
 		return Record{}, true, ErrDenied
 	case Active:
-		if err := tx.CheckActive(ctx, current.LocalSubject); err != nil { return Record{}, true, err }
+		if err := tx.CheckActive(ctx, current.LocalSubject); err != nil {
+			return Record{}, true, err
+		}
 		return current, true, nil
 	case Approved:
 		var result Record
 		err := s.activate(ctx, tx, current, identity, &result)
 		return result, true, err
 	case Pending:
-		if invitationID == "" { return current, true, nil }
+		if invitationID == "" {
+			return current, true, nil
+		}
 		return Record{}, false, nil
 	default:
 		return Record{}, true, ErrDenied
@@ -252,18 +282,26 @@ func (s *Service) checkedInvitation(
 	ctx context.Context, tx Tx, identity Identity, invitationID string,
 ) (Invitation, error) {
 	if invitationID == "" {
-		if s.cfg.Mode == InvitationOnly { return Invitation{}, ErrDenied }
+		if s.cfg.Mode == InvitationOnly {
+			return Invitation{}, ErrDenied
+		}
 		return Invitation{}, nil
 	}
 	invite, err := tx.Invitation(ctx, invitationID)
-	if err != nil { return Invitation{}, err }
+	if err != nil {
+		return Invitation{}, err
+	}
 	if invite.Scope != identity.Scope || invite.ExternalSubject != identity.Subject ||
 		invite.Revoked || invite.AcceptedSubject != "" || !s.cfg.Now().Before(invite.ExpiresAt) {
 		return Invitation{}, ErrDenied
 	}
 	roles, err := tx.Authorize(ctx, invite.IssuedBy, actionInvite, roleIDs(invite.Roles))
-	if err != nil { return Invitation{}, err }
-	if !sameRoles(roles, invite.Roles) { return Invitation{}, ErrConflict }
+	if err != nil {
+		return Invitation{}, err
+	}
+	if !sameRoles(roles, invite.Roles) {
+		return Invitation{}, ErrConflict
+	}
 	return invite, nil
 }
 
@@ -272,9 +310,13 @@ func (s *Service) saveAdmission(
 ) (Record, error) {
 	expected := current.Version
 	if current.ID == "" {
-		current = Record{ID:s.cfg.NewID(), Scope:identity.Scope,
-			ExternalSubject:identity.Subject, LocalSubject:local, Status:Pending}
-	} else if current.LocalSubject != local { return Record{}, ErrConflict }
+		current = Record{
+			ID: s.cfg.NewID(), Scope: identity.Scope,
+			ExternalSubject: identity.Subject, LocalSubject: local, Status: Pending,
+		}
+	} else if current.LocalSubject != local {
+		return Record{}, ErrConflict
+	}
 	if invite.ID != "" {
 		current.Status = Approved
 		current.ApprovedBy = invite.IssuedBy
@@ -283,12 +325,22 @@ func (s *Service) saveAdmission(
 		current.ExpiresAt = invite.ExpiresAt
 	}
 	current, err := tx.Save(ctx, current, expected)
-	if err != nil { return Record{}, err }
-	if err := tx.Audit(ctx, local, "admission.requested", current.ID); err != nil { return Record{}, err }
-	if invite.ID == "" { return current, nil }
+	if err != nil {
+		return Record{}, err
+	}
+	if err := tx.Audit(ctx, local, "admission.requested", current.ID); err != nil {
+		return Record{}, err
+	}
+	if invite.ID == "" {
+		return current, nil
+	}
 	var result Record
-	if err := s.activate(ctx, tx, current, identity, &result); err != nil { return Record{}, err }
-	if err := tx.ConsumeInvitation(ctx, invite.ID, local); err != nil { return Record{}, err }
+	if err := s.activate(ctx, tx, current, identity, &result); err != nil {
+		return Record{}, err
+	}
+	if err := tx.ConsumeInvitation(ctx, invite.ID, local); err != nil {
+		return Record{}, err
+	}
 	return result, nil
 }
 

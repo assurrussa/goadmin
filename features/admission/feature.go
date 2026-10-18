@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	componentKey = "admission"
+	componentKey   = "admission"
 	componentTitle = "SSO access"
 )
 

@@ -376,7 +376,9 @@ func (s *Postgres) List(ctx context.Context, actor string, scope Scope) ([]Recor
 			return err
 		}
 		pg, ok := tx.(*pgTx)
-		if !ok { return ErrInvalid }
+		if !ok {
+			return ErrInvalid
+		}
 		db := pg.sql
 		rows, err := db.QueryContext(ctx, "SELECT "+recordColumns+` FROM admin_admissions
  WHERE issuer=$1 AND project_id=$2 AND client_id=$3 ORDER BY created_at DESC,id DESC LIMIT 100`,
@@ -483,7 +485,9 @@ func (s *Postgres) Invitations(ctx context.Context, actor string, scope Scope) (
 			return err
 		}
 		pg, ok := tx.(*pgTx)
-		if !ok { return ErrInvalid }
+		if !ok {
+			return ErrInvalid
+		}
 		rows, err := pg.sql.QueryContext(ctx, `SELECT id::text,external_subject,issued_by::text,roles,expires_at,revoked,
  COALESCE(accepted_subject::text,'') FROM admin_admission_invitations
  WHERE issuer=$1 AND project_id=$2 AND client_id=$3 ORDER BY created_at DESC,id DESC LIMIT 100`,
