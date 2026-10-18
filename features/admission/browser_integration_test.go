@@ -333,9 +333,9 @@ func TestAdmissionRealBrowser(t *testing.T) {
 	require.NoError(t, err)
 	password := "Synthetic-Browser-" + uuid.NewString() + "!"
 	operators := map[string]int64{
-		"manager@example.invalid": manager.ID,
+		"manager@example.invalid":  manager.ID,
 		"observer@example.invalid": reader.ID,
-		"owner@example.invalid": owner.ID,
+		"owner@example.invalid":    owner.ID,
 	}
 	for email, role := range operators {
 		account, err := auth.Runtime().ProvisionTrustedLocalAccount(t.Context(),
@@ -455,6 +455,8 @@ func TestAdmissionRealBrowser(t *testing.T) {
 }
 
 func TestBrowserAdmissionAuthorityBindingJSONRoundTrip(t *testing.T) {
+	const changedSuffix = "-changed"
+
 	now := time.Now()
 	original := host.ExternalBinding{
 		Issuer: "https://synthetic-issuer.invalid", Subject: browserAdmissionSubject, LinkID: uuid.NewString(),
@@ -476,12 +478,12 @@ func TestBrowserAdmissionAuthorityBindingJSONRoundTrip(t *testing.T) {
 	require.True(t, proof.ExpiresAt.Equal(restored.Proof.ExpiresAt))
 	for name, change := range map[string]func(*host.ExternalBinding){
 		"issuer":           func(b *host.ExternalBinding) { b.Issuer += "/changed" },
-		"subject":          func(b *host.ExternalBinding) { b.Subject += "-changed" },
+		"subject":          func(b *host.ExternalBinding) { b.Subject += changedSuffix },
 		"link":             func(b *host.ExternalBinding) { b.LinkID = uuid.NewString() },
 		"authority":        func(b *host.ExternalBinding) { b.AuthorityID = uuid.NewString() },
 		"provider-session": func(b *host.ExternalBinding) { b.ProviderSessionID = uuid.NewString() },
-		"client":           func(b *host.ExternalBinding) { b.ClientID += "-changed" },
-		"project":          func(b *host.ExternalBinding) { b.ProjectID += "-changed" },
+		"client":           func(b *host.ExternalBinding) { b.ClientID += changedSuffix },
+		"project":          func(b *host.ExternalBinding) { b.ProjectID += changedSuffix },
 		"generation":       func(b *host.ExternalBinding) { b.Generation++ },
 		"login-generation": func(b *host.ExternalBinding) { b.LoginGeneration++ },
 		"local-subject":    func(b *host.ExternalBinding) { b.LocalSubject = goauth.NewSubjectID() },

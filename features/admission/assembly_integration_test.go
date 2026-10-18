@@ -89,7 +89,7 @@ func TestAdmissionAssemblyOffModeAndProtectedWaitingIdentity(t *testing.T) {
 		},
 		Server: host.ServerConfig{Addr: "127.0.0.1:12345", AllowOrigins: []string{origin}, DisableStartupMessage: true},
 		Auth:   tests.AuthRuntimeConfig(t),
-		CSRF:   host.CSRFConfig{
+		CSRF: host.CSRFConfig{
 			AppDomain: admissionDomain, SecretKey: strings.Repeat("s", 32), AllowedOrigins: []string{origin},
 		},
 	}
