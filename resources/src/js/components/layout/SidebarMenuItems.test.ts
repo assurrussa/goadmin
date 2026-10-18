@@ -43,6 +43,26 @@ function mount(collapsed: boolean) {
 
 describe('sidebar navigation', () => {
   it.each([true, false])(
+    'distinguishes the active child from its ancestor when collapsed=%s',
+    (collapsed) => {
+      mount(collapsed)
+      const parent = container.querySelector('a[href="/admins"]')!
+      const child = container.querySelector('a[href="/auth/profile"]')!
+      const toggle = container.querySelector('button')!
+      const group = document.getElementById(toggle.getAttribute('aria-controls')!)!
+      expect(parent.classList.contains('bg-primary/10')).toBe(false)
+      expect(parent.classList.contains('text-primary')).toBe(true)
+      expect(child.classList.contains('bg-primary/10')).toBe(true)
+      expect(parent.hasAttribute('aria-current')).toBe(false)
+      expect(child.getAttribute('aria-current')).toBe('page')
+      expect(group.classList.contains('mt-1')).toBe(true)
+      expect(group.classList.contains('border-l')).toBe(true)
+      expect(child.parentElement?.classList.contains('pl-3')).toBe(false)
+      expect(parent.classList.contains('focus-visible:ring-2')).toBe(true)
+      expect(child.classList.contains('focus-visible:ring-2')).toBe(true)
+    },
+  )
+  it.each([true, false])(
     'keeps nested active navigation reachable when collapsed=%s',
     async (collapsed) => {
       mount(collapsed)

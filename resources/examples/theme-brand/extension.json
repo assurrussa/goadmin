@@ -1,0 +1,14 @@
+{
+  "formatVersion": 1,
+  "extensions": [
+    {
+      "key": "example.brand-theme",
+      "apiVersion": 1,
+      "sourceRoot": "src",
+      "fingerprint": "sha256:55a6cd20bd22c7b823561690b7039e4b3e79c3735527eaafb6dc8f3b56bbbd03",
+      "requires": [
+        "goadmin.core"
+      ]
+    }
+  ]
+}

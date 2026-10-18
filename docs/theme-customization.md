@@ -132,3 +132,29 @@ manifest and rebuilding. Existing explicit component class overrides still win.
 These are build-time examples, not a runtime theme selector or profile setting.
 They do not change AuthHub/NotifyHub dependencies or deploy a consumer. Handwritten
 controls and page-specific layouts remain outside the shared-component contract.
+
+## Optional branding example
+
+[Branding](../resources/examples/theme-brand/extension.json) adds a local system
+font and blue primary/focus colors, with explicit light/dark foreground pairs.
+It is not enabled by default and does not override density or status colors.
+The example's primary text pairs meet 4.5:1 contrast; validate other color
+combinations in your own screens when adapting the palette.
+
+Compose it with one density preset through the existing manifest list, from
+`resources/` (use `;` instead of `:` as the list separator on Windows):
+
+```sh
+VITE_ADMIN_EXTENSION_MANIFESTS=examples/theme-compact/extension.json:examples/theme-brand/extension.json npm run build-only
+```
+
+Keep other project manifests in the list. Do not combine compact and comfortable
+or theme-shell. Copy the branding source into your project to customize it,
+regenerate its fingerprint as above, and rebuild. Remove the branding manifest
+and rebuild to restore the default palette. Light/dark preference remains under
+the existing theme controls.
+
+For a UI-only preview using the existing synthetic layout fixture, run
+`GOADMIN_FIXTURE_BRANDING=1 node scripts/ui-browser-fixture.mjs` from `resources/`
+and open `http://127.0.0.1:8766/__ui`. It displays the compact/branding examples
+with shared Input and Button controls; use the header's existing theme toggle.
