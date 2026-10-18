@@ -3,7 +3,23 @@
 This file records changes prepared in the checkout. A release is published only
 after a new tag and its clean-consumer checks complete.
 
-## Unreleased
+## v0.13.0 candidate (unpublished)
+
+- Add opt-in assisted recovery, local MFA settings and owner-only read-only role
+  preview, with shared Russian/English UI.
+- Refine sidebar selection and shared shell/control/card theme tokens; provide
+  opt-in compact/comfortable density and branding examples.
+- Pin published GoAuth v0.11.0 (schema 14). Hosts upgrading from schema 13 must
+  migrate before starting compatible writers/workers; older binaries cannot
+  assume rollback compatibility. Rebuild consuming host bundles. See
+  [upgrade and rollback](RELEASING.md#v0130-candidate).
+- Release checks and publication are separate gates; this entry is not a
+  readiness claim.
+
+## Earlier checkout history
+
+The following entries retain historical scope and do not all describe changes
+since v0.12.3.
 
 - Current-page external authentication recovery is opt-in: keep mounted form
   drafts and require manual resubmission, without retaining or replaying a

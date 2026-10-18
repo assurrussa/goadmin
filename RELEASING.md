@@ -4,14 +4,14 @@ This module is published as `github.com/assurrussa/goadmin`.
 
 ## Current Baseline
 
-- The latest published release is [v0.11.1](https://github.com/assurrussa/goadmin/releases/tag/v0.11.1).
-  Current-page recovery and the login-provider slot are included in this
-  consolidated unreleased candidate; no completed release checks are claimed here.
+- The latest published baseline is [v0.12.3](https://github.com/assurrussa/goadmin/releases/tag/v0.12.3).
+  The selected next candidate is `v0.13.0`; selection does not claim release
+  readiness, publication, host acceptance or deployment.
 
 - Go 1.27.2 is the minimum. Modular host assembly is a breaking source API:
   migrate hosts to `host.New`, explicit modules and `host.AdminConfig`.
-- The current root module pins published GoAuth `v0.8.0`, including the
-  companion MFA APIs, without a sibling replacement. Verify the resulting
+- The current root module pins published GoAuth `v0.11.0` (schema 14), including the
+  companion MFA and assisted-recovery APIs, without a sibling replacement. Verify the resulting
   natural dependency graph with the release gates below.
 - GoNotify v0.5.0 changes `host.NotificationManager` to
   `transport.Transport`; `host.NewNotificationManager` now takes
@@ -27,7 +27,7 @@ This module is published as `github.com/assurrussa/goadmin`.
 - The clean-history baseline was published as v0.7.0.
   Old history, PRs and tags remain in the private history archive; do not move
   or rewrite them. Verify the new remote tag and public module independently.
-- Current `go.mod` pins GoAuth v0.8.0 and GoNotify v0.6.0.
+- Current `go.mod` pins GoAuth v0.11.0 and GoNotify v0.6.0.
   GoInertia v0.11.1 retains protocol v2 by default, matching the embedded v2 frontend. GoCache
   resolves v0.2.2. GoDI and GoLogger retain their existing compatible pins.
 - `VERSION` is intentionally unset by default. Pass the exact planned or
@@ -46,6 +46,44 @@ This module is published as `github.com/assurrussa/goadmin`.
   Published verification rejects every replacement and legacy shared/Redis module.
 - The frontend advisory gate and its remaining moderate findings are reviewed
   in [docs/dependency-advisory-review.md](docs/dependency-advisory-review.md).
+
+## v0.13.0 candidate
+
+- Opt-in assisted account recovery with independently verified identity, a
+  dedicated canonical permission, fresh operator proof and encrypted delivery.
+- Local MFA settings with locally generated QR codes, one-time recovery-code
+  display and explicit handling of unavailable or uncertain outcomes.
+- Owner-only read-only role preview intersects selected-role permissions with
+  actual authority, revalidates canonical ownership and denies mutations.
+- Shared Russian/English UI, clearer sidebar parent/child selection and shared
+  shell, control and card theme tokens. Compact/comfortable density and optional
+  branding examples remain opt-in; see [the branding example](docs/theme-customization.md).
+- Replace the GoAuth development pseudo-version with published `v0.11.0`
+  (commit `34d747a6134ffe2303785f9f54655fda7b5ef067`). Other dependency pins
+  remain unchanged. Rebuild embedded assets and consuming host bundles together.
+
+For hosts on GoAuth schema 13, the canonical migration applies the additive
+13→14 assisted-recovery invitation step. Older schemas also require their
+intervening GoAuth migrations. The development pseudo-version already used
+schema 14; changing that pin does not itself add another schema step. Preserve
+published migration bytes, canonical accounts, credentials, projections, audit
+history and encryption key rings. Keep a restorable pre-upgrade database backup
+with its matching keys. Stop/join older notification workers and coordinate
+writers before migration; resume only schema-14-compatible binaries. Mixed older
+writers/workers are unsupported. Preserve queued delivery IDs and deadlines.
+
+GoAuth migration does not downgrade storage. Schema-13 GoAuth v0.10.0 rejects
+schema 14: rolling back only the GoAdmin binary is insufficient. Use a reviewed
+schema-compatible binary or restore the pre-upgrade snapshot and matching keys,
+accounting for subsequent writes. Reset/Down is destructive development/test
+behavior, never a production rollback. Review adopted MFA/recovery policies and
+drain or invalidate affected recovery mail before removing recipient policy.
+See [assisted recovery](docs/assisted-recovery.md) and the pinned
+[GoAuth upgrade contract](https://github.com/assurrussa/goauth/blob/v0.11.0/RELEASING.md).
+
+The pre-tag gate is `make publish-readiness VERSION=v0.13.0`; the published-tag
+consumer gate remains pending until a separately approved publication. Earlier
+validation records below retain their original version and source scope.
 
 ## Custom upload strategy acceptance
 
