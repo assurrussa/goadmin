@@ -4,8 +4,8 @@ This module is published as `github.com/assurrussa/goadmin`.
 
 ## Current Baseline
 
-- The latest published baseline is [v0.12.3](https://github.com/assurrussa/goadmin/releases/tag/v0.12.3).
-  The selected next candidate is `v0.13.0`; selection does not claim release
+- The latest published baseline is [v0.13.0](https://github.com/assurrussa/goadmin/releases/tag/v0.13.0).
+  The selected next candidate is `v0.14.0`; selection does not claim release
   readiness, publication, host acceptance or deployment.
 
 - Go 1.27.2 is the minimum. Modular host assembly is a breaking source API:
@@ -47,7 +47,28 @@ This module is published as `github.com/assurrussa/goadmin`.
 - The frontend advisory gate and its remaining moderate findings are reviewed
   in [docs/dependency-advisory-review.md](docs/dependency-advisory-review.md).
 
-## v0.13.0 candidate
+## v0.14.0 candidate
+
+- Adds the explicit, optional `features/admission` component. Hosts choose
+  invitation-only or project-pending mode; no existing host enables it automatically.
+- The trusted callback must verify issuer, subject, project and client. Pending
+  canonical accounts receive no native admin membership, role or local password.
+- Role grants require explicit current operator authority and per-role permission.
+  Activation rechecks the grant and role snapshot inside the canonical transaction.
+- Adds `20261018100000_create_admin_admissions.sql` to the normal GoAdmin
+  migration runner. It creates enrollment, invitation and append-only audit tables;
+  it does not modify existing accounts or enable SSO admission. Preserve a
+  restorable backup and allow ordinary PostgreSQL DDL locks during migration.
+- Requires the strict provisioning API selected for GoAuth `v0.12.0` (schema 14).
+  Publication and the final dependency pin must be verified before this release.
+  A local candidate replacement is development evidence only.
+- See [SSO admission](docs/sso-admission.md) for the host-owned proof adapter,
+  moderation, invitation binding and off-mode contract. Actual host enrollment
+  acceptance is separate from synthetic component tests.
+- Use `make publish-readiness VERSION=v0.14.0`, followed by the exact published
+  consumer gate. Do not claim deployment from this library release.
+
+## v0.13.0 historical scope
 
 - Opt-in assisted account recovery with independently verified identity, a
   dedicated canonical permission, fresh operator proof and encrypted delivery.
