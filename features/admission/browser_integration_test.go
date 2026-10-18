@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -37,8 +38,16 @@ type browserAdmissionAuthority struct {
 	states map[string]browserAdmissionState
 	owners map[string]string
 	scope admission.Scope
+	observations []browserAdmissionObservation
 }
 type browserAdmissionState struct { browser, reference, invitation string }
+type browserAdmissionObservation struct {
+	Method string `json:"method"`
+	Origin string `json:"origin"`
+	Referer string `json:"referer"`
+	HasCSRF bool `json:"hasCSRF"`
+	HasSession bool `json:"hasSession"`
+}
 
 func (a *browserAdmissionAuthority) Verify(_ context.Context, ref string) (admission.VerifiedIdentity, error) {
 	a.mu.Lock()
@@ -76,7 +85,17 @@ type browserAdmissionFeature struct {
 func (f browserAdmissionFeature) Descriptor() host.FeatureDescriptor { return host.FeatureDescriptor{Key: "admission-browser-fixture"} }
 func (f browserAdmissionFeature) Build(host.Menu) host.ExtensionBuilder {
 	return func(app *host.App) (*host.Extension, error) {
-		return host.NewExtension().WithPublicRegister(func(routes *fiber.App) {
+		return host.NewExtension().WithMiddlewares(func(c fiber.Ctx) error {
+			if c.Method() == fiber.MethodPost && c.Path() == "/admissions/approve" {
+				f.authority.mu.Lock()
+				f.authority.observations = append(f.authority.observations, browserAdmissionObservation{
+					Method: c.Method(), Origin: c.Get("Origin"), Referer: c.Get("Referer"),
+					HasCSRF: c.Get("X-CSRF-Token") != "", HasSession: c.Cookies("admission_browser_session") != "",
+				})
+				f.authority.mu.Unlock()
+			}
+			return c.Next()
+		}).WithPublicRegister(func(routes *fiber.App) {
 			routes.Get("/admission-browser/start", func(c fiber.Ctx) error {
 				scenario := c.Query("scenario", "alice")
 				if scenario != "alice" && scenario != "wrong" && scenario != "no-project" { return fiber.ErrBadRequest }
@@ -146,6 +165,17 @@ func TestAdmissionRealBrowser(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = listener.Close() })
 	url := "https://localhost:"+strings.TrimPrefix(listener.Addr().String(), "127.0.0.1:")
+	foreignListener, err := net.Listen("tcp4", "127.0.0.1:0")
+	require.NoError(t, err)
+	foreignURL := "https://localhost:"+strings.TrimPrefix(foreignListener.Addr().String(), "127.0.0.1:")
+	foreignServer := &http.Server{ReadHeaderTimeout: 5*time.Second, Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte("<!doctype html><title>Synthetic foreign origin</title>"))
+	})}
+	foreignDone := make(chan error, 1)
+	go func() { foreignDone <- foreignServer.Serve(tls.NewListener(foreignListener, &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12})) }()
+	t.Cleanup(func() { require.NoError(t, foreignServer.Close()); require.ErrorIs(t, <-foreignDone, http.ErrServerClosed) })
+
 	db, _, cleanup := tests.PrepareDB(t.Context(), t, "AdmissionBrowser")
 	t.Cleanup(func() { cleanup(context.Background()) })
 	cfg := host.Config{
@@ -213,13 +243,21 @@ func TestAdmissionRealBrowser(t *testing.T) {
 	require.NoError(t, cmd.Start())
 	t.Cleanup(func() { _ = cmd.Process.Kill() })
 	encoder := json.NewEncoder(in)
-	require.NoError(t, encoder.Encode(map[string]any{"url": url, "password": password, "role": target.ID, "previewRole": manager.ID}))
+	require.NoError(t, encoder.Encode(map[string]any{"url": url, "foreignURL": foreignURL, "password": password, "role": target.ID, "previewRole": manager.ID}))
 	scanner := bufio.NewScanner(out)
 	completed := false
 	for scanner.Scan() {
 		var message struct { Op string `json:"op"` }
 		require.NoError(t, json.Unmarshal(scanner.Bytes(), &message))
 		if message.Op == "done" { completed = true; break }
+		if message.Op == "failed" { break }
+		if message.Op == "observations" {
+			authority.mu.Lock()
+			observations := append([]browserAdmissionObservation{}, authority.observations...)
+			authority.mu.Unlock()
+			require.NoError(t, encoder.Encode(observations))
+			continue
+		}
 		require.Equal(t, "snapshot", message.Op)
 		var raw []byte
 		err := auth.Runtime().Database().QueryRowContext(t.Context(), `SELECT json_build_object(

@@ -5,11 +5,16 @@
 const assert = require('node:assert/strict')
 const readline = require('node:readline')
 const { chromium } = require(process.env.GOADMIN_PLAYWRIGHT_MODULE)
-const lines = readline.createInterface({ input: process.stdin })[Symbol.asyncIterator]()
+const input = readline.createInterface({ input: process.stdin })
+const lines = input[Symbol.asyncIterator]()
 async function receive() {
   const line = await lines.next()
   assert.equal(line.done, false, 'fixture pipe closed')
   return JSON.parse(line.value)
+}
+async function observations() {
+  process.stdout.write(JSON.stringify({ op: 'observations' }) + '\n')
+  return receive()
 }
 async function snapshot() {
   process.stdout.write(JSON.stringify({ op: 'snapshot' }) + '\n')
@@ -111,14 +116,48 @@ async function main() {
     await post(manager, '/admissions/approve', approveBody(record(before).version), false)
     assert.deepEqual(await snapshot(), before, 'missing-CSRF approval persisted a mutation')
 
-    // Interception models an actual foreign Origin on the browser's HTTP
-    // request; browser JS itself cannot set the forbidden Origin header.
-    await manager.route('**/admissions/approve', async route => {
-      await route.continue({ headers: { ...route.request().headers(), origin: 'https://foreign.example.invalid' } })
+    // A second localhost TLS port is genuinely cross-origin but same-site, so
+    // native SameSite cookies remain attached. Only the browser's preflight is
+    // fulfilled; the actual POST goes unchanged to the real native host.
+    const foreign = await manager.context().newPage()
+    await foreign.goto(cfg.foreignURL)
+    const foreignOrigin = new URL(cfg.foreignURL).origin
+    const observationCount = (await observations()).length
+    await foreign.route('**/admissions/approve', async route => {
+      if (route.request().method() === 'OPTIONS') {
+        await route.fulfill({ status: 204, headers: {
+          'Access-Control-Allow-Origin': foreignOrigin,
+          'Access-Control-Allow-Credentials': 'true',
+          'Access-Control-Allow-Methods': 'POST',
+          'Access-Control-Allow-Headers': 'content-type,x-csrf-token,x-inertia',
+        } })
+      } else {
+        await route.continue()
+      }
     })
-    await post(manager, '/admissions/approve', approveBody(record(before).version))
-    await manager.unroute('**/admissions/approve')
-    assert.deepEqual(await snapshot(), before, 'foreign-origin approval persisted a mutation')
+    const foreignResult = await foreign.evaluate(async ({ url, body, token }) => {
+      try {
+        const response = await fetch(url + '/admissions/approve', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json', 'X-Inertia': 'true', 'X-CSRF-Token': token },
+          body: JSON.stringify(body),
+        })
+        await response.text()
+        return { status: response.status }
+      } catch {
+        // CORS can hide a denial response. The server's private receipt below
+        // must still prove the POST reached it with the intended Origin.
+        return { corsBlocked: true }
+      }
+    }, { url: cfg.url, body: approveBody(record(before).version), token: await csrf(manager) })
+    const receipts = (await observations()).slice(observationCount)
+    assert.equal(receipts.length, 1, 'foreign-origin POST must reach the native host')
+    assert.equal(receipts[0].origin, foreignOrigin, 'server must observe the real foreign Origin')
+    assert.equal(receipts[0].hasCSRF, true, 'foreign request must carry valid token')
+    assert.equal(receipts[0].hasSession, true, 'foreign request must carry native session cookie')
+    assert.ok(foreignResult.corsBlocked || foreignResult.status >= 400, 'foreign request must be denied')
+    assert.deepEqual(await snapshot(), before, 'received foreign-origin approval persisted a mutation')
+    await foreign.close()
 
     const owner = await page()
     await login(owner, 'owner@example.invalid')
@@ -180,12 +219,16 @@ async function main() {
     assert.deepEqual(uiErrors, [], 'embedded UI runtime errors')
     process.stderr.write('Admission real-browser assertions passed; persisted effects verified.\n')
   } finally {
-    for (const context of contexts) await context.close()
+    await Promise.allSettled(contexts.map(context => context.close()))
     await persistent.close()
   }
   process.stdout.write(JSON.stringify({ op: 'done' }) + '\n')
 }
 main().catch(error => {
   process.stderr.write('Admission browser acceptance failed: ' + error.message + '\n')
+  process.stdout.write(JSON.stringify({ op: 'failed' }) + '\n')
   process.exitCode = 1
+}).finally(() => {
+  input.close()
+  process.stdin.destroy()
 })

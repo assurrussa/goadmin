@@ -49,6 +49,14 @@ observes committed SQL effects over private parent/child pipes. It checks:
 - invitation acceptance by a different identity or without the exact project
   grant cannot consume the invitation or create authority
 
+A second loopback TLS port supplies a genuinely cross-origin, same-site page.
+The browser-only preflight fixture allows the adversarial POST to be dispatched;
+the POST itself is delivered unchanged to native middleware. Its server-observed
+Origin, Referer and token/session presence are verified over private pipes before
+interpreting the persisted-effect assertion. No cookie/token values are recorded.
+The runner closes its input reader on success or failure so the Go process can
+observe termination without waiting for the overall timeout.
+
 Synthetic scenario selectors choose fixed server-side identities. They never
 accept identity JSON. One-time random callback state is bound to an HttpOnly,
 Secure browser cookie; the waiting-page opaque reference is bound to that same
