@@ -116,7 +116,8 @@ func TestPostgresAdmissionPendingApprovalAndNoLocalPassword(t *testing.T) {
 	require.Equal(t, admission.Pending, r.Status)
 	require.Zero(t, count(t, f, "SELECT count(*) FROM administrations WHERE subject_id=$1", r.LocalSubject))
 	require.Zero(t, count(t, f, "SELECT count(*) FROM auth_local_credentials WHERE subject_id=$1", r.LocalSubject))
-	require.NoError(t, f.service.Approve(ctx, f.actor.Subject.ID.String(), "alice", r.Version, []int64{f.role.ID}, f.now.Add(time.Hour)))
+	require.NoError(t, f.service.Approve(ctx,
+		f.actor.Subject.ID.String(), "alice", r.Version, []int64{f.role.ID}, f.now.Add(time.Hour)))
 	require.Zero(t, count(t, f, "SELECT count(*) FROM administrations WHERE subject_id=$1", r.LocalSubject))
 	f.proof.denied = true
 	_, err = f.service.Admit(ctx, "denied-rp", "")
@@ -125,8 +126,10 @@ func TestPostgresAdmissionPendingApprovalAndNoLocalPassword(t *testing.T) {
 	r, err = f.service.Admit(ctx, "fresh-rp", "")
 	require.NoError(t, err)
 	require.Equal(t, admission.Active, r.Status)
-	require.Equal(t, 1, count(t, f, "SELECT count(*) FROM administrations WHERE subject_id=$1 AND deleted_at IS NULL", r.LocalSubject))
-	require.Equal(t, 1, count(t, f, "SELECT count(*) FROM auth_subject_roles WHERE subject_id=$1 AND role_id=$2", r.LocalSubject, f.role.ID))
+	require.Equal(t, 1, count(t, f,
+		"SELECT count(*) FROM administrations WHERE subject_id=$1 AND deleted_at IS NULL", r.LocalSubject))
+	require.Equal(t, 1, count(t, f,
+		"SELECT count(*) FROM auth_subject_roles WHERE subject_id=$1 AND role_id=$2", r.LocalSubject, f.role.ID))
 	require.Zero(t, count(t, f, "SELECT count(*) FROM auth_sessions WHERE subject_id=$1", r.LocalSubject))
 }
 
@@ -146,7 +149,8 @@ func TestPostgresAdmissionConcurrentCallbacksAreIdempotent(t *testing.T) {
 	for err := range results {
 		require.NoError(t, err)
 	}
-	require.Equal(t, 1, count(t, f, "SELECT count(*) FROM auth_identity_links WHERE issuer=$1 AND external_subject='alice'", f.proof.identity.Scope.Issuer))
+	require.Equal(t, 1, count(t, f,
+		"SELECT count(*) FROM auth_identity_links WHERE issuer=$1 AND external_subject='alice'", f.proof.identity.Scope.Issuer))
 	require.Equal(t, 1, count(t, f, "SELECT count(*) FROM admin_admissions WHERE external_subject='alice' AND status='active'"))
 }
 
@@ -206,7 +210,8 @@ func TestPostgresAdmissionNeverRestoresSoftDeletedMembership(t *testing.T) {
 	require.NoError(t, err)
 	r, err := f.service.Admit(ctx, "rp", i.ID)
 	require.NoError(t, err)
-	_, err = f.auth.Runtime().Database().ExecContext(ctx, "UPDATE administrations SET deleted_at=now() WHERE subject_id=$1", r.LocalSubject)
+	_, err = f.auth.Runtime().Database().ExecContext(ctx,
+		"UPDATE administrations SET deleted_at=now() WHERE subject_id=$1", r.LocalSubject)
 	require.NoError(t, err)
 	_, err = f.service.Admit(ctx, "rp", i.ID)
 	require.ErrorIs(t, err, admission.ErrDenied)
