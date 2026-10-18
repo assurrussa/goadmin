@@ -1,0 +1,110 @@
+{
+  "seedDate": "2026-10-19",
+  "browser": "149.0.7827.55",
+  "playwright": "chromium",
+  "deviceScaleFactor": 1,
+  "locale": "en-GB",
+  "timezone": "UTC",
+  "screenshots": [
+    {
+      "file": "dashboard-compact-light.png",
+      "view": "dashboard",
+      "preset": "compact",
+      "mode": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1100
+      }
+    },
+    {
+      "file": "dashboard-default-light.png",
+      "view": "dashboard",
+      "preset": "default",
+      "mode": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1100
+      }
+    },
+    {
+      "file": "dashboard-branded-dark.png",
+      "view": "dashboard",
+      "preset": "branded",
+      "mode": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1100
+      }
+    },
+    {
+      "file": "participants-compact-light.png",
+      "view": "participants",
+      "preset": "compact",
+      "mode": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "training-branded-light.png",
+      "view": "training",
+      "preset": "branded",
+      "mode": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "permissions-compact-dark.png",
+      "view": "permissions",
+      "preset": "compact",
+      "mode": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "queue-compact-light.png",
+      "view": "queue",
+      "preset": "compact",
+      "mode": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "settings-default-light.png",
+      "view": "settings",
+      "preset": "default",
+      "mode": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "dashboard-compact-mobile.png",
+      "view": "dashboard",
+      "preset": "compact",
+      "mode": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "participants-compact-mobile.png",
+      "view": "participants",
+      "preset": "compact",
+      "mode": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    }
+  ]
+}

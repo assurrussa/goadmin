@@ -4,6 +4,10 @@
 projects integrate it through the stable `github.com/assurrussa/goadmin/host`
 facade instead of copying admin internals.
 
+![GoAdmin sports club dashboard with compact light theme, attendance and upcoming training](docs/screenshots/dashboard-compact-light.png)
+
+[Explore the screenshot gallery and run the local presentation demo](docs/presentation-demo.md).
+
 Install the public release with `go get github.com/assurrussa/goadmin@v0.12.0`.
 Its dependency graph uses GoAuth v0.8.0, GoNotify v0.6.0, GoUploads v0.13.0 and
 GoWebSocket v0.2.1 without sibling replacements.

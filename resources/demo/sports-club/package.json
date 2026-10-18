@@ -1,0 +1,13 @@
+{
+  "name": "goadmin-sports-club-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test data.test.mjs",
+    "capture": "node capture.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.64.0-alpha-1790635538000"
+  }
+}
