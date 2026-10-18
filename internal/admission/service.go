@@ -17,6 +17,11 @@ const (
 	ProjectPending Mode = "project-pending"
 )
 
+const (
+	actionInvite = "invite"
+	actionApprove = "approve"
+)
+
 type Status string
 
 const (
@@ -45,11 +50,11 @@ type (
 )
 
 type Role struct {
-	ID       int64
-	PublicID string
-	Name     string
+	ID       int64 `json:"ID"`
+	PublicID string `json:"PublicID"`
+	Name     string `json:"Name"`
 	// Fingerprint pins the exact role permission set at authorization time.
-	Fingerprint string
+	Fingerprint string `json:"Fingerprint"`
 }
 type Record struct {
 	ID                            string
@@ -75,38 +80,38 @@ type Invitation struct {
 // Verify may contact the provider before the transaction. Revalidate must be a
 // local, read-only authority check; it must not refresh or perform network I/O.
 type Verifier interface {
-	Verify(context.Context, string) (Identity, error)
-	Revalidate(context.Context, string, Identity) error
+	Verify(ctx context.Context, reference string) (Identity, error)
+	Revalidate(ctx context.Context, reference string, identity Identity) error
 }
 type Store interface {
 	// Owned commits once and returns nil only for confirmed commit. Callback
 	// errors roll back; unknown outcomes must stay errors. No automatic retry.
-	Owned(context.Context, func(context.Context, Tx) error) error
+	Owned(ctx context.Context, fn func(context.Context, Tx) error) error
 }
 type Tx interface {
 	// LockIdentity serializes exact scope/issuer/subject enrollment, including
 	// the missing-row case, without changing global subject status.
-	LockIdentity(context.Context, Scope, string) error
-	Find(context.Context, Scope, string) (Record, error)
-	Save(context.Context, Record, int64) (Record, error)
-	Invitation(context.Context, string) (Invitation, error)
-	CreateInvitation(context.Context, Invitation) error
-	ConsumeInvitation(context.Context, string, string) error
-	RevokeInvitation(context.Context, string) error
+	LockIdentity(ctx context.Context, scope Scope, subject string) error
+	Find(ctx context.Context, scope Scope, subject string) (Record, error)
+	Save(ctx context.Context, record Record, expected int64) (Record, error)
+	Invitation(ctx context.Context, id string) (Invitation, error)
+	CreateInvitation(ctx context.Context, invitation Invitation) error
+	ConsumeInvitation(ctx context.Context, id, subject string) error
+	RevokeInvitation(ctx context.Context, id string) error
 	// Authorize checks live canonical actor + admin membership + explicit
 	// admission management and role-grant permissions. It locks the relevant
 	// authority through commit. No super-role or own-role hierarchy shortcut.
-	Authorize(context.Context, string, string, []int64) ([]Role, error)
+	Authorize(ctx context.Context, actor, action string, ids []int64) ([]Role, error)
 	// Provision uses exact identity and strict no-email-autolink canonical API.
 	// Existing disabled/retired accounts and deleted memberships must deny.
-	Provision(context.Context, Identity) (string, error)
+	Provision(ctx context.Context, identity Identity) (string, error)
 	// Activate atomically creates the local membership and assigns roles using
 	// the canonical Runtime/RBAC transaction, without a local credential.
-	Activate(context.Context, string, []Role) error
+	Activate(ctx context.Context, subject string, roles []Role) error
 	// CheckActive denies revoked membership and disabled/retired subjects.
-	CheckActive(context.Context, string) error
-	CheckIdentity(context.Context, Identity, string) error
-	Audit(context.Context, string, string, string) error
+	CheckActive(ctx context.Context, subject string) error
+	CheckIdentity(ctx context.Context, identity Identity, subject string) error
+	Audit(ctx context.Context, actor, action, target string) error
 }
 
 type Config struct {
@@ -183,120 +188,107 @@ func normalizedIDs(ids []int64) ([]int64, error) {
 // session credentials; an Active result must still traverse LoginExternalAdmin.
 func (s *Service) Admit(ctx context.Context, reference, invitationID string) (Record, error) {
 	identity, err := s.verifier.Verify(ctx, reference)
-	if err != nil {
-		return Record{}, err
-	}
-	if !s.validIdentity(identity) {
-		return Record{}, ErrDenied
-	}
+	if err != nil { return Record{}, err }
+	if !s.validIdentity(identity) { return Record{}, ErrDenied }
 	var result Record
 	err = s.store.Owned(ctx, func(txCtx context.Context, tx Tx) error {
-		if err := tx.LockIdentity(txCtx, identity.Scope, identity.Subject); err != nil {
-			return err
-		}
-		if !s.validIdentity(identity) {
-			return ErrDenied
-		}
-		if err := s.verifier.Revalidate(txCtx, reference, identity); err != nil {
-			return err
-		}
-		current, err := tx.Find(txCtx, identity.Scope, identity.Subject)
-		if err != nil && !errors.Is(err, ErrNotFound) {
-			return err
-		}
-		if err == nil {
-			local, checkErr := tx.Provision(txCtx, identity)
-			if checkErr != nil {
-				return checkErr
-			}
-			if local != current.LocalSubject {
-				return ErrConflict
-			}
-			switch current.Status {
-			case Rejected:
-				return ErrDenied
-			case Active:
-				if err := tx.CheckActive(txCtx, current.LocalSubject); err != nil {
-					return err
-				}
-				result = current
-				return nil
-			case Approved:
-				return s.activate(txCtx, tx, current, identity, &result)
-			case Pending:
-				if invitationID == "" {
-					result = current
-					return nil
-				}
-			default:
-				return ErrDenied
-			}
-		}
-		var invite Invitation
-		if invitationID != "" {
-			invite, err = tx.Invitation(txCtx, invitationID)
-			if err != nil {
-				return err
-			}
-			if invite.Scope != identity.Scope || invite.ExternalSubject != identity.Subject ||
-				invite.Revoked || invite.AcceptedSubject != "" || !s.cfg.Now().Before(invite.ExpiresAt) {
-				return ErrDenied
-			}
-			roles, authErr := tx.Authorize(txCtx, invite.IssuedBy, "invite", roleIDs(invite.Roles))
-			if authErr != nil {
-				return authErr
-			}
-			if !sameRoles(roles, invite.Roles) {
-				return ErrConflict
-			}
-		} else if s.cfg.Mode == InvitationOnly {
-			return ErrDenied
-		}
-		local, err := tx.Provision(txCtx, identity)
-		if err != nil {
-			return err
-		}
-		if !s.validIdentity(identity) {
-			return ErrDenied
-		}
-		if err := s.verifier.Revalidate(txCtx, reference, identity); err != nil {
-			return err
-		}
-		expected := current.Version
-		if current.ID == "" {
-			current = Record{
-				ID: s.cfg.NewID(), Scope: identity.Scope,
-				ExternalSubject: identity.Subject, LocalSubject: local, Status: Pending,
-			}
-		} else if current.LocalSubject != local {
-			return ErrConflict
-		}
-		if invite.ID != "" {
-			current.Status = Approved
-			current.ApprovedBy = invite.IssuedBy
-			current.GrantAction = "invite"
-			current.Roles = slices.Clone(invite.Roles)
-			current.ExpiresAt = invite.ExpiresAt
-		}
-		current, err = tx.Save(txCtx, current, expected)
-		if err != nil {
-			return err
-		}
-		if err := tx.Audit(txCtx, local, "admission.requested", current.ID); err != nil {
-			return err
-		}
-		if invite.ID != "" {
-			if err := s.activate(txCtx, tx, current, identity, &result); err != nil {
-				return err
-			}
-			return tx.ConsumeInvitation(txCtx, invite.ID, local)
-		}
-		result = current
-		return nil
+		var admissionErr error
+		result, admissionErr = s.admitTransaction(txCtx, tx, identity, reference, invitationID)
+		return admissionErr
 	})
-	if err != nil {
-		return Record{}, err
+	if err != nil { return Record{}, err }
+	return result, nil
+}
+
+func (s *Service) checkProof(ctx context.Context, reference string, identity Identity) error {
+	if !s.validIdentity(identity) { return ErrDenied }
+	return s.verifier.Revalidate(ctx, reference, identity)
+}
+
+func (s *Service) admitTransaction(
+	ctx context.Context, tx Tx, identity Identity, reference, invitationID string,
+) (Record, error) {
+	if err := tx.LockIdentity(ctx, identity.Scope, identity.Subject); err != nil { return Record{}, err }
+	if err := s.checkProof(ctx, reference, identity); err != nil { return Record{}, err }
+	current, err := tx.Find(ctx, identity.Scope, identity.Subject)
+	if err != nil && !errors.Is(err, ErrNotFound) { return Record{}, err }
+	if err == nil {
+		result, handled, existingErr := s.existingAdmission(ctx, tx, current, identity, invitationID)
+		if handled || existingErr != nil { return result, existingErr }
 	}
+	invite, err := s.checkedInvitation(ctx, tx, identity, invitationID)
+	if err != nil { return Record{}, err }
+	local, err := tx.Provision(ctx, identity)
+	if err != nil { return Record{}, err }
+	if err := s.checkProof(ctx, reference, identity); err != nil { return Record{}, err }
+	return s.saveAdmission(ctx, tx, current, identity, invite, local)
+}
+
+func (s *Service) existingAdmission(
+	ctx context.Context, tx Tx, current Record, identity Identity, invitationID string,
+) (Record, bool, error) {
+	local, err := tx.Provision(ctx, identity)
+	if err != nil { return Record{}, true, err }
+	if local != current.LocalSubject { return Record{}, true, ErrConflict }
+	switch current.Status {
+	case Rejected:
+		return Record{}, true, ErrDenied
+	case Active:
+		if err := tx.CheckActive(ctx, current.LocalSubject); err != nil { return Record{}, true, err }
+		return current, true, nil
+	case Approved:
+		var result Record
+		err := s.activate(ctx, tx, current, identity, &result)
+		return result, true, err
+	case Pending:
+		if invitationID == "" { return current, true, nil }
+		return Record{}, false, nil
+	default:
+		return Record{}, true, ErrDenied
+	}
+}
+
+func (s *Service) checkedInvitation(
+	ctx context.Context, tx Tx, identity Identity, invitationID string,
+) (Invitation, error) {
+	if invitationID == "" {
+		if s.cfg.Mode == InvitationOnly { return Invitation{}, ErrDenied }
+		return Invitation{}, nil
+	}
+	invite, err := tx.Invitation(ctx, invitationID)
+	if err != nil { return Invitation{}, err }
+	if invite.Scope != identity.Scope || invite.ExternalSubject != identity.Subject ||
+		invite.Revoked || invite.AcceptedSubject != "" || !s.cfg.Now().Before(invite.ExpiresAt) {
+		return Invitation{}, ErrDenied
+	}
+	roles, err := tx.Authorize(ctx, invite.IssuedBy, actionInvite, roleIDs(invite.Roles))
+	if err != nil { return Invitation{}, err }
+	if !sameRoles(roles, invite.Roles) { return Invitation{}, ErrConflict }
+	return invite, nil
+}
+
+func (s *Service) saveAdmission(
+	ctx context.Context, tx Tx, current Record, identity Identity, invite Invitation, local string,
+) (Record, error) {
+	expected := current.Version
+	if current.ID == "" {
+		current = Record{ID:s.cfg.NewID(), Scope:identity.Scope,
+			ExternalSubject:identity.Subject, LocalSubject:local, Status:Pending}
+	} else if current.LocalSubject != local { return Record{}, ErrConflict }
+	if invite.ID != "" {
+		current.Status = Approved
+		current.ApprovedBy = invite.IssuedBy
+		current.GrantAction = actionInvite
+		current.Roles = slices.Clone(invite.Roles)
+		current.ExpiresAt = invite.ExpiresAt
+	}
+	current, err := tx.Save(ctx, current, expected)
+	if err != nil { return Record{}, err }
+	if err := tx.Audit(ctx, local, "admission.requested", current.ID); err != nil { return Record{}, err }
+	if invite.ID == "" { return current, nil }
+	var result Record
+	if err := s.activate(ctx, tx, current, identity, &result); err != nil { return Record{}, err }
+	if err := tx.ConsumeInvitation(ctx, invite.ID, local); err != nil { return Record{}, err }
 	return result, nil
 }
 
@@ -304,7 +296,7 @@ func (s *Service) activate(ctx context.Context, tx Tx, record Record, identity I
 	if !s.validIdentity(identity) || !s.cfg.Now().Before(record.ExpiresAt) {
 		return ErrDenied
 	}
-	if record.GrantAction != "approve" && record.GrantAction != "invite" {
+	if record.GrantAction != actionApprove && record.GrantAction != actionInvite {
 		return ErrDenied
 	}
 	roles, err := tx.Authorize(ctx, record.ApprovedBy, record.GrantAction, roleIDs(record.Roles))
@@ -353,7 +345,7 @@ func (s *Service) Invite(ctx context.Context, actor, subject string, ids []int64
 		if err := tx.LockIdentity(ctx, s.cfg.Scope, subject); err != nil {
 			return err
 		}
-		roles, err := tx.Authorize(ctx, actor, "invite", ids)
+		roles, err := tx.Authorize(ctx, actor, actionInvite, ids)
 		if err != nil {
 			return err
 		}
@@ -391,7 +383,7 @@ func (s *Service) Approve(ctx context.Context, actor, subject string, version in
 		if current.Version != version || current.Status != Pending {
 			return ErrConflict
 		}
-		roles, err := tx.Authorize(ctx, actor, "approve", ids)
+		roles, err := tx.Authorize(ctx, actor, actionApprove, ids)
 		if err != nil {
 			return err
 		}
@@ -399,7 +391,7 @@ func (s *Service) Approve(ctx context.Context, actor, subject string, version in
 			return ErrDenied
 		}
 		current.Status, current.ApprovedBy, current.Roles, current.ExpiresAt = Approved, actor, roles, until
-		current.GrantAction = "approve"
+		current.GrantAction = actionApprove
 		if _, err := tx.Save(ctx, current, version); err != nil {
 			return err
 		}
@@ -441,7 +433,7 @@ func (s *Service) Revoke(ctx context.Context, actor, id string) error {
 		if invite.Scope != s.cfg.Scope || invite.AcceptedSubject != "" {
 			return ErrDenied
 		}
-		if _, err := tx.Authorize(ctx, actor, "invite", nil); err != nil {
+		if _, err := tx.Authorize(ctx, actor, actionInvite, nil); err != nil {
 			return err
 		}
 		if err := tx.RevokeInvitation(ctx, id); err != nil {
