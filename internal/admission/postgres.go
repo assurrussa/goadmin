@@ -7,9 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -151,14 +149,14 @@ func (t *pgTx) Authorize(ctx context.Context,actor,action string,ids []int64)([]
 	key,err:=rbac.NewPermissionKey("admission",action);if err!=nil{return nil,err}
 	ok,err:=t.store.roles.Check(ctx,subject,key);if err!=nil{return nil,err};if !ok{return nil,ErrDenied}
 	if len(ids)>0{
-		assign,err:=rbac.NewPermissionKey("admission","assign");if err!=nil{return nil,err}
+		assign,err:=rbac.NewPermissionKey("roles","assign");if err!=nil{return nil,err}
 		ok,err=t.store.roles.Check(ctx,subject,assign);if err!=nil{return nil,err};if !ok{return nil,ErrDenied}
 	}
 	result:=make([]Role,0,len(ids))
 	for _,id:=range ids{
 		role,err:=t.store.roles.Role(ctx,id);if err!=nil{return nil,err}
 		// Owner/bootstrap identities are never provisioned by this component.
-		if role.System{return nil,ErrDenied}
+		if role.Slug=="super_admin"{return nil,ErrDenied}
 		grant,err:=GrantPermission(role.PublicID);if err!=nil{return nil,err}
 		ok,err:=t.store.roles.Check(ctx,subject,grant);if err!=nil{return nil,err};if !ok{return nil,ErrDenied}
 		permissions,err:=t.store.roles.RolePermissions(ctx,id);if err!=nil{return nil,err}
@@ -219,14 +217,14 @@ func (s *Postgres) List(ctx context.Context,actor string,scope Scope)([]Record,e
 	})
 	if err!=nil{return nil,err};return result,nil
 }
-func (s *Postgres) GrantableRoles(ctx context.Context,actor string)([]Role,error){
+func (s *Postgres) GrantableRoles(ctx context.Context,actor,action string)([]Role,error){
 	var result []Role
 	err:=s.Owned(ctx,func(ctx context.Context,tx Tx)error{
 		if _,err:=tx.Authorize(ctx,actor,"read",nil);err!=nil{return err}
 		all,err:=s.roles.Roles(ctx,rbac.RoleFilter{Limit:1000});if err!=nil{return err}
 		for _,role:=range all{
-			if role.System{continue}
-			grants,err:=tx.Authorize(ctx,actor,"invite",[]int64{role.ID})
+			if role.Slug=="super_admin"{continue}
+			grants,err:=tx.Authorize(ctx,actor,action,[]int64{role.ID})
 			if errors.Is(err,ErrDenied){continue};if err!=nil{return err}
 			result=append(result,grants...)
 		}
@@ -235,7 +233,45 @@ func (s *Postgres) GrantableRoles(ctx context.Context,actor string)([]Role,error
 	if err!=nil{return nil,err};return result,nil
 }
 
-// These helpers keep compiler diagnostics local while the public facade exposes
-// only canonical role IDs and explicit permission definitions.
-var _ = fmt.Sprintf
-var _ = strconv.FormatInt
+
+func (t *pgTx) CheckIdentity(ctx context.Context,i Identity,id string)error{
+	if err:=t.lockActiveSubject(ctx,id);err!=nil{return err}
+	var linked string
+	err:=t.sql.QueryRowContext(ctx,`SELECT subject_id::text FROM auth_identity_links
+ WHERE issuer=$1 AND external_subject=$2 FOR SHARE`,i.Scope.Issuer,i.Subject).Scan(&linked)
+	if errors.Is(err,sql.ErrNoRows){return ErrDenied};if err!=nil{return err}
+	if linked!=id{return ErrDenied};return nil
+}
+func (s *Postgres) Permissions(ctx context.Context)([]rbac.Permission,error){
+	result:=[]rbac.Permission{}
+	for _,action:=range []string{"read","invite","approve","reject"} {
+		key,err:=rbac.NewPermissionKey("admission",action);if err!=nil{return nil,err}
+		result=append(result,rbac.Permission{Key:key,Description:"SSO admission: "+action})
+	}
+	roles,err:=s.roles.Roles(ctx,rbac.RoleFilter{Limit:1000});if err!=nil{return nil,err}
+	for _,role:=range roles{
+		if role.Slug=="super_admin"{continue}
+		key,err:=GrantPermission(role.PublicID);if err!=nil{return nil,err}
+		result=append(result,rbac.Permission{Key:key,Description:"Grant role: "+role.Name})
+	}
+	return result,nil
+}
+func (s *Postgres) Invitations(ctx context.Context,actor string,scope Scope)([]Invitation,error){
+	var result []Invitation
+	err:=s.Owned(ctx,func(ctx context.Context,tx Tx)error{
+		if _,err:=tx.Authorize(ctx,actor,"read",nil);err!=nil{return err}
+		rows,err:=tx.(*pgTx).sql.QueryContext(ctx,`SELECT id::text,external_subject,issued_by::text,roles,expires_at,revoked,
+ COALESCE(accepted_subject::text,'') FROM admin_admission_invitations
+ WHERE issuer=$1 AND project_id=$2 AND client_id=$3 ORDER BY created_at DESC,id DESC LIMIT 100`,
+			scope.Issuer,scope.Project,scope.Client)
+		if err!=nil{return err};defer rows.Close()
+		for rows.Next(){
+			i:=Invitation{Scope:scope};var raw []byte
+			if err:=rows.Scan(&i.ID,&i.ExternalSubject,&i.IssuedBy,&raw,&i.ExpiresAt,&i.Revoked,&i.AcceptedSubject);err!=nil{return err}
+			if err:=json.Unmarshal(raw,&i.Roles);err!=nil{return err}
+			result=append(result,i)
+		}
+		return rows.Err()
+	})
+	if err!=nil{return nil,err};return result,nil
+}
