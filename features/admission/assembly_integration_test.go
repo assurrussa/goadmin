@@ -82,8 +82,14 @@ func TestAdmissionAssemblyOffModeAndProtectedWaitingIdentity(t *testing.T){
 		status,_:=request(t,on,"GET",path,"",cookies,"","")
 		require.NotEqual(t,http.StatusOK,status,"pending identity must not be a native administrator")
 	}
-	status,_:=request(t,on,"GET","/auth/admission","",cookies,"","")
-	require.Equal(t,http.StatusUnauthorized,status)
+	// HTML requests preserve the error status. Inertia v2 errors intentionally
+	// redirect back, so a redirect alone is not evidence of authorization.
+	anonymous:=httptest.NewRequestWithContext(t.Context(),"GET",origin+"/auth/admission",nil)
+	denied,err:=on.App().Test(anonymous,fiber.TestConfig{Timeout:0,FailOnTimeout:false});require.NoError(t,err)
+	deniedBody,err:=io.ReadAll(denied.Body);require.NoError(t,err);require.NoError(t,denied.Body.Close())
+	require.Equal(t,http.StatusUnauthorized,denied.StatusCode)
+	require.NotContains(t,string(deniedBody),result.LocalSubject)
+	require.NotContains(t,string(deniedBody),"pending-person@example.test")
 	req:=httptest.NewRequestWithContext(t.Context(),"GET",origin+"/auth/admission",nil)
 	req.Header.Set("X-Synthetic-Reference","fixture-reference");req.Header.Set("X-Inertia","true")
 	resp,err:=on.App().Test(req,fiber.TestConfig{Timeout:0,FailOnTimeout:false});require.NoError(t,err)
@@ -104,17 +110,30 @@ func TestAdmissionAssemblyOffModeAndProtectedWaitingIdentity(t *testing.T){
 	_,err=roles.UpsertPermission(t.Context(),rbac.Permission{Key:key});require.NoError(t,err)
 	role,err:=roles.CreateRole(t.Context(),rbac.Role{Slug:"admission-reviewer",Name:"Reviewer"},[]rbac.PermissionKey{key})
 	require.NoError(t,err);require.NoError(t,roles.ReplaceSubjectRoles(t.Context(),operator.Subject.ID,[]int64{role.ID}))
-	status,_=request(t,on,"GET","/auth/login","",cookies,"","");require.Equal(t,http.StatusOK,status)
+	status,_:=request(t,on,"GET","/auth/login","",cookies,"","");require.Equal(t,http.StatusOK,status)
 	require.NotNil(t,cookies["csrf_token"])
 	status,_=request(t,on,"POST","/auth/login",
 		`{"email":"operator@example.test","password":"Synthetic-Admission-Operator-2026!"}`,cookies,cookies["csrf_token"].Value,origin)
 	require.Contains(t,[]int{302,303},status)
 	body:=`{"subject":"pending-person","version":1}`
+	assertPending:=func(){
+		t.Helper()
+		var state string
+		require.NoError(t,auth.Runtime().Database().QueryRowContext(t.Context(),"SELECT status FROM admin_admissions WHERE subject_id=$1",result.LocalSubject).Scan(&state))
+		require.Equal(t,"pending",state)
+	}
+	// Inertia v2 renders command errors as redirects with flash errors.
+	// Assert the persistent effect after each denied request, not a guessed code.
 	status,_=request(t,on,"POST","/admissions/reject",body,cookies,"",origin)
-	require.NotContains(t,[]int{200,302,303,204},status)
+	require.Equal(t,http.StatusSeeOther,status)
+	assertPending()
 	status,_=request(t,on,"POST","/admissions/reject",body,cookies,cookies["csrf_token"].Value,"https://foreign.example.test")
-	require.NotContains(t,[]int{200,302,303,204},status)
+	require.Equal(t,http.StatusSeeOther,status)
+	assertPending()
+	// Positive control: this same actor and route can mutate with valid CSRF.
+	status,_=request(t,on,"POST","/admissions/reject",body,cookies,cookies["csrf_token"].Value,origin)
+	require.Equal(t,http.StatusSeeOther,status)
 	var state string
 	require.NoError(t,auth.Runtime().Database().QueryRowContext(t.Context(),"SELECT status FROM admin_admissions WHERE subject_id=$1",result.LocalSubject).Scan(&state))
-	require.Equal(t,"pending",state)
+	require.Equal(t,"rejected",state)
 }
