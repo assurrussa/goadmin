@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* Presentation fixtures must not add styles to the embedded production build. */
+@source not '../../demo';
 @import '../../.admin-extensions/tailwind-sources.css';
 @import 'nprogress/nprogress.css';
 
