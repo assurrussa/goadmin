@@ -13,7 +13,19 @@ facade instead of copying admin internals.
 - **Keep access integrated:** the [GoAuth adapter](host/auth_adapter.go) owns admin membership and RBAC, and exposes its runtime for host-owned OIDC wiring.
 
 Application size and RAM/CPU depend on the host, selected modules and deployment.
-This presentation does not benchmark them; frontend asset sizes are not whole-application footprints.
+A five-minute observation of two deployed host applications on 2026-10-18
+(07:06:54–07:11:54 UTC, 20 samples per application at 15-second intervals)
+recorded the following whole-application Docker working-set memory:
+
+- TSOP: 15.85 MiB median, 15.85–15.98 MiB range; median CPU 0.35%.
+- NotifyHub: 22.78 MiB median, 22.78–22.81 MiB range; median CPU 0.425%.
+
+CPU 100% represents one logical core. Database and messaging containers are
+excluded. These are observational examples without generated load, not a load
+benchmark, an idle baseline or a measurement of GoAdmin's isolated overhead.
+Deployed dependency versions and binary sizes were not verified. Frontend asset
+sizes are not whole-application footprints; these observations do not establish
+minimum requirements or performance guarantees.
 
 Install the public release with `go get github.com/assurrussa/goadmin@v0.13.0`.
 Its dependency graph uses GoAuth v0.11.0, GoNotify v0.6.0, GoUploads v0.13.0 and
