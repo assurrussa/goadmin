@@ -50,11 +50,11 @@ type (
 )
 
 type Role struct {
-	ID       int64  `json:"ID"`
-	PublicID string `json:"PublicID"`
-	Name     string `json:"Name"`
+	ID       int64  `json:"ID"` //nolint:tagliatelle // Preserve the persisted role snapshot and existing UI field contract.
+	PublicID string `json:"PublicID"` //nolint:tagliatelle // Preserve the persisted role snapshot and existing UI field contract.
+	Name     string `json:"Name"` //nolint:tagliatelle // Preserve the persisted role snapshot and existing UI field contract.
 	// Fingerprint pins the exact role permission set at authorization time.
-	Fingerprint string `json:"Fingerprint"`
+	Fingerprint string `json:"Fingerprint"` //nolint:tagliatelle // Preserve the persisted role snapshot and existing UI field contract.
 }
 type Record struct {
 	ID                            string
