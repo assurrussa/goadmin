@@ -2,6 +2,10 @@ package admission
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"github.com/assurrussa/goauth"
+	"github.com/gofiber/fiber/v3"
 	"testing"
 
 	"github.com/assurrussa/goadmin/host"
@@ -32,4 +36,10 @@ func TestGrantPermissionUsesImmutableRoleID(t *testing.T) {
 	for _,value:=range []string{"","super_admin","../roles","arbitrary:permission"}{
 		_,err:=GrantRolePermission(value);require.Error(t,err)
 	}
+}
+
+func TestRevokedProofIsUnauthorizedButInfrastructureFailsClosed(t *testing.T) {
+	require.ErrorIs(t,httpError(goauth.ErrSessionRevoked),fiber.ErrUnauthorized)
+	require.ErrorIs(t,httpError(fmt.Errorf("verify: %w",goauth.ErrSessionRevoked)),fiber.ErrUnauthorized)
+	require.ErrorIs(t,httpError(errors.New("provider unavailable")),fiber.ErrServiceUnavailable)
 }
