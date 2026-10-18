@@ -18,14 +18,14 @@ func TestPreviewDeniesProfileMutationBeforeBindingOrService(t *testing.T) {
 		return c.Next()
 	})
 	h := &handler{}
-	for _, path := range []string{sourcePath, sourcePath+refreshSuffix, sourcePath+cancelSuffix} {
+	for _, path := range []string{sourcePath, sourcePath + refreshSuffix, sourcePath + cancelSuffix} {
 		app.Post(path, func(c fiber.Ctx) error {
 			_, _, err := h.input(c)
 			require.ErrorIs(t, err, ErrDenied)
 			return c.SendStatus(http.StatusForbidden)
 		})
 	}
-	for _, path := range []string{sourcePath, sourcePath+refreshSuffix, sourcePath+cancelSuffix} {
+	for _, path := range []string{sourcePath, sourcePath + refreshSuffix, sourcePath + cancelSuffix} {
 		response, err := app.Test(httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, nil))
 		require.NoError(t, err)
 		require.NoError(t, response.Body.Close())

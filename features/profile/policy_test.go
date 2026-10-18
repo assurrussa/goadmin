@@ -13,11 +13,13 @@ import (
 	"github.com/assurrussa/goadmin/host"
 )
 
-const testDisplay = "Display"
-const testAvatarHost = "images.example.test"
-const testAvatarURL = "https://images.example.test/avatar.png"
-const testNative = "native-browser-digest"
-const testSelector = "synthetic-profile-selector"
+const (
+	testDisplay    = "Display"
+	testAvatarHost = "images.example.test"
+	testAvatarURL  = "https://images.example.test/avatar.png"
+	testNative     = "native-browser-digest"
+	testSelector   = "synthetic-profile-selector"
+)
 
 func testBinding() host.ExternalBinding {
 	now := time.Now().UTC()
@@ -33,9 +35,11 @@ func testBinding() host.ExternalBinding {
 func TestAvatarPolicyIsExplicitBoundedAndNetworkFree(t *testing.T) {
 	require.NoError(t, ValidateAvatarHosts(nil))
 	require.NoError(t, ValidateAvatarHosts([]string{testAvatarHost}))
-	for _, host := range []string{"localhost", "127.0.0.1", "169.254.169.254", "::1",
+	for _, host := range []string{
+		"localhost", "127.0.0.1", "169.254.169.254", "::1",
 		"images.local", "metadata.google.internal", "*.example.test", "Images.example.test",
-		"images.example.test:443", "images.example.test/", "-bad.example.test", "images..test"} {
+		"images.example.test:443", "images.example.test/", "-bad.example.test", "images..test",
+	} {
 		require.ErrorIs(t, ValidateAvatarHosts([]string{host}), ErrInvalid, host)
 	}
 	require.ErrorIs(t, ValidateAvatarHosts([]string{testAvatarHost, testAvatarHost}), ErrInvalid)
@@ -47,7 +51,9 @@ func TestAvatarPolicyIsExplicitBoundedAndNetworkFree(t *testing.T) {
 		"https://images.example.test/a#fragment", "//images.example.test/a",
 		"https://images.example.test/%0d", "javascript:alert(1)", "data:image/png;base64,a",
 		"https://images.example.test\\other/a",
-	} { require.False(t, policy.validate(value), value) }
+	} {
+		require.False(t, policy.validate(value), value)
+	}
 	now := time.Now()
 	value, err := (avatarPolicy{}).snapshot(Snapshot{AvatarURL: testAvatarURL, IssuedAt: now}, now)
 	require.NoError(t, err)
@@ -71,15 +77,22 @@ func TestPresentationClaimsNeverBecomeAuthorityOrMutableIdentity(t *testing.T) {
 	for _, value := range []Snapshot{
 		{Name: strings.Repeat("x", 257), IssuedAt: now},
 		{Login: "bad\nlabel", IssuedAt: now},
-		{IssuedAt: now.Add(-31 * time.Second)}, {IssuedAt: now.Add(31 * time.Second)}, {},
-	} { _, err = policy.snapshot(value, now); require.ErrorIs(t, err, ErrInvalid) }
+		{IssuedAt: now.Add(-31 * time.Second)},
+		{IssuedAt: now.Add(31 * time.Second)},
+		{},
+	} {
+		_, err = policy.snapshot(value, now)
+		require.ErrorIs(t, err, ErrInvalid)
+	}
 }
 
 func TestPendingIntentExactPinsTTLAndNoReplayAuthority(t *testing.T) {
 	now := time.Now()
 	binding := testBinding()
-	p := pending{Selector: digest(testSelector), Native: testNative, Started: now,
-		Until: now.Add(refreshLifetime), Original: binding}
+	p := pending{
+		Selector: digest(testSelector), Native: testNative, Started: now,
+		Until: now.Add(refreshLifetime), Original: binding,
+	}
 	require.True(t, p.valid(testSelector, testNative, now))
 	require.False(t, p.valid("another-selector", testNative, now))
 	require.False(t, p.valid(testSelector, "another-browser", now))

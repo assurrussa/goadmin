@@ -24,10 +24,10 @@ const remoteDisplay = "Remote display"
 
 type profileFixture struct {
 	component *Component
-	auth *host.AuthAdapter
-	old host.ExternalBinding
-	fresh host.ExternalBinding
-	session string
+	auth      *host.AuthAdapter
+	old       host.ExternalBinding
+	fresh     host.ExternalBinding
+	session   string
 }
 
 func newProfileFixture(t *testing.T) *profileFixture {
@@ -73,7 +73,9 @@ func (f *profileFixture) prepare(t *testing.T) {
 	now := time.Now()
 	require.NoError(t, f.component.owned(t.Context(), f.old, func(ctx context.Context, ex postgres.SQLExecutor) error {
 		subject := f.old.LocalSubject.String()
-		if err := ensureRecord(ctx, ex, subject); err != nil { return err }
+		if err := ensureRecord(ctx, ex, subject); err != nil {
+			return err
+		}
 		return storePending(ctx, ex, subject, pending{
 			Selector: digest(testSelector), Native: testNative, AuthSession: f.session, Version: 1,
 			Started: now, Until: now.Add(refreshLifetime), Phase: phaseStarted, Original: f.old,
@@ -129,7 +131,8 @@ func TestProfilePostgresWrongBrowserPinsExpirySelectionAndLogoutDeny(t *testing.
 				_, err := f.component.Claim(t.Context(), testSelector, "wrong-native-browser", f.fresh)
 				require.ErrorIs(t, err, ErrDenied)
 			case "identity":
-				other := f.fresh; other.Subject = "another-person"
+				other := f.fresh
+				other.Subject = "another-person"
 				_, err := f.component.Claim(t.Context(), testSelector, testNative, other)
 				require.Error(t, err)
 			case "expired":
@@ -139,7 +142,8 @@ func TestProfilePostgresWrongBrowserPinsExpirySelectionAndLogoutDeny(t *testing.
 				var p pending
 				require.NoError(t, json.Unmarshal(raw, &p))
 				p.Until = time.Now().Add(-time.Second)
-				raw, err := json.Marshal(p); require.NoError(t, err)
+				raw, err := json.Marshal(p)
+				require.NoError(t, err)
 				_, err = f.auth.Runtime().Database().ExecContext(t.Context(),
 					"UPDATE admin_profile_presentations SET pending=$2::jsonb WHERE subject_id=$1", f.old.LocalSubject, string(raw))
 				require.NoError(t, err)
@@ -176,7 +180,10 @@ func TestProfilePostgresConcurrentClaimsAndCancellationFenceCompletion(t *testin
 	f.prepare(t)
 	f.capture(t)
 	var wg sync.WaitGroup
-	type result struct { claim string; err error }
+	type result struct {
+		claim string
+		err   error
+	}
 	results := make(chan result, 2)
 	for range 2 {
 		wg.Go(func() {
@@ -188,7 +195,11 @@ func TestProfilePostgresConcurrentClaimsAndCancellationFenceCompletion(t *testin
 	close(results)
 	claims := make([]string, 0, 1)
 	for value := range results {
-		if value.err == nil { claims = append(claims, value.claim) } else { require.ErrorIs(t, value.err, ErrDenied) }
+		if value.err == nil {
+			claims = append(claims, value.claim)
+		} else {
+			require.ErrorIs(t, value.err, ErrDenied)
+		}
 	}
 	require.Len(t, claims, 1, "concurrent claim has exactly one winner")
 	require.NoError(t, f.component.Cancel(t.Context(), testSelector))
@@ -218,7 +229,9 @@ func TestProfilePostgresSelectionAndCompletionRaceHasOneCASWinner(t *testing.T) 
 	close(results)
 	successes := 0
 	for err := range results {
-		if err == nil { successes++ } else {
+		if err == nil {
+			successes++
+		} else {
 			require.True(t, errors.Is(err, ErrDenied) || errors.Is(err, ErrConflict), "unexpected storage failure: %v", err)
 		}
 	}

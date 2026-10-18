@@ -16,23 +16,29 @@ import (
 	"github.com/assurrussa/goadmin/models"
 )
 
-const sourcePath = "/profile-source"
-const componentKey = "profile-source"
-const refreshSuffix = "/refresh"
-const cancelSuffix = "/cancel"
+const (
+	sourcePath    = "/profile-source"
+	componentKey  = "profile-source"
+	refreshSuffix = "/refresh"
+	cancelSuffix  = "/cancel"
+)
 
 type Config struct {
-	Runtime *postgres.Runtime
-	Issuer string
-	ClientID string
-	ProjectID string
+	Runtime     *postgres.Runtime
+	Issuer      string
+	ClientID    string
+	ProjectID   string
 	AvatarHosts []string
 	// Start navigates to the host's exact state-bound SDK landing using ONLY
 	// the opaque selector. The host must request a new callback, never cached Verify.
 	Start func(ctx fiber.Ctx, selector string) error
 }
 
-type Component struct { cfg Config; avatars avatarPolicy; built atomic.Bool }
+type Component struct {
+	cfg     Config
+	avatars avatarPolicy
+	built   atomic.Bool
+}
 
 func New(ctx context.Context, cfg Config) (*Component, error) {
 	u, err := url.Parse(cfg.Issuer)
@@ -43,8 +49,12 @@ func New(ctx context.Context, cfg Config) (*Component, error) {
 		return nil, ErrInvalid
 	}
 	rows, err := cfg.Runtime.Database().QueryContext(ctx, "SELECT "+columns+" FROM admin_profile_presentations LIMIT 0")
-	if err != nil { return nil, errors.New("profile presentation schema is not ready") }
-	if err = rows.Close(); err != nil { return nil, err }
+	if err != nil {
+		return nil, errors.New("profile presentation schema is not ready")
+	}
+	if err = rows.Close(); err != nil {
+		return nil, err
+	}
 	cfg.AvatarHosts = slices.Clone(cfg.AvatarHosts)
 	return &Component{cfg: cfg, avatars: avatarPolicy{hosts: cfg.AvatarHosts}}, nil
 }
@@ -65,12 +75,16 @@ func (c *Component) Build(host.Menu) host.ExtensionBuilder {
 		if app == nil || !app.Unwrap().AdminAuth().UsesCanonicalRuntime(c.cfg.Runtime) {
 			return nil, ErrInvalid
 		}
-		if !c.built.CompareAndSwap(false, true) { return nil, errors.New("profile component already mounted") }
+		if !c.built.CompareAndSwap(false, true) {
+			return nil, errors.New("profile component already mounted")
+		}
 		h := &handler{component: c, app: app}
 		return host.NewExtension().WithHandlers(h).WithMiddlewares(func(ctx fiber.Ctx) error {
 			presentation.Set(ctx, func() (View, error) {
 				_, binding, err := c.current(ctx, app)
-				if err != nil { return View{Enabled: true}, nil }
+				if err != nil {
+					return View{Enabled: true}, nil
+				}
 				return c.read(ctx, binding)
 			})
 			return ctx.Next()
@@ -80,9 +94,13 @@ func (c *Component) Build(host.Menu) host.ExtensionBuilder {
 
 func (c *Component) current(ctx fiber.Ctx, app *host.App) (*models.SessionAdmin, host.ExternalBinding, error) {
 	if app == nil || app.Unwrap() == nil || !app.Unwrap().AdminAuth().UsesCanonicalRuntime(c.cfg.Runtime) ||
-		len(ctx.Request().Header.PeekAll("Authorization")) != 0 { return nil, host.ExternalBinding{}, ErrDenied }
+		len(ctx.Request().Header.PeekAll("Authorization")) != 0 {
+		return nil, host.ExternalBinding{}, ErrDenied
+	}
 	admin, err := app.Unwrap().AdminAuth().GetAdminAuth(ctx)
-	if err != nil || admin == nil { return nil, host.ExternalBinding{}, ErrDenied }
+	if err != nil || admin == nil {
+		return nil, host.ExternalBinding{}, ErrDenied
+	}
 	binding, err := app.ExternalAdminBinding(ctx)
 	if err != nil || binding == nil || binding.LocalSubject != admin.AuthSubjectID() ||
 		binding.Issuer != c.cfg.Issuer || binding.ClientID != c.cfg.ClientID || binding.ProjectID != c.cfg.ProjectID {
@@ -91,11 +109,14 @@ func (c *Component) current(ctx fiber.Ctx, app *host.App) (*models.SessionAdmin,
 	return admin, *binding, nil
 }
 
-type handler struct { component *Component; app *host.App }
+type handler struct {
+	component *Component
+	app       *host.App
+}
 
 type selectionInput struct {
 	Version string `json:"version"`
-	Fields Fields `json:"fields"`
+	Fields  Fields `json:"fields"`
 }
 
 func (h *handler) RegisterGroupRoutes(router fiber.Router, _ ...fiber.Handler) {
@@ -114,26 +135,38 @@ func (h *handler) page(ctx fiber.Ctx) error {
 		})
 	}
 	view, err := h.component.read(ctx, binding)
-	if err != nil { return fiber.ErrServiceUnavailable }
+	if err != nil {
+		return fiber.ErrServiceUnavailable
+	}
 	return h.app.Render(ctx, "profile/SourcePage", map[string]any{
 		"presentation": view, "avatarAvailable": len(h.component.avatars.hosts) > 0,
 	})
 }
 
 func (h *handler) input(ctx fiber.Ctx) (selectionInput, host.ExternalBinding, error) {
-	if authcore.RolePreviewActive(ctx) || len(ctx.Body()) > 2048 { return selectionInput{}, host.ExternalBinding{}, ErrDenied }
+	if authcore.RolePreviewActive(ctx) || len(ctx.Body()) > 2048 {
+		return selectionInput{}, host.ExternalBinding{}, ErrDenied
+	}
 	_, binding, err := h.component.current(ctx, h.app)
-	if err != nil { return selectionInput{}, host.ExternalBinding{}, err }
+	if err != nil {
+		return selectionInput{}, host.ExternalBinding{}, err
+	}
 	var in selectionInput
-	if err = ctx.Bind().Body(&in); err != nil { return selectionInput{}, host.ExternalBinding{}, err }
+	if err = ctx.Bind().Body(&in); err != nil {
+		return selectionInput{}, host.ExternalBinding{}, err
+	}
 	return in, binding, nil
 }
 
 func (h *handler) selectSource(ctx fiber.Ctx) error {
 	in, binding, err := h.input(ctx)
-	if err != nil { return fiber.ErrForbidden }
+	if err != nil {
+		return fiber.ErrForbidden
+	}
 	admin, _, err := h.component.current(ctx, h.app)
-	if err != nil { return fiber.ErrForbidden }
+	if err != nil {
+		return fiber.ErrForbidden
+	}
 	if err = h.component.selectFields(ctx, binding, in.Version, in.Fields, admin.AuthSessionID); err != nil {
 		return presentationError(err)
 	}
@@ -142,24 +175,40 @@ func (h *handler) selectSource(ctx fiber.Ctx) error {
 
 func (h *handler) refresh(ctx fiber.Ctx) error {
 	in, _, err := h.input(ctx)
-	if err != nil { return fiber.ErrForbidden }
+	if err != nil {
+		return fiber.ErrForbidden
+	}
 	selector, err := h.component.CreateIntent(ctx, h.app, in.Version)
-	if err != nil { return presentationError(err) }
+	if err != nil {
+		return presentationError(err)
+	}
 	return h.component.cfg.Start(ctx, selector)
 }
 
 func (h *handler) cancel(ctx fiber.Ctx) error {
-	if _, _, err := h.input(ctx); err != nil { return fiber.ErrForbidden }
+	if _, _, err := h.input(ctx); err != nil {
+		return fiber.ErrForbidden
+	}
 	selector, err := Selector(ctx)
-	if err != nil { return fiber.ErrForbidden }
-	if err = h.component.Cancel(ctx, selector); err != nil { return fiber.ErrServiceUnavailable }
+	if err != nil {
+		return fiber.ErrForbidden
+	}
+	if err = h.component.Cancel(ctx, selector); err != nil {
+		return fiber.ErrServiceUnavailable
+	}
 	clearRefreshCookie(ctx)
 	return h.app.Redirect(ctx, sourcePath)
 }
 
 func presentationError(err error) error {
-	if errors.Is(err, ErrConflict) { return fiber.ErrConflict }
-	if errors.Is(err, ErrInvalid) { return fiber.ErrBadRequest }
-	if errors.Is(err, ErrDenied) { return fiber.ErrForbidden }
+	if errors.Is(err, ErrConflict) {
+		return fiber.ErrConflict
+	}
+	if errors.Is(err, ErrInvalid) {
+		return fiber.ErrBadRequest
+	}
+	if errors.Is(err, ErrDenied) {
+		return fiber.ErrForbidden
+	}
 	return fiber.ErrServiceUnavailable
 }

@@ -19,8 +19,8 @@ import (
 	goinertia "github.com/assurrussa/goadmin/infrastructure/inertia"
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 	"github.com/assurrussa/goadmin/internal/auth/browsercookie"
-	"github.com/assurrussa/goadmin/internal/presentation"
 	csrfservice "github.com/assurrussa/goadmin/internal/csrf"
+	"github.com/assurrussa/goadmin/internal/presentation"
 	"github.com/assurrussa/goadmin/services/adminservice"
 	"github.com/assurrussa/goadmin/views"
 )
@@ -152,12 +152,12 @@ func loadAuthUser(servicePreviewLoader FileLoader, log logger.Logger) func(ctx c
 		}
 		return map[string]any{
 			"profilePresentation": profile,
-			"id":        admin.ID,
-			"name":      name,
-			"lastName":  lastName,
-			"email":     admin.Email,
-			"roles":     admin.Roles,
-			"avatarUrl": avatarURL,
+			"id":                  admin.ID,
+			"name":                name,
+			"lastName":            lastName,
+			"email":               admin.Email,
+			"roles":               admin.Roles,
+			"avatarUrl":           avatarURL,
 		}, nil
 	}
 }
