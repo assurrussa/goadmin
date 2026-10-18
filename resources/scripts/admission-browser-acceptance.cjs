@@ -22,17 +22,19 @@ async function main() {
   const persistent = await chromium.launchPersistentContext(process.env.GOADMIN_BROWSER_PROFILE, {
     executablePath: process.env.GOADMIN_BROWSER_EXECUTABLE,
     headless: process.env.GOADMIN_BROWSER_HEADLESS !== '0',
+    chromiumSandbox: true,
     ignoreHTTPSErrors: false,
   })
   const browser = persistent.browser()
   assert.ok(browser, 'browser instance required')
   const contexts = []
+  const uiErrors = []
   async function page() {
     const context = await browser.newContext({ ignoreHTTPSErrors: false })
     contexts.push(context)
     const p = await context.newPage()
     p.setDefaultTimeout(15000)
-    p.on('pageerror', err => { throw new Error('embedded UI runtime error: ' + err.message) })
+    p.on('pageerror', err => { uiErrors.push(err.message) })
     return p
   }
   async function visit(p, path) {
@@ -120,11 +122,11 @@ async function main() {
 
     const owner = await page()
     await login(owner, 'owner@example.invalid')
-    await post(owner, '/auth/role-preview', { roleId: cfg.previewRole })
+    assert.equal(await post(owner, '/auth/role-preview', { roleId: cfg.previewRole }), 200, 'native role preview must activate')
     before = await snapshot()
-    await post(owner, '/admissions/approve', approveBody(record(before).version))
+    assert.equal(await post(owner, '/admissions/approve', approveBody(record(before).version)), 403, 'active native role preview must deny commands')
     assert.deepEqual(await snapshot(), before, 'role-preview mutation persisted a change')
-    await post(owner, '/auth/role-preview', { roleId: 0 })
+    assert.equal(await post(owner, '/auth/role-preview', { roleId: 0 }), 200, 'native role preview must clear')
 
     // Positive control goes through the rendered embedded Vue approval form.
     await visit(manager, '/admissions')
@@ -175,6 +177,7 @@ async function main() {
     const noGrant = await page()
     await visit(noGrant, '/admission-browser/start?scenario=no-project&invitation=' + invitation.id)
     assert.deepEqual(await snapshot(), before, 'missing project grant created authority')
+    assert.deepEqual(uiErrors, [], 'embedded UI runtime errors')
     process.stderr.write('Admission real-browser assertions passed; persisted effects verified.\n')
   } finally {
     for (const context of contexts) await context.close()
