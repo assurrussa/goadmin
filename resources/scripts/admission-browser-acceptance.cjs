@@ -21,6 +21,16 @@ async function snapshot() {
   return receive()
 }
 function record(s, subject = 'alice') { return s.records.find(r => r.subject === subject) }
+// datetime-local has no zone suffix. Build its wall-clock value in the same
+// browser zone that Vue's new Date(value) uses when preparing expiresAt.
+function browserLocalExpiry(epochMillis) {
+  const date = new Date(epochMillis)
+  const pad = value => String(value).padStart(2, '0')
+  const value = date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) +
+    'T' + pad(date.getHours()) + ':' + pad(date.getMinutes())
+  return { value, roundTrip: new Date(value).getTime(), now: Date.now(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }
+}
 async function main() {
   const cfg = await receive()
   for (const key of ['GOADMIN_BROWSER_PROFILE', 'GOADMIN_BROWSER_EXECUTABLE']) assert.ok(process.env[key], key)
@@ -34,6 +44,7 @@ async function main() {
   assert.ok(browser, 'browser instance required')
   const contexts = []
   const uiErrors = []
+  const expiryInputs = new WeakMap()
   async function page() {
     const context = await browser.newContext({ ignoreHTTPSErrors: false })
     contexts.push(context)
@@ -76,6 +87,38 @@ async function main() {
       await response.text()
       return response.status
     }, { path, body, value })
+  }
+  async function fillFutureExpiry(p) {
+    const target = Date.now() + 3600000
+    const expiry = await p.evaluate(browserLocalExpiry, target)
+    assert.ok(expiry.roundTrip > expiry.now + 55 * 60000 &&
+      expiry.roundTrip <= expiry.now + 65 * 60000,
+    'datetime-local must round-trip to a future instant in the browser zone')
+    await p.locator('input[type=datetime-local]').fill(expiry.value)
+    expiryInputs.set(p, expiry)
+  }
+  async function submitPositive(p, path, click) {
+    const [response] = await Promise.all([
+      p.waitForResponse(r => new URL(r.url()).pathname === path && r.request().method() === 'POST'),
+      click(),
+    ])
+    await response.finished()
+    const submitted = response.request().postDataJSON()
+    const expiresAt = typeof submitted.expiresAt === 'string' ? submitted.expiresAt : ''
+    const location = response.headers().location
+    // Deliberate allowlist: never log headers/cookies, response bodies, tokens,
+    // passwords, arbitrary page props, or redirect query strings.
+    const diagnostic = {
+      path, status: response.status(),
+      redirectPath: location ? new URL(location, cfg.url).pathname : null,
+      expiresAt, secondsUntilExpiry: Math.floor((Date.parse(expiresAt) - Date.now()) / 1000),
+      browserTimezone: expiryInputs.get(p)?.timezone ?? null,
+    }
+    process.stderr.write('Admission positive command: ' + JSON.stringify(diagnostic) + '\n')
+    assert.equal(diagnostic.status, 303, 'positive native command must return its expected redirect')
+    assert.equal(diagnostic.redirectPath, '/admissions')
+    assert.ok(diagnostic.secondsUntilExpiry > 30 * 60, 'submitted expiry must remain in the future')
+    return snapshot()
   }
   function approveBody(version) {
     return { subject: 'alice', version, roleIds: [cfg.role], expiresAt: new Date(Date.now() + 3600000).toISOString() }
@@ -169,16 +212,16 @@ async function main() {
 
     // Positive control goes through the rendered embedded Vue approval form.
     await visit(manager, '/admissions')
-    await manager.locator('input[type=datetime-local]').fill(new Date(Date.now() + 3600000).toISOString().slice(0, 16))
+    await fillFutureExpiry(manager)
     const alice = manager.locator('article').filter({ hasText: 'alice' })
     await alice.locator('select').selectOption(String(cfg.role))
-    await Promise.all([
-      manager.waitForResponse(r => r.url().endsWith('/admissions/approve') && r.request().method() === 'POST'),
-      alice.getByRole('button', { name: /Approve access|Одобрить доступ/ }).click(),
-    ])
+    state = await submitPositive(manager, '/admissions/approve',
+      () => alice.getByRole('button', { name: /Approve access|Одобрить доступ/ }).click())
+    const approval = record(state)
+    process.stderr.write('Admission approval persistence: ' +
+      JSON.stringify({ status: approval?.status ?? null, version: approval?.version ?? null }) + '\n')
+    assert.equal(approval?.status, 'approved', 'positive approval must persist before UI confirmation')
     await alice.getByText(/Approved|Одобрено/).waitFor()
-    state = await snapshot()
-    assert.equal(record(state).status, 'approved')
     assert.equal(state.memberships, 3, 'approval alone must not activate membership')
     assert.equal(state.credentials, 3)
     const approvedSessions = state.sessions
@@ -201,15 +244,14 @@ async function main() {
     await visit(manager, '/admissions')
     await manager.locator('input[name=subject]').fill('invited')
     await manager.locator('select').first().selectOption(String(cfg.role))
-    await manager.locator('input[type=datetime-local]').fill(new Date(Date.now() + 3600000).toISOString().slice(0, 16))
-    await Promise.all([
-      manager.waitForResponse(r => r.url().endsWith('/admissions/invitations') && r.request().method() === 'POST'),
-      manager.getByRole('button', { name: /Create invitation|Создать приглашение/ }).click(),
-    ])
-    await manager.locator('article').filter({ hasText: 'invited' }).waitFor()
-    before = await snapshot()
+    await fillFutureExpiry(manager)
+    before = await submitPositive(manager, '/admissions/invitations',
+      () => manager.getByRole('button', { name: /Create invitation|Создать приглашение/ }).click())
     const invitation = before.invitations.find(i => i.subject === 'invited')
-    assert.ok(invitation)
+    process.stderr.write('Admission invitation persistence: ' +
+      JSON.stringify({ found: Boolean(invitation), accepted: Boolean(invitation?.accepted) }) + '\n')
+    assert.ok(invitation, 'positive invitation must persist before UI confirmation')
+    await manager.locator('article').filter({ hasText: 'invited' }).waitFor()
     const wrong = await page()
     await visit(wrong, '/admission-browser/start?scenario=wrong&invitation=' + invitation.id)
     assert.deepEqual(await snapshot(), before, 'wrong identity consumed invitation or created authority')
