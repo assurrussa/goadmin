@@ -62,6 +62,13 @@ func New(ctx context.Context,cfg Config)(*Component,error){
 	issuer,err:=url.Parse(cfg.Scope.Issuer)
 	if err!=nil || issuer.Scheme!="https" || issuer.Host=="" || issuer.User!=nil ||
 		issuer.RawQuery!="" || issuer.Fragment!="" || issuer.Path!="" {return nil,policy.ErrInvalid}
+	// Readiness is read-only; schema changes remain in the normal migration runner.
+	checkCtx,cancel:=context.WithTimeout(ctx,5*time.Second)
+	defer cancel()
+	rows,err:=cfg.Runtime.Database().QueryContext(checkCtx,
+		"SELECT a.id,i.id,e.id FROM admin_admissions a,admin_admission_invitations i,admin_admission_events e LIMIT 0")
+	if err!=nil{return nil,errors.New("admission schema is not ready")}
+	if err:=rows.Close();err!=nil{return nil,err}
 	store,err:=policy.NewPostgres(cfg.Runtime,cfg.Now);if err!=nil{return nil,err}
 	service,err:=policy.New(policy.Config{Mode:cfg.Mode,Scope:cfg.Scope,Now:cfg.Now,NewID:uuid.NewString},store,cfg.Verifier)
 	if err!=nil{return nil,err}
@@ -129,7 +136,7 @@ func httpError(err error)error{
 	case err==nil:return nil
 	case errors.Is(err,policy.ErrDenied),errors.Is(err,goauth.ErrAccountUnavailable),errors.Is(err,goauth.ErrMembershipDenied):return fiber.ErrForbidden
 	case errors.Is(err,goauth.ErrExplicitIdentityLink),errors.Is(err,goauth.ErrIdentifierAlreadyExists),errors.Is(err,goauth.ErrIdentityLinkConflict):return fiber.ErrConflict
-	case errors.Is(err,policy.ErrInvalid):return fiber.ErrBadRequest
+	case errors.Is(err,policy.ErrInvalid),errors.Is(err,goauth.ErrInvalidIdentifier):return fiber.ErrBadRequest
 	case errors.Is(err,policy.ErrNotFound):return fiber.ErrNotFound
 	case errors.Is(err,policy.ErrConflict):return fiber.ErrConflict
 	default:return fiber.ErrServiceUnavailable
