@@ -164,7 +164,7 @@ func (t *pgTx) Authorize(ctx context.Context,actor,action string,ids []int64)([]
 		for _,p:=range permissions{keys=append(keys,string(p.Key))}
 		slices.Sort(keys)
 		digest:=sha256.Sum256([]byte(role.PublicID+"\n"+strings.Join(keys,"\n")))
-		result=append(result,Role{ID:id,PublicID:role.PublicID,Fingerprint:hex.EncodeToString(digest[:])})
+		result=append(result,Role{ID:id,PublicID:role.PublicID,Name:role.Name,Fingerprint:hex.EncodeToString(digest[:])})
 	}
 	return result,nil
 }
@@ -274,4 +274,12 @@ func (s *Postgres) Invitations(ctx context.Context,actor string,scope Scope)([]I
 		return rows.Err()
 	})
 	if err!=nil{return nil,err};return result,nil
+}
+
+func (s *Postgres) Allowed(ctx context.Context,actor,action string)(bool,error){
+	err:=s.Owned(ctx,func(ctx context.Context,tx Tx)error{
+		_,err:=tx.Authorize(ctx,actor,action,nil);return err
+	})
+	if errors.Is(err,ErrDenied){return false,nil}
+	return err==nil,err
 }
