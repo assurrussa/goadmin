@@ -1,1 +1,0 @@
-import{t as e,aq as o}from"./app.js";import{d as s,P as l,Q as n,R as i,O as d,z as t}from"./editor-DHCvUJ8n.js";const m=s({__name:"AppHead",props:{title:String},setup(a){return(r,f)=>(l(),n(t(o),{title:a.title?`${t(e)(a.title)} — ${t(e)("Админка")}`:t(e)("Админка")},{default:i(()=>[d(r.$slots,"default")]),_:3},8,["title"]))}});export{m as _};

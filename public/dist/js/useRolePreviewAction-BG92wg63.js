@@ -1,0 +1,1 @@
+import{a as n}from"./app.js";import{f as s}from"./editor-Dn0fTmeM.js";function c(t,o){const u=n();return s(()=>{var r;const e=u.props.rolePreview;return e!=null&&e.active?((r=e.actions)==null?void 0:r[`${t}:${o}`])===!0:!0})}export{c as u};

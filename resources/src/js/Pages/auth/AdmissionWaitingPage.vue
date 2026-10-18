@@ -14,7 +14,8 @@ registerTranslations({
   },
   en: {
     'Admission waiting title': 'Admin access',
-    'Admission waiting pending': 'Your account has been created. Wait for an administrator to grant access.',
+    'Admission waiting pending':
+      'Your account has been created. Wait for an administrator to grant access.',
     'Admission waiting approved': 'Access approved. Sign in through SSO again.',
     'Admission waiting active': 'Access granted. Continue through SSO.',
     'Admission waiting rejected': 'Request rejected. Contact your administrator.',
@@ -22,10 +23,18 @@ registerTranslations({
   },
 })
 const props = defineProps<{ admissionStatus: string; signInPath: string }>()
-const known = computed(() => ['pending', 'approved', 'active', 'rejected'].includes(props.admissionStatus)
-  ? props.admissionStatus : 'rejected')
-const safePath = computed(() => props.signInPath.startsWith('/') &&
-  !props.signInPath.startsWith('//') && !/[\\\r\n]/.test(props.signInPath) ? props.signInPath : '/auth/login')
+const known = computed(() =>
+  ['pending', 'approved', 'active', 'rejected'].includes(props.admissionStatus)
+    ? props.admissionStatus
+    : 'rejected',
+)
+const safePath = computed(() =>
+  props.signInPath.startsWith('/') &&
+  !props.signInPath.startsWith('//') &&
+  !/[\\\r\n]/.test(props.signInPath)
+    ? props.signInPath
+    : '/auth/login',
+)
 </script>
 <template>
   <AuthLayout>
