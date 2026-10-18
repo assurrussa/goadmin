@@ -75,30 +75,30 @@ func (m Menu) Merge(other Menu) Menu {
 		if sec.Key == "" {
 			return
 		}
-		if existing, ok := merged[sec.Key]; ok {
-			if existing.Placement == "" && sec.Placement == "account" {
-				existing.Placement = sec.Placement
-			}
-			if sec.Title != "" {
-				existing.Title = sec.Title
-			}
-			if sec.Order != 0 {
-				existing.Order = sec.Order
-			}
-			for _, item := range sec.Items {
-				if idx := findItemIndex(existing.Items, item); idx >= 0 {
-					mergeItem(&existing.Items[idx], item)
-				} else {
-					existing.Items = append(existing.Items, cloneItem(item))
-				}
-			}
+		existing, ok := merged[sec.Key]
+		if !ok {
+			s := sec
+			s.Items = cloneItems(sec.Items)
+			merged[sec.Key] = &s
+			order = append(order, sec.Key)
 			return
 		}
-
-		s := sec
-		s.Items = cloneItems(sec.Items)
-		merged[sec.Key] = &s
-		order = append(order, sec.Key)
+		if existing.Placement == "" && sec.Placement == "account" {
+			existing.Placement = sec.Placement
+		}
+		if sec.Title != "" {
+			existing.Title = sec.Title
+		}
+		if sec.Order != 0 {
+			existing.Order = sec.Order
+		}
+		for _, item := range sec.Items {
+			if idx := findItemIndex(existing.Items, item); idx >= 0 {
+				mergeItem(&existing.Items[idx], item)
+			} else {
+				existing.Items = append(existing.Items, cloneItem(item))
+			}
+		}
 	}
 
 	for _, sec := range m.Sections {
