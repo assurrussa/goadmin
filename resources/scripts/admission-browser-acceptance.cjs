@@ -12,6 +12,10 @@ async function receive() {
   assert.equal(line.done, false, 'fixture pipe closed')
   return JSON.parse(line.value)
 }
+async function callbackDiagnostics() {
+  process.stdout.write(JSON.stringify({ op: 'callbacks' }) + '\n')
+  return receive()
+}
 async function observations() {
   process.stdout.write(JSON.stringify({ op: 'observations' }) + '\n')
   return receive()
@@ -228,10 +232,30 @@ async function main() {
 
     // Fresh callback is required, and uses the same pending browser's opaque
     // server-generated cookie reference. Native session must also be issued.
+    const callbackBefore = await callbackDiagnostics()
     await visit(pending, '/admission-browser/start')
-    assert.equal(new URL(pending.url()).pathname, '/auth/profile')
-    await pending.locator('#app').waitFor()
+    const callbackAfter = await callbackDiagnostics()
+    const callbackResult = {
+      finalPath: new URL(pending.url()).pathname,
+      callbacks: callbackAfter.callbacks.slice(callbackBefore.callbacks.length),
+      validations: callbackAfter.validations.slice(callbackBefore.validations.length),
+    }
+    process.stderr.write('Admission fresh callback: ' + JSON.stringify(callbackResult) + '\n')
     state = await snapshot()
+    process.stderr.write('Admission activation persistence: ' + JSON.stringify({
+      status: record(state)?.status ?? null, version: record(state)?.version ?? null,
+      memberships: state.memberships, credentials: state.credentials,
+      roles: state.roles, sessions: state.sessions,
+    }) + '\n')
+    assert.ok(callbackResult.callbacks.some(c => c.stage === 'admission-active' && c.success),
+      'fresh verified callback must activate admission')
+    assert.ok(callbackResult.callbacks.some(c => c.stage === 'native-login' && c.success),
+      'fresh callback must complete native external login')
+    assert.ok(callbackResult.validations.length > 0 &&
+      callbackResult.validations.every(v => v.found && v.matches),
+    'native serialized binding must retain every authority pin')
+    assert.equal(callbackResult.finalPath, '/auth/profile')
+    await pending.locator('#app').waitFor()
     assert.equal(record(state).status, 'active')
     assert.equal(state.memberships, 4)
     assert.equal(state.roles, before.roles + 1)

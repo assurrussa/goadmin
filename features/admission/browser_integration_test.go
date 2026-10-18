@@ -39,6 +39,8 @@ type browserAdmissionAuthority struct {
 	owners map[string]string
 	scope admission.Scope
 	observations []browserAdmissionObservation
+	callbacks []browserAdmissionCallbackObservation
+	validations []browserAdmissionValidationObservation
 }
 type browserAdmissionState struct { browser, reference, invitation string }
 type browserAdmissionObservation struct {
@@ -47,6 +49,31 @@ type browserAdmissionObservation struct {
 	Referer string `json:"referer"`
 	HasCSRF bool `json:"hasCSRF"`
 	HasSession bool `json:"hasSession"`
+}
+
+type browserAdmissionCallbackObservation struct {
+	Stage string `json:"stage"`
+	Success bool `json:"success"`
+}
+type browserAdmissionValidationObservation struct {
+	Found bool `json:"found"`
+	Matches bool `json:"matches"`
+}
+func (a *browserAdmissionAuthority) observeCallback(stage string, success bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.callbacks = append(a.callbacks, browserAdmissionCallbackObservation{Stage: stage, Success: success})
+}
+// A native journal JSON round-trip preserves instants, not time.Time's process-
+// local monotonic clock or location pointer. All identity/version pins remain exact.
+func sameBrowserAdmissionBinding(a, b host.ExternalBinding) bool {
+	return a.Issuer == b.Issuer && a.Subject == b.Subject && a.LinkID == b.LinkID &&
+		a.AuthorityID == b.AuthorityID && a.ProviderSessionID == b.ProviderSessionID &&
+		a.ClientID == b.ClientID && a.ProjectID == b.ProjectID &&
+		a.Generation == b.Generation && a.LoginGeneration == b.LoginGeneration &&
+		a.LocalSubject == b.LocalSubject && a.ExternalAuthTime.Equal(b.ExternalAuthTime) &&
+		a.Deadline.Equal(b.Deadline) && a.AbsoluteUntil.Equal(b.AbsoluteUntil) &&
+		a.Proof.IssuedAt.Equal(b.Proof.IssuedAt) && a.Proof.ExpiresAt.Equal(b.Proof.ExpiresAt)
 }
 
 func (a *browserAdmissionAuthority) Verify(_ context.Context, ref string) (admission.VerifiedIdentity, error) {
@@ -66,7 +93,9 @@ func (a *browserAdmissionAuthority) Validate(_ context.Context, b host.ExternalB
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	want, ok := a.bindings[b.AuthorityID]
-	if !ok || want != b { return host.ExternalProof{}, goauth.ErrSessionRevoked }
+	matches := ok && sameBrowserAdmissionBinding(want, b)
+	a.validations = append(a.validations, browserAdmissionValidationObservation{Found: ok, Matches: matches})
+	if !matches { return host.ExternalProof{}, goauth.ErrSessionRevoked }
 	return want.Proof, nil
 }
 func (*browserAdmissionAuthority) Detach(context.Context, host.ExternalBinding) error { return nil }
@@ -120,17 +149,21 @@ func (f browserAdmissionFeature) Build(host.Menu) host.ExtensionBuilder {
 				state, ok := f.authority.states[c.Query("state")]
 				if ok && state.browser == c.Cookies("admission_fixture_browser") { delete(f.authority.states, c.Query("state")) } else { ok = false }
 				f.authority.mu.Unlock()
-				if !ok { return fiber.ErrForbidden }
+				if !ok { f.authority.observeCallback("state", false); return fiber.ErrForbidden }
+				f.authority.observeCallback("state", true)
 				i, err := f.authority.Verify(c, state.reference)
-				if err != nil { return fiber.ErrForbidden }
+				if err != nil { f.authority.observeCallback("verify", false); return fiber.ErrForbidden }
+				f.authority.observeCallback("verify", true)
 				result, err := f.component.Complete(c, state.reference, state.invitation)
-				if err != nil { return fiber.ErrForbidden }
+				if err != nil { f.authority.observeCallback("admission", false); return fiber.ErrForbidden }
+				f.authority.observeCallback("admission-"+result.Status, true)
 				c.Cookie(&fiber.Cookie{Name: "admission_fixture_reference", Value: state.reference, Secure: true, HTTPOnly: true, SameSite: "Lax", Path: "/"})
 				if result.Status != "active" { return c.Redirect().To("/auth/admission") }
 				store, err := postgres.NewStore(f.auth.Runtime().Database())
 				if err != nil { return err }
 				account, link, err := store.ResolveIdentityLink(c, i.Scope.Issuer, i.Subject)
-				if err != nil || account.Subject.ID.String() != result.LocalSubject { return fiber.ErrForbidden }
+				if err != nil || account.Subject.ID.String() != result.LocalSubject { f.authority.observeCallback("link", false); return fiber.ErrForbidden }
+				f.authority.observeCallback("link", true)
 				now := time.Now().UTC()
 				b := host.ExternalBinding{
 					Issuer: i.Scope.Issuer, Subject: i.Subject, ClientID: i.Scope.Client, ProjectID: i.Scope.Project,
@@ -142,7 +175,8 @@ func (f browserAdmissionFeature) Build(host.Menu) host.ExtensionBuilder {
 				f.authority.mu.Lock()
 				f.authority.bindings[state.reference] = b
 				f.authority.mu.Unlock()
-				if _, err := app.LoginExternalAdmin(c, b); err != nil { return err }
+				if _, err := app.LoginExternalAdmin(c, b); err != nil { f.authority.observeCallback("native-login", false); return err }
+				f.authority.observeCallback("native-login", true)
 				return c.Redirect().To("/auth/profile")
 			})
 		}), nil
@@ -251,6 +285,14 @@ func TestAdmissionRealBrowser(t *testing.T) {
 		require.NoError(t, json.Unmarshal(scanner.Bytes(), &message))
 		if message.Op == "done" { completed = true; break }
 		if message.Op == "failed" { break }
+		if message.Op == "callbacks" {
+			authority.mu.Lock()
+			callbacks := append([]browserAdmissionCallbackObservation{}, authority.callbacks...)
+			validations := append([]browserAdmissionValidationObservation{}, authority.validations...)
+			authority.mu.Unlock()
+			require.NoError(t, encoder.Encode(map[string]any{"callbacks": callbacks, "validations": validations}))
+			continue
+		}
 		if message.Op == "observations" {
 			authority.mu.Lock()
 			observations := append([]browserAdmissionObservation{}, authority.observations...)
@@ -276,4 +318,50 @@ func TestAdmissionRealBrowser(t *testing.T) {
 	require.NoError(t, in.Close())
 	require.NoError(t, cmd.Wait())
 	require.True(t, completed, "runner must reach its terminal assertions")
+}
+
+func TestBrowserAdmissionAuthorityBindingJSONRoundTrip(t *testing.T) {
+	now := time.Now()
+	original := host.ExternalBinding{
+		Issuer: "https://synthetic-issuer.invalid", Subject: "alice", LinkID: uuid.NewString(),
+		AuthorityID: uuid.NewString(), ProviderSessionID: uuid.NewString(),
+		ClientID: "browser-client", ProjectID: "browser-project", Generation: 1, LoginGeneration: 1,
+		LocalSubject: goauth.NewSubjectID(), ExternalAuthTime: now.Add(-time.Minute),
+		Deadline: now.Add(4*time.Minute), AbsoluteUntil: now.Add(time.Hour),
+		Proof: host.ExternalProof{IssuedAt: now.Add(-time.Second), ExpiresAt: now.Add(time.Hour)},
+	}
+	raw, err := json.Marshal(original)
+	require.NoError(t, err)
+	var restored host.ExternalBinding
+	require.NoError(t, json.Unmarshal(raw, &restored))
+	require.NotEqual(t, original, restored, "fixture must reproduce lost monotonic/location metadata")
+	authority := &browserAdmissionAuthority{bindings: map[string]host.ExternalBinding{original.AuthorityID: original}}
+	proof, err := authority.Validate(t.Context(), restored)
+	require.NoError(t, err)
+	require.True(t, proof.IssuedAt.Equal(restored.Proof.IssuedAt))
+	require.True(t, proof.ExpiresAt.Equal(restored.Proof.ExpiresAt))
+	for name, change := range map[string]func(*host.ExternalBinding){
+		"issuer": func(b *host.ExternalBinding) { b.Issuer += "/changed" },
+		"subject": func(b *host.ExternalBinding) { b.Subject += "-changed" },
+		"link": func(b *host.ExternalBinding) { b.LinkID = uuid.NewString() },
+		"authority": func(b *host.ExternalBinding) { b.AuthorityID = uuid.NewString() },
+		"provider-session": func(b *host.ExternalBinding) { b.ProviderSessionID = uuid.NewString() },
+		"client": func(b *host.ExternalBinding) { b.ClientID += "-changed" },
+		"project": func(b *host.ExternalBinding) { b.ProjectID += "-changed" },
+		"generation": func(b *host.ExternalBinding) { b.Generation++ },
+		"login-generation": func(b *host.ExternalBinding) { b.LoginGeneration++ },
+		"local-subject": func(b *host.ExternalBinding) { b.LocalSubject = goauth.NewSubjectID() },
+		"auth-time": func(b *host.ExternalBinding) { b.ExternalAuthTime = b.ExternalAuthTime.Add(time.Nanosecond) },
+		"deadline": func(b *host.ExternalBinding) { b.Deadline = b.Deadline.Add(time.Nanosecond) },
+		"absolute-until": func(b *host.ExternalBinding) { b.AbsoluteUntil = b.AbsoluteUntil.Add(time.Nanosecond) },
+		"proof-issued": func(b *host.ExternalBinding) { b.Proof.IssuedAt = b.Proof.IssuedAt.Add(time.Nanosecond) },
+		"proof-expires": func(b *host.ExternalBinding) { b.Proof.ExpiresAt = b.Proof.ExpiresAt.Add(time.Nanosecond) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			changed := restored
+			change(&changed)
+			_, err := authority.Validate(t.Context(), changed)
+			require.ErrorIs(t, err, goauth.ErrSessionRevoked)
+		})
+	}
 }
