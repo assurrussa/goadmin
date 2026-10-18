@@ -192,6 +192,8 @@ func (s *Service) Admit(ctx context.Context, reference, invitationID string) (Re
 		}
 		local, err := tx.Provision(txCtx, identity)
 		if err != nil { return err }
+		if !s.validIdentity(identity) { return ErrDenied }
+		if err := s.verifier.Revalidate(txCtx, reference, identity); err != nil { return err }
 		expected := current.Version
 		if current.ID == "" {
 			current = Record{ID:s.cfg.NewID(), Scope:identity.Scope,
@@ -227,6 +229,7 @@ func (s *Service) activate(ctx context.Context, tx Tx, record Record, identity I
 	local, err := tx.Provision(ctx, identity)
 	if err != nil { return err }
 	if local != record.LocalSubject { return ErrConflict }
+	if !s.validIdentity(identity) || !s.cfg.Now().Before(record.ExpiresAt) { return ErrDenied }
 	if err := tx.Activate(ctx, local, roles); err != nil { return err }
 	record.Status = Active
 	updated, err := tx.Save(ctx, record, record.Version)
