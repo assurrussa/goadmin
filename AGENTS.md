@@ -52,6 +52,7 @@ published support. Host projects should integrate only through:
 - `github.com/assurrussa/goadmin/hosttest`
 - `github.com/assurrussa/goadmin/features/operations`
 - `github.com/assurrussa/goadmin/features/access`
+- `github.com/assurrussa/goadmin/features/admission`
 - `github.com/assurrussa/goadmin/features/jobs`
 - `github.com/assurrussa/goadmin/features/uploads`
 - `github.com/assurrussa/goadmin/features/queues`
