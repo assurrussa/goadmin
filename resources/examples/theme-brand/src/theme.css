@@ -1,0 +1,34 @@
+/* Optional project-owned branding. Safe to compose with one density preset. */
+:root {
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --hue-primary: 221;
+  --saturation-primary: 76%;
+  --primary-h: var(--hue-primary);
+  --primary-s: var(--saturation-primary);
+  --primary-l: 48%;
+  --color-primary: #1d4ed8;
+  --color-primary-foreground: #ffffff;
+  --color-primary-contrast: #ffffff;
+  --color-primary-rgb: 29, 78, 216;
+  --primary: 221 76% 48%;
+  --primary-foreground: 0 0% 100%;
+  --color-focus-ring: #1d4ed8;
+  --color-ring: var(--color-focus-ring);
+  --color-border-focus: var(--color-focus-ring);
+  --ring: 221 76% 48%;
+}
+
+:root.dark,
+:root[data-theme-mode='dark'] {
+  --hue-primary: 213;
+  --saturation-primary: 97%;
+  --primary-l: 78%;
+  --color-primary: #93c5fd;
+  --color-primary-foreground: #0f172a;
+  --color-primary-contrast: #0f172a;
+  --color-primary-rgb: 147, 197, 253;
+  --primary: 213 97% 78%;
+  --primary-foreground: 222 47% 11%;
+  --color-focus-ring: #93c5fd;
+  --ring: 213 97% 78%;
+}
