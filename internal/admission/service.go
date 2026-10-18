@@ -97,6 +97,7 @@ type Tx interface {
 	Activate(context.Context, string, []Role) error
 	// CheckActive denies revoked membership and disabled/retired subjects.
 	CheckActive(context.Context, string) error
+	CheckIdentity(context.Context, Identity, string) error
 	Audit(context.Context, string, string, string) error
 }
 
@@ -294,4 +295,19 @@ func (s *Service) Revoke(ctx context.Context, actor, id string) error {
 		if err := tx.RevokeInvitation(ctx, id); err != nil { return err }
 		return tx.Audit(ctx, actor, "admission.invitation-revoked", id)
 	})
+}
+
+func (s *Service) View(ctx context.Context, reference string) (Record,error) {
+	i,err:=s.verifier.Verify(ctx,reference)
+	if err!=nil{return Record{},err}
+	if !s.validIdentity(i){return Record{},ErrDenied}
+	var result Record
+	err=s.store.Owned(ctx,func(ctx context.Context,tx Tx)error{
+		r,err:=tx.Find(ctx,i.Scope,i.Subject);if err!=nil{return err}
+		if err:=tx.CheckIdentity(ctx,i,r.LocalSubject);err!=nil{return err}
+		if !s.validIdentity(i){return ErrDenied}
+		if err:=s.verifier.Revalidate(ctx,reference,i);err!=nil{return err}
+		result=r;return nil
+	})
+	if err!=nil{return Record{},err};return result,nil
 }
