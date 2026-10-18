@@ -40,6 +40,7 @@ type Identity struct {
 type Role struct {
 	ID int64
 	PublicID string
+	Name string
 	// Fingerprint pins the exact role permission set at authorization time.
 	Fingerprint string
 }
