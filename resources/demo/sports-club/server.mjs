@@ -3,18 +3,9 @@ import { createServer } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
-import { createRequire } from 'node:module'
-const require = createRequire(import.meta.url)
-const { materializeAdminExtensions } = require('../../scripts/materialize-admin-extensions.cjs')
-materializeAdminExtensions({
-  generatedRoot: path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)),
-    '../../.admin-extensions',
-  ),
-  manifestPaths: [],
-  legacyRoot: '',
-  includeLegacy: false,
-})
+import { createDemoScaffold } from './scaffold.mjs'
+const scaffold = createDemoScaffold()
+process.once('exit', scaffold.cleanup)
 import { fileURLToPath } from 'node:url'
 import { demoPage } from './data.mjs'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -73,13 +64,26 @@ const server = await createServer({
       },
     },
   ],
-  resolve: { alias: { '@': path.join(root, 'src/js'), '~': path.join(root, 'src/js') } },
+  resolve: {
+    alias: [
+      ...scaffold.aliases,
+      { find: '@', replacement: path.join(root, 'src/js') },
+      { find: '~', replacement: path.join(root, 'src/js') },
+    ],
+  },
   server: { host: '127.0.0.1', port: 8767, strictPort: true },
 })
-await server.listen()
+try {
+  await server.listen()
+} catch (error) {
+  await server.close()
+  scaffold.cleanup()
+  throw error
+}
 console.log('Sports club demo: http://127.0.0.1:8767/demo/dashboard')
 for (const signal of ['SIGINT', 'SIGTERM'])
   process.on(signal, async () => {
     await server.close()
+    scaffold.cleanup()
     process.exit(0)
   })

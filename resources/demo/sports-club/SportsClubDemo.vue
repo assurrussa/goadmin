@@ -5,8 +5,36 @@ import AppCard from '@/components/ui/AppCard.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
-import { Users, Activity, CalendarDays, Target, ArrowUpRight, ShieldCheck } from 'lucide-vue-next'
+import {
+  Users,
+  Activity,
+  CalendarDays,
+  Target,
+  ArrowUpRight,
+  ShieldCheck,
+  Bell,
+  ListTodo,
+} from 'lucide-vue-next'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
 import { participants, sessions } from './data.mjs'
+const notificationOpen = ref(false)
+const administrators = ref([
+  { name: 'Demo administrator', role: 'Administrator' },
+  { name: 'Morgan Lee', role: 'Coach' },
+  { name: 'Riley Chen', role: 'Front desk' },
+])
+const notifications = [
+  'Attendance report is ready',
+  '5 participant registrations need review',
+  'Saturday training is nearly full',
+]
 const props = defineProps<{ view: string; preset: string; mode: string }>()
 const titles: Record<string, string> = {
   dashboard: 'Club overview',
@@ -76,7 +104,30 @@ const metrics = [
   <AdminLayout
     ><div class="club-demo" data-demo-ready>
       <div class="banner">
-        <span>● &nbsp; NORTHLINE / CLUB OPERATIONS</span><span>Synthetic data · 19 Oct 2026</span>
+        <span>● &nbsp; NORTHLINE / CLUB OPERATIONS</span>
+        <div class="capability-cues">
+          <span class="seed-label">Synthetic · 19 Oct 2026</span
+          ><a :href="href('queue')" class="queue-indicator" aria-label="Synthetic queue: 3 waiting"
+            ><ListTodo :size="15" /><span>Queue</span><AppBadge variant="outline">3</AppBadge></a
+          ><DropdownMenu v-model:open="notificationOpen"
+            ><DropdownMenuTrigger as-child
+              ><AppButton variant="outline" size="sm" aria-label="Synthetic notifications: 3 unread"
+                ><Bell :size="15" /><span>3</span></AppButton
+              ></DropdownMenuTrigger
+            ><DropdownMenuContent align="end" style="width: min(22rem, calc(100vw - 2rem))"
+              ><DropdownMenuLabel>Notifications · synthetic</DropdownMenuLabel
+              ><DropdownMenuSeparator /><DropdownMenuItem
+                v-for="(n, i) in notifications"
+                :key="n"
+                @select="preview(n)"
+                ><span class="notification-item"
+                  ><strong>{{ n }}</strong
+                  ><small>{{ [12, 28, 45][i] }} min ago · local preview</small></span
+                ></DropdownMenuItem
+              ></DropdownMenuContent
+            ></DropdownMenu
+          >
+        </div>
       </div>
       <div class="heading">
         <div>
@@ -396,6 +447,16 @@ const metrics = [
             {{ permissions.length }} permissions selected for the
             {{ role.toLowerCase() }} presentation.
           </p>
+          <h3>Administrator assignments</h3>
+          <p class="muted">Fictional staff · in-memory role preview</p>
+          <label v-for="admin in administrators" :key="admin.name" class="assignment-row"
+            ><span>{{ admin.name }}</span
+            ><select v-model="admin.role" :aria-label="`Role for ${admin.name}`">
+              <option>Administrator</option>
+              <option>Coach</option>
+              <option>Front desk</option>
+            </select></label
+          >
           <div class="note">
             The real host owns authentication and RBAC. This fixture does not evaluate or persist
             role changes.
@@ -521,6 +582,37 @@ const metrics = [
   >
 </template>
 <style scoped>
+.capability-cues,
+.queue-indicator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.queue-indicator {
+  gap: 6px;
+  color: var(--color-text-primary);
+  letter-spacing: normal;
+  font-size: 11px;
+}
+.notification-item {
+  display: block;
+  font-size: 12px;
+  padding: 5px 0;
+}
+.notification-item strong {
+  font-weight: 550;
+}
+.assignment-row {
+  display: grid;
+  grid-template-columns: 1fr 140px;
+  gap: 10px;
+  align-items: center;
+  margin-top: 16px;
+  font-size: 12px;
+}
+.assignment-row select {
+  margin-top: 0;
+}
 .club-demo {
   font-size: 14px;
   line-height: 1.5;
@@ -874,6 +966,17 @@ form > button {
   }
 }
 @media (max-width: 767px) {
+  .capability-cues {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .seed-label {
+    margin-right: auto;
+    font-size: 9px;
+  }
+  .assignment-row {
+    grid-template-columns: 1fr 130px;
+  }
   .banner {
     align-items: flex-start;
     flex-direction: column;

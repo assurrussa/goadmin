@@ -1,7 +1,9 @@
 {
   "seedDate": "2026-10-19",
   "browser": "149.0.7827.55",
-  "playwright": "chromium",
+  "playwright": "1.64.0-alpha-1790635538000",
+  "browserEngine": "chromium",
+  "fullPage": false,
   "deviceScaleFactor": 1,
   "locale": "en-GB",
   "timezone": "UTC",
@@ -17,9 +19,9 @@
       }
     },
     {
-      "file": "dashboard-default-light.png",
+      "file": "dashboard-notifications.png",
       "view": "dashboard",
-      "preset": "default",
+      "preset": "compact",
       "mode": "light",
       "viewport": {
         "width": 1440,
@@ -67,38 +69,8 @@
       }
     },
     {
-      "file": "queue-compact-light.png",
-      "view": "queue",
-      "preset": "compact",
-      "mode": "light",
-      "viewport": {
-        "width": 1440,
-        "height": 1000
-      }
-    },
-    {
-      "file": "settings-default-light.png",
-      "view": "settings",
-      "preset": "default",
-      "mode": "light",
-      "viewport": {
-        "width": 1440,
-        "height": 1000
-      }
-    },
-    {
       "file": "dashboard-compact-mobile.png",
       "view": "dashboard",
-      "preset": "compact",
-      "mode": "light",
-      "viewport": {
-        "width": 390,
-        "height": 844
-      }
-    },
-    {
-      "file": "participants-compact-mobile.png",
-      "view": "participants",
       "preset": "compact",
       "mode": "light",
       "viewport": {

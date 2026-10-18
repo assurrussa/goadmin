@@ -8,8 +8,15 @@ facade instead of copying admin internals.
 
 [Explore the screenshot gallery and run the local presentation demo](docs/presentation-demo.md).
 
-Install the public release with `go get github.com/assurrussa/goadmin@v0.12.0`.
-Its dependency graph uses GoAuth v0.8.0, GoNotify v0.6.0, GoUploads v0.13.0 and
+- **Embed in your Go host:** use the [supported host facade](docs/consumer-guide.md), with [prebuilt UI assets](host/assets.go) embedded in the module; no separate Node server is needed in production.
+- **Choose your capabilities:** enable [explicit optional modules](docs/consumer-guide.md#know-which-parts-are-required) and adapt the UI through [theme extensions](docs/theme-customization.md).
+- **Keep access integrated:** the [GoAuth adapter](host/auth_adapter.go) owns admin membership and RBAC, and exposes its runtime for host-owned OIDC wiring.
+
+Application size and RAM/CPU depend on the host, selected modules and deployment.
+This presentation does not benchmark them; frontend asset sizes are not whole-application footprints.
+
+Install the public release with `go get github.com/assurrussa/goadmin@v0.13.0`.
+Its dependency graph uses GoAuth v0.11.0, GoNotify v0.6.0, GoUploads v0.13.0 and
 GoWebSocket v0.2.1 without sibling replacements.
 
 ## Before integrating

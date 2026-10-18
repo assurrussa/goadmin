@@ -1,26 +1,22 @@
 import assert from 'node:assert/strict'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile, readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { createRequire } from 'node:module'
+import { shots, screenshotOptions } from './capture-config.mjs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 // Optional overrides let maintainers reuse an installed Playwright/browser.
 const { chromium } = await import(
   process.env.PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PLAYWRIGHT_MODULE).href : 'playwright'
 )
+const playwrightRequire = createRequire(
+  process.env.PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PLAYWRIGHT_MODULE) : import.meta.url,
+)
+const playwrightVersion = JSON.parse(
+  await readFile(playwrightRequire.resolve('playwright/package.json'), 'utf8'),
+).version
 const origin = 'http://127.0.0.1:8767'
 const out = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../docs/screenshots')
 await mkdir(out, { recursive: true })
-const shots = [
-  ['dashboard-compact-light', 'dashboard', 'compact', 'light', 1440, 1100],
-  ['dashboard-default-light', 'dashboard', 'default', 'light', 1440, 1100],
-  ['dashboard-branded-dark', 'dashboard', 'branded', 'dark', 1440, 1100],
-  ['participants-compact-light', 'participants', 'compact', 'light', 1440, 1000],
-  ['training-branded-light', 'training', 'branded', 'light', 1440, 1000],
-  ['permissions-compact-dark', 'permissions', 'compact', 'dark', 1440, 1000],
-  ['queue-compact-light', 'queue', 'compact', 'light', 1440, 1000],
-  ['settings-default-light', 'settings', 'default', 'light', 1440, 1000],
-  ['dashboard-compact-mobile', 'dashboard', 'compact', 'light', 390, 844],
-  ['participants-compact-mobile', 'participants', 'compact', 'light', 390, 844],
-]
 const browser = await chromium.launch({
   headless: true,
   ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH
@@ -74,12 +70,37 @@ try {
       1,
       `${name}: active navigation`,
     )
+    if (name === 'dashboard-notifications') {
+      await page.getByRole('button', { name: 'Synthetic notifications: 3 unread' }).click()
+      await page.getByRole('menu').waitFor()
+    }
     await page.screenshot({
       path: path.join(out, `${name}.png`),
-      fullPage: true,
-      animations: 'disabled',
+      ...screenshotOptions,
     })
     // Exercise representative behavior after taking the clean initial-state image.
+    if (name === 'dashboard-compact-light') {
+      const bell = page.getByRole('button', { name: 'Synthetic notifications: 3 unread' })
+      await bell.click()
+      assert.equal(await page.getByRole('menuitem').count(), 3)
+      await page.keyboard.press('Escape')
+      assert.equal(await bell.evaluate((el) => el === document.activeElement), true)
+      await page.getByRole('link', { name: 'Synthetic queue: 3 waiting' }).click()
+      await page.getByRole('heading', { name: 'Job queue', exact: true }).waitFor()
+      await page.getByRole('link', { name: 'Overview', exact: true }).click()
+      await page.getByRole('heading', { name: 'Club overview', exact: true }).waitFor()
+      await page.getByRole('button', { name: 'Switch to dark theme', exact: true }).click()
+      assert.equal(await page.locator('html').getAttribute('data-theme-mode'), 'dark')
+      await page.locator('[data-profile-menu-trigger]').click()
+      await page.getByRole('menuitem', { name: 'Profile', exact: true }).waitFor()
+      await page.keyboard.press('Escape')
+      assert.equal(
+        await page
+          .locator('[data-profile-menu-trigger]')
+          .evaluate((el) => el === document.activeElement),
+        true,
+      )
+    }
     if (name === 'participants-compact-light') {
       await page.getByRole('button', { name: 'Next', exact: true }).click()
       assert.match(await page.locator('.pagination').innerText(), /Page 2 of 4/)
@@ -101,6 +122,11 @@ try {
       assert.match(await page.getByRole('status').innerText(), /Training draft saved/)
     }
     if (name === 'permissions-compact-dark') {
+      await page.getByLabel('Role for Morgan Lee', { exact: true }).selectOption('Administrator')
+      assert.equal(
+        await page.getByLabel('Role for Morgan Lee', { exact: true }).inputValue(),
+        'Administrator',
+      )
       await page.getByRole('button', { name: 'Administrator', exact: true }).click()
       assert.equal(await page.locator('input:checked').count(), 6)
       await page.getByLabel('Manage roles', { exact: false }).uncheck()
@@ -124,19 +150,6 @@ try {
       assert.equal(await menu.evaluate((el) => el === document.activeElement), true)
       assert.equal(await page.locator('#admin-sidebar').getAttribute('inert'), '')
     }
-    if (name === 'settings-default-light') {
-      await page.getByRole('button', { name: 'Switch to dark theme', exact: true }).click()
-      assert.equal(await page.locator('html').getAttribute('data-theme-mode'), 'dark')
-      await page.locator('[data-profile-menu-trigger]').click()
-      await page.getByRole('menuitem', { name: 'Profile', exact: true }).waitFor()
-      await page.keyboard.press('Escape')
-      assert.equal(
-        await page
-          .locator('[data-profile-menu-trigger]')
-          .evaluate((el) => el === document.activeElement),
-        true,
-      )
-    }
     await context.close()
     console.log(`PASS ${name}: capture, console, overflow, navigation`)
   }
@@ -148,7 +161,9 @@ try {
       {
         seedDate: '2026-10-19',
         browser: browser.version(),
-        playwright: chromium.name(),
+        playwright: playwrightVersion,
+        browserEngine: chromium.name(),
+        fullPage: screenshotOptions.fullPage,
         deviceScaleFactor: 1,
         locale: 'en-GB',
         timezone: 'UTC',

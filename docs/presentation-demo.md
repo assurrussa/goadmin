@@ -16,8 +16,10 @@ node resources/demo/sports-club/server.mjs
 
 Open <http://127.0.0.1:8767/demo/dashboard>. The separate fixture binds only to
 `127.0.0.1:8767` and never changes the library's production routes or entry point.
-Stop it with Ctrl-C. The demo materializes the same empty extension scaffolding
-used by the existing UI browser fixture. Host extensions are intentionally absent.
+Stop it with Ctrl-C. Empty extension sources are created in an owned temporary
+directory, resolved through demo-only Vite aliases, and removed on shutdown.
+The developer’s `resources/.admin-extensions` state is neither loaded nor overwritten.
+Host extensions are intentionally absent.
 
 The six screens are `dashboard`, `participants`, `training`, `permissions`,
 `queue`, and `settings`, all below `/demo/`. Add `?preset=default`,
@@ -45,65 +47,59 @@ intentional local horizontal scrolling on narrow screens.
 
 Representative interaction checks cover filters, pagination, row actions, editor
 preview/save, separate role selections, shared theme and profile menus, and mobile
-menu focus wrapping, Escape dismissal and focus return. This is deliberately a
+menu focus wrapping, Escape dismissal and focus return. The synthetic notification
+dropdown and queue indicator are demo-only capability cues; the existing access
+screen includes fictional administrator assignments. No extra feature page is added. This is deliberately a
 curated presentation check rather than every screen/theme/viewport combination.
 
 To reuse an existing installation, set `PLAYWRIGHT_MODULE` to its absolute
 `playwright/index.mjs` and optionally `PLAYWRIGHT_EXECUTABLE_PATH` to its Chromium
 binary. Browser/platform font changes can change pixels. The committed
-`capture-manifest.json` records the browser and viewport used for this gallery.
+`capture-manifest.json` records the actual Playwright package version, Chromium
+version and viewport used for this gallery.
 
 ## Gallery
 
-All images are committed repo-relative PNGs. Desktop viewport is **1440 × 1100**
-for dashboards and **1440 × 1000** for other views; mobile is **390 × 844**.
-Images capture the full page, so image height may exceed viewport height.
+Seven curated viewport images show capabilities rather than every available page.
+Desktop dashboards use **1440 × 1100**, tables/forms/access use **1440 × 1000**,
+and mobile uses **390 × 844**. Captures use `fullPage: false`, including the README
+hero, so the shared fixed sidebar fills the viewport naturally. Scroll locally to
+explore the rest of each page; production positioning is unchanged.
 
-### Dashboard · compact · light · desktop (README hero)
+### Overview · compact · light (README hero)
 
-![Compact light sports club dashboard](screenshots/dashboard-compact-light.png)
+![Compact light sports club overview with synthetic notification and queue indicators](screenshots/dashboard-compact-light.png)
 
-### Dashboard · default · light · desktop
+### Notifications · shared dropdown · synthetic
 
-![Default light dashboard with standard shell density](screenshots/dashboard-default-light.png)
+![Synthetic notification bell expanded using shared dropdown components](screenshots/dashboard-notifications.png)
 
-### Dashboard · branded · dark · desktop
+### Tables · compact · light
 
-![Branded dark dashboard using the existing theme extension](screenshots/dashboard-branded-dark.png)
+![Participant directory with filters, statuses, actions and pagination](screenshots/participants-compact-light.png)
 
-### Participants · compact · light · desktop
-
-![Participant directory with filters, statuses and pagination](screenshots/participants-compact-light.png)
-
-### Training editor · branded · light · desktop
+### Forms · branded · light
 
 ![Grouped training fields and local sports court illustration](screenshots/training-branded-light.png)
 
-### Roles and permissions · compact · dark · desktop
+### Access · compact · dark
 
-![Illustrative coach permissions in the dark theme](screenshots/permissions-compact-dark.png)
+![Illustrative permissions and fictional administrator role assignments](screenshots/permissions-compact-dark.png)
 
-### Job queue · compact · light · desktop
+### Theme extension · branded · dark
 
-![Synthetic queue snapshot with completed and waiting jobs](screenshots/queue-compact-light.png)
+![Branded dark dashboard using the existing theme extension](screenshots/dashboard-branded-dark.png)
 
-### Profile and settings · default · light · desktop
+### Responsive shell · compact · mobile
 
-![Fictional profile and presentation theme options](screenshots/settings-default-light.png)
-
-### Dashboard · compact · light · mobile
-
-![Mobile dashboard with stacked cards and scrollable training table](screenshots/dashboard-compact-mobile.png)
-
-### Participants · compact · light · mobile
-
-![Mobile participant filters and horizontally scrollable directory](screenshots/participants-compact-mobile.png)
+![Mobile viewport showing the shared header, capability cues and overview cards](screenshots/dashboard-compact-mobile.png)
 
 ## Boundaries and limitations
 
 This is a presentation fixture, not an authenticated host integration. Mutations
 only show local notices or edit in-memory state; reload resets them. Permission
-checkboxes are illustrative, never backend-verified authorization. Queue jobs,
+checkboxes and administrator assignments are illustrative, never backend-verified
+authorization. Notification items are seeded and only open local notices. Queue jobs,
 activity and metrics are seeded snapshots: no workers, notifications, mail,
 security checks, uploads or external services execute. The court SVG is a local
 original placeholder. Names and `example.invalid` addresses are fictional.
