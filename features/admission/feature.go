@@ -139,9 +139,11 @@ func (h *handler) Index(c fiber.Ctx)error{
 	invites,err:=h.component.store.Invitations(c,actor.SubjectID,h.component.cfg.Scope);if err!=nil{return httpError(err)}
 	inviteRoles,err:=h.component.store.GrantableRoles(c,actor.SubjectID,"invite");if err!=nil{return httpError(err)}
 	approveRoles,err:=h.component.store.GrantableRoles(c,actor.SubjectID,"approve");if err!=nil{return httpError(err)}
+	canInvite,err:=h.component.store.Allowed(c,actor.SubjectID,"invite");if err!=nil{return httpError(err)}
+	canReject,err:=h.component.store.Allowed(c,actor.SubjectID,"reject");if err!=nil{return httpError(err)}
 	return h.app.Render(c,"admission/IndexPage",map[string]any{
 		"title":"SSO access","records":rows,"invitations":invites,"inviteRoles":inviteRoles,"approveRoles":approveRoles,
-		"scope":h.component.cfg.Scope,"maxDisplayed":100,
+		"scope":h.component.cfg.Scope,"maxDisplayed":100,"canInvite":canInvite,"canReject":canReject,
 	})
 }
 func (h *handler) Invite(c fiber.Ctx,a host.Actor,in inviteInput)error{
@@ -169,7 +171,16 @@ func (h *handler) Waiting(c fiber.Ctx)error{
 	reference,err:=h.component.cfg.Reference(c);if err!=nil{return fiber.ErrUnauthorized}
 	r,err:=h.component.service.View(c,reference);if err!=nil{return httpError(err)}
 	// No identities, role assignments or credentials are emitted to this page.
-	return h.app.Render(c,"admission/WaitingPage",map[string]any{
+	return h.app.Render(c,"auth/AdmissionWaitingPage",map[string]any{
 		"title":"SSO access","admissionStatus":r.Status,"signInPath":h.component.cfg.SignInPath,
 	})
+}
+
+// GrantRolePermission returns the explicit permission needed to assign this
+// immutable role ID. Include it in the normal permission catalogue for roles
+// added after this component was assembled; it grants nothing by itself.
+func GrantRolePermission(publicID string)(host.PermissionKey,error){
+	key,err:=policy.GrantPermission(publicID);if err!=nil{return host.PermissionKey{},err}
+	d,a,_:=strings.Cut(string(key),":")
+	return host.NewPermissionKey(host.PermissionDomain(d),host.PermissionAction(a)),nil
 }
