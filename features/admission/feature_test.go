@@ -1,4 +1,4 @@
-package admission
+package admission //nolint:testpackage // White-box tests cover unmounted guards and transaction ordering.
 
 import (
 	"context"
