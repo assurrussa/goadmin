@@ -150,6 +150,7 @@ must not rewrite another namespace into `/public` after compression selection.
 - `github.com/assurrussa/goadmin/hosttest`
 - `github.com/assurrussa/goadmin/features/operations`
 - `github.com/assurrussa/goadmin/features/access`
+- `github.com/assurrussa/goadmin/features/admission`
 - `github.com/assurrussa/goadmin/features/jobs`
 - `github.com/assurrussa/goadmin/features/uploads`
 - `github.com/assurrussa/goadmin/features/queues`
@@ -546,3 +547,6 @@ the pinned GoAuth API, adds no public package/import path, and does not enable a
 host SSO mode. Real RP consumer and end-to-end SSO
 acceptance follow using released dependencies and remain required before
 application release. Library publication does not establish that acceptance.
+
+Optional SSO enrollment is described in [the admission contract](docs/sso-admission.md).
+This candidate needs the matching strict GoAuth provisioning API before activation.
