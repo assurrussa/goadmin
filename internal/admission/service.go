@@ -43,6 +43,7 @@ type (
 		ExpiresAt time.Time
 	}
 )
+
 type Role struct {
 	ID       int64
 	PublicID string
