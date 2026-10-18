@@ -66,7 +66,7 @@ function until() {
   const parsed = new Date(expires.value)
   return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString()
 }
-function send(path: string, body: Record<string, unknown>) {
+function send(path: string, body: Record<string, string | number | number[]>) {
   if (busy.value) return
   error.value = ''
   busy.value = true
