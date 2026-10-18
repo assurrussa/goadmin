@@ -191,3 +191,29 @@ func TestRoleIDsAreBoundedSortedAndCopied(t *testing.T){
 	if err!=nil||!slices.Equal(got,[]int64{1,2})||!slices.Equal(input,[]int64{2,1,2}){t.Fatal(got,err)}
 	for _,ids:=range [][]int64{nil,{0},{-1},make([]int64,33)}{if _,err:=normalizedIDs(ids);err==nil{t.Fatal("invalid role set accepted")}}
 }
+
+type orderedRevokeStore struct { Store; calls *[]string }
+type orderedRevokeTx struct { Tx; calls *[]string }
+func (s orderedRevokeStore) Owned(ctx context.Context, fn func(context.Context, Tx) error) error {
+	return s.Store.Owned(ctx, func(ctx context.Context, tx Tx) error {
+		return fn(ctx, orderedRevokeTx{Tx:tx, calls:s.calls})
+	})
+}
+func (t orderedRevokeTx) Invitation(ctx context.Context, id string) (Invitation,error) {
+	*t.calls=append(*t.calls,"invitation")
+	return t.Tx.Invitation(ctx,id)
+}
+func (t orderedRevokeTx) Authorize(ctx context.Context, actor, action string, ids []int64) ([]Role,error) {
+	*t.calls=append(*t.calls,"authority")
+	return t.Tx.Authorize(ctx,actor,action,ids)
+}
+func TestRevokeLocksInvitationBeforeAuthority(t *testing.T) {
+	s,db,_,now:=fixture(t,InvitationOnly)
+	i,err:=s.Invite(context.Background(),"operator","alice",[]int64{1},now.Add(time.Hour))
+	if err!=nil{t.Fatal(err)}
+	calls:=[]string{}
+	s.store=orderedRevokeStore{Store:db,calls:&calls}
+	if err:=s.Revoke(context.Background(),"operator",i.ID);err!=nil{t.Fatal(err)}
+	if !slices.Equal(calls,[]string{"invitation","authority"}){t.Fatalf("lock order: %v",calls)}
+	if !db.state.invites[i.ID].Revoked{t.Fatal("invitation not revoked")}
+}
