@@ -132,7 +132,11 @@ func (c *Component) read(ctx context.Context, binding host.ExternalBinding) (Vie
 			return nil
 		}
 		if r.Pending.Selector != "" && !time.Now().Before(r.Pending.Until) {
-			if err := storePending(ctx, ex, binding.LocalSubject.String(), pending{}); err != nil {
+			// Zero time and nested struct fields survive JSON omitempty. Clear
+			// the persisted object explicitly rather than encoding pending{}.
+			if _, err := ex.ExecContext(ctx,
+				"UPDATE admin_profile_presentations SET pending='{}'::jsonb WHERE subject_id=$1",
+				binding.LocalSubject.String()); err != nil {
 				return err
 			}
 		}
