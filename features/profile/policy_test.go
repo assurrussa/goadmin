@@ -141,3 +141,21 @@ func TestSelectionVersionNeverWrapsOrAcceptsApproximateJSONNumber(t *testing.T) 
 	require.ErrorIs(t, nextVersion(record{Version: 1}, "2"), ErrConflict)
 	require.ErrorIs(t, nextVersion(record{Version: 9223372036854775807}, "9223372036854775807"), ErrConflict)
 }
+
+func TestCompletionClaimCookieIsOpaqueUniqueAndBounded(t *testing.T) {
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "https://app.example.test/profile-source/complete", nil)
+	value, err := uniqueCookie(request, completionCookie)
+	require.NoError(t, err)
+	require.Empty(t, value)
+	request.AddCookie(&http.Cookie{
+		Name: completionCookie, Value: "synthetic-completion-claim", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode,
+	})
+	value, err = uniqueCookie(request, completionCookie)
+	require.NoError(t, err)
+	require.NotEmpty(t, value)
+	request.AddCookie(&http.Cookie{
+		Name: completionCookie, Value: "duplicate", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode,
+	})
+	_, err = uniqueCookie(request, completionCookie)
+	require.ErrorIs(t, err, ErrDenied)
+}

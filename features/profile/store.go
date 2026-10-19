@@ -131,6 +131,9 @@ func (c *Component) read(ctx context.Context, binding host.ExternalBinding) (Vie
 		if r.Version == 0 {
 			return nil
 		}
+		if r.Pending.Selector != "" && !time.Now().Before(r.Pending.Until) {
+			if err := storePending(ctx, ex, binding.LocalSubject.String(), pending{}); err != nil { return err }
+		}
 		view.Version, view.Fields = versionString(r.Version), r.Fields
 		r.Binding.LocalSubject = binding.LocalSubject
 		if samePins(r.Binding, binding) && r.Updated.Valid {

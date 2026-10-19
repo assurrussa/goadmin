@@ -20,6 +20,8 @@ const (
 	phaseStarted    = "started"
 	phaseCandidate  = "candidate"
 	phaseClaimed    = "claimed"
+	phaseArmed = "armed"
+	completionCookie = "__Host-goadmin_profile_completion"
 )
 
 type pending struct {
@@ -33,6 +35,7 @@ type pending struct {
 	Original    host.ExternalBinding `json:"original,omitempty"`
 	Fresh       host.ExternalBinding `json:"fresh,omitempty"`
 	Snapshot    Snapshot             `json:"snapshot,omitempty"`
+	CompletionNative string `json:"completionNative,omitempty"`
 	Claim       string               `json:"claim,omitempty"`
 }
 
@@ -80,9 +83,10 @@ func (c *Component) CreateIntent(ctx fiber.Ctx, app *host.App, expected string) 
 	if err != nil {
 		return "", err
 	}
+	clearCompletionCookie(ctx)
 	ctx.Cookie(&fiber.Cookie{
 		Name: refreshCookie, Value: id, Path: "/", Secure: true,
-		HTTPOnly: true, SameSite: "Lax", MaxAge: int(refreshLifetime.Seconds()),
+		HTTPOnly: true, SameSite: fiber.CookieSameSiteLaxMode, MaxAge: int(refreshLifetime.Seconds()),
 	})
 	return id, nil
 }
@@ -171,23 +175,55 @@ func (c *Component) Claim(ctx context.Context, selector, native string, fresh ho
 	return claim, nil
 }
 
-// Complete runs after successful canonical native login. It reauthenticates the
-// new native cookie/binding and atomically consumes the claimed intent plus
-// replaces only its pinned subject's snapshot. Selected fields never change.
+// Arm is called only after successful native login. native is the hash of the
+// uniquely server-issued native response cookie, never an incoming browser value.
+// It does not apply the snapshot or re-read the old request's native session.
+func (c *Component) Arm(ctx fiber.Ctx, selector, claim, native string, fresh host.ExternalBinding) error {
+	if err := c.arm(ctx, selector, claim, native, fresh); err != nil { return err }
+	ctx.Cookie(&fiber.Cookie{Name: completionCookie, Value: claim, Path: "/", Secure: true,
+		HTTPOnly: true, SameSite: fiber.CookieSameSiteLaxMode, MaxAge: int(refreshLifetime.Seconds())})
+	return nil
+}
+
+func (c *Component) arm(ctx context.Context, selector, claim, native string, fresh host.ExternalBinding) error {
+	if len(native) != 64 || claim == "" || len(claim) > 128 { return ErrDenied }
+	if _, err := hex.DecodeString(native); err != nil { return ErrDenied }
+	return c.withIntent(ctx, selector, fresh, func(ctx context.Context, ex postgres.SQLExecutor, subject string, r record) error {
+		p := r.Pending
+		if p.Phase != phaseClaimed || p.Claim != digest(claim) || !time.Now().Before(p.Until) ||
+			p.Native == native || !sameProof(p.Fresh, fresh) { return ErrDenied }
+		p.Phase, p.CompletionNative = phaseArmed, native
+		return storePending(ctx, ex, subject, p)
+	})
+}
+
+// Complete runs in a subsequent authenticated, CSRF-protected request after the
+// browser accepted the newly issued native cookie. The claim never enters JS.
 func (c *Component) Complete(ctx fiber.Ctx, app *host.App, selector, claim string) error {
 	admin, binding, err := c.current(ctx, app)
-	if err != nil {
-		return err
-	}
-	err = c.complete(ctx, selector, claim, binding, admin.AuthSessionID)
-	if err == nil {
-		clearRefreshCookie(ctx)
-	}
-	return err
+	if err != nil { return err }
+	return c.complete(ctx, selector, claim, binding, admin.AuthSessionID, host.CSRFSessionBinding(admin.SessionID))
+}
+
+func (c *Component) completionReady(ctx fiber.Ctx, app *host.App) bool {
+	if ctx.Query("complete") != "1" { return false }
+	admin, binding, err := c.current(ctx, app)
+	if err != nil { return false }
+	selector, err := Selector(ctx)
+	if err != nil { return false }
+	claim, err := completionClaim(ctx)
+	if err != nil || claim == "" { return false }
+	err = c.withIntent(ctx, selector, binding, func(_ context.Context, _ postgres.SQLExecutor, _ string, r record) error {
+		p := r.Pending
+		if p.Phase != phaseArmed || p.Claim != digest(claim) || !time.Now().Before(p.Until) ||
+			p.CompletionNative != host.CSRFSessionBinding(admin.SessionID) || !sameProof(p.Fresh, binding) { return ErrDenied }
+		return nil
+	})
+	return err == nil
 }
 
 func (c *Component) complete(ctx context.Context, selector, claim string,
-	binding host.ExternalBinding, authSession string,
+	binding host.ExternalBinding, authSession, native string,
 ) error {
 	return c.withIntent(ctx, selector, binding, func(
 		txctx context.Context, ex postgres.SQLExecutor, subject string, r record,
@@ -199,7 +235,8 @@ func (c *Component) complete(ctx context.Context, selector, claim string,
 		if err := originalSessionActive(txctx, ex, pending{AuthSession: authSession, Original: binding}); err != nil {
 			return err
 		}
-		if p.Phase != phaseClaimed || p.Claim != digest(claim) || claim == "" ||
+		if p.Phase != phaseArmed || p.CompletionNative == "" || p.CompletionNative != native ||
+			p.Claim != digest(claim) || claim == "" ||
 			!time.Now().Before(p.Until) || !sameProof(p.Fresh, binding) {
 			return ErrDenied
 		}
@@ -215,6 +252,10 @@ func (c *Component) complete(ctx context.Context, selector, claim string,
 // Cancel is for an already authenticated/CSRF-validated host logout or cancel.
 // It cancels only this opaque intent; the selected snapshot remains untouched.
 func (c *Component) Cancel(ctx context.Context, selector string) error {
+	if request, ok := ctx.(fiber.Ctx); ok {
+		clearCompletionCookie(request)
+		clearRefreshCookie(request)
+	}
 	if selector == "" {
 		return nil
 	}
@@ -231,31 +272,40 @@ func (c *Component) Cancel(ctx context.Context, selector string) error {
 // Selector reads only this browser's unique opaque refresh cookie.
 func Selector(ctx fiber.Ctx) (string, error) {
 	headers := make(http.Header)
-	for _, raw := range ctx.Request().Header.PeekAll("Cookie") {
-		headers.Add("Cookie", string(raw))
+	for _, raw := range ctx.Request().Header.PeekAll(fiber.HeaderCookie) {
+		headers.Add(fiber.HeaderCookie, string(raw))
 	}
 	return RequestSelector(&http.Request{Header: headers})
 }
 
 // RequestSelector has the same duplicate-cookie policy for a host HTTP callback.
 func RequestSelector(request *http.Request) (string, error) {
-	count := 0
-	value := ""
+	return uniqueCookie(request, refreshCookie)
+}
+
+func uniqueCookie(request *http.Request, name string) (string, error) {
+	count, value := 0, ""
 	for _, cookie := range request.Cookies() {
-		if cookie.Name == refreshCookie {
-			count++
-			value = cookie.Value
-		}
+		if cookie.Name == name { count++; value = cookie.Value }
 	}
-	if count > 1 || len(value) > 128 {
-		return "", ErrDenied
-	}
+	if count > 1 || len(value) > 128 { return "", ErrDenied }
 	return value, nil
+}
+
+func completionClaim(ctx fiber.Ctx) (string, error) {
+	headers := make(http.Header)
+	for _, raw := range ctx.Request().Header.PeekAll(fiber.HeaderCookie) { headers.Add(fiber.HeaderCookie, string(raw)) }
+	return uniqueCookie(&http.Request{Header: headers}, completionCookie)
+}
+
+func clearCompletionCookie(c fiber.Ctx) {
+	c.Cookie(&fiber.Cookie{Name: completionCookie, Value: "", Path: "/", Secure: true,
+		HTTPOnly: true, SameSite: fiber.CookieSameSiteLaxMode, MaxAge: -1})
 }
 
 func clearRefreshCookie(c fiber.Ctx) {
 	c.Cookie(&fiber.Cookie{
 		Name: refreshCookie, Value: "", Path: "/", Secure: true,
-		HTTPOnly: true, SameSite: "Lax", MaxAge: -1,
+		HTTPOnly: true, SameSite: fiber.CookieSameSiteLaxMode, MaxAge: -1,
 	})
 }

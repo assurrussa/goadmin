@@ -22,6 +22,8 @@ import (
 
 const remoteDisplay = "Remote display"
 
+var completedNative = host.CSRFSessionBinding("newly-published-native-cookie")
+
 type profileFixture struct {
 	component *Component
 	auth      *host.AuthAdapter
@@ -107,9 +109,10 @@ func TestProfilePostgresCallbackNativeCommitAndSingleConsumption(t *testing.T) {
 	claim, err := f.component.Claim(t.Context(), testSelector, testNative, f.fresh)
 	require.NoError(t, err)
 	require.Empty(t, f.snapshot(t), "claim alone must not apply a snapshot")
-	require.NoError(t, f.component.complete(t.Context(), testSelector, claim, f.fresh, f.session))
+	require.NoError(t, f.component.arm(t.Context(), testSelector, claim, completedNative, f.fresh))
+	require.NoError(t, f.component.complete(t.Context(), testSelector, claim, f.fresh, f.session, completedNative))
 	require.Equal(t, remoteDisplay, f.snapshot(t))
-	require.ErrorIs(t, f.component.complete(t.Context(), testSelector, claim, f.fresh, f.session), ErrDenied)
+	require.ErrorIs(t, f.component.complete(t.Context(), testSelector, claim, f.fresh, f.session, completedNative), ErrDenied)
 	var local string
 	require.NoError(t, f.auth.Runtime().Database().QueryRowContext(t.Context(),
 		"SELECT display_name FROM auth_basic_profiles WHERE subject_id=$1", f.old.LocalSubject).Scan(&local))
@@ -203,7 +206,7 @@ func TestProfilePostgresConcurrentClaimsAndCancellationFenceCompletion(t *testin
 	}
 	require.Len(t, claims, 1, "concurrent claim has exactly one winner")
 	require.NoError(t, f.component.Cancel(t.Context(), testSelector))
-	require.ErrorIs(t, f.component.complete(t.Context(), testSelector, claims[0], f.fresh, f.session), ErrDenied)
+	require.ErrorIs(t, f.component.complete(t.Context(), testSelector, claims[0], f.fresh, f.session, completedNative), ErrDenied)
 	require.Empty(t, f.snapshot(t))
 }
 
@@ -213,6 +216,7 @@ func TestProfilePostgresSelectionAndCompletionRaceHasOneCASWinner(t *testing.T) 
 	f.capture(t)
 	claim, err := f.component.Claim(t.Context(), testSelector, testNative, f.fresh)
 	require.NoError(t, err)
+	require.NoError(t, f.component.arm(t.Context(), testSelector, claim, completedNative, f.fresh))
 	start := make(chan struct{})
 	results := make(chan error, 2)
 	var wg sync.WaitGroup
@@ -222,7 +226,7 @@ func TestProfilePostgresSelectionAndCompletionRaceHasOneCASWinner(t *testing.T) 
 	})
 	wg.Go(func() {
 		<-start
-		results <- f.component.complete(t.Context(), testSelector, claim, f.fresh, f.session)
+		results <- f.component.complete(t.Context(), testSelector, claim, f.fresh, f.session, completedNative)
 	})
 	close(start)
 	wg.Wait()
@@ -243,4 +247,68 @@ func TestProfilePostgresSelectionAndCompletionRaceHasOneCASWinner(t *testing.T) 
 	} else {
 		require.Equal(t, remoteDisplay, f.snapshot(t), "completion winner preserves previous field selection")
 	}
+}
+
+func TestProfilePostgresArmedCompletionPinsNewNativeAndPreservesSnapshotOnDenial(t *testing.T) {
+	for _, kind := range []string{"native", "claim", "logout", "relink", "membership", "selection", "blocked"} {
+		t.Run(kind, func(t *testing.T) {
+			f := newProfileFixture(t)
+			f.prepare(t)
+			_, err := f.auth.Runtime().Database().ExecContext(t.Context(),
+				"UPDATE admin_profile_presentations SET display_name=$2 WHERE subject_id=$1",
+				f.old.LocalSubject, "previous verified snapshot")
+			require.NoError(t, err)
+			f.capture(t)
+			claim, err := f.component.Claim(t.Context(), testSelector, testNative, f.fresh)
+			require.NoError(t, err)
+			require.NoError(t, f.component.arm(t.Context(), testSelector, claim, completedNative, f.fresh))
+			require.ErrorIs(t, f.component.arm(t.Context(), testSelector, claim, completedNative, f.fresh), ErrDenied)
+			native := completedNative
+			switch kind {
+			case "native":
+				native = host.CSRFSessionBinding("intervening-same-subject-login")
+			case "claim":
+				claim = "another-completion-claim"
+			case "logout":
+				require.NoError(t, f.auth.Runtime().Logout(t.Context(), f.old.LocalSubject, f.session))
+			case "relink":
+				_, err = f.auth.Runtime().Database().ExecContext(t.Context(),
+					"UPDATE auth_identity_links SET id=$2 WHERE id=$1", f.old.LinkID, uuid.NewString())
+				require.NoError(t, err)
+			case "membership":
+				_, err = f.auth.Runtime().Database().ExecContext(t.Context(),
+					"UPDATE administrations SET deleted_at=$2 WHERE subject_id=$1", f.old.LocalSubject, time.Now())
+				require.NoError(t, err)
+			case "blocked":
+				_, err = f.auth.Runtime().Database().ExecContext(t.Context(),
+					"UPDATE auth_subjects SET status=$2 WHERE id=$1", f.old.LocalSubject, goauth.SubjectStatusSuspended)
+				require.NoError(t, err)
+			case "selection":
+				require.NoError(t, f.component.selectFields(t.Context(), f.fresh, "1", Fields{Name: true}, f.session))
+			}
+			require.Error(t, f.component.complete(t.Context(), testSelector, claim, f.fresh, f.session, native))
+			require.Equal(t, "previous verified snapshot", f.snapshot(t))
+		})
+	}
+}
+
+func TestProfilePostgresExpiredPendingDeniesBeforeLazyCleanup(t *testing.T) {
+	f := newProfileFixture(t)
+	f.prepare(t)
+	f.capture(t)
+	claim, err := f.component.Claim(t.Context(), testSelector, testNative, f.fresh)
+	require.NoError(t, err)
+	require.NoError(t, f.component.arm(t.Context(), testSelector, claim, completedNative, f.fresh))
+	_, err = f.auth.Runtime().Database().ExecContext(t.Context(), `UPDATE admin_profile_presentations
+ SET pending=jsonb_set(pending,'{until}',to_jsonb($2::text)) WHERE subject_id=$1`,
+		f.old.LocalSubject, time.Now().Add(-time.Second).UTC().Format(time.RFC3339Nano))
+	require.NoError(t, err)
+	require.ErrorIs(t, f.component.complete(t.Context(), testSelector, claim, f.fresh, f.session, completedNative), ErrDenied)
+	require.Empty(t, f.snapshot(t), "expiry denies even before physical cleanup")
+	_, err = f.component.read(t.Context(), f.fresh)
+	require.NoError(t, err)
+	var empty bool
+	require.NoError(t, f.auth.Runtime().Database().QueryRowContext(t.Context(),
+		"SELECT pending='{}'::jsonb FROM admin_profile_presentations WHERE subject_id=$1", f.old.LocalSubject).Scan(&empty))
+	require.True(t, empty, "authenticated presentation read lazily clears expired pending data")
 }

@@ -21,6 +21,7 @@ const (
 	componentKey  = "profile-source"
 	refreshSuffix = "/refresh"
 	cancelSuffix  = "/cancel"
+	completionSuffix = "/complete"
 )
 
 type Config struct {
@@ -124,6 +125,7 @@ func (h *handler) RegisterGroupRoutes(router fiber.Router, _ ...fiber.Handler) {
 	router.Post(sourcePath, h.selectSource)
 	router.Post(sourcePath+refreshSuffix, h.refresh)
 	router.Post(sourcePath+cancelSuffix, h.cancel)
+	router.Post(sourcePath+completionSuffix, h.complete)
 }
 
 func (h *handler) page(ctx fiber.Ctx) error {
@@ -139,6 +141,7 @@ func (h *handler) page(ctx fiber.Ctx) error {
 	}
 	return h.app.Render(ctx, "profile/SourcePage", map[string]any{
 		"presentation": view, "avatarAvailable": len(h.component.avatars.hosts) > 0,
+		"completionReady": !authcore.RolePreviewActive(ctx) && h.component.completionReady(ctx, h.app),
 	})
 }
 
@@ -169,6 +172,8 @@ func (h *handler) selectSource(ctx fiber.Ctx) error {
 	if err = h.component.selectFields(ctx, binding, in.Version, in.Fields, admin.AuthSessionID); err != nil {
 		return presentationError(err)
 	}
+	clearCompletionCookie(ctx)
+	clearRefreshCookie(ctx)
 	return h.app.Redirect(ctx, sourcePath)
 }
 
@@ -196,6 +201,23 @@ func (h *handler) cancel(ctx fiber.Ctx) error {
 		return fiber.ErrServiceUnavailable
 	}
 	clearRefreshCookie(ctx)
+	clearCompletionCookie(ctx)
+	return h.app.Redirect(ctx, sourcePath)
+}
+
+func (h *handler) complete(ctx fiber.Ctx) error {
+	defer clearCompletionCookie(ctx)
+	defer clearRefreshCookie(ctx)
+	in, binding, err := h.input(ctx)
+	if err != nil { return fiber.ErrForbidden }
+	selector, err := Selector(ctx)
+	if err != nil { return fiber.ErrForbidden }
+	claim, err := completionClaim(ctx)
+	if err != nil || claim == "" { return fiber.ErrForbidden }
+	view, err := h.component.read(ctx, binding)
+	if err != nil { return fiber.ErrServiceUnavailable }
+	if view.Version != in.Version { return fiber.ErrConflict }
+	if err = h.component.Complete(ctx, h.app, selector, claim); err != nil { return presentationError(err) }
 	return h.app.Redirect(ctx, sourcePath)
 }
 

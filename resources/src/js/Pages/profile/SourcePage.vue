@@ -7,6 +7,8 @@
         Локальные значения сохраняются. Отметьте только поля, которые хотите показывать из AuthHub.
       </p>
       <p>Логин здесь является подписью профиля и не меняет способ входа, привязку или права.</p>
+      <p v-if="completionUnavailable" role="alert">Автоматическое завершение недоступно. Профиль не изменён.</p>
+      <p v-if="completionReady && !completionUnavailable" role="status">Завершаем подтверждённое обновление. При ошибке автоматического повтора не будет.</p>
       <p v-if="!presentation.version">Сначала явно войдите через связанный SSO-аккаунт.</p>
       <form v-else class="space-y-3" @submit.prevent="save">
         <label class="block"
@@ -51,6 +53,7 @@
 
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3'
+import { onMounted, ref } from 'vue'
 import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -61,15 +64,32 @@ type Presentation = {
   updatedAt: string
   fields: { name: boolean; login: boolean; avatar: boolean }
 }
-const props = defineProps<{ presentation: Presentation; avatarAvailable: boolean }>()
+const props = defineProps<{ presentation: Presentation; avatarAvailable: boolean; completionReady?: boolean }>()
 const form = useForm({
   version: props.presentation.version,
   fields: { ...props.presentation.fields },
+})
+const completionAttemptKey = 'goadmin.profile.completion-attempted'
+const completionUnavailable = ref(false)
+// Consume navigation intent before the request; reload/back never auto-retries.
+// No selector, claim or session identifier enters page props or JS.
+onMounted(() => {
+  if (!props.completionReady) return
+  try {
+    window.history.replaceState(window.history.state, '', '/profile-source')
+    if (window.sessionStorage.getItem(completionAttemptKey)) return
+    window.sessionStorage.setItem(completionAttemptKey, '1')
+  } catch {
+    completionUnavailable.value = true
+    return
+  }
+  form.post('/profile-source/complete', { preserveState: 'errors' })
 })
 function save() {
   form.post('/profile-source', { preserveState: 'errors' })
 }
 function refresh() {
+  try { window.sessionStorage.removeItem(completionAttemptKey) } catch { /* Completion will fail closed. */ }
   form.post('/profile-source/refresh', { preserveState: 'errors' })
 }
 function cancel() {
