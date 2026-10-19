@@ -2,6 +2,9 @@
   <AppHead :title="props.title" />
 
   <div class="max-w-4xl mx-auto space-y-8">
+    <p v-if="remote?.enabled">
+      <Link href="/profile-source">Источник имени, логина и аватара</Link>
+    </p>
     <!-- Заголовок с основной информацией -->
     <Card class="overflow-hidden">
       <div class="px-6 py-8 sm:px-8">
@@ -12,8 +15,9 @@
               class="relative h-24 w-24 rounded-full overflow-hidden shadow-lg bg-gradient-to-br from-primary to-primary-light flex items-center justify-center"
             >
               <img
-                v-if="uploads && avatarUrl"
+                v-if="(uploads || remote?.fields.avatar) && avatarUrl"
                 :src="avatarUrl"
+                referrerpolicy="no-referrer"
                 :alt="t('Аватар профиля')"
                 class="h-full w-full object-cover"
               />
@@ -35,9 +39,9 @@
               </AppBadge>
             </div>
 
-            <div v-if="props.data.username" class="flex items-center text-text-secondary mb-4">
+            <div v-if="displayLogin" class="flex items-center text-text-secondary mb-4">
               <User class="h-4 w-4 mr-2" />
-              <span class="font-medium">@{{ props.data.username }}</span>
+              <span class="font-medium">@{{ displayLogin }}</span>
             </div>
 
             <div class="flex flex-wrap gap-4 text-sm text-text-secondary">
@@ -131,9 +135,7 @@
             <span class="text-text-secondary font-medium">{{ t('Имя пользователя') }}</span>
             <div class="flex items-center">
               <AtSign class="h-4 w-4 text-text-tertiary mr-2" />
-              <span class="break-all text-text-primary">{{
-                props.data.username || t('Не указано')
-              }}</span>
+              <span class="break-all text-text-primary">{{ displayLogin || t('Не указано') }}</span>
             </div>
           </div>
         </CardContent>
@@ -182,7 +184,7 @@ import { t, locale } from '@/i18n'
 import { computed, ref, watch, type PropType } from 'vue'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 import AppHead from '@/components/layout/AppHead.vue'
-import { Link } from '@inertiajs/vue3'
+import { Link, usePage } from '@inertiajs/vue3'
 import { useAdminProfileStore } from '@/stores/adminProfile'
 import { FormImageUploader } from '@/components/form'
 import AppBadge from '@/components/ui/AppBadge.vue'
@@ -232,6 +234,25 @@ const props = defineProps({
   },
 })
 
+type RemoteProfile = {
+  enabled: boolean
+  available: boolean
+  name: string
+  login: string
+  avatarUrl: string
+  fields: { name: boolean; login: boolean; avatar: boolean }
+}
+const page = usePage()
+const remote = computed(
+  () =>
+    (page.props.authuser as { profilePresentation?: RemoteProfile } | undefined)
+      ?.profilePresentation,
+)
+const displayLogin = computed(() =>
+  remote.value?.available && remote.value.fields.login && remote.value.login
+    ? remote.value.login
+    : props.data.username,
+)
 const profileStore = useAdminProfileStore()
 
 const getPreview = (): ImagePreview | null => props.admin_preview ?? props.data.preview ?? null
@@ -246,7 +267,10 @@ const avatarAspectRatioOptions: CropperAspectRatioOption[] = [
 ]
 
 const avatarUrl = computed({
-  get: () => profileStore.avatarUrl,
+  get: () =>
+    remote.value?.available && remote.value.fields.avatar && remote.value.avatarUrl
+      ? remote.value.avatarUrl
+      : profileStore.avatarUrl,
   set: (value: string | null) => profileStore.setAvatarUrl(value),
 })
 
@@ -312,6 +336,8 @@ watch(
 
 // Вычисляемые свойства
 const fullName = computed(() => {
+  if (remote.value?.available && remote.value.fields.name && remote.value.name)
+    return remote.value.name
   return `${props.data.name || ''} ${props.data.lastName || ''}`.trim() || t('Без имени')
 })
 

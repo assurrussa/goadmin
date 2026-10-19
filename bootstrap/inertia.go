@@ -20,6 +20,7 @@ import (
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 	"github.com/assurrussa/goadmin/internal/auth/browsercookie"
 	csrfservice "github.com/assurrussa/goadmin/internal/csrf"
+	"github.com/assurrussa/goadmin/internal/presentation"
 	"github.com/assurrussa/goadmin/services/adminservice"
 	"github.com/assurrussa/goadmin/views"
 )
@@ -138,13 +139,25 @@ func loadAuthUser(servicePreviewLoader FileLoader, log logger.Logger) func(ctx c
 			}
 		}
 
+		var profile presentation.View
+		if c, ok := ctx.(fiber.Ctx); ok {
+			profile, _ = presentation.Current(c)
+		}
+		name, lastName := admin.Name, admin.LastName
+		if profile.Available && profile.Fields.Name && profile.Name != "" {
+			name, lastName = profile.Name, ""
+		}
+		if profile.Available && profile.Fields.Avatar && profile.AvatarURL != "" {
+			avatarURL = profile.AvatarURL
+		}
 		return map[string]any{
-			"id":        admin.ID,
-			"name":      admin.Name,
-			"lastName":  admin.LastName,
-			"email":     admin.Email,
-			"roles":     admin.Roles,
-			"avatarUrl": avatarURL,
+			"profilePresentation": profile,
+			"id":                  admin.ID,
+			"name":                name,
+			"lastName":            lastName,
+			"email":               admin.Email,
+			"roles":               admin.Roles,
+			"avatarUrl":           avatarURL,
 		}, nil
 	}
 }

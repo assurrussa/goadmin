@@ -61,6 +61,7 @@
               <img
                 v-if="avatarUrl"
                 :src="avatarUrl"
+                referrerpolicy="no-referrer"
                 :alt="t('Аватар администратора')"
                 class="h-full w-full object-cover"
               />

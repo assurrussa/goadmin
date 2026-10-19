@@ -562,8 +562,22 @@
       "_AppInput.vue_vue_type_script_setup_true_lang-CIvYZVst.js"
     ]
   },
+  "src/js/Pages/profile/SourcePage.vue": {
+    "file": "js/SourcePage-CQZFeuwz.js",
+    "name": "SourcePage",
+    "src": "src/js/Pages/profile/SourcePage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_editor-Dn0fTmeM.js",
+      "src/js/app.ts",
+      "_AppHead.vue_vue_type_script_setup_true_lang-BYitHUQs.js",
+      "_PageActionBar.vue_vue_type_script_setup_true_lang-BpznI7Wy.js",
+      "_Card.vue_vue_type_script_setup_true_lang-B6H8P_Sq.js",
+      "_CardContent.vue_vue_type_script_setup_true_lang-Cd8uOSWH.js"
+    ]
+  },
   "src/js/Pages/profile/ViewPage.vue": {
-    "file": "js/ViewPage-BAKjALcr.js",
+    "file": "js/ViewPage-YRDQnc4J.js",
     "name": "ViewPage",
     "src": "src/js/Pages/profile/ViewPage.vue",
     "isDynamicEntry": true,
@@ -844,6 +858,7 @@
       "src/js/Pages/permissions/IndexPage.vue",
       "src/js/Pages/profile/EditPage.vue",
       "src/js/Pages/profile/SettingsPage.vue",
+      "src/js/Pages/profile/SourcePage.vue",
       "src/js/Pages/profile/ViewPage.vue",
       "src/js/Pages/queues/ActivePage.vue",
       "src/js/Pages/queues/FailedPage.vue",

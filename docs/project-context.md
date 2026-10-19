@@ -47,6 +47,7 @@ Stable reusable feature packages:
 - `github.com/assurrussa/goadmin/features/operations`
 - `github.com/assurrussa/goadmin/features/access`
 - `github.com/assurrussa/goadmin/features/admission`
+- `github.com/assurrussa/goadmin/features/profile`
 - `github.com/assurrussa/goadmin/features/jobs`
 - `github.com/assurrussa/goadmin/features/uploads`
 - `github.com/assurrussa/goadmin/features/queues`
@@ -601,3 +602,11 @@ link. The default configuration retains the original routes.
 ## Optional SSO admission candidate
 
 See [sso-admission.md](sso-admission.md). Off by default; exact issuer/subject and project grant precede scoped pending enrollment or a single-use invitation. No email autolink or local password. Explicit per-role grant permissions are checked transactionally. Existing native admission remains mandatory; source-mode GoAuth dependency support is required before enabling this candidate.
+
+## Optional profile presentation candidate
+
+The supported `github.com/assurrussa/goadmin/features/profile` package adds
+explicit per-field SSO presentation, local by default, and a manual-refresh
+contract. It is an unreleased candidate; no release readiness is claimed.
+See [profile presentation](profile-presentation.md) for source pins,
+privacy, migration and host callback/native-login sequencing.

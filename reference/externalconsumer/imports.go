@@ -8,6 +8,7 @@ import (
 	_ "github.com/assurrussa/goadmin/features/jobs"
 	_ "github.com/assurrussa/goadmin/features/notifications"
 	_ "github.com/assurrussa/goadmin/features/operations"
+	_ "github.com/assurrussa/goadmin/features/profile"
 	_ "github.com/assurrussa/goadmin/features/queues"
 	_ "github.com/assurrussa/goadmin/features/realtime"
 	_ "github.com/assurrussa/goadmin/features/uploads"
