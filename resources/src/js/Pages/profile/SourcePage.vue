@@ -7,8 +7,12 @@
         Локальные значения сохраняются. Отметьте только поля, которые хотите показывать из AuthHub.
       </p>
       <p>Логин здесь является подписью профиля и не меняет способ входа, привязку или права.</p>
-      <p v-if="completionUnavailable" role="alert">Автоматическое завершение недоступно. Профиль не изменён.</p>
-      <p v-if="completionReady && !completionUnavailable" role="status">Завершаем подтверждённое обновление. При ошибке автоматического повтора не будет.</p>
+      <p v-if="completionUnavailable" role="alert">
+        Автоматическое завершение недоступно. Профиль не изменён.
+      </p>
+      <p v-if="completionReady && !completionUnavailable" role="status">
+        Завершаем подтверждённое обновление. При ошибке автоматического повтора не будет.
+      </p>
       <p v-if="!presentation.version">Сначала явно войдите через связанный SSO-аккаунт.</p>
       <form v-else class="space-y-3" @submit.prevent="save">
         <label class="block"
@@ -64,7 +68,11 @@ type Presentation = {
   updatedAt: string
   fields: { name: boolean; login: boolean; avatar: boolean }
 }
-const props = defineProps<{ presentation: Presentation; avatarAvailable: boolean; completionReady?: boolean }>()
+const props = defineProps<{
+  presentation: Presentation
+  avatarAvailable: boolean
+  completionReady?: boolean
+}>()
 const form = useForm({
   version: props.presentation.version,
   fields: { ...props.presentation.fields },
@@ -89,7 +97,11 @@ function save() {
   form.post('/profile-source', { preserveState: 'errors' })
 }
 function refresh() {
-  try { window.sessionStorage.removeItem(completionAttemptKey) } catch { /* Completion will fail closed. */ }
+  try {
+    window.sessionStorage.removeItem(completionAttemptKey)
+  } catch {
+    /* Completion will fail closed. */
+  }
   form.post('/profile-source/refresh', { preserveState: 'errors' })
 }
 function cancel() {

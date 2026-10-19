@@ -163,6 +163,7 @@ The supported embedding surface is intentionally narrow:
 - `github.com/assurrussa/goadmin/features/operations`
 - `github.com/assurrussa/goadmin/features/access`
 - `github.com/assurrussa/goadmin/features/admission`
+- `github.com/assurrussa/goadmin/features/profile`
 - `github.com/assurrussa/goadmin/features/jobs`
 - `github.com/assurrussa/goadmin/features/uploads`
 - `github.com/assurrussa/goadmin/features/queues`

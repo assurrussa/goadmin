@@ -48,7 +48,11 @@ afterEach(() => {
   apps.splice(0).forEach((app) => app.unmount())
   state.pageProps = {}
   state.forms = []
-  try { window.sessionStorage.clear() } catch { /* No state to clean in opaque test origins. */ }
+  try {
+    window.sessionStorage.clear()
+  } catch {
+    /* No state to clean in opaque test origins. */
+  }
   setAdminCapabilities({ props: {} })
 })
 
@@ -232,12 +236,15 @@ it('falls back locally for unavailable or unselected source snapshots', () => {
   expect(root.querySelector('img[src^="https://images.example.test"]')).toBeNull()
 })
 
-
 it('automatically completes only the armed native navigation once without secrets', () => {
   const replace = vi.spyOn(window.history, 'replaceState')
   const root = document.createElement('div')
   const app = createApp(ProfileSource, {
-    presentation: { version: '2', updatedAt: '', fields: { name: false, login: false, avatar: false } },
+    presentation: {
+      version: '2',
+      updatedAt: '',
+      fields: { name: false, login: false, avatar: false },
+    },
     avatarAvailable: false,
     completionReady: true,
   })
@@ -245,7 +252,9 @@ it('automatically completes only the armed native navigation once without secret
   app.mount(root)
   expect(replace).toHaveBeenCalledWith(window.history.state, '', '/profile-source')
   expect(state.forms[0].post).toHaveBeenCalledTimes(1)
-  expect(state.forms[0].post).toHaveBeenCalledWith('/profile-source/complete', { preserveState: 'errors' })
+  expect(state.forms[0].post).toHaveBeenCalledWith('/profile-source/complete', {
+    preserveState: 'errors',
+  })
   expect(Object.keys(state.forms[0])).not.toContain('claim')
   expect(Object.keys(state.forms[0])).not.toContain('selector')
   replace.mockRestore()
@@ -255,7 +264,11 @@ it('does not auto-retry completion after an interrupted attempt or history resto
   window.sessionStorage.setItem('goadmin.profile.completion-attempted', '1')
   const root = document.createElement('div')
   const app = createApp(ProfileSource, {
-    presentation: { version: '2', updatedAt: '', fields: { name: false, login: false, avatar: false } },
+    presentation: {
+      version: '2',
+      updatedAt: '',
+      fields: { name: false, login: false, avatar: false },
+    },
     avatarAvailable: false,
     completionReady: true,
   })
