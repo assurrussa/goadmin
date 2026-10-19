@@ -182,8 +182,10 @@ func (c *Component) Arm(ctx fiber.Ctx, selector, claim, native string, fresh hos
 	if err := c.arm(ctx, selector, claim, native, fresh); err != nil {
 		return err
 	}
-	ctx.Cookie(&fiber.Cookie{Name: completionCookie, Value: claim, Path: "/", Secure: true,
-		HTTPOnly: true, SameSite: fiber.CookieSameSiteLaxMode, MaxAge: int(refreshLifetime.Seconds())})
+	ctx.Cookie(&fiber.Cookie{
+		Name: completionCookie, Value: claim, Path: "/", Secure: true,
+		HTTPOnly: true, SameSite: fiber.CookieSameSiteLaxMode, MaxAge: int(refreshLifetime.Seconds()),
+	})
 	return nil
 }
 
@@ -326,8 +328,10 @@ func completionClaim(ctx fiber.Ctx) (string, error) {
 }
 
 func clearCompletionCookie(c fiber.Ctx) {
-	c.Cookie(&fiber.Cookie{Name: completionCookie, Value: "", Path: "/", Secure: true,
-		HTTPOnly: true, SameSite: fiber.CookieSameSiteLaxMode, MaxAge: -1})
+	c.Cookie(&fiber.Cookie{
+		Name: completionCookie, Value: "", Path: "/", Secure: true,
+		HTTPOnly: true, SameSite: fiber.CookieSameSiteLaxMode, MaxAge: -1,
+	})
 }
 
 func clearRefreshCookie(c fiber.Ctx) {

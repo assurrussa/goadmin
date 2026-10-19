@@ -20,7 +20,13 @@ import (
 	"github.com/assurrussa/goadmin/tests"
 )
 
-const remoteDisplay = "Remote display"
+const (
+	remoteDisplay  = "Remote display"
+	logoutCase     = "logout"
+	selectionCase  = "selection"
+	relinkCase     = "relink"
+	membershipCase = "membership"
+)
 
 var completedNative = host.CSRFSessionBinding("newly-published-native-cookie")
 
@@ -124,7 +130,7 @@ func TestProfilePostgresCallbackNativeCommitAndSingleConsumption(t *testing.T) {
 }
 
 func TestProfilePostgresWrongBrowserPinsExpirySelectionAndLogoutDeny(t *testing.T) {
-	for _, kind := range []string{"browser", "identity", "expired", "selection", "logout", "relink", "membership"} {
+	for _, kind := range []string{"browser", "identity", "expired", selectionCase, logoutCase, relinkCase, membershipCase} {
 		t.Run(kind, func(t *testing.T) {
 			f := newProfileFixture(t)
 			f.prepare(t)
@@ -152,21 +158,21 @@ func TestProfilePostgresWrongBrowserPinsExpirySelectionAndLogoutDeny(t *testing.
 				require.NoError(t, err)
 				_, err = f.component.Claim(t.Context(), testSelector, testNative, f.fresh)
 				require.ErrorIs(t, err, ErrDenied)
-			case "selection":
+			case selectionCase:
 				require.NoError(t, f.component.selectFields(t.Context(), f.old, "1", Fields{Name: true}, f.session))
 				_, err := f.component.Claim(t.Context(), testSelector, testNative, f.fresh)
 				require.ErrorIs(t, err, ErrDenied)
-			case "logout":
+			case logoutCase:
 				require.NoError(t, f.auth.Runtime().Logout(t.Context(), f.old.LocalSubject, f.session))
 				_, err := f.component.Claim(t.Context(), testSelector, testNative, f.fresh)
 				require.ErrorIs(t, err, ErrDenied)
-			case "relink":
+			case relinkCase:
 				_, err := f.auth.Runtime().Database().ExecContext(t.Context(),
 					"UPDATE auth_identity_links SET id=$2 WHERE id=$1", f.old.LinkID, uuid.NewString())
 				require.NoError(t, err)
 				_, err = f.component.Claim(t.Context(), testSelector, testNative, f.fresh)
 				require.ErrorIs(t, err, ErrDenied)
-			case "membership":
+			case membershipCase:
 				_, err := f.auth.Runtime().Database().ExecContext(t.Context(),
 					"UPDATE administrations SET deleted_at=$2 WHERE subject_id=$1", f.old.LocalSubject, time.Now())
 				require.NoError(t, err)
@@ -250,7 +256,7 @@ func TestProfilePostgresSelectionAndCompletionRaceHasOneCASWinner(t *testing.T) 
 }
 
 func TestProfilePostgresArmedCompletionPinsNewNativeAndPreservesSnapshotOnDenial(t *testing.T) {
-	for _, kind := range []string{"native", "claim", "logout", "relink", "membership", "selection", "blocked"} {
+	for _, kind := range []string{"native", "claim", logoutCase, relinkCase, membershipCase, selectionCase, "blocked"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newProfileFixture(t)
 			f.prepare(t)
@@ -269,13 +275,13 @@ func TestProfilePostgresArmedCompletionPinsNewNativeAndPreservesSnapshotOnDenial
 				native = host.CSRFSessionBinding("intervening-same-subject-login")
 			case "claim":
 				claim = "another-completion-claim"
-			case "logout":
+			case logoutCase:
 				require.NoError(t, f.auth.Runtime().Logout(t.Context(), f.old.LocalSubject, f.session))
-			case "relink":
+			case relinkCase:
 				_, err = f.auth.Runtime().Database().ExecContext(t.Context(),
 					"UPDATE auth_identity_links SET id=$2 WHERE id=$1", f.old.LinkID, uuid.NewString())
 				require.NoError(t, err)
-			case "membership":
+			case membershipCase:
 				_, err = f.auth.Runtime().Database().ExecContext(t.Context(),
 					"UPDATE administrations SET deleted_at=$2 WHERE subject_id=$1", f.old.LocalSubject, time.Now())
 				require.NoError(t, err)
@@ -283,7 +289,7 @@ func TestProfilePostgresArmedCompletionPinsNewNativeAndPreservesSnapshotOnDenial
 				_, err = f.auth.Runtime().Database().ExecContext(t.Context(),
 					"UPDATE auth_subjects SET status=$2 WHERE id=$1", f.old.LocalSubject, goauth.SubjectStatusSuspended)
 				require.NoError(t, err)
-			case "selection":
+			case selectionCase:
 				require.NoError(t, f.component.selectFields(t.Context(), f.fresh, "1", Fields{Name: true}, f.session))
 			}
 			require.Error(t, f.component.complete(t.Context(), testSelector, claim, f.fresh, f.session, native))
