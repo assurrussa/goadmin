@@ -17,10 +17,10 @@ import (
 )
 
 const (
-	sourcePath    = "/profile-source"
-	componentKey  = "profile-source"
-	refreshSuffix = "/refresh"
-	cancelSuffix  = "/cancel"
+	sourcePath       = "/profile-source"
+	componentKey     = "profile-source"
+	refreshSuffix    = "/refresh"
+	cancelSuffix     = "/cancel"
 	completionSuffix = "/complete"
 )
 
@@ -209,15 +209,27 @@ func (h *handler) complete(ctx fiber.Ctx) error {
 	defer clearCompletionCookie(ctx)
 	defer clearRefreshCookie(ctx)
 	in, binding, err := h.input(ctx)
-	if err != nil { return fiber.ErrForbidden }
+	if err != nil {
+		return fiber.ErrForbidden
+	}
 	selector, err := Selector(ctx)
-	if err != nil { return fiber.ErrForbidden }
+	if err != nil {
+		return fiber.ErrForbidden
+	}
 	claim, err := completionClaim(ctx)
-	if err != nil || claim == "" { return fiber.ErrForbidden }
+	if err != nil || claim == "" {
+		return fiber.ErrForbidden
+	}
 	view, err := h.component.read(ctx, binding)
-	if err != nil { return fiber.ErrServiceUnavailable }
-	if view.Version != in.Version { return fiber.ErrConflict }
-	if err = h.component.Complete(ctx, h.app, selector, claim); err != nil { return presentationError(err) }
+	if err != nil {
+		return fiber.ErrServiceUnavailable
+	}
+	if view.Version != in.Version {
+		return fiber.ErrConflict
+	}
+	if err = h.component.Complete(ctx, h.app, selector, claim); err != nil {
+		return presentationError(err)
+	}
 	return h.app.Redirect(ctx, sourcePath)
 }
 

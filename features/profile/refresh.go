@@ -15,28 +15,28 @@ import (
 )
 
 const (
-	refreshCookie   = "__Host-goadmin_profile_refresh"
-	refreshLifetime = 2 * time.Minute
-	phaseStarted    = "started"
-	phaseCandidate  = "candidate"
-	phaseClaimed    = "claimed"
-	phaseArmed = "armed"
+	refreshCookie    = "__Host-goadmin_profile_refresh"
+	refreshLifetime  = 2 * time.Minute
+	phaseStarted     = "started"
+	phaseCandidate   = "candidate"
+	phaseClaimed     = "claimed"
+	phaseArmed       = "armed"
 	completionCookie = "__Host-goadmin_profile_completion"
 )
 
 type pending struct {
-	Selector    string               `json:"selector,omitempty"`
-	Native      string               `json:"native,omitempty"`
-	AuthSession string               `json:"authSession,omitempty"`
-	Version     int64                `json:"version,omitempty"`
-	Started     time.Time            `json:"started,omitempty"`
-	Until       time.Time            `json:"until,omitempty"`
-	Phase       string               `json:"phase,omitempty"`
-	Original    host.ExternalBinding `json:"original,omitempty"`
-	Fresh       host.ExternalBinding `json:"fresh,omitempty"`
-	Snapshot    Snapshot             `json:"snapshot,omitempty"`
-	CompletionNative string `json:"completionNative,omitempty"`
-	Claim       string               `json:"claim,omitempty"`
+	Selector         string               `json:"selector,omitempty"`
+	Native           string               `json:"native,omitempty"`
+	AuthSession      string               `json:"authSession,omitempty"`
+	Version          int64                `json:"version,omitempty"`
+	Started          time.Time            `json:"started,omitempty"`
+	Until            time.Time            `json:"until,omitempty"`
+	Phase            string               `json:"phase,omitempty"`
+	Original         host.ExternalBinding `json:"original,omitempty"`
+	Fresh            host.ExternalBinding `json:"fresh,omitempty"`
+	Snapshot         Snapshot             `json:"snapshot,omitempty"`
+	CompletionNative string               `json:"completionNative,omitempty"`
+	Claim            string               `json:"claim,omitempty"`
 }
 
 func digest(value string) string {
@@ -179,19 +179,27 @@ func (c *Component) Claim(ctx context.Context, selector, native string, fresh ho
 // uniquely server-issued native response cookie, never an incoming browser value.
 // It does not apply the snapshot or re-read the old request's native session.
 func (c *Component) Arm(ctx fiber.Ctx, selector, claim, native string, fresh host.ExternalBinding) error {
-	if err := c.arm(ctx, selector, claim, native, fresh); err != nil { return err }
+	if err := c.arm(ctx, selector, claim, native, fresh); err != nil {
+		return err
+	}
 	ctx.Cookie(&fiber.Cookie{Name: completionCookie, Value: claim, Path: "/", Secure: true,
 		HTTPOnly: true, SameSite: fiber.CookieSameSiteLaxMode, MaxAge: int(refreshLifetime.Seconds())})
 	return nil
 }
 
 func (c *Component) arm(ctx context.Context, selector, claim, native string, fresh host.ExternalBinding) error {
-	if len(native) != 64 || claim == "" || len(claim) > 128 { return ErrDenied }
-	if _, err := hex.DecodeString(native); err != nil { return ErrDenied }
+	if len(native) != 64 || claim == "" || len(claim) > 128 {
+		return ErrDenied
+	}
+	if _, err := hex.DecodeString(native); err != nil {
+		return ErrDenied
+	}
 	return c.withIntent(ctx, selector, fresh, func(ctx context.Context, ex postgres.SQLExecutor, subject string, r record) error {
 		p := r.Pending
 		if p.Phase != phaseClaimed || p.Claim != digest(claim) || !time.Now().Before(p.Until) ||
-			p.Native == native || !sameProof(p.Fresh, fresh) { return ErrDenied }
+			p.Native == native || !sameProof(p.Fresh, fresh) {
+			return ErrDenied
+		}
 		p.Phase, p.CompletionNative = phaseArmed, native
 		return storePending(ctx, ex, subject, p)
 	})
@@ -201,22 +209,34 @@ func (c *Component) arm(ctx context.Context, selector, claim, native string, fre
 // browser accepted the newly issued native cookie. The claim never enters JS.
 func (c *Component) Complete(ctx fiber.Ctx, app *host.App, selector, claim string) error {
 	admin, binding, err := c.current(ctx, app)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	return c.complete(ctx, selector, claim, binding, admin.AuthSessionID, host.CSRFSessionBinding(admin.SessionID))
 }
 
 func (c *Component) completionReady(ctx fiber.Ctx, app *host.App) bool {
-	if ctx.Query("complete") != "1" { return false }
+	if ctx.Query("complete") != "1" {
+		return false
+	}
 	admin, binding, err := c.current(ctx, app)
-	if err != nil { return false }
+	if err != nil {
+		return false
+	}
 	selector, err := Selector(ctx)
-	if err != nil { return false }
+	if err != nil {
+		return false
+	}
 	claim, err := completionClaim(ctx)
-	if err != nil || claim == "" { return false }
+	if err != nil || claim == "" {
+		return false
+	}
 	err = c.withIntent(ctx, selector, binding, func(_ context.Context, _ postgres.SQLExecutor, _ string, r record) error {
 		p := r.Pending
 		if p.Phase != phaseArmed || p.Claim != digest(claim) || !time.Now().Before(p.Until) ||
-			p.CompletionNative != host.CSRFSessionBinding(admin.SessionID) || !sameProof(p.Fresh, binding) { return ErrDenied }
+			p.CompletionNative != host.CSRFSessionBinding(admin.SessionID) || !sameProof(p.Fresh, binding) {
+			return ErrDenied
+		}
 		return nil
 	})
 	return err == nil
@@ -286,15 +306,22 @@ func RequestSelector(request *http.Request) (string, error) {
 func uniqueCookie(request *http.Request, name string) (string, error) {
 	count, value := 0, ""
 	for _, cookie := range request.Cookies() {
-		if cookie.Name == name { count++; value = cookie.Value }
+		if cookie.Name == name {
+			count++
+			value = cookie.Value
+		}
 	}
-	if count > 1 || len(value) > 128 { return "", ErrDenied }
+	if count > 1 || len(value) > 128 {
+		return "", ErrDenied
+	}
 	return value, nil
 }
 
 func completionClaim(ctx fiber.Ctx) (string, error) {
 	headers := make(http.Header)
-	for _, raw := range ctx.Request().Header.PeekAll(fiber.HeaderCookie) { headers.Add(fiber.HeaderCookie, string(raw)) }
+	for _, raw := range ctx.Request().Header.PeekAll(fiber.HeaderCookie) {
+		headers.Add(fiber.HeaderCookie, string(raw))
+	}
 	return uniqueCookie(&http.Request{Header: headers}, completionCookie)
 }
 
