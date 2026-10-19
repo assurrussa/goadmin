@@ -1,6 +1,6 @@
 # Frontend dependency advisory review
 
-Reviewed on 2026-10-10 for the next release. The current
+Reviewed on 2026-10-19 for the next release. The current
 `npm audit --audit-level=high --json` command completes with exit status 0:
 0 high, 0 critical and 35 moderate dependency records. Those records represent
 one unique advisory, not 35 independent vulnerabilities. Passing this gate
@@ -53,11 +53,41 @@ Vitest/mocker 4.1.11 addresses
 No editor or frontend framework major, `npm audit fix --force`, override,
 advisory ignore, dependency exclusion or severity reduction is used.
 
-## Remaining moderate advisories
+## Remaining audit records: verified Tiptap 2 backport
 
-| Advisory | Installed version and exposure | Review and remaining limit |
-| --- | --- | --- |
-| [GHSA-cp6q-959q-f8rh](https://github.com/advisories/GHSA-cp6q-959q-f8rh) | `@tiptap/core` 2.27.3; 35 records including affected dependants; browser editor runtime | The upstream `mergeAttributes` helper remains affected. Exploitation requires an untrusted own `__proto__` attribute key to reach that helper and then a consumer that renders inherited attributes. The current editor's attribute names are fixed by its ProseMirror schemas; extension HTML options are application constants. Eight regression cases exercise the real image/video/CMS schemas and link marks with imported JSON, content updates, imported HTML and the video insertion command. They preserve the intended nodes while rejecting executable/prototype attributes in serialization. These checks do not certify arbitrary custom host extensions or direct calls to the upstream helper. A future extension that forwards arbitrary attribute maps must validate them or use a patched upstream version. The official patched release begins at 3.30.4; there is no listed 2.x fix. Removing this finding requires a separately reviewed Tiptap 2→3 editor migration. This is production editor code, not development-only tooling. |
+The unchanged lockfile selects `@tiptap/core` **2.27.3**, which already contains
+the upstream fix for
+[GHSA-cp6q-959q-f8rh](https://github.com/advisories/GHSA-cp6q-959q-f8rh).
+The previous statement that this installed helper remained vulnerable and
+required a major upgrade was incorrect.
+
+Upstream merged the [v2 backport #8301](https://github.com/ueberdosis/tiptap/pull/8301)
+on 2026-09-03 and included it in [the 2.27.3 release PR #8310](https://github.com/ueberdosis/tiptap/pull/8310).
+The immutable [2.27.3 changelog](https://github.com/ueberdosis/tiptap/blob/0ed4a30a6cda23799a01881f67d01ad218a2ac6d/packages/core/CHANGELOG.md#L3-L7)
+and [helper implementation](https://github.com/ueberdosis/tiptap/blob/0ed4a30a6cda23799a01881f67d01ad218a2ac6d/packages/core/src/utilities/mergeAttributes.ts#L7-L18)
+show the fix: an own JSON `__proto__` key is copied with `Object.defineProperty`
+as an ordinary data property, preserving `Object.prototype` rather than invoking
+its legacy setter. It can remain an inert own key in serialized attributes;
+the helper is not a general sanitizer of explicitly supplied event handlers.
+
+A fresh official npm tarball for 2.27.3 matches the unchanged lockfile integrity:
+
+```text
+sha512-a5LfRbLpfaGI3hbL/LPHUYHI0I+FQHdSHsy8L4YnVIuu3hXcm3QZgkWbpEGf8hCz8krk6zEiu0+iFOjTySU2FA==
+```
+
+The advisory metadata lists only the v3 patched floor (3.30.4), omitting this
+v2 backport; [upstream issue #8339](https://github.com/ueberdosis/tiptap/issues/8339)
+tracks that discrepancy. The unsuppressed `npm audit --audit-level=high --json`
+still reports **35 moderate records representing this one advisory**, with zero
+high/critical findings. Those records remain visible; neither their severity
+nor audit configuration has been changed. This package/source verification
+addresses the specific prototype-mutation flaw, not a claim that the graph is
+globally vulnerability-free or that arbitrary host extensions are safe.
+
+Retain Tiptap 2.27.3 for this correction. [GoAdmin PR #54](https://github.com/assurrussa/goadmin/pull/54)
+is an optional, unmerged major upgrade with separate compatibility implications;
+it is not required solely to obtain this backport.
 
 ## Verification scope
 
@@ -69,14 +99,27 @@ collisions, symlinks, encoded traversal, Vite deny rules, GET/HEAD and condition
 requests, source additions/changes/deletions, and recovery after invalid source
 files are removed. These tests run in the ordinary `test:manifest` gate.
 
-The existing eight `mediaAttributeSecurity.test.ts` cases protect the first-party
-editor's fixed attribute boundary. They do not repair the vulnerable upstream
-Tiptap helper or certify arbitrary host extensions. A patched Tiptap major remains separate migration work. The Vitest 4.1.11
-migration passes the complete resource gate: 48 manifest tests, 40 unit files
-and 519 unit tests, followed by lint, formatting, type and build checks. The
-DataGrid contract retains its 15-second deadline and assertions. The earlier
-full-suite timeout remains historical failed evidence; this success does not
-establish its cause or convert the earlier publish-readiness wrapper to PASS.
+The existing eight `mediaAttributeSecurity.test.ts` cases protect first-party
+fixed schemas; they do not exercise arbitrary attribute maps directly. Six
+`mergeAttributesSecurity.test.ts` regressions now complement them on unchanged
+2.27.3. They merge hostile JSON maps in first/middle/last positions, verify the
+own data-property descriptor and unchanged prototype through repeated merges,
+and serialize a host-like custom Node through ProseMirror DOMSerializer and
+editor HTML output. Inherited `onerror`, `onclick`, attacker `src` and canary
+attributes must not escape; legitimate attributes and custom JSON content remain.
+This verifies the already-shipped upstream fix rather than repairing it locally.
+
+For this documentation/test-only correction, the focused 14 tests (six direct
+helper/custom-extension and eight media-schema cases), focused ESLint/Prettier,
+vue-tsc and typed-host checks pass. Dependencies, runtime and generated assets
+are unchanged; the unchanged broad build/backend suites are not rerun.
+
+The earlier Vitest 4.1.11 migration passed the complete resource gate: 48
+manifest tests, 40 unit files and 519 unit tests, followed by lint, formatting,
+type and build checks. The DataGrid contract retains its 15-second deadline
+and assertions. The earlier full-suite timeout remains historical failed
+evidence; that success does not establish its cause or convert the earlier
+publish-readiness wrapper to PASS.
 
 The conclusions apply to the reviewed first-party source and lockfile. They do
 not constitute an independent security audit or extend to a host's custom
