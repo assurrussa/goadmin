@@ -878,3 +878,41 @@ describe('unconfirmed rich text uploads', () => {
 // Existing English control selectors run under the explicit English UI locale.
 beforeEach(() => setLocale('en'))
 afterEach(() => setLocale('ru'))
+
+describe('Tiptap 3 mounted editor contract', () => {
+  it('keeps schema allowlists and controlled prop updates without duplicate extensions or feedback', async () => {
+    const updated = vi.fn()
+    const invalid = vi.fn()
+    const props = reactive({
+      modelValue: '<p><strong>before</strong></p>',
+      allowedNodes: ['doc', 'paragraph', 'text'],
+      allowedMarks: ['bold'],
+    })
+    const el = document.createElement('div')
+    document.body.append(el)
+    const app = createApp({
+      render: () =>
+        h(RichTextEditor, { ...props, 'onUpdate:modelValue': updated, onInvalidContent: invalid }),
+    }).use(createPinia())
+    apps.push(app)
+    app.mount(el)
+    try {
+      await nextTick()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      const editor = (el.querySelector('.tiptap') as HTMLElement & { editor: CoreEditor }).editor
+      expect(editor).toBeDefined()
+      expect(Object.keys(editor.schema.nodes)).toEqual(['paragraph', 'doc', 'text'])
+      expect(Object.keys(editor.schema.marks)).toEqual(['bold'])
+      const names = editor.extensionManager.extensions.map((extension) => extension.name)
+      expect(new Set(names).size).toBe(names.length)
+      updated.mockClear()
+      props.modelValue = '<p><strong>after</strong></p>'
+      await nextTick()
+      expect(editor.getHTML()).toBe('<p><strong>after</strong></p>')
+      expect(updated).not.toHaveBeenCalled()
+      expect(invalid).not.toHaveBeenCalled()
+    } finally {
+      el.remove()
+    }
+  })
+})

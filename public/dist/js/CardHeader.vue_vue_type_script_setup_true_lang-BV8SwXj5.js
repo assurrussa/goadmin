@@ -1,1 +1,0 @@
-import{L as s}from"./app.js";import{d as o,P as n,a0 as l,a7 as t,z as c,O as p}from"./editor-Dn0fTmeM.js";const f=o({__name:"CardHeader",props:{class:{type:[Boolean,null,String,Object,Array]}},setup(a){const e=a;return(r,d)=>(n(),l("div",{class:t(c(s)("flex flex-col gap-y-1.5 p-[var(--goadmin-card-padding,1.5rem)]",e.class))},[p(r.$slots,"default")],2))}});export{f as _};

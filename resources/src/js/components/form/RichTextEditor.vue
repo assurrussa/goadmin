@@ -524,7 +524,7 @@ import Image from '@tiptap/extension-image'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import CharacterCount from '@tiptap/extension-character-count'
-import Table from '@tiptap/extension-table'
+import { Table } from '@tiptap/extension-table'
 import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
 import TableRow from '@tiptap/extension-table-row'
@@ -1131,6 +1131,10 @@ const markAllowed = (...names: string[]) =>
 
 const extensions = [
   StarterKit.configure({
+    link: false,
+    underline: false,
+    listKeymap: false,
+    trailingNode: false,
     blockquote: nodeAllowed('blockquote') ? {} : false,
     bold: markAllowed('bold') ? {} : false,
     bulletList: nodeAllowed('bulletList') ? {} : false,
@@ -1391,7 +1395,10 @@ const setValidatedContent = (
 ) => {
   if (!editor.value) return false
   try {
-    editor.value.commands.setContent(value || '', false, {}, { errorOnInvalidContent: true })
+    editor.value.commands.setContent(value || '', {
+      emitUpdate: false,
+      errorOnInvalidContent: true,
+    })
     updateCounts()
     return true
   } catch (error) {

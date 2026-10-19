@@ -1,10 +1,11 @@
 # Frontend dependency advisory review
 
-Reviewed on 2026-10-10 for the next release. The current
-`npm audit --audit-level=high --json` command completes with exit status 0:
-0 high, 0 critical and 35 moderate dependency records. Those records represent
-one unique advisory, not 35 independent vulnerabilities. Passing this gate
-does not mean that the dependency tree is vulnerability-free.
+Reviewed on 2026-10-19 for the Tiptap migration candidate. The baseline
+`npm audit --json` reported 35 moderate dependency records, representing one
+unique advisory (GHSA-cp6q-959q-f8rh), with no low/high/critical findings.
+After migrating the coherent Tiptap graph from 2.27.3 to 3.32.0, the same
+command reports **0 vulnerabilities at every severity**. No suppression,
+severity reduction, forced upgrade or incompatible override is used.
 
 ## Removed advisory paths
 
@@ -50,14 +51,21 @@ transitive graph. Vue runtime is 3.5.42; compiler packages may resolve compatibl
 Vitest 4 removes Tinypool rather than overriding its incompatible major.
 Vitest/mocker 4.1.11 addresses
 [GHSA-82fw-gwwq-j7x9](https://github.com/advisories/GHSA-82fw-gwwq-j7x9).
-No editor or frontend framework major, `npm audit fix --force`, override,
+That earlier cleanup used no editor or frontend framework major, `npm audit fix --force`, override,
 advisory ignore, dependency exclusion or severity reduction is used.
 
-## Remaining moderate advisories
+## Tiptap advisory removed
 
-| Advisory | Installed version and exposure | Review and remaining limit |
-| --- | --- | --- |
-| [GHSA-cp6q-959q-f8rh](https://github.com/advisories/GHSA-cp6q-959q-f8rh) | `@tiptap/core` 2.27.3; 35 records including affected dependants; browser editor runtime | The upstream `mergeAttributes` helper remains affected. Exploitation requires an untrusted own `__proto__` attribute key to reach that helper and then a consumer that renders inherited attributes. The current editor's attribute names are fixed by its ProseMirror schemas; extension HTML options are application constants. Eight regression cases exercise the real image/video/CMS schemas and link marks with imported JSON, content updates, imported HTML and the video insertion command. They preserve the intended nodes while rejecting executable/prototype attributes in serialization. These checks do not certify arbitrary custom host extensions or direct calls to the upstream helper. A future extension that forwards arbitrary attribute maps must validate them or use a patched upstream version. The official patched release begins at 3.30.4; there is no listed 2.x fix. Removing this finding requires a separately reviewed Tiptap 2→3 editor migration. This is production editor code, not development-only tooling. |
+The [official advisory](https://github.com/advisories/GHSA-cp6q-959q-f8rh)
+lists versions below 3.30.4 as affected and 3.30.4 as patched. The candidate
+pins every directly declared Tiptap package to 3.32.0, including an explicit
+core dependency for our custom extensions. The lockfile contains one coherent
+3.32.0 graph and no Tiptap 2 packages. The existing fixed-schema media tests
+remain useful defense in depth; the upstream upgrade removes the vulnerable
+helper, rather than claiming those tests fixed it.
+
+See [the migration contract](tiptap3-migration.md) for API/default changes,
+host extension compatibility and validation scope.
 
 ## Verification scope
 
@@ -69,14 +77,13 @@ collisions, symlinks, encoded traversal, Vite deny rules, GET/HEAD and condition
 requests, source additions/changes/deletions, and recovery after invalid source
 files are removed. These tests run in the ordinary `test:manifest` gate.
 
-The existing eight `mediaAttributeSecurity.test.ts` cases protect the first-party
-editor's fixed attribute boundary. They do not repair the vulnerable upstream
-Tiptap helper or certify arbitrary host extensions. A patched Tiptap major remains separate migration work. The Vitest 4.1.11
-migration passes the complete resource gate: 48 manifest tests, 40 unit files
-and 519 unit tests, followed by lint, formatting, type and build checks. The
-DataGrid contract retains its 15-second deadline and assertions. The earlier
-full-suite timeout remains historical failed evidence; this success does not
-establish its cause or convert the earlier publish-readiness wrapper to PASS.
+The eight `mediaAttributeSecurity.test.ts` cases still protect the first-party
+fixed-schema boundary. Additional Tiptap 3 regressions exercise the patched
+helper with own JSON `__proto__`, a custom extension and ProseMirror DOMSerializer,
+formatting, links, tables, task lists, all media nodes, JSON round-trip,
+controlled updates, invalid-content rejection and undo/redo. The mounted editor
+also checks allowlists and duplicate extension names. Historical Vitest 4
+migration results above do not substitute for the current candidate gates.
 
 The conclusions apply to the reviewed first-party source and lockfile. They do
 not constitute an independent security audit or extend to a host's custom
