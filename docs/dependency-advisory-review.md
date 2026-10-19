@@ -54,18 +54,34 @@ Vitest/mocker 4.1.11 addresses
 That earlier cleanup used no editor or frontend framework major, `npm audit fix --force`, override,
 advisory ignore, dependency exclusion or severity reduction is used.
 
-## Tiptap advisory removed
+## Tiptap audit metadata and chosen v3 migration
 
 The [official advisory](https://github.com/advisories/GHSA-cp6q-959q-f8rh)
-lists versions below 3.30.4 as affected and 3.30.4 as patched. The candidate
-pins every directly declared Tiptap package to 3.32.0, including an explicit
-core dependency for our custom extensions. The lockfile contains one coherent
-3.32.0 graph and no Tiptap 2 packages. The existing fixed-schema media tests
-remain useful defense in depth; the upstream upgrade removes the vulnerable
-helper, rather than claiming those tests fixed it.
+lists the v3 patched floor as 3.30.4 but omits the v2 backport. The baseline
+2.27.3 helper already contains the fix, merged in
+[upstream #8301](https://github.com/ueberdosis/tiptap/pull/8301) and included in
+[release #8310](https://github.com/ueberdosis/tiptap/pull/8310).
+See the immutable [changelog](https://github.com/ueberdosis/tiptap/blob/0ed4a30a6cda23799a01881f67d01ad218a2ac6d/packages/core/CHANGELOG.md#L3-L7)
+and [helper](https://github.com/ueberdosis/tiptap/blob/0ed4a30a6cda23799a01881f67d01ad218a2ac6d/packages/core/src/utilities/mergeAttributes.ts#L7-L18),
+plus [metadata issue #8339](https://github.com/ueberdosis/tiptap/issues/8339).
+A fresh official 2.27.3 tarball matched the baseline lockfile SHA-512
+`a5LfRbLpfaGI3hbL/LPHUYHI0I+FQHdSHsy8L4YnVIuu3hXcm3QZgkWbpEGf8hCz8krk6zEiu0+iFOjTySU2FA==`;
+its published helper defines __proto__ as an own data property rather than
+mutating the result's prototype. The earlier assertion that the installed
+baseline helper remained vulnerable was incorrect.
+
+The project chooses Tiptap 3 as a planned development upgrade, not as a mandatory
+repair for this advisory. The candidate pins all directly declared packages to
+3.32.0, including explicit core for our extensions, with one coherent graph.
+The baseline audit reported 35 moderate records for this single advisory;
+the v3 graph reports 0 findings. No audit suppression, severity adjustment,
+forced upgrade or override is used. A clean audit is not a blanket security
+certification of arbitrary host extensions or the whole application.
 
 See [the migration contract](tiptap3-migration.md) for API/default changes,
-host extension compatibility and validation scope.
+normalization, keyboard behavior, host extension compatibility and validation
+scope. PR #55 preserves the separate minimal-v2 evidence; this candidate
+intentionally follows the selected v3 path.
 
 ## Verification scope
 
