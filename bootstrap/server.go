@@ -336,6 +336,7 @@ func registerStaticRoutes(
 	uploadReadGuard fiber.Handler,
 	adminMiddlewares ...fiber.Handler,
 ) {
+	fiberApp.Get("/public/auth-recovery.js", adminmiddleware.BrowserAuthRecoveryScript)
 	if publicFS != nil {
 		fiberApp.Use("/public", func(c fiber.Ctx) error {
 			if c.Method() == fiber.MethodGet || c.Method() == fiber.MethodHead {

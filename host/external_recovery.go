@@ -37,3 +37,12 @@ func (a *App) CompleteExternalAdminRecovery(c fiber.Ctx, recovery *ExternalAdmin
 func EnableExternalAdminRecovery(c fiber.Ctx) {
 	adminservice.EnableExternalAdminRecovery(c)
 }
+
+// EnableExternalAdminRecoveryWithSignIn also supplies a fixed host-owned public
+// sign-in continuation. It must bypass native auth and require ordinary verified
+// login/admission. Never pass a browser-selected URL or a protected login loop.
+// Invalid or native /auth/login destinations are not rendered.
+func EnableExternalAdminRecoveryWithSignIn(c fiber.Ctx, target string) {
+	EnableExternalAdminRecovery(c)
+	adminservice.SetExternalAdminRecoverySignIn(c, target)
+}

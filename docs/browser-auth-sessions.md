@@ -112,6 +112,30 @@ policy requires it.
 
 ## Opt-in current-page external-session recovery
 
+### Full-document browser navigation
+
+When the external proof deadline expires, an opted-in HTML document GET now
+receives a minimal no-store recovery document, not raw JSON or protected page
+data. The independent same-origin script calls the same guarded recovery
+endpoint below, bounded by two GET requests and 30 seconds. Verified success
+offers an explicit Continue button that reloads only the current safe GET.
+There is no automatic navigation loop or mutation replay. HEAD, API/JSON,
+Inertia, AJAX, non-document fetches and mutations retain their JSON error
+contract and do not dispatch a protected handler.
+
+Hosts may use `host.EnableExternalAdminRecoveryWithSignIn(c, fixedLocalPath)`
+instead of `EnableExternalAdminRecovery` to provide an explicit fresh-sign-in
+link on this document. The fixed public route must bypass native authentication
+and use the host's ordinary verified SSO login/admission flow. Never derive it
+from browser input. The native `/auth/login` and recovery endpoint are rejected
+as fallback links because the retained stale binding could loop. Without a
+host continuation, failure offers only an explicit new bounded recovery attempt;
+the library does not invent a login route, clear cookies or discard the journal.
+
+The script is embedded independently of the UI bundle and registered before
+static/auth middleware at `/public/auth-recovery.js`. It needs only the normal
+same-origin script and connect policy, not inline scripts or a weakened CSP.
+
 Hosts may opt a rejected mutation into the shared frontend recovery coordinator
 by returning the existing versioned JSON authentication error:
 HTTP 401, `X-Goadmin-Auth-Error: 1`, `Content-Type: application/json`,
