@@ -39,6 +39,9 @@ func TestExternalRecoveryDocumentNavigation(t *testing.T) {
 			require.Empty(t, response.Header.Values("Set-Cookie"))
 			require.Empty(t, response.Header.Get("Location"))
 			require.Contains(t, string(body), `src="/public/auth-recovery.js"`)
+			require.Contains(t, string(body), `href="/public/auth-recovery.css"`)
+			require.Contains(t, string(body), `aria-live="polite"`)
+			require.NotContains(t, string(body), "<style>")
 			require.Contains(t, string(body), `href="/sso?login=1"`)
 			require.NotContains(t, string(body), `href="/auth/login`)
 			require.NotContains(t, string(body), "<script>")
@@ -122,4 +125,21 @@ func TestRecoveryScriptDoesNotRequireBrowserAuthority(t *testing.T) {
 	defer response.Body.Close()
 	require.Equal(t, http.StatusOK, response.StatusCode)
 	require.Contains(t, response.Header.Get("Content-Type"), "javascript")
+}
+
+func TestRecoveryStylesDoNotRequireBrowserAuthority(t *testing.T) {
+	app := fiber.New()
+	app.Get("/public/auth-recovery.css", BrowserAuthRecoveryStyles)
+	app.Use(func(c fiber.Ctx) error { return c.SendStatus(http.StatusForbidden) })
+	response, err := app.Test(httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/public/auth-recovery.css", nil))
+	require.NoError(t, err)
+	defer response.Body.Close()
+	require.Equal(t, http.StatusOK, response.StatusCode)
+	require.Contains(t, response.Header.Get("Content-Type"), "text/css")
+	require.Equal(t, "no-store", response.Header.Get("Cache-Control"))
+	body, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	require.Contains(t, string(body), "prefers-color-scheme: dark")
+	require.NotContains(t, string(body), "@import")
+	require.NotContains(t, string(body), "url(")
 }

@@ -118,8 +118,12 @@ When the external proof deadline expires, an opted-in HTML document GET now
 receives a minimal no-store recovery document, not raw JSON or protected page
 data. The independent same-origin script calls the same guarded recovery
 endpoint below, bounded by two GET requests and 30 seconds. Verified success
-offers an explicit Continue button that reloads only the current safe GET.
-There is no automatic navigation loop or mutation replay. HEAD, API/JSON,
+automatically reloads only the current safe GET, with a Continue fallback.
+A tab-scoped sessionStorage timestamp is persisted before navigation: a recovery
+document encountered again within 60 seconds requires manual retry, preventing
+unattended recovery/reload loops. No URL, identity, cookie or proof is stored.
+If storage is unavailable, recovery and continuation require explicit clicks.
+Mutations are never replayed. HEAD, API/JSON,
 Inertia, AJAX, non-document fetches and mutations retain their JSON error
 contract and do not dispatch a protected handler.
 
@@ -132,9 +136,10 @@ as fallback links because the retained stale binding could loop. Without a
 host continuation, failure offers only an explicit new bounded recovery attempt;
 the library does not invent a login route, clear cookies or discard the journal.
 
-The script is embedded independently of the UI bundle and registered before
-static/auth middleware at `/public/auth-recovery.js`. It needs only the normal
-same-origin script and connect policy, not inline scripts or a weakened CSP.
+The script and responsive light/dark stylesheet are embedded independently of
+the UI bundle, before static/auth middleware at `/public/auth-recovery.js` and
+`/public/auth-recovery.css`. They use system fonts and same-origin script,
+style and connect policies, without external resources, inline code or weaker CSP.
 
 Hosts may opt a rejected mutation into the shared frontend recovery coordinator
 by returning the existing versioned JSON authentication error:
