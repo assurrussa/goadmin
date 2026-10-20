@@ -252,8 +252,10 @@ func (s *Service) verifyExternalRecoveryToken(
 	return auth, err
 }
 
-type externalRecoveryEnabledKey struct{}
-type externalRecoverySignInKey struct{}
+type (
+	externalRecoveryEnabledKey struct{}
+	externalRecoverySignInKey  struct{}
+)
 
 // EnableExternalAdminRecovery is called only by trusted host middleware that
 // registered a guarded recovery endpoint. Browser headers cannot enable it.
