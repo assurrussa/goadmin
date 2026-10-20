@@ -337,6 +337,7 @@ func registerStaticRoutes(
 	adminMiddlewares ...fiber.Handler,
 ) {
 	fiberApp.Get("/public/auth-recovery.js", adminmiddleware.BrowserAuthRecoveryScript)
+	fiberApp.Get("/public/auth-recovery.css", adminmiddleware.BrowserAuthRecoveryStyles)
 	if publicFS != nil {
 		fiberApp.Use("/public", func(c fiber.Ctx) error {
 			if c.Method() == fiber.MethodGet || c.Method() == fiber.MethodHead {
