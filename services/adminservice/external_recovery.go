@@ -253,6 +253,7 @@ func (s *Service) verifyExternalRecoveryToken(
 }
 
 type externalRecoveryEnabledKey struct{}
+type externalRecoverySignInKey struct{}
 
 // EnableExternalAdminRecovery is called only by trusted host middleware that
 // registered a guarded recovery endpoint. Browser headers cannot enable it.
@@ -263,4 +264,15 @@ func EnableExternalAdminRecovery(c fiber.Ctx) {
 func ExternalAdminRecoveryEnabled(c fiber.Ctx) bool {
 	enabled, _ := c.Locals(externalRecoveryEnabledKey{}).(bool)
 	return enabled
+}
+
+// SetExternalAdminRecoverySignIn stores a trusted host-owned navigation hint.
+// Transport code validates it before rendering; it never grants authority.
+func SetExternalAdminRecoverySignIn(c fiber.Ctx, target string) {
+	c.Locals(externalRecoverySignInKey{}, target)
+}
+
+func ExternalAdminRecoverySignIn(c fiber.Ctx) string {
+	target, _ := c.Locals(externalRecoverySignInKey{}).(string)
+	return target
 }

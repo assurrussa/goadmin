@@ -68,6 +68,9 @@ func browserAuthFailure(c fiber.Ctx, err error) error {
 	case errors.Is(err, adminservice.ErrExternalRecoveryRequired):
 		if adminservice.ExternalAdminRecoveryEnabled(c) {
 			c.Set("X-Goadmin-Auth-Recovery", "1")
+			if isBrowserRecoveryNavigation(c) {
+				return sendBrowserRecoveryDocument(c)
+			}
 		} else if c.Method() == fiber.MethodGet || c.Method() == fiber.MethodHead {
 			return goinertia.Redirect(c, "/auth/login")
 		}
