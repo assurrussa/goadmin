@@ -23,7 +23,7 @@ func TestExternalRecoveryDocumentNavigation(t *testing.T) {
 				adminservice.SetExternalAdminRecoverySignIn(c, "/sso?login=1")
 				return browserAuthFailure(c, adminservice.ErrExternalRecoveryRequired)
 			})
-			request := httptest.NewRequest(http.MethodGet, target, nil)
+			request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, target, nil)
 			request.Header.Set("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8")
 			request.Header.Set("Sec-Fetch-Mode", "navigate")
 			request.Header.Set("Sec-Fetch-Dest", "document")
@@ -33,7 +33,7 @@ func TestExternalRecoveryDocumentNavigation(t *testing.T) {
 			body, err := io.ReadAll(response.Body)
 			require.NoError(t, err)
 			require.Equal(t, http.StatusUnauthorized, response.StatusCode)
-			require.Contains(t, response.Header.Get("Content-Type"), "text/html")
+			require.Contains(t, response.Header.Get("Content-Type"), fiber.MIMETextHTML)
 			require.Equal(t, "no-store", response.Header.Get("Cache-Control"))
 			require.Equal(t, "1", response.Header.Get("X-Goadmin-Auth-Recovery"))
 			require.Empty(t, response.Header.Values("Set-Cookie"))
@@ -50,21 +50,21 @@ func TestExternalRecoveryNonDocumentContractUnchanged(t *testing.T) {
 	cases := []struct {
 		name, method, accept, header, value string
 	}{
-		{"head", "HEAD", "text/html", "", ""},
-		{"post", "POST", "text/html", "", ""},
-		{"patch", "PATCH", "text/html", "", ""},
-		{"delete", "DELETE", "text/html", "", ""},
-		{"api", "GET", "application/json", "", ""},
-		{"mixed api", "GET", "text/html,application/json", "", ""},
-		{"wildcard", "GET", "*/*", "", ""},
-		{"html forbidden", "GET", "text/html;q=0", "", ""},
-		{"html zero quality", "GET", "text/html;q=0.000", "", ""},
-		{"html invalid quality", "GET", "text/html;q=NaN", "", ""},
-		{"inertia", "GET", "text/html", "X-Inertia", "true"},
-		{"xhr", "GET", "text/html", "X-Requested-With", "XMLHttpRequest"},
-		{"fetch", "GET", "text/html", "Sec-Fetch-Mode", "cors"},
-		{"resource", "GET", "text/html", "Sec-Fetch-Dest", "script"},
-		{"authorization", "GET", "text/html", "Authorization", "Bearer synthetic"},
+		{"head", http.MethodHead, fiber.MIMETextHTML, "", ""},
+		{"post", http.MethodPost, fiber.MIMETextHTML, "", ""},
+		{"patch", http.MethodPatch, fiber.MIMETextHTML, "", ""},
+		{"delete", http.MethodDelete, fiber.MIMETextHTML, "", ""},
+		{"api", http.MethodGet, "application/json", "", ""},
+		{"mixed api", http.MethodGet, "text/html,application/json", "", ""},
+		{"wildcard", http.MethodGet, "*/*", "", ""},
+		{"html forbidden", http.MethodGet, "text/html;q=0", "", ""},
+		{"html zero quality", http.MethodGet, "text/html;q=0.000", "", ""},
+		{"html invalid quality", http.MethodGet, "text/html;q=NaN", "", ""},
+		{"inertia", http.MethodGet, fiber.MIMETextHTML, "X-Inertia", "true"},
+		{"xhr", http.MethodGet, fiber.MIMETextHTML, "X-Requested-With", "XMLHttpRequest"},
+		{"fetch", http.MethodGet, fiber.MIMETextHTML, "Sec-Fetch-Mode", "cors"},
+		{"resource", http.MethodGet, fiber.MIMETextHTML, "Sec-Fetch-Dest", "script"},
+		{"authorization", http.MethodGet, fiber.MIMETextHTML, "Authorization", "Bearer synthetic"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -73,7 +73,7 @@ func TestExternalRecoveryNonDocumentContractUnchanged(t *testing.T) {
 				adminservice.EnableExternalAdminRecovery(c)
 				return browserAuthFailure(c, adminservice.ErrExternalRecoveryRequired)
 			})
-			r := httptest.NewRequest(tc.method, "/command", strings.NewReader("must-not-replay"))
+			r := httptest.NewRequestWithContext(t.Context(), tc.method, "/command", strings.NewReader("must-not-replay"))
 			r.Header.Set("Accept", tc.accept)
 			if tc.header != "" {
 				r.Header.Set(tc.header, tc.value)
@@ -104,7 +104,7 @@ func TestRecoverySignInRejectsUnsafeAndLoopTargets(t *testing.T) {
 func TestRecoveryWithoutHostSignInDoesNotInventLoginLink(t *testing.T) {
 	app := fiber.New()
 	app.Get("/", sendBrowserRecoveryDocument)
-	response, err := app.Test(httptest.NewRequest(http.MethodGet, "/", nil))
+	response, err := app.Test(httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
 	require.NoError(t, err)
 	defer response.Body.Close()
 	body, err := io.ReadAll(response.Body)
@@ -117,7 +117,7 @@ func TestRecoveryScriptDoesNotRequireBrowserAuthority(t *testing.T) {
 	app := fiber.New()
 	app.Get("/public/auth-recovery.js", BrowserAuthRecoveryScript)
 	app.Use(func(c fiber.Ctx) error { return c.SendStatus(http.StatusForbidden) })
-	response, err := app.Test(httptest.NewRequest(http.MethodGet, "/public/auth-recovery.js", nil))
+	response, err := app.Test(httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/public/auth-recovery.js", nil))
 	require.NoError(t, err)
 	defer response.Body.Close()
 	require.Equal(t, http.StatusOK, response.StatusCode)

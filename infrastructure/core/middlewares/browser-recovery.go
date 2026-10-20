@@ -78,11 +78,13 @@ func safeRecoverySignIn(target string) string {
 var browserRecoveryPage = template.Must(template.New("recovery").Parse(`<!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Восстановление входа</title><script src="/public/auth-recovery.js" defer></script></head>
-<body><main><h1>Проверяем вход</h1><p id="auth-recovery-status" role="status">Восстанавливаем подтверждение доступа. Сохранение и отправка не повторяются.</p>
+<body><main><h1>Проверяем вход</h1><p id="auth-recovery-status" role="status">` +
+	`Восстанавливаем подтверждение доступа. Сохранение и отправка не повторяются.</p>
 <button id="auth-recovery-retry" type="button" hidden>Повторить проверку</button>
 <button id="auth-recovery-continue" type="button" hidden>Продолжить</button>
 {{if .}}<p><a id="auth-recovery-sign-in" href="{{.}}">Войти заново</a></p>{{end}}
-<noscript>Для восстановления требуется JavaScript. Используйте новый вход, если ссылка доступна. Удалять cookies не требуется.</noscript>
+<noscript>` +
+	`Для восстановления требуется JavaScript. Используйте новый вход, если ссылка доступна. Удалять cookies не требуется.</noscript>
 </main></body></html>`))
 
 func sendBrowserRecoveryDocument(c fiber.Ctx) error {
