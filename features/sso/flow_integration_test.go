@@ -219,6 +219,56 @@ func TestSSOReturnPathThroughRealSDK(t *testing.T) {
 	if callback.StatusCode != http.StatusOK || !strings.Contains(string(cbBody), continuationScript) {
 		t.Fatalf("callback status %d: %s", callback.StatusCode, cbBody)
 	}
+	testRealSDKLinkSemanticTimes(t, rp, page, callback)
+	var ref string
+	var generation int64
+	var target string
+	row := db.QueryRowContext(t.Context(), "SELECT authority_id,login_generation,target FROM goadmin_sso.sso_return_paths")
+	if err = row.Scan(&ref, &generation, &target); err != nil {
+		t.Fatal(err)
+	}
+	if ref == "" || generation <= 0 || target != testReturnTarget {
+		t.Fatal("SDK round trip lost or unbound return target")
+	}
+
+	for _, wrong := range []browser.Binding{
+		{Reference: "another-browser", LoginGeneration: generation},
+		{Reference: ref, LoginGeneration: generation + 1},
+	} {
+		got, e := rp.takeReturn(t.Context(), wrong)
+		if e != nil || got != "/" {
+			t.Fatal("return target crossed browser/login binding", e)
+		}
+	}
+	binding := browser.Binding{Reference: ref, LoginGeneration: generation}
+	assertReturnRemainsAvailable(t, rp, binding)
+	got, e := rp.takeReturn(t.Context(), binding)
+	if e != nil || got != testReturnTarget {
+		t.Fatal("bound return target unavailable", e)
+	}
+	got, e = rp.takeReturn(t.Context(), binding)
+	if e != nil || got != "/" {
+		t.Fatal("return target replayed", e)
+	}
+	var consumed bool
+	query := "SELECT consumed_at IS NOT NULL FROM goadmin_sso.sso_login_return_intents WHERE state_digest=$1"
+	if err = db.QueryRowContext(t.Context(), query, stateDigest(state)).Scan(&consumed); err != nil || !consumed {
+		t.Fatal("login return intent not consumed", err)
+	}
+}
+
+func assertReturnRemainsAvailable(t *testing.T, rp *Runtime, binding browser.Binding) {
+	t.Helper()
+	for range 2 {
+		peeked, err := rp.peekReturn(t.Context(), binding)
+		if err != nil || peeked != testReturnTarget {
+			t.Fatal("peek consumed the target before admission", err)
+		}
+	}
+}
+
+func testRealSDKLinkSemanticTimes(t *testing.T, rp *Runtime, page, callback *http.Response) {
+	t.Helper()
 	// Exercise the real SDK proof and the same JSONB intent round-trip used by
 	// /sso-link. The old handler compared these Binding structs directly.
 	verifyReq := httptest.NewRequestWithContext(t.Context(), http.MethodGet, rp.Config.Origin+"/sso-link", nil)
@@ -336,49 +386,4 @@ func TestSSOReturnPathThroughRealSDK(t *testing.T) {
 	}
 	t.Logf("real SDK direct Binding equality after PostgreSQL JSONB: %t; SDK deadline later than snapshot: %t",
 		sdkBindingValue == oldBinding, sdkBindingValue.Deadline.After(persisted.Deadline))
-	var ref string
-	var generation int64
-	var target string
-	row := db.QueryRowContext(t.Context(), "SELECT authority_id,login_generation,target FROM goadmin_sso.sso_return_paths")
-	if err = row.Scan(&ref, &generation, &target); err != nil {
-		t.Fatal(err)
-	}
-	if ref == "" || generation <= 0 || target != testReturnTarget {
-		t.Fatal("SDK round trip lost or unbound return target")
-	}
-
-	for _, wrong := range []browser.Binding{
-		{Reference: "another-browser", LoginGeneration: generation},
-		{Reference: ref, LoginGeneration: generation + 1},
-	} {
-		got, e := rp.takeReturn(t.Context(), wrong)
-		if e != nil || got != "/" {
-			t.Fatal("return target crossed browser/login binding", e)
-		}
-	}
-	binding := browser.Binding{Reference: ref, LoginGeneration: generation}
-	assertReturnRemainsAvailable(t, rp, binding)
-	got, e := rp.takeReturn(t.Context(), binding)
-	if e != nil || got != testReturnTarget {
-		t.Fatal("bound return target unavailable", e)
-	}
-	got, e = rp.takeReturn(t.Context(), binding)
-	if e != nil || got != "/" {
-		t.Fatal("return target replayed", e)
-	}
-	var consumed bool
-	query := "SELECT consumed_at IS NOT NULL FROM goadmin_sso.sso_login_return_intents WHERE state_digest=$1"
-	if err = db.QueryRowContext(t.Context(), query, stateDigest(state)).Scan(&consumed); err != nil || !consumed {
-		t.Fatal("login return intent not consumed", err)
-	}
-}
-
-func assertReturnRemainsAvailable(t *testing.T, rp *Runtime, binding browser.Binding) {
-	t.Helper()
-	for range 2 {
-		peeked, err := rp.peekReturn(t.Context(), binding)
-		if err != nil || peeked != testReturnTarget {
-			t.Fatal("peek consumed the target before admission", err)
-		}
-	}
 }
