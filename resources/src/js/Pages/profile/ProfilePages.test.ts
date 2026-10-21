@@ -131,6 +131,9 @@ it.each([undefined, {}, { uploads: true }])(
     expect(root.querySelector('[data-avatar-uploader]') !== null).toBe(
       capabilities === undefined || capabilities.uploads === true,
     )
+    if (capabilities === undefined || capabilities.uploads === true) {
+      expect(root.querySelector('[data-avatar-uploader]')?.getAttribute('name')).toBe('avatar')
+    }
   },
 )
 

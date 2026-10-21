@@ -27,6 +27,34 @@ beforeEach(() => {
 })
 
 describe('durable upload completion fence', () => {
+  it('preserves a legacy fence after adding a field key without granting field ownership', async () => {
+    const legacy = await load()
+    legacy.retain(completion)
+    vi.resetModules()
+    const { useUploadCompletion } = await import('./useUploadCompletion')
+    const field = (name: string) =>
+      useUploadCompletion(
+        () => 'article',
+        () => 7,
+        () => 'rich-text',
+        undefined,
+        () => name,
+        true,
+      )
+    const upgraded = field('avatar')
+    const sibling = field('cover')
+    expect(upgraded.pending.value?.completion).toEqual(completion)
+    expect(upgraded.pendingFieldKnown.value).toBe(false)
+    expect(sibling.pendingFieldKnown.value).toBe(false)
+    expect(upgraded.retain({ ...completion, location: '/files/tus/new' })).toBe(false)
+    upgraded.release(completion)
+    expect(upgraded.pending.value).toBeNull()
+    expect(sibling.pending.value).toBeNull()
+    expect(sibling.retain(completion)).toBe(false)
+    expect(upgraded.retain({ ...completion, location: '/files/tus/new' })).toBe(true)
+    expect(upgraded.pendingFieldKnown.value).toBe(true)
+    expect(sibling.pending.value).toBeNull()
+  })
   it('shares a fence across remounts and restores only metadata after module reload', async () => {
     const first = await load()
     const file = new File(['bytes'], completion.filename, { type: 'video/mp4' })

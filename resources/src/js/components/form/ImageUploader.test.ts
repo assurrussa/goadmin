@@ -63,6 +63,132 @@ afterEach(async () => {
 })
 
 describe('image upload capabilities', () => {
+  it.each(['websocket', 'poll'])(
+    'assigns once when %s completes before the other channel',
+    async (first) => {
+      setAdminCapabilities({ props: { adminCapabilities: { uploads: true, realtime: true } } })
+      mocks.on.mockReturnValue(vi.fn())
+      mocks.upload.mockResolvedValue({ status: 'queued', tasks: [{ id: 42, status: 'queued' }] })
+      let finish!: (result: unknown) => void
+      mocks.poll.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve
+          }),
+      )
+      const update = vi.fn()
+      const root = mountUploader(update)
+      const input = root.querySelector<HTMLInputElement>('input[type=file]')!
+      Object.defineProperty(input, 'files', {
+        value: [new File(['image'], 'avatar.png', { type: 'image/png' })],
+      })
+      input.dispatchEvent(new Event('change'))
+      await vi.waitFor(() => expect(mocks.poll).toHaveBeenCalled())
+      const listener = mocks.on.mock.calls.at(-1)![1]
+      const event = {
+        eventType: 'files.upload.status',
+        taskId: 42,
+        status: 'completed',
+        file: { id: 42, fileName: 'avatar.png', url: '/avatar.png' },
+      }
+      const pollResult = {
+        status: 'completed',
+        task: { id: 42 },
+        file: { id: 42, filename: 'avatar.png', url: '/avatar.png' },
+      }
+      if (first === 'websocket') listener(event)
+      else finish(pollResult)
+      await vi.waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+      if (first === 'websocket') finish(pollResult)
+      else listener(event)
+      await nextTick()
+      expect(update).toHaveBeenCalledTimes(1)
+      expect(mocks.upload).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('ignores an old polling error after a realtime field changes entity', async () => {
+    setAdminCapabilities({ props: { adminCapabilities: { uploads: true, realtime: true } } })
+    mocks.on.mockReturnValue(vi.fn())
+    mocks.upload.mockResolvedValue({ status: 'queued', tasks: [{ id: 42, status: 'queued' }] })
+    let reject!: (reason: Error) => void
+    mocks.poll.mockImplementation(
+      () =>
+        new Promise((_resolve, fail) => {
+          reject = fail
+        }),
+    )
+    const onError = vi.fn()
+    const props = reactive({ objectType: 'admin', objectId: 7, onError })
+    const root = document.createElement('div')
+    const app = createApp({ render: () => h(ImageUploader, props) }).use(createPinia())
+    apps.push(app)
+    app.mount(root)
+    const input = root.querySelector<HTMLInputElement>('input[type=file]')!
+    Object.defineProperty(input, 'files', {
+      value: [new File(['image'], 'avatar.png', { type: 'image/png' })],
+    })
+    input.dispatchEvent(new Event('change'))
+    await vi.waitFor(() => expect(mocks.poll).toHaveBeenCalled())
+    props.objectId = 8
+    await nextTick()
+    reject(new Error('stale polling error'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(onError).not.toHaveBeenCalled()
+    expect(root.textContent).not.toContain('stale polling error')
+  })
+  it('reconciles a missed realtime terminal event through the same task status', async () => {
+    setAdminCapabilities({ props: { adminCapabilities: { uploads: true, realtime: true } } })
+    const unsubscribe = vi.fn()
+    mocks.on.mockReturnValue(unsubscribe)
+    mocks.upload.mockResolvedValue({ status: 'queued', tasks: [{ id: 42, status: 'queued' }] })
+    mocks.poll.mockResolvedValue({
+      status: 'completed',
+      task: { id: 42, status: 'completed' },
+      file: { id: 42, filename: 'avatar.png', url: '/avatar.png' },
+    })
+    const update = vi.fn()
+    const root = mountUploader(update)
+    const input = root.querySelector<HTMLInputElement>('input[type=file]')!
+    Object.defineProperty(input, 'files', {
+      value: [new File(['image'], 'avatar.png', { type: 'image/png' })],
+    })
+    input.dispatchEvent(new Event('change'))
+    await vi.waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+    expect(mocks.upload).toHaveBeenCalledTimes(1)
+    expect(mocks.poll).toHaveBeenCalledWith(42, { signal: expect.any(AbortSignal) })
+    expect(unsubscribe).toHaveBeenCalled()
+    expect(input.disabled).toBe(false)
+  })
+
+  it('keeps realtime recovery alive after status polling fails', async () => {
+    setAdminCapabilities({ props: { adminCapabilities: { uploads: true, realtime: true } } })
+    const unsubscribe = vi.fn()
+    mocks.on.mockReturnValue(unsubscribe)
+    mocks.upload.mockResolvedValue({ status: 'queued', tasks: [{ id: 42, status: 'queued' }] })
+    mocks.poll.mockRejectedValue(new Error('status temporarily unavailable'))
+    const update = vi.fn()
+    const root = mountUploader(update)
+    const input = root.querySelector<HTMLInputElement>('input[type=file]')!
+    Object.defineProperty(input, 'files', {
+      value: [new File(['image'], 'avatar.png', { type: 'image/png' })],
+    })
+    input.dispatchEvent(new Event('change'))
+    await vi.waitFor(() => expect(root.textContent).toContain('status temporarily unavailable'))
+    expect(unsubscribe).not.toHaveBeenCalled()
+    const listener = mocks.on.mock.calls.at(-1)![1]
+    const event = {
+      eventType: 'files.upload.status',
+      taskId: 42,
+      status: 'completed',
+      file: { id: 42, fileName: 'avatar.png', url: '/avatar.png' },
+    }
+    listener(event)
+    listener(event)
+    await vi.waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+    expect(root.textContent).not.toContain('status temporarily unavailable')
+  })
   it('disables upload controls and does not connect when uploads are absent', () => {
     setAdminCapabilities({ props: { adminCapabilities: {} } })
     const root = mountUploader()
@@ -325,62 +451,76 @@ describe('image upload capabilities', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(update).not.toHaveBeenCalled()
   })
-  it('requires explicit assignment after legacy unkeyed image recovery remount', async () => {
-    setAdminCapabilities({ props: { adminCapabilities: { uploads: true } } })
-    const completion = {
-      location: `/files/tus/unkeyed-${++nextSession}`,
-      filename: 'avatar.png',
-      context: 'image-uploader',
-      entityType: 'admin',
-      entityId: 7,
-    }
-    mocks.upload.mockResolvedValue({
-      status: 'completion_unknown',
-      tasks: [],
-      uncertainCompletion: completion,
-    })
-    mocks.reconcile.mockResolvedValue({
-      status: 'completed',
-      tasks: [
-        {
-          id: 42,
-          status: 'completed',
-          tempUrl: '/foreign-temp.png',
-          file: { id: 42, filename: 'avatar.png', originalName: 'avatar.png', url: '/avatar.png' },
-        },
-      ],
-    })
-    const first = mountUploader()
-    const input = first.querySelector<HTMLInputElement>('input[type=file]')!
-    Object.defineProperty(input, 'files', {
-      value: [new File(['image'], 'avatar.png', { type: 'image/png' })],
-    })
-    input.dispatchEvent(new Event('change'))
-    await vi.waitFor(() => expect(first.textContent).toContain('Check upload'))
-    apps.pop()!.unmount()
-    const update = vi.fn()
-    let restored = mountUploader(update, { modelValue: { id: 6, url: '/kept.png' } })
-    Array.from(restored.querySelectorAll('button'))
-      .find((button) => button.textContent?.includes('Check upload'))!
-      .click()
-    await vi.waitFor(() => expect(restored.textContent).toContain('Use image in this field'))
-    expect(update).not.toHaveBeenCalled()
-    expect(restored.querySelector('img')?.getAttribute('src')).toBe('/kept.png')
-    apps.pop()!.unmount()
-    restored = mountUploader(update, { modelValue: { id: 6, url: '/kept.png' } })
-    expect(restored.querySelector<HTMLInputElement>('input[type=file]')!.disabled).toBe(true)
-    Array.from(restored.querySelectorAll('button'))
-      .find((button) => button.textContent?.includes('Check upload'))!
-      .click()
-    await vi.waitFor(() => expect(restored.textContent).toContain('Use image in this field'))
-    expect(update).not.toHaveBeenCalled()
+  it.each([undefined, 'avatar-lifecycle'])(
+    'requires explicit assignment after legacy recovery remount with key %s',
+    async (uploadRecoveryKey) => {
+      setAdminCapabilities({ props: { adminCapabilities: { uploads: true } } })
+      const completion = {
+        location: `/files/tus/unkeyed-${++nextSession}`,
+        filename: 'avatar.png',
+        context: 'image-uploader',
+        entityType: 'admin',
+        entityId: 7,
+      }
+      mocks.upload.mockResolvedValue({
+        status: 'completion_unknown',
+        tasks: [],
+        uncertainCompletion: completion,
+      })
+      mocks.reconcile.mockResolvedValue({
+        status: 'completed',
+        tasks: [
+          {
+            id: 42,
+            status: 'completed',
+            tempUrl: '/foreign-temp.png',
+            file: {
+              id: 42,
+              filename: 'avatar.png',
+              originalName: 'avatar.png',
+              url: '/avatar.png',
+            },
+          },
+        ],
+      })
+      const first = mountUploader()
+      const input = first.querySelector<HTMLInputElement>('input[type=file]')!
+      Object.defineProperty(input, 'files', {
+        value: [new File(['image'], 'avatar.png', { type: 'image/png' })],
+      })
+      input.dispatchEvent(new Event('change'))
+      await vi.waitFor(() => expect(first.textContent).toContain('Check upload'))
+      apps.pop()!.unmount()
+      const update = vi.fn()
+      let restored = mountUploader(update, {
+        modelValue: { id: 6, url: '/kept.png' },
+        uploadRecoveryKey,
+      })
+      Array.from(restored.querySelectorAll('button'))
+        .find((button) => button.textContent?.includes('Check upload'))!
+        .click()
+      await vi.waitFor(() => expect(restored.textContent).toContain('Use image in this field'))
+      expect(update).not.toHaveBeenCalled()
+      expect(restored.querySelector('img')?.getAttribute('src')).toBe('/kept.png')
+      apps.pop()!.unmount()
+      restored = mountUploader(update, {
+        modelValue: { id: 6, url: '/kept.png' },
+        uploadRecoveryKey,
+      })
+      expect(restored.querySelector<HTMLInputElement>('input[type=file]')!.disabled).toBe(true)
+      Array.from(restored.querySelectorAll('button'))
+        .find((button) => button.textContent?.includes('Check upload'))!
+        .click()
+      await vi.waitFor(() => expect(restored.textContent).toContain('Use image in this field'))
+      expect(update).not.toHaveBeenCalled()
 
-    Array.from(restored.querySelectorAll('button'))
-      .find((button) => button.textContent?.includes('Use image in this field'))!
-      .click()
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }))
-    expect(mocks.upload).toHaveBeenCalledTimes(1)
-  })
+      Array.from(restored.querySelectorAll('button'))
+        .find((button) => button.textContent?.includes('Use image in this field'))!
+        .click()
+      expect(update).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }))
+      expect(mocks.upload).toHaveBeenCalledTimes(1)
+    },
+  )
   it.each(
     ['fresh', 'replay'].flatMap((source) =>
       ['queued', 'processing'].flatMap((status) =>
