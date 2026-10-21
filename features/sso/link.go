@@ -265,8 +265,11 @@ func (h *linkHandler) confirm(c fiber.Ctx) error {
 		return h.failure(c, http.StatusForbidden, "sso_confirmation_invalid", "Подтверждение SSO изменилось. Откройте новую форму.")
 	}
 	pinned, err := sdkBinding(binding)
-	if err != nil || current != pinned {
-		return h.deny(c, "link_binding_changed", "Подтверждение SSO изменилось. Откройте новую форму.")
+	if err != nil {
+		return h.denyBinding(c, "stored_binding_invalid")
+	}
+	if reason := sdkBindingDifference(current, pinned); reason != "" {
+		return h.denyBinding(c, reason)
 	}
 	if _, err = h.admin.LinkExternalAdminIdentity(c, binding); err != nil {
 		if !admissionDenied(err) {
@@ -287,6 +290,49 @@ func (h *linkHandler) confirm(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{"next": next})
 	}
 	return c.Redirect().Status(http.StatusSeeOther).To(next)
+}
+
+// Compare all original SDK fields, including the fixed deadline. time.Time's
+// Go == also compares Location pointers and monotonic clock metadata, which
+// are not security properties and need not survive durable serialization.
+// The returned enum never contains a value from either binding.
+func sdkBindingDifference(a, b browser.Binding) string {
+	switch {
+	case a.Reference != b.Reference:
+		return "reference"
+	case a.Generation != b.Generation:
+		return "generation"
+	case a.LoginGeneration != b.LoginGeneration:
+		return "login_generation"
+	case !a.Deadline.Equal(b.Deadline):
+		return "deadline"
+	case a.Issuer != b.Issuer:
+		return "issuer"
+	case a.Subject != b.Subject:
+		return "subject"
+	case a.ProjectID != b.ProjectID:
+		return "project_id"
+	case a.ClientID != b.ClientID:
+		return "client_id"
+	case a.CentralSessionID != b.CentralSessionID:
+		return "central_session_id"
+	case a.AuthTime != b.AuthTime:
+		return "auth_time"
+	case !a.AbsoluteUntil.Equal(b.AbsoluteUntil):
+		return "absolute_until"
+	default:
+		return ""
+	}
+}
+
+func (h *linkHandler) denyBinding(c fiber.Ctx, reason string) error {
+	if c.Get("Accept") != linkJSONAccept {
+		return c.SendStatus(http.StatusForbidden)
+	}
+	return c.Status(http.StatusForbidden).JSON(fiber.Map{
+		errorCodeProp: "link_binding_changed", messageProp: "Подтверждение SSO изменилось. Откройте новую форму.",
+		"reason": reason,
+	})
 }
 
 // Keep the original non-JSON denial while making JSON form failures
