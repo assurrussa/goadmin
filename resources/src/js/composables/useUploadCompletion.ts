@@ -54,20 +54,21 @@ export function useUploadCompletion(
   context: () => string | undefined = () => undefined,
   uploadUrl: () => string | undefined = () => undefined,
   field: () => string | undefined = () => undefined,
+  recoverLegacy = false,
 ) {
   const auth = useAuthUserStore()
   const owner = auth.id
   const endpoint = resolveTusEndpoint(uploadUrl())
   const initialContext = context()
   const initialField = field() ?? ''
-  const keyFor = (completion: UncertainUploadCompletion) =>
+  const keyFor = (completion: UncertainUploadCompletion, field = initialField) =>
     storageKey(
       owner,
       endpoint,
       completion.entityType,
       completion.entityId,
       completion.context ?? initialContext,
-      initialField,
+      field,
     )
   const isCurrentScope = computed(
     () =>
@@ -76,15 +77,33 @@ export function useUploadCompletion(
       context() === initialContext &&
       (field() ?? '') === initialField,
   )
-  const pending = computed(() =>
-    isCurrentScope.value
-      ? stateFor(storageKey(owner, endpoint, entityType(), entityId(), context(), initialField))
-          .value
+  // A newly named field must not hide a session retained by an older UI.
+  // Its field ownership is still unknown, so recovery requires explicit assignment.
+  const legacyPending = computed(() =>
+    isCurrentScope.value && initialField && recoverLegacy
+      ? stateFor(storageKey(owner, endpoint, entityType(), entityId(), context(), '')).value
       : null,
   )
+  const pending = computed(() => {
+    if (!isCurrentScope.value) return null
+    return (
+      legacyPending.value ??
+      stateFor(storageKey(owner, endpoint, entityType(), entityId(), context(), initialField)).value
+    )
+  })
+  const pendingFieldKnown = computed(() => !!initialField && !legacyPending.value)
 
   const retain = (completion: UncertainUploadCompletion, file?: File) => {
-    const key = keyFor(completion)
+    if (
+      initialField &&
+      recoverLegacy &&
+      resolvedSessions.has(JSON.stringify([keyFor(completion, ''), completion.location]))
+    ) {
+      return false
+    }
+    const legacy = initialField && recoverLegacy ? stateFor(keyFor(completion, '')).value : null
+    if (legacy && legacy.completion.location !== completion.location) return false
+    const key = keyFor(completion, legacy ? '' : initialField)
     if (resolvedSessions.has(JSON.stringify([key, completion.location]))) return false
     const state = stateFor(key)
     // An unresolved session must never be replaced by a different one.
@@ -102,7 +121,11 @@ export function useUploadCompletion(
   }
 
   const release = (completion: UncertainUploadCompletion) => {
-    const key = keyFor(completion)
+    const legacy = initialField && recoverLegacy ? stateFor(keyFor(completion, '')).value : null
+    const key = keyFor(
+      completion,
+      legacy?.completion.location === completion.location ? '' : initialField,
+    )
     const state = stateFor(key)
     if (state.value?.completion.location !== completion.location) return
     resolvedSessions.add(JSON.stringify([key, completion.location]))
@@ -114,5 +137,5 @@ export function useUploadCompletion(
     }
   }
 
-  return { pending, retain, release, isCurrentScope }
+  return { pending, pendingFieldKnown, retain, release, isCurrentScope }
 }

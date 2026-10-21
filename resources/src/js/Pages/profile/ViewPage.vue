@@ -87,6 +87,7 @@
       </CardHeader>
       <CardContent class="pt-6">
         <FormImageUploader
+          name="avatar"
           class="max-w-sm"
           :model-value="avatarFile"
           :label="t('Аватар администратора')"

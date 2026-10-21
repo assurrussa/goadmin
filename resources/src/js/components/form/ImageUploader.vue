@@ -347,12 +347,14 @@ const {
   retain: retainCompletion,
   release: releaseCompletion,
   isCurrentScope,
+  pendingFieldKnown,
 } = useUploadCompletion(
   () => props.objectType,
   () => props.objectId,
   () => props.context,
   () => props.uploadUrl,
   () => props.uploadRecoveryKey,
+  true,
 )
 const ownedCompletionLocation = ref<string | null>(null)
 const recoveredImage = ref<{
@@ -470,6 +472,7 @@ const handleFileStatusEvent = (event: FileUploadStatusEvent, confirmedTerminal =
   }
 
   if (event.status === 'completed' && event.file?.url) {
+    error.value = null
     const uploaded = mapEventFile(event.file)
     if (requireAssignmentConfirmation) {
       recoveredImage.value = {
@@ -615,7 +618,7 @@ const uploadFile = async (file: File | undefined, reconcile = false) => {
   let completion = reconcile ? uncertainUpload.value?.completion : undefined
   requireAssignmentConfirmation = !!(
     reconcile &&
-    !props.uploadRecoveryKey &&
+    !pendingFieldKnown.value &&
     ownedCompletionLocation.value !== completion?.location
   )
   if (!reconcile) recoveredImage.value = null
@@ -752,7 +755,10 @@ const uploadFile = async (file: File | undefined, reconcile = false) => {
     if (realtime.value) {
       ensureConnected()
       unsubscribe.value = on('files.upload.status', handleFileStatusEvent)
-    } else {
+    }
+    // WebSocket delivery is advisory: a terminal event may precede subscription
+    // or be lost during reconnect. Read-only polling reconciles the same task.
+    {
       const controller = new AbortController()
       pollController = controller
       void pollUploadTask(task.id, { signal: controller.signal })
@@ -782,6 +788,21 @@ const uploadFile = async (file: File | undefined, reconcile = false) => {
         })
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return
+          if (
+            unmounted ||
+            !isCurrentScope.value ||
+            taskEntity?.type !== props.objectType ||
+            taskEntity?.id !== String(props.objectId)
+          )
+            return
+          if (unsubscribe.value && currentTaskId.value === task.id) {
+            // Losing the status request is not a terminal task failure. Keep
+            // the live listener and durable fence for a later terminal event.
+            error.value =
+              reason instanceof Error ? reason.message : t('Не удалось проверить статус файла.')
+            emit('error', error.value)
+            return
+          }
           handleFileStatusEvent(
             {
               eventId: `poll-${task.id}`,
