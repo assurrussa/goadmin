@@ -29,6 +29,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
+
+	"github.com/assurrussa/goadmin/host"
 )
 
 func testSSODatabase(t *testing.T) *sql.DB {
@@ -217,44 +219,7 @@ func TestSSOReturnPathThroughRealSDK(t *testing.T) {
 	if callback.StatusCode != http.StatusOK || !strings.Contains(string(cbBody), continuationScript) {
 		t.Fatalf("callback status %d: %s", callback.StatusCode, cbBody)
 	}
-	// Exercise the real SDK proof and the same JSONB intent round-trip used by
-	// /sso-link. The old handler compared these Binding structs directly.
-	verifyReq := httptest.NewRequestWithContext(t.Context(), http.MethodGet, rp.Config.Origin+"/sso-link", nil)
-	allCookies := make(map[string]*http.Cookie)
-	for _, cookie := range append(page.Cookies(), callback.Cookies()...) {
-		allCookies[cookie.Name] = cookie
-	}
-	for _, cookie := range allCookies {
-		verifyReq.AddCookie(cookie)
-	}
-	id, sdkBindingValue, err := rp.verify(verifyReq)
-	if err != nil {
-		t.Fatalf("real SDK proof not available after callback: %v", err)
-	}
-	local := goauth.NewSubjectID()
-	snapshot, err := buildSnapshot(sdkBindingValue, id, local, "", time.Now())
-	if err != nil {
-		t.Fatalf("real SDK snapshot invalid: %v", err)
-	}
-	native := "native-integration-session"
-	intent := strings.Repeat("z", 43)
-	if err = rp.intents.create(t.Context(), intent, native, snapshot); err != nil {
-		t.Fatal(err)
-	}
-	persisted, err := rp.intents.consume(t.Context(), intent, native, local)
-	if err != nil {
-		t.Fatal(err)
-	}
-	oldBinding, err := sdkBinding(persisted)
-	if err != nil {
-		t.Fatal(err)
-	}
-	current, err := buildSnapshot(sdkBindingValue, id, local, persisted.LinkID, time.Now())
-	if err != nil || !sameSnapshot(current, persisted) {
-		t.Fatalf("unchanged real SDK proof rejected by canonical comparison: %v", err)
-	}
-	t.Logf("real SDK direct Binding equality after PostgreSQL JSONB: %t; SDK deadline later than snapshot: %t",
-		sdkBindingValue == oldBinding, sdkBindingValue.Deadline.After(persisted.Deadline))
+	testRealSDKLinkSemanticTimes(t, rp, page, callback)
 	var ref string
 	var generation int64
 	var target string
@@ -300,4 +265,125 @@ func assertReturnRemainsAvailable(t *testing.T, rp *Runtime, binding browser.Bin
 			t.Fatal("peek consumed the target before admission", err)
 		}
 	}
+}
+
+func testRealSDKLinkSemanticTimes(t *testing.T, rp *Runtime, page, callback *http.Response) {
+	t.Helper()
+	// Exercise the real SDK proof and the same JSONB intent round-trip used by
+	// /sso-link. The old handler compared these Binding structs directly.
+	verifyReq := httptest.NewRequestWithContext(t.Context(), http.MethodGet, rp.Config.Origin+"/sso-link", nil)
+	allCookies := make(map[string]*http.Cookie)
+	for _, cookie := range append(page.Cookies(), callback.Cookies()...) {
+		allCookies[cookie.Name] = cookie
+	}
+	for _, cookie := range allCookies {
+		verifyReq.AddCookie(cookie)
+	}
+	id, sdkBindingValue, err := rp.verify(verifyReq)
+	if err != nil {
+		t.Fatalf("real SDK proof not available after callback: %v", err)
+	}
+	local := goauth.NewSubjectID()
+	snapshot, err := buildSnapshot(sdkBindingValue, id, local, "", time.Now())
+	if err != nil {
+		t.Fatalf("real SDK snapshot invalid: %v", err)
+	}
+	native := "native-integration-session"
+	intent := strings.Repeat("z", 43)
+	if err = rp.intents.create(t.Context(), intent, native, snapshot); err != nil {
+		t.Fatal(err)
+	}
+	persisted, err := rp.intents.consume(t.Context(), intent, native, local)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldBinding, err := sdkBinding(persisted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, err := buildSnapshot(sdkBindingValue, id, local, persisted.LinkID, time.Now())
+	if err != nil || !sameSnapshot(current, persisted) {
+		t.Fatalf("unchanged real SDK proof rejected by canonical comparison: %v", err)
+	}
+	// Different time-zone representations of the real proof remain the same
+	// pinned instants after PostgreSQL JSONB persistence.
+	shifted := sdkBindingValue
+	zone := time.FixedZone("plus-three", 3*60*60)
+	shifted.Deadline = shifted.Deadline.In(zone)
+	shifted.AbsoluteUntil = shifted.AbsoluteUntil.In(zone)
+	if shifted == oldBinding || sdkBindingDifference(shifted, oldBinding) != "" {
+		t.Fatal("real SDK binding times were not compared semantically")
+	}
+	rp.csrfCookie = "csrf_token"
+	linkCSRF, err := host.NewCSRFService(host.CSRFConfig{
+		AppDomain: "admin.test", SecretKey: strings.Repeat("x", 32), AllowedOrigins: []string{rp.Config.Origin},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	linkAdmin := &fakeLinkAdmin{
+		actor:  host.Actor{AdminID: 1, SubjectID: local.String()},
+		native: host.CSRFRequest{SessionID: native},
+	}
+	verifyCalls := 0
+	link := &linkHandler{
+		service: rp, admin: linkAdmin, csrf: linkCSRF,
+		verify: func(request *http.Request) (browser.Identity, browser.Binding, error) {
+			identity, binding, verifyErr := rp.verify(request)
+			verifyCalls++
+			if verifyErr == nil && verifyCalls == 2 {
+				binding.Deadline = binding.Deadline.In(zone)
+				binding.AbsoluteUntil = binding.AbsoluteUntil.In(zone)
+			}
+			return identity, binding, verifyErr
+		},
+		takeReturn: func(context.Context, browser.Binding) (string, error) { return "/", nil },
+		render:     func(c fiber.Ctx, _ string, props map[string]any) error { return c.JSON(props) },
+	}
+	linkApp := fiber.New()
+	link.RegisterGroupRoutes(linkApp)
+	linkPageReq := httptest.NewRequestWithContext(t.Context(), http.MethodGet, rp.Config.Origin+"/sso-link", nil)
+	for _, cookie := range allCookies {
+		linkPageReq.AddCookie(cookie)
+	}
+	linkPage, err := linkApp.Test(linkPageReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer linkPage.Body.Close()
+	if linkPage.StatusCode != http.StatusOK {
+		t.Fatalf("link page status %d", linkPage.StatusCode)
+	}
+	var linkProps struct {
+		Intent string `json:"intent"`
+		CSRF   string `json:"csrf"`
+	}
+	if err = json.NewDecoder(linkPage.Body).Decode(&linkProps); err != nil {
+		t.Fatal(err)
+	}
+	linkForm := url.Values{
+		"intent": {linkProps.Intent}, "csrf": {linkProps.CSRF},
+		"confirm": {"link-this-identity"},
+	}
+	linkPost := httptest.NewRequestWithContext(t.Context(), http.MethodPost, rp.Config.Origin+"/sso-link",
+		strings.NewReader(linkForm.Encode()))
+	linkPost.Header.Set("Origin", rp.Config.Origin)
+	linkPost.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	linkPost.Header.Set("Accept", "application/json")
+	for _, cookie := range allCookies {
+		linkPost.AddCookie(cookie)
+	}
+	for _, cookie := range linkPage.Cookies() {
+		linkPost.AddCookie(cookie)
+	}
+	linkResult, err := linkApp.Test(linkPost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer linkResult.Body.Close()
+	if linkResult.StatusCode != http.StatusOK || len(linkAdmin.linked) != 1 {
+		t.Fatalf("real SDK and PostgreSQL link rejected: status=%d, links=%d", linkResult.StatusCode, len(linkAdmin.linked))
+	}
+	t.Logf("real SDK direct Binding equality after PostgreSQL JSONB: %t; SDK deadline later than snapshot: %t",
+		sdkBindingValue == oldBinding, sdkBindingValue.Deadline.After(persisted.Deadline))
 }
