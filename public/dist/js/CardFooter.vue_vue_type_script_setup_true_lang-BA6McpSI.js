@@ -1,0 +1,1 @@
+import{L as s}from"./app.js";import{d as o,P as n,a0 as t,a7 as c,z as l,O as p}from"./editor-BMLT2hBV.js";const f=o({__name:"CardFooter",props:{class:{type:[Boolean,null,String,Object,Array]}},setup(e){const a=e;return(r,m)=>(n(),t("div",{class:c(l(s)("flex items-center p-[var(--goadmin-card-padding,1.5rem)] pt-0",a.class))},[p(r.$slots,"default")],2))}});export{f as _};

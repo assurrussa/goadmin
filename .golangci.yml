@@ -94,6 +94,8 @@ linters:
             - go.uber.org/goleak
             - github.com/assurrussa/goadmin
             - github.com/assurrussa/goauth
+            - github.com/assurrussa/gossoclient
+            - github.com/go-jose/go-jose/v4
             - github.com/assurrussa/outbox
             - github.com/assurrussa/gouploads
             - github.com/assurrussa/gologger
