@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/assurrussa/goauth"
 	browser "github.com/assurrussa/gossoclient"
 	jose "github.com/go-jose/go-jose/v4"
 	"github.com/gofiber/fiber/v3"
@@ -216,6 +217,44 @@ func TestSSOReturnPathThroughRealSDK(t *testing.T) {
 	if callback.StatusCode != http.StatusOK || !strings.Contains(string(cbBody), continuationScript) {
 		t.Fatalf("callback status %d: %s", callback.StatusCode, cbBody)
 	}
+	// Exercise the real SDK proof and the same JSONB intent round-trip used by
+	// /sso-link. The old handler compared these Binding structs directly.
+	verifyReq := httptest.NewRequestWithContext(t.Context(), http.MethodGet, rp.Config.Origin+"/sso-link", nil)
+	allCookies := make(map[string]*http.Cookie)
+	for _, cookie := range append(page.Cookies(), callback.Cookies()...) {
+		allCookies[cookie.Name] = cookie
+	}
+	for _, cookie := range allCookies {
+		verifyReq.AddCookie(cookie)
+	}
+	id, sdkBindingValue, err := rp.verify(verifyReq)
+	if err != nil {
+		t.Fatalf("real SDK proof not available after callback: %v", err)
+	}
+	local := goauth.NewSubjectID()
+	snapshot, err := buildSnapshot(sdkBindingValue, id, local, "", time.Now())
+	if err != nil {
+		t.Fatalf("real SDK snapshot invalid: %v", err)
+	}
+	native := "native-integration-session"
+	intent := strings.Repeat("z", 43)
+	if err = rp.intents.create(t.Context(), intent, native, snapshot); err != nil {
+		t.Fatal(err)
+	}
+	persisted, err := rp.intents.consume(t.Context(), intent, native, local)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldBinding, err := sdkBinding(persisted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, err := buildSnapshot(sdkBindingValue, id, local, persisted.LinkID, time.Now())
+	if err != nil || !sameSnapshot(current, persisted) {
+		t.Fatalf("unchanged real SDK proof rejected by canonical comparison: %v", err)
+	}
+	t.Logf("real SDK direct Binding equality after PostgreSQL JSONB: %t; SDK deadline later than snapshot: %t",
+		sdkBindingValue == oldBinding, sdkBindingValue.Deadline.After(persisted.Deadline))
 	var ref string
 	var generation int64
 	var target string

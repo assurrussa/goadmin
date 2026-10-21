@@ -2,6 +2,7 @@ package bootstrap //nolint:testpackage // Exercises request middleware and serve
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -30,6 +31,8 @@ func (s *previewOwner) AdminGuardCheck(ctx context.Context, _ int64, key integra
 }
 
 type previewRoles struct{ RolesService }
+
+const previewOtherPath = "/other"
 
 func (*previewRoles) GetRole(context.Context, int64) (*integrationroles.Role, error) {
 	return &integrationroles.Role{ID: 2, Name: "Viewer"}, nil
@@ -95,6 +98,62 @@ func TestRolePreviewPersistsReadOnlyPolicyAndRequiresCurrentOwner(t *testing.T) 
 	require.Equal(t, 1, writes)
 	owner.owner = false
 	require.Equal(t, 403, request("POST", rolePreviewPath, `{"roleId":2}`))
+}
+
+func TestRolePreviewReportsSSOLinkDenialOnlyForJSONPost(t *testing.T) {
+	deps := Dependencies{}
+	deps.System.SessionStore = session.NewStore()
+	owner := &previewOwner{owner: true}
+	deps.Repos.RolesService = owner
+	deps.Repos.RolesManager = &previewRoles{}
+	app := fiber.New()
+	app.Use(func(c fiber.Ctx) error { c.Locals("sess_admin", &models.SessionAdmin{ID: 1}); return c.Next() })
+	app.Use(rolePreviewMiddleware(deps))
+	app.Post("/sso-link", func(c fiber.Ctx) error { return c.SendStatus(http.StatusNoContent) })
+	app.Post(previewOtherPath, func(c fiber.Ctx) error { return c.SendStatus(http.StatusNoContent) })
+	activate := httptest.NewRequestWithContext(t.Context(), http.MethodPost, rolePreviewPath,
+		strings.NewReader(`{"roleId":2}`))
+	activate.Header.Set("Content-Type", "application/json")
+	active, err := app.Test(activate)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, active.StatusCode)
+	require.NoError(t, active.Body.Close())
+	for _, path := range []string{"/sso-link", previewOtherPath} {
+		request := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, nil)
+		request.Header.Set("Accept", "application/json")
+		for _, cookie := range active.Cookies() {
+			request.AddCookie(cookie)
+		}
+		response, err := app.Test(request)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusForbidden, response.StatusCode)
+		if path == "/sso-link" {
+			var body struct {
+				Code string `json:"code"`
+			}
+			require.NoError(t, json.NewDecoder(response.Body).Decode(&body))
+			require.Equal(t, "role_preview_active", body.Code)
+			require.Equal(t, "no-store", response.Header.Get("Cache-Control"))
+		} else {
+			require.Equal(t, "text/plain; charset=utf-8", response.Header.Get("Content-Type"))
+		}
+		require.NoError(t, response.Body.Close())
+	}
+	owner.owner = false
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/sso-link", nil)
+	request.Header.Set("Accept", "application/json")
+	for _, cookie := range active.Cookies() {
+		request.AddCookie(cookie)
+	}
+	response, err := app.Test(request)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusForbidden, response.StatusCode)
+	var body struct {
+		Code string `json:"code"`
+	}
+	require.NoError(t, json.NewDecoder(response.Body).Decode(&body))
+	require.Equal(t, "role_preview_invalid", body.Code)
+	require.NoError(t, response.Body.Close())
 }
 
 func TestRolePreviewActionPresentationIntersectsCurrentGuard(t *testing.T) {

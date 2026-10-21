@@ -37,13 +37,14 @@ func rolePreviewMiddleware(deps Dependencies) fiber.Handler {
 		state := fiber.Map{"active": id > 0, "available": owner, "roles": []fiber.Map{}}
 		if err := applyRolePreview(c, deps, owner, id, state); err != nil {
 			if errors.Is(err, fiber.ErrForbidden) {
-				return c.SendStatus(fiber.StatusForbidden)
+				return denyRolePreviewLink(c, "role_preview_invalid",
+					"Режим просмотра роли недоступен. Выйдите из него и откройте форму заново.")
 			}
 			return err
 		}
 		// Every mutation is denied before route/command execution, even without a guard.
 		if id > 0 && c.Method() != fiber.MethodGet && c.Method() != fiber.MethodHead {
-			return c.SendStatus(fiber.StatusForbidden)
+			return denyRolePreviewLink(c, "role_preview_active", "Выйдите из режима просмотра роли и откройте форму привязки заново.")
 		}
 		if owner && deps.Repos.RolesManager != nil {
 			options, err := rolePreviewOptions(c, deps)
@@ -55,6 +56,14 @@ func rolePreviewMiddleware(deps Dependencies) fiber.Handler {
 		c.Locals("goadmin.rolePreview", state)
 		return c.Next()
 	}
+}
+
+func denyRolePreviewLink(c fiber.Ctx, code, message string) error {
+	if c.Path() == "/sso-link" && c.Method() == fiber.MethodPost && c.Get("Accept") == "application/json" {
+		c.Set(fiber.HeaderCacheControl, "no-store")
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"code": code, "message": message})
+	}
+	return c.SendStatus(fiber.StatusForbidden)
 }
 
 func controlRolePreview(c fiber.Ctx, deps Dependencies, owner bool) error {

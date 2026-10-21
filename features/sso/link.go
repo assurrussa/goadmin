@@ -21,6 +21,8 @@ import (
 	"github.com/assurrussa/goadmin/host"
 )
 
+const linkJSONAccept = "application/json"
+
 // LinkSchema is migrated by the host in the same dedicated schema as Schema.
 // Intent identifiers are hashed at rest; no provider tokens are stored here.
 func LinkSchema() string {
@@ -219,11 +221,11 @@ func (h *linkHandler) confirm(c fiber.Ctx) error {
 		c.Get("Origin") != h.service.Config.Origin ||
 		!strings.HasPrefix(c.Get("Content-Type"), "application/x-www-form-urlencoded") ||
 		(c.Get("Sec-Fetch-Site") != "" && c.Get("Sec-Fetch-Site") != "same-origin") {
-		return c.SendStatus(http.StatusForbidden)
+		return h.deny(c, "link_request_invalid", "Запрос привязки отклонён. Откройте форму заново.")
 	}
 	local, native, err := h.current(c)
 	if err != nil {
-		return c.SendStatus(http.StatusForbidden)
+		return h.deny(c, "link_native_session_invalid", "Локальный вход недоступен. Войдите локально заново.")
 	}
 	args := c.Request().PostArgs()
 	for _, name := range []string{"intent", "csrf", "confirm"} {
@@ -264,7 +266,7 @@ func (h *linkHandler) confirm(c fiber.Ctx) error {
 	}
 	pinned, err := sdkBinding(binding)
 	if err != nil || current != pinned {
-		return c.SendStatus(http.StatusForbidden)
+		return h.deny(c, "link_binding_changed", "Подтверждение SSO изменилось. Откройте новую форму.")
 	}
 	if _, err = h.admin.LinkExternalAdminIdentity(c, binding); err != nil {
 		if !admissionDenied(err) {
@@ -281,15 +283,24 @@ func (h *linkHandler) confirm(c fiber.Ctx) error {
 			"Учётная запись привязана, но не удалось восстановить путь возврата.")
 	}
 	next := "/sso?redirectback=" + url.QueryEscape(target)
-	if c.Get("Accept") == "application/json" {
+	if c.Get("Accept") == linkJSONAccept {
 		return c.JSON(fiber.Map{"next": next})
 	}
 	return c.Redirect().Status(http.StatusSeeOther).To(next)
 }
 
+// Keep the original non-JSON denial while making JSON form failures
+// distinguishable without returning credentials or identity details.
+func (h *linkHandler) deny(c fiber.Ctx, code, message string) error {
+	if c.Get("Accept") == linkJSONAccept {
+		return h.failure(c, http.StatusForbidden, code, message)
+	}
+	return c.SendStatus(http.StatusForbidden)
+}
+
 func (h *linkHandler) failure(c fiber.Ctx, status int, code, message string) error {
 	c.Status(status)
-	if c.Get("Accept") == "application/json" {
+	if c.Get("Accept") == linkJSONAccept {
 		return c.JSON(fiber.Map{errorCodeProp: code, messageProp: message})
 	}
 	return h.render(c, "auth/SSOErrorPage", map[string]any{
