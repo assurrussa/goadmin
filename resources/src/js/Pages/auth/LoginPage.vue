@@ -6,7 +6,9 @@
 
     <template #subtitle> {{ t('Войдите в административную панель') }} </template>
 
-    <slot name="auth-providers" />
+    <slot name="auth-providers">
+      <SSOButton v-if="page.props.adminSSOEnabled === true" />
+    </slot>
 
     <AdminForm :form="form" :fields="['email', 'password']" @submit="handleLogin">
       <!-- Email -->
@@ -82,6 +84,7 @@
 </template>
 
 <script setup lang="ts">
+import SSOButton from '@/components/auth/SSOButton.vue'
 import { t } from '@/i18n'
 
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
@@ -108,6 +111,7 @@ const props = defineProps({
 })
 
 const page = usePage()
+
 const pageErrors = (page.props.errors as Record<string, string>) || {}
 const oldData = (page.props.old as Record<string, string | null>) || {}
 

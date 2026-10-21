@@ -1419,3 +1419,21 @@ Disposable browser fixtures exercised the actual Vue/Inertia pages at 1440px and
 390px in light/dark themes, including keyboard submission. HTTP mutations in the
 browser fixture were synthetic; handler/service tests verify backend behavior.
 This change does not merge, release, deploy, or enable hosted CI.
+
+## Optional shared SSO adapter (candidate, 2026-10-21)
+
+Explicit selection only: `features/sso`. No gossoclient changes and no automatic
+installation into hosts. Preserve local canonical membership and identity links.
+SEO Center is the first consumer; other sites remain unchanged until separately
+validated. Core login only renders the SSO button when the feature sets its prop.
+
+Moved browser runtime/authority/link/recovery and navigation-intent logic into
+one optional package. Link forms now use the native Inertia renderer; submissions
+carry native CSRF and do not silently repeat after uncertain outcomes. Same-origin
+callback continuation remains automatic. Removed a repeated entry click with a
+CSRF-bound POST; the entry history is replaced with a normal login URL so Back
+should not restart authorization. Browser confirmation of that behavior is pending.
+
+Evidence and remaining gates are listed in docs/sso-adapter.md. This is not yet
+released or production-verified. The application still owns local admission and
+its existing ENV mapping; do not expose secrets through props or diagnostics.

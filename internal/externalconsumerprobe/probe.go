@@ -135,6 +135,7 @@ import (
 	_ "github.com/assurrussa/goadmin/features/access"
 	_ "github.com/assurrussa/goadmin/features/admission"
 	_ "github.com/assurrussa/goadmin/features/profile"
+ _ "github.com/assurrussa/goadmin/features/sso"
 	_ "github.com/assurrussa/goadmin/features/authmail"
 	_ "github.com/assurrussa/goadmin/features/jobs"
 	adminuploads "github.com/assurrussa/goadmin/features/uploads"

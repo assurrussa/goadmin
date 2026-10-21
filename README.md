@@ -155,6 +155,7 @@ must not rewrite another namespace into `/public` after compression selection.
 - `github.com/assurrussa/goadmin/features/access`
 - `github.com/assurrussa/goadmin/features/admission`
 - `github.com/assurrussa/goadmin/features/profile`
+- `github.com/assurrussa/goadmin/features/sso`
 - `github.com/assurrussa/goadmin/features/jobs`
 - `github.com/assurrussa/goadmin/features/uploads`
 - `github.com/assurrussa/goadmin/features/queues`
@@ -562,3 +563,11 @@ explicit per-field SSO presentation, local by default, and a manual-refresh
 contract. It is an unreleased candidate; no release readiness is claimed.
 See [profile presentation](docs/profile-presentation.md) for source pins,
 privacy, migration and host callback/native-login sequencing.
+
+## Optional browser SSO adapter
+
+`github.com/assurrussa/goadmin/features/sso` is an explicitly selected feature.
+It uses gossoclient without adding admin concepts to that SDK. No SSO feature
+means no provider discovery, SSO routes, new required configuration or migrations.
+Local membership and canonical links remain authoritative; email never auto-links.
+See `docs/sso-adapter.md` for the integration and verification contract.

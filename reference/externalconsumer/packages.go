@@ -15,6 +15,7 @@ var TestSupportPackages = [...]string{
 // FeaturePackages are reusable admin feature packages supported for host
 // projects. Future features must be added explicitly before they are stable.
 var FeaturePackages = [...]string{
+	"github.com/assurrussa/goadmin/features/sso",
 	"github.com/assurrussa/goadmin/features/operations",
 	"github.com/assurrussa/goadmin/features/access",
 	"github.com/assurrussa/goadmin/features/admission",

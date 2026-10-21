@@ -11,6 +11,7 @@ import (
 	_ "github.com/assurrussa/goadmin/features/profile"
 	_ "github.com/assurrussa/goadmin/features/queues"
 	_ "github.com/assurrussa/goadmin/features/realtime"
+	_ "github.com/assurrussa/goadmin/features/sso"
 	_ "github.com/assurrussa/goadmin/features/uploads"
 	_ "github.com/assurrussa/goadmin/features/users"
 	_ "github.com/assurrussa/goadmin/host"
