@@ -176,3 +176,24 @@ mutation in a browser, including denied access. Match the build-time CSRF
 cookie name to the server configuration. Use the
 [embedding guide's failure matrix](embedding-client.md#add-change-or-remove-a-page)
 for blank pages, fallback components and failed writes.
+
+### Selecting canonical administrators for a host-owned team
+
+Use `host.NewAdminDirectory(existingSQLDB, permissionChecker, manageTeamKey)`.
+It borrows the same canonical database and checks the host-selected permission
+for every search. It adds no HTTP route, roles or optional modules.
+`Search(ctx, actor, query, limit)` accepts a literal 2–128 character name/email/
+username prefix and a limit of 1–50; `More` means the UI should refine its query.
+Only active, non-retired subjects with undeleted admin membership are returned.
+The minimal result contains canonical `SubjectID`, name, username and email,
+never credentials or numeric IDs from another application.
+
+Before opening the write transaction, authorize the host action using its current
+permission guard. Then call `LockActive(ctx, tx, subject)`
+inside the same transaction used for that write. This target-validation primitive
+does not authorize the caller or obtain another pooled connection. Use the existing canonical
+pool and retain the locks until commit/rollback. Handle unavailable targets as
+validation failures. Revocation must not require an active target, so disabled
+accounts can still be removed from teams. The host still owns its route guards,
+CSRF checks, optimistic versioning and team authorization. A directory entry
+alone never grants access.
