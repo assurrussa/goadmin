@@ -87,7 +87,7 @@ func testSSOIssuer(t *testing.T) (*httptest.Server, func(url.Values)) {
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
 			_ = json.NewEncoder(w).Encode(map[string]any{
-				"issuer": origin, "authorization_endpoint": origin + "/authorize", "token_endpoint": origin + "/token",
+				testIssuerReason: origin, "authorization_endpoint": origin + "/authorize", "token_endpoint": origin + "/token",
 				"jwks_uri": origin + "/keys", "revocation_endpoint": origin + "/revoke",
 				"id_token_signing_alg_values_supported": []string{"RS256"},
 			})
@@ -146,6 +146,7 @@ func testSSOIssuer(t *testing.T) (*httptest.Server, func(url.Values)) {
 }
 
 func TestSSOReturnPathThroughRealSDK(t *testing.T) {
+	const settingsReturn = "/auth/profile/settings"
 	db := testSSODatabase(t)
 	if err := Migrate(t.Context(), db); err != nil {
 		t.Fatal(err)
@@ -173,7 +174,7 @@ func TestSSOReturnPathThroughRealSDK(t *testing.T) {
 	app.Get("/sso", f.page)
 	app.Post("/login", f.begin)
 	app.Get(callbackPath, f.callback)
-	pageURL := rp.Config.Origin + "/sso?redirectback=%2Freports%3Ftab%3Dactive"
+	pageURL := rp.Config.Origin + "/sso?redirectback=%2Fauth%2Fprofile%2Fsettings"
 	page, err := app.Test(httptest.NewRequestWithContext(t.Context(), "GET", pageURL, nil))
 	if err != nil {
 		t.Fatal(err)
@@ -184,7 +185,7 @@ func TestSSOReturnPathThroughRealSDK(t *testing.T) {
 	if len(match) != 2 {
 		t.Fatalf("missing CSRF form: status %d", page.StatusCode)
 	}
-	form := url.Values{"csrf": {string(match[1])}, "return": {testReturnTarget}}
+	form := url.Values{testLinkCSRFField: {string(match[1])}, "return": {settingsReturn}}
 	req := httptest.NewRequestWithContext(t.Context(), "POST", rp.Config.Origin+"/login", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", rp.Config.Origin)
@@ -227,7 +228,7 @@ func TestSSOReturnPathThroughRealSDK(t *testing.T) {
 	if err = row.Scan(&ref, &generation, &target); err != nil {
 		t.Fatal(err)
 	}
-	if ref == "" || generation <= 0 || target != testReturnTarget {
+	if ref == "" || generation <= 0 || target != settingsReturn {
 		t.Fatal("SDK round trip lost or unbound return target")
 	}
 
@@ -241,9 +242,9 @@ func TestSSOReturnPathThroughRealSDK(t *testing.T) {
 		}
 	}
 	binding := browser.Binding{Reference: ref, LoginGeneration: generation}
-	assertReturnRemainsAvailable(t, rp, binding)
+	assertReturnRemainsAvailable(t, rp, binding, settingsReturn)
 	got, e := rp.takeReturn(t.Context(), binding)
-	if e != nil || got != testReturnTarget {
+	if e != nil || got != settingsReturn {
 		t.Fatal("bound return target unavailable", e)
 	}
 	got, e = rp.takeReturn(t.Context(), binding)
@@ -257,11 +258,11 @@ func TestSSOReturnPathThroughRealSDK(t *testing.T) {
 	}
 }
 
-func assertReturnRemainsAvailable(t *testing.T, rp *Runtime, binding browser.Binding) {
+func assertReturnRemainsAvailable(t *testing.T, rp *Runtime, binding browser.Binding, target string) {
 	t.Helper()
 	for range 2 {
 		peeked, err := rp.peekReturn(t.Context(), binding)
-		if err != nil || peeked != testReturnTarget {
+		if err != nil || peeked != target {
 			t.Fatal("peek consumed the target before admission", err)
 		}
 	}
@@ -314,7 +315,7 @@ func testRealSDKLinkSemanticTimes(t *testing.T, rp *Runtime, page, callback *htt
 	if shifted == oldBinding || sdkBindingDifference(shifted, oldBinding) != "" {
 		t.Fatal("real SDK binding times were not compared semantically")
 	}
-	rp.csrfCookie = "csrf_token"
+	rp.csrfCookie = testLinkCSRFCookie
 	linkCSRF, err := host.NewCSRFService(host.CSRFConfig{
 		AppDomain: "admin.test", SecretKey: strings.Repeat("x", 32), AllowedOrigins: []string{rp.Config.Origin},
 	}, nil)
@@ -362,7 +363,7 @@ func testRealSDKLinkSemanticTimes(t *testing.T, rp *Runtime, page, callback *htt
 		t.Fatal(err)
 	}
 	linkForm := url.Values{
-		"intent": {linkProps.Intent}, "csrf": {linkProps.CSRF},
+		"intent": {linkProps.Intent}, testLinkCSRFField: {linkProps.CSRF},
 		"confirm": {"link-this-identity"},
 	}
 	linkPost := httptest.NewRequestWithContext(t.Context(), http.MethodPost, rp.Config.Origin+"/sso-link",

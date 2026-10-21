@@ -19,6 +19,16 @@
       >
     </form>
     <p v-if="error" role="alert" class="mt-4 text-sm text-danger">{{ error }}</p>
+    <form
+      v-if="errorCode === 'local_auth_stale'"
+      method="post"
+      action="/sso-link/reauth"
+      class="mt-3"
+    >
+      <input type="hidden" name="csrf" :value="csrf" />
+      <input type="hidden" name="confirm" value="reauthenticate-local" />
+      <button type="submit" class="text-primary">Войти заново</button>
+    </form>
     <a v-if="error" href="/sso-link" class="mt-3 block text-primary">Открыть новую форму</a>
     <a href="/" class="mt-4 block text-center text-primary">Отмена</a>
   </AuthLayout>
@@ -31,10 +41,12 @@ import FormButton from '@/components/form/FormButton.vue'
 const props = defineProps<{ issuer: string; subject: string; intent: string; csrf: string }>()
 const submitting = ref(false)
 const error = ref('')
+const errorCode = ref('')
 async function confirmLink() {
   if (submitting.value) return
   submitting.value = true
   error.value = ''
+  errorCode.value = ''
   try {
     const response = await fetch('/sso-link', {
       method: 'POST',
@@ -65,6 +77,7 @@ async function confirmLink() {
       typeof body?.message === 'string'
         ? body.message
         : 'Привязка не подтверждена. Откройте новую форму или войдите локально заново.'
+    errorCode.value = typeof body?.code === 'string' ? body.code : ''
   } catch {
     error.value =
       'Результат запроса неизвестен. Не повторяйте отправку: откройте новую форму для проверки.'

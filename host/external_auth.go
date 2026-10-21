@@ -8,6 +8,40 @@ import (
 	"github.com/assurrussa/goadmin/services/adminservice"
 )
 
+type IdentityLinkEligibility = adminservice.IdentityLinkEligibility
+
+const (
+	IdentityLinkFresh    = adminservice.IdentityLinkFresh
+	IdentityLinkStale    = adminservice.IdentityLinkStale
+	IdentityLinkNotLocal = adminservice.IdentityLinkNotLocal
+)
+
+// LocalIdentityLinkEligibility reads the canonical session's original creation
+// time using the same effective freshness setting as GoAuth. It is UI guidance;
+// the mutation performs the final canonical enforcement.
+func (a *App) LocalIdentityLinkEligibility(c fiber.Ctx) (IdentityLinkEligibility, error) {
+	if a == nil || a.inner == nil {
+		return "", goauth.ErrSessionRevoked
+	}
+	return a.inner.AdminAuth().LocalIdentityLinkEligibility(c)
+}
+
+// LogoutLocalAdminAuth only terminates a verified local native session. It
+// never invokes RP logout, even if a browser session was replaced concurrently.
+func (a *App) LogoutLocalAdminAuth(c fiber.Ctx) error {
+	if a == nil || a.inner == nil {
+		return goauth.ErrSessionRevoked
+	}
+	return a.inner.AdminAuth().LogoutLocalAdminAuth(c)
+}
+
+func (a *App) HasExternalAdminIdentity(c fiber.Ctx, issuer, externalSubject string) (bool, error) {
+	if a == nil || a.inner == nil {
+		return false, goauth.ErrSessionRevoked
+	}
+	return a.inner.AdminAuth().HasExternalAdminIdentity(c, issuer, externalSubject)
+}
+
 type (
 	ExternalBinding          = adminservice.ExternalBinding
 	ExternalProof            = adminservice.ExternalProof

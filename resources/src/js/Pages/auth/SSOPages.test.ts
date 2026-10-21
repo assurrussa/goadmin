@@ -88,4 +88,27 @@ describe('shared SSO pages', () => {
     expect(root.textContent).toContain('identity_not_linked')
     expect(root.querySelector('a[href*="redirectback"]')).toBeNull()
   })
+  it('guides a verified unlinked identity through local login to a new confirmation form', () => {
+    const root = mount(SSOErrorPage, {
+      title: 'Привязка нужна',
+      message: 'Войдите локально и подтвердите привязку',
+      code: 'identity_not_linked',
+      linkAvailable: true,
+      returnTarget: '/auth/profile/settings',
+    })
+    expect(root.querySelector('a[href="/sso-link"]')).not.toBeNull()
+    expect(root.querySelector('form[action="/sso-link"]')).toBeNull()
+  })
+  it('does not loop through linking for an external native session', () => {
+    const root = mount(SSOErrorPage, {
+      title: 'Локальный вход нужен',
+      message: 'Завершите текущий сеанс и войдите локально',
+      code: 'local_auth_required',
+      linkAvailable: false,
+      startAvailable: false,
+    })
+    expect(root.querySelector('a[href="/sso-link"]')).toBeNull()
+    expect(root.querySelector('a[href="/auth/profile/settings"]')).not.toBeNull()
+    expect(root.querySelector('a[href="/auth/login?local=1"]')).toBeNull()
+  })
 })

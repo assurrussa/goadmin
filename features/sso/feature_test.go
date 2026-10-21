@@ -68,7 +68,7 @@ func TestRecoveryIntentRejectsCrossOriginAndUnsafeMethods(t *testing.T) {
 		{"exact origin", http.MethodGet, "", testAdminOrigin, "", http.StatusNoContent},
 		{"cross origin", http.MethodGet, "cross-site", "https://attacker.invalid", "", http.StatusForbidden},
 		{"missing provenance", http.MethodGet, "", "", "", http.StatusForbidden},
-		{"mutation", "POST", ssoSameOrigin, "", "", http.StatusForbidden},
+		{"mutation", http.MethodPost, ssoSameOrigin, "", "", http.StatusForbidden},
 		{"query", http.MethodGet, ssoSameOrigin, "", "?next=https://attacker.invalid", http.StatusForbidden},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

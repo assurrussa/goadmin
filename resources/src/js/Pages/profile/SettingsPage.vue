@@ -8,6 +8,51 @@
   />
 
   <div class="space-y-8">
+    <section v-if="ssoEnabled" aria-labelledby="sso-settings-title" class="space-y-4">
+      <h2 id="sso-settings-title" class="text-xl font-semibold">AuthHub SSO</h2>
+      <Card>
+        <CardHeader class="border-b border-border-secondary bg-surface-variant/40">
+          <CardTitle>Связь учётной записи</CardTitle>
+          <CardDescription
+            >Вход через SSO использует ваши существующие локальные права.</CardDescription
+          >
+        </CardHeader>
+        <CardContent class="space-y-3 pt-6">
+          <p v-if="ssoLoading" role="status">Проверяем состояние привязки…</p>
+          <p v-else-if="ssoError" role="alert">
+            Состояние привязки временно недоступно. Обновите страницу позже.
+          </p>
+          <template v-else-if="ssoAccount">
+            <p v-if="ssoAccount.linked" role="status">Учётная запись AuthHub привязана.</p>
+            <template v-else>
+              <p role="status">Учётная запись AuthHub не привязана.</p>
+              <p v-if="ssoAccount.pending" class="text-sm text-text-secondary">
+                Вход через AuthHub подтверждён. Завершите привязку, чтобы использовать SSO в этой
+                админке.
+              </p>
+              <p v-if="ssoAccount.localAuth === 'stale'" class="text-sm text-text-secondary">
+                Для привязки потребуется новый локальный вход.
+              </p>
+              <p v-if="ssoAccount.localAuth === 'not_local'" class="text-sm text-text-secondary">
+                Для привязки завершите текущий сеанс через меню профиля и войдите локально. Выход из
+                AuthHub не выполняется автоматически.
+              </p>
+              <a
+                v-if="ssoAccount.localAuth !== 'not_local'"
+                :href="
+                  ssoAccount.pending
+                    ? '/sso-link'
+                    : '/sso?redirectback=%2Fauth%2Fprofile%2Fsettings'
+                "
+                class="text-primary"
+              >
+                {{ ssoAccount.pending ? 'Завершить привязку' : 'Привязать AuthHub' }}
+              </a>
+            </template>
+          </template>
+        </CardContent>
+      </Card>
+    </section>
     <section v-if="authmail" aria-labelledby="profile-settings-title" class="space-y-4">
       <h2 id="profile-settings-title" class="text-xl font-semibold">{{ t('Профиль') }}</h2>
       <Card>
@@ -179,7 +224,7 @@ import { t, locale } from '@/i18n'
 import LocalMFASettings from '@/components/profile/LocalMFASettings.vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
-import { useForm } from '@inertiajs/vue3'
+import { useForm, usePage } from '@inertiajs/vue3'
 import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'
 import FormInput from '@/components/form/FormInput.vue'
@@ -206,6 +251,41 @@ interface SettingsProps {
 
 const props = defineProps<SettingsProps>()
 const { authmail } = useAdminCapabilities()
+const page = usePage()
+const ssoEnabled = computed(() => page.props.adminSSOEnabled === true)
+interface SSOAccount {
+  linked: boolean
+  pending: boolean
+  localAuth: 'fresh' | 'stale' | 'not_local'
+}
+const ssoAccount = ref<SSOAccount | null>(null)
+const ssoLoading = ref(false)
+const ssoError = ref(false)
+onMounted(async () => {
+  if (!ssoEnabled.value) return
+  ssoLoading.value = true
+  try {
+    const response = await fetch('/sso-account', {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    })
+    if (!response.ok) throw new Error('unavailable')
+    const data: unknown = await response.json()
+    if (
+      !data ||
+      typeof data !== 'object' ||
+      typeof (data as SSOAccount).linked !== 'boolean' ||
+      typeof (data as SSOAccount).pending !== 'boolean' ||
+      !['fresh', 'stale', 'not_local'].includes((data as SSOAccount).localAuth)
+    )
+      throw new Error('invalid status')
+    ssoAccount.value = data as SSOAccount
+  } catch {
+    ssoError.value = true
+  } finally {
+    ssoLoading.value = false
+  }
+})
 
 const emailRequestForm = useForm({
   currentPassword: '',

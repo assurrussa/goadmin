@@ -131,7 +131,10 @@ func (f *linkFeature) Build(host.Menu) host.ExtensionBuilder {
 type linkAdmin interface {
 	CurrentActor(ctx context.Context) (host.Actor, bool)
 	AdminCSRFRequest(c fiber.Ctx) (host.CSRFRequest, error)
+	LocalIdentityLinkEligibility(c fiber.Ctx) (host.IdentityLinkEligibility, error)
+	HasExternalAdminIdentity(c fiber.Ctx, issuer, externalSubject string) (bool, error)
 	LinkExternalAdminIdentity(c fiber.Ctx, b host.ExternalBinding) (goauth.IdentityLink, error)
+	LogoutLocalAdminAuth(c fiber.Ctx) error
 }
 
 type linkHandler struct {
@@ -145,8 +148,10 @@ type linkHandler struct {
 
 func (h *linkHandler) RegisterGroupRoutes(router fiber.Router, _ ...fiber.Handler) {
 	router.Get("/sso-link", h.page)
+	router.Get("/sso-account", h.account)
 	// Core authentication, Origin/CSRF and role-preview mutation denial run first.
 	router.Post("/sso-link", h.confirm)
+	router.Post("/sso-link/reauth", h.reauthenticate)
 }
 
 func (h *linkHandler) current(c fiber.Ctx) (goauth.SubjectID, host.CSRFRequest, error) {
@@ -172,6 +177,18 @@ func (h *linkHandler) page(c fiber.Ctx) error {
 	local, native, err := h.current(c)
 	if err != nil {
 		return c.SendStatus(http.StatusForbidden)
+	}
+	eligibility, err := h.admin.LocalIdentityLinkEligibility(c)
+	if err != nil {
+		return h.failure(c, http.StatusServiceUnavailable, "local_auth_unavailable",
+			"Не удалось проверить локальный вход. Попробуйте позже.")
+	}
+	if eligibility == host.IdentityLinkStale {
+		return h.staleFailure(c, native)
+	}
+	if eligibility != host.IdentityLinkFresh {
+		return h.failure(c, http.StatusForbidden, "local_auth_required",
+			"Завершите текущий сеанс через меню профиля и войдите локально для привязки.")
 	}
 	r, err := adaptor.ConvertRequest(c, true)
 	if err != nil {
@@ -227,6 +244,17 @@ func (h *linkHandler) confirm(c fiber.Ctx) error {
 	if err != nil {
 		return h.deny(c, "link_native_session_invalid", "Локальный вход недоступен. Войдите локально заново.")
 	}
+	eligibility, err := h.admin.LocalIdentityLinkEligibility(c)
+	if err != nil {
+		return h.failure(c, http.StatusServiceUnavailable, "local_auth_unavailable",
+			"Не удалось проверить локальный вход. Попробуйте позже.")
+	}
+	if eligibility == host.IdentityLinkStale {
+		return h.staleFailure(c, native)
+	}
+	if eligibility != host.IdentityLinkFresh {
+		return h.deny(c, "local_auth_required", "Для привязки войдите локально.")
+	}
 	args := c.Request().PostArgs()
 	for _, name := range []string{"intent", "csrf", "confirm"} {
 		if len(args.PeekMulti(name)) != 1 {
@@ -272,12 +300,7 @@ func (h *linkHandler) confirm(c fiber.Ctx) error {
 		return h.denyBinding(c, reason)
 	}
 	if _, err = h.admin.LinkExternalAdminIdentity(c, binding); err != nil {
-		if !admissionDenied(err) {
-			return h.failure(c, http.StatusServiceUnavailable, "identity_store_unavailable",
-				"Хранилище привязок временно недоступно. Откройте новую форму позже.")
-		}
-		return h.failure(c, http.StatusForbidden, "identity_link_rejected",
-			"Не удалось привязать учётную запись. Проверьте локальный аккаунт и существующую привязку.")
+		return h.linkFailure(c, native, err)
 	}
 	// The explicit link grants no session. Continue with a fresh state-bound login.
 	target, err := h.takeReturn(c.Context(), current)
@@ -290,6 +313,107 @@ func (h *linkHandler) confirm(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{"next": next})
 	}
 	return c.Redirect().Status(http.StatusSeeOther).To(next)
+}
+
+func (h *linkHandler) linkFailure(c fiber.Ctx, native host.CSRFRequest, linkErr error) error {
+	if errors.Is(linkErr, goauth.ErrIdentityLinkConflict) {
+		return h.failure(c, http.StatusConflict, "identity_link_conflict",
+			"Эта учётная запись SSO уже привязана. Проверьте существующую привязку.")
+	}
+	if errors.Is(linkErr, goauth.ErrExplicitIdentityLink) {
+		eligibility, checkErr := h.admin.LocalIdentityLinkEligibility(c)
+		if checkErr == nil && eligibility == host.IdentityLinkStale {
+			return h.staleFailure(c, native)
+		}
+	}
+	if !admissionDenied(linkErr) {
+		return h.failure(c, http.StatusServiceUnavailable, "identity_store_unavailable",
+			"Хранилище привязок временно недоступно. Откройте новую форму позже.")
+	}
+	return h.failure(c, http.StatusForbidden, "identity_link_rejected",
+		"Не удалось привязать учётную запись. Проверьте локальный аккаунт и существующую привязку.")
+}
+
+// account is an authenticated, read-only status endpoint. No provider or
+// canonical secrets are returned to the browser.
+func (h *linkHandler) account(c fiber.Ctx) error {
+	c.Set("Cache-Control", "no-store")
+	_, _, err := h.current(c)
+	if err != nil {
+		return c.SendStatus(http.StatusForbidden)
+	}
+	r, err := adaptor.ConvertRequest(c, true)
+	if err != nil {
+		return c.SendStatus(http.StatusBadRequest)
+	}
+	id, binding, verifyErr := h.verify(r.WithContext(c.Context()))
+	verified := verifyErr == nil && h.service.matchesSnapshot(id, binding)
+	subject := ""
+	if verified {
+		subject = id.Subject
+	}
+	linked, err := h.admin.HasExternalAdminIdentity(c, h.service.Config.Issuer, subject)
+	if err != nil {
+		return c.Status(http.StatusServiceUnavailable).JSON(fiber.Map{"code": "identity_store_unavailable"})
+	}
+	eligibility, err := h.admin.LocalIdentityLinkEligibility(c)
+	if err != nil {
+		return c.Status(http.StatusServiceUnavailable).JSON(fiber.Map{"code": "local_auth_unavailable"})
+	}
+	pending := verified && !linked
+	return c.JSON(fiber.Map{"linked": linked, "pending": pending, "localAuth": eligibility})
+}
+
+func (h *linkHandler) staleFailure(c fiber.Ctx, native host.CSRFRequest) error {
+	const message = "Локальный вход слишком старый для привязки SSO. " +
+		"Нажмите «Войти заново», затем подтвердите привязку в новой форме."
+	if c.Get("Accept") == linkJSONAccept {
+		return h.failure(c, http.StatusForbidden, "local_auth_stale", message)
+	}
+	token, err := h.csrf.Create(c.Context(), native)
+	if err != nil {
+		return h.failure(c, http.StatusServiceUnavailable, "local_auth_unavailable",
+			"Не удалось подготовить повторный вход. Попробуйте позже.")
+	}
+	c.Cookie(&fiber.Cookie{Name: h.service.csrfCookie, Value: token.Token, Path: "/", Secure: true, SameSite: "Lax"})
+	return h.render(c, "auth/SSOErrorPage", map[string]any{
+		titleProp: "Повторный локальный вход", errorCodeProp: "local_auth_stale", messageProp: message,
+		"reauthCSRF": token.Token,
+	})
+}
+
+// reauthenticate is explicit user intent, not an automatic logout or replay.
+func (h *linkHandler) reauthenticate(c fiber.Ctx) error {
+	c.Set("Cache-Control", "no-store")
+	if len(c.Body()) > 1024 || len(c.Request().Header.PeekAll("Origin")) != 1 ||
+		c.Get("Origin") != h.service.Config.Origin ||
+		!strings.HasPrefix(c.Get("Content-Type"), "application/x-www-form-urlencoded") ||
+		(c.Get("Sec-Fetch-Site") != "" && c.Get("Sec-Fetch-Site") != "same-origin") {
+		return c.SendStatus(http.StatusForbidden)
+	}
+	_, native, err := h.current(c)
+	if err != nil {
+		return c.SendStatus(http.StatusForbidden)
+	}
+	eligibility, err := h.admin.LocalIdentityLinkEligibility(c)
+	if err != nil {
+		return c.SendStatus(http.StatusServiceUnavailable)
+	}
+	if eligibility == host.IdentityLinkNotLocal {
+		return c.SendStatus(http.StatusForbidden)
+	}
+	args := c.Request().PostArgs()
+	if len(args.PeekMulti("csrf")) != 1 || len(args.PeekMulti("confirm")) != 1 ||
+		string(args.Peek("confirm")) != "reauthenticate-local" {
+		return c.SendStatus(http.StatusBadRequest)
+	}
+	if _, valid, err := h.csrf.Check(c.Context(), native, string(args.Peek("csrf"))); err != nil || !valid {
+		return c.SendStatus(http.StatusForbidden)
+	}
+	if err := h.admin.LogoutLocalAdminAuth(c); err != nil {
+		return c.SendStatus(http.StatusServiceUnavailable)
+	}
+	return c.Redirect().Status(http.StatusSeeOther).To("/auth/login?local=1&redirectback=%2Fsso-link")
 }
 
 // Compare all original SDK fields, including the fixed deadline. time.Time's
@@ -351,7 +475,8 @@ func (h *linkHandler) failure(c fiber.Ctx, status int, code, message string) err
 	}
 	return h.render(c, "auth/SSOErrorPage", map[string]any{
 		titleProp:     "Не удалось завершить привязку",
-		errorCodeProp: code, messageProp: message, "linkAvailable": true, "startAvailable": true,
+		errorCodeProp: code, messageProp: message,
+		"linkAvailable": code != "local_auth_required", "startAvailable": code != "local_auth_required",
 	})
 }
 

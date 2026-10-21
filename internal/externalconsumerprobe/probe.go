@@ -229,6 +229,15 @@ func TestHostAuthAdapterAndMigrationContract(t *testing.T) {
 	}
 	_ = (*adminhost.Runtime).App
 	_ = adminmigrations.Migrate
+	// Optional SSO enrollment uses host-owned, read-only canonical status and a
+	// separate explicit local-only reauthentication action.
+	var _ func(*adminhost.App, fiber.Ctx) (adminhost.IdentityLinkEligibility, error) = (*adminhost.App).LocalIdentityLinkEligibility
+	var _ func(*adminhost.App, fiber.Ctx, string, string) (bool, error) = (*adminhost.App).HasExternalAdminIdentity
+	var _ func(*adminhost.App, fiber.Ctx) error = (*adminhost.App).LogoutLocalAdminAuth
+	if adminhost.IdentityLinkStale == adminhost.IdentityLinkFresh ||
+		adminhost.IdentityLinkNotLocal == adminhost.IdentityLinkFresh {
+		t.Fatal("identity link eligibility states collapsed")
+	}
 }
 
 type audioStrategy struct{}

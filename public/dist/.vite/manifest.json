@@ -454,7 +454,7 @@
     ]
   },
   "src/js/Pages/auth/SSOErrorPage.vue": {
-    "file": "js/SSOErrorPage-B6HxHa88.js",
+    "file": "js/SSOErrorPage-Rr_hoIwA.js",
     "name": "SSOErrorPage",
     "src": "src/js/Pages/auth/SSOErrorPage.vue",
     "isDynamicEntry": true,
@@ -467,7 +467,7 @@
     ]
   },
   "src/js/Pages/auth/SSOLinkPage.vue": {
-    "file": "js/SSOLinkPage-DJ8Om-LY.js",
+    "file": "js/SSOLinkPage-BMx37S69.js",
     "name": "SSOLinkPage",
     "src": "src/js/Pages/auth/SSOLinkPage.vue",
     "isDynamicEntry": true,
@@ -576,7 +576,7 @@
     ]
   },
   "src/js/Pages/profile/SettingsPage.vue": {
-    "file": "js/SettingsPage-CXTUQFtC.js",
+    "file": "js/SettingsPage-B3Qm4wNw.js",
     "name": "SettingsPage",
     "src": "src/js/Pages/profile/SettingsPage.vue",
     "isDynamicEntry": true,

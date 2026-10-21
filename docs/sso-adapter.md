@@ -17,6 +17,18 @@ Status: candidate, not released. Opt in only on admin origins.
   native admission. Canonical linkage, local membership and permissions are required.
 - Explicit identity linking uses a native authenticated GoAdmin page, CSRF and a
   single-use intent bound to both sessions. Success starts a fresh verified login.
+- The optional account/settings card reads the canonical GoAuth link and local
+  session creation time through the host boundary. It shows linked/unlinked and
+  a pending reminder only for a verified, not-yet-linked SSO identity. No SSO
+  module means no card or status routes. The RP store is not used to infer local
+  links, and no credential or secret enters page props.
+- The host passes GoAuth's effective `IdentityLinkAuthMaxAge` to the read-only
+  eligibility check: zero means GoAuth's 10-minute default, otherwise 1m–1h.
+  The final mutation still enforces GoAuth freshness. A stale local session
+  keeps ordinary profile access but offers an explicit CSRF-protected local-only
+  logout, then returns through local login to a new single-use linking form.
+  It never replays the old POST or revokes the provider session. Conflict and
+  dependency failures remain distinct from age expiration.
 - Expired external sessions use the existing native recovery protocol. No unsafe
   request is replayed, and absent/revoked identities never gain membership.
 - The host owns routing behind HTTPS, public URL, cookie policy and local RBAC.
