@@ -32,9 +32,13 @@ func TestSchemaCannotInjectSQL(t *testing.T) {
 
 func TestLandingAutostartsWithProtectedPOST(t *testing.T) {
 	w := httptest.NewRecorder()
-	renderLanding(w, nil, browser.View{}, "/materials")
+	renderLanding(w, nil, browser.View{}, "/materials", "https://issuer.example.test")
 	if w.Header().Get("Referrer-Policy") != "strict-origin" {
 		t.Fatal("native form POST must preserve Origin")
+	}
+	policy := w.Header().Get("Content-Security-Policy")
+	if !strings.Contains(policy, "form-action 'self' https://issuer.example.test;") || strings.Contains(policy, "*") {
+		t.Fatal("issuer redirect must be explicitly allowed without wildcards")
 	}
 	body := w.Body.String()
 	for _, fragment := range []string{beginScript, `method="post"`, `name="csrf"`, `name="return"`, "<noscript>"} {

@@ -83,7 +83,7 @@ func (f *Feature) page(c fiber.Ctx) error {
 		r.URL.Path, r.URL.RawPath, r.URL.RawQuery, r.RequestURI = "/", "", "", "/"
 		target := safeReturnPath(c.Query("redirectback"), f.rp.Config.Origin)
 		f.rp.Client.Handler(func(w http.ResponseWriter, r *http.Request, view browser.View) {
-			renderLanding(w, r, view, target)
+			renderLanding(w, r, view, target, f.rp.Config.Issuer)
 		}).ServeHTTP(w, r)
 	})
 }
@@ -227,11 +227,11 @@ var landing = template.Must(template.New("sso").Parse(`<!doctype html><html lang
 <script>` + beginScript + `</script><p>Переходим к авторизации…</p>
 <p><a href="/auth/login?local=1">Вернуться к локальному входу</a></p></html>`))
 
-func renderLanding(w http.ResponseWriter, _ *http.Request, view browser.View, target string) {
+func renderLanding(w http.ResponseWriter, _ *http.Request, view browser.View, target, issuer string) {
 	hash := sha256.Sum256([]byte(beginScript))
 	w.Header().Set("Content-Security-Policy",
 		"default-src 'none'; script-src 'sha256-"+base64.StdEncoding.EncodeToString(hash[:])+
-			"'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
+			"'; form-action 'self' "+issuer+"; base-uri 'none'; frame-ancestors 'none'")
 	w.Header().Set("Referrer-Policy", "strict-origin")
 	_ = landing.Execute(w, struct {
 		browser.View
