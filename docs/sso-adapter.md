@@ -22,6 +22,15 @@ Status: candidate, not released. Opt in only on admin origins.
   a pending reminder only for a verified, not-yet-linked SSO identity. No SSO
   module means no card or status routes. The RP store is not used to infer local
   links, and no credential or secret enters page props.
+- Mounting `LinkFeature` also contributes two profile-dropdown links:
+  «Связь с AuthHub» opens the shared linkage card in native profile settings;
+  «Открыть AuthHub» uses authenticated `GET /sso-provider-account` to redirect
+  to the configured issuer's `/sso/account` with only the configured client ID
+  and exact callback URL. The redirect does not read destination parameters
+  from the request. `GET /sso-account` remains the JSON linkage-status API;
+  hosts may retain their legacy `/sso/account` routes without a collision.
+  With no mounted LinkFeature, neither profile link is rendered. Hosts with an
+  incompatible provider override may retain legacy navigation as a fallback.
 - The host passes GoAuth's effective `IdentityLinkAuthMaxAge` to the read-only
   eligibility check: zero means GoAuth's 10-minute default, otherwise 1m–1h.
   The final mutation still enforces GoAuth freshness. A stale local session

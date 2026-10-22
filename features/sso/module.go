@@ -21,7 +21,7 @@ func (s *Runtime) Modules(links LinkResolver, csrf *host.CSRFService, csrfCookie
 		}, feature),
 		host.DefinedFeatureModule(host.ModuleDescriptor{
 			Key:    link.Descriptor().Key,
-			Routes: []string{"GET /sso-link", "POST /sso-link", "GET /sso-account", "POST /sso-link/reauth"},
+			Routes: []string{"GET /sso-link", "POST /sso-link", "GET /sso-account", "GET /sso-provider-account", "POST /sso-link/reauth"},
 		}, link),
 	}
 }

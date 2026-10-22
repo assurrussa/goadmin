@@ -146,6 +146,56 @@ func linkFixture(t *testing.T, customCookie ...string) (*fiber.App, *fakeLinkAdm
 	return app, admin, store, p, token.Token
 }
 
+func TestProviderAccountNavigationRequiresNativeActorAndUsesOnlyConfiguredTarget(t *testing.T) {
+	_, fixtureAdmin, _, _, _ := linkFixture(t)
+	admin := &fakeLinkAdmin{actor: fixtureAdmin.actor, native: fixtureAdmin.native}
+	service := &Runtime{Config: testConfig()}
+	h := &linkHandler{service: service, admin: admin}
+	app := fiber.New()
+	h.RegisterGroupRoutes(app)
+	want := service.Config.Issuer + "/sso/account?client_id=" + service.Config.ClientID +
+		"&redirect_uri=https%3A%2F%2Fadmin.example.test%2Fcallback"
+	for _, tc := range []struct {
+		name, path, inertia, authorization string
+		actor                              bool
+		status                             int
+	}{
+		{"document", providerAccountPath + "?redirect_uri=https://attacker.invalid", "", "", true, http.StatusSeeOther},
+		{"inertia", providerAccountPath, "true", "", true, http.StatusConflict},
+		{"no actor", providerAccountPath, "", "", false, http.StatusForbidden},
+		{"bearer", providerAccountPath, "", "Bearer fabricated", true, http.StatusForbidden},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.actor {
+				admin.actor = fixtureAdmin.actor
+			} else {
+				admin.actor = host.Actor{}
+			}
+			request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, tc.path, nil)
+			if tc.inertia != "" {
+				request.Header.Set("X-Inertia", tc.inertia)
+			}
+			if tc.authorization != "" {
+				request.Header.Set("Authorization", tc.authorization)
+			}
+			response, err := app.Test(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer response.Body.Close()
+			if response.StatusCode != tc.status {
+				t.Fatalf("status: %d", response.StatusCode)
+			}
+			if tc.status == http.StatusSeeOther && response.Header.Get("Location") != want {
+				t.Fatalf("target: %q", response.Header.Get("Location"))
+			}
+			if tc.status == http.StatusConflict && response.Header.Get("X-Inertia-Location") != want {
+				t.Fatalf("inertia target: %q", response.Header.Get("X-Inertia-Location"))
+			}
+		})
+	}
+}
+
 func linkRequest(t *testing.T, app *fiber.App, secret, csrf, origin string) *http.Response {
 	t.Helper()
 	form := url.Values{"intent": {secret}, testLinkCSRFField: {csrf}, testLinkConfirmField: {"link-this-identity"}}

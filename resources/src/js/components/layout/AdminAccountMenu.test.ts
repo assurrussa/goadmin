@@ -80,6 +80,42 @@ it('places only safe flat account links in the profile and keeps them out of the
   expect(sidebar.querySelector('a[href="/users"]')?.textContent).toContain('Sidebar only')
 })
 
+it('renders the adapter account links only when its section is supplied', () => {
+  const original = mocks.page.props.adminMenu.sections
+  const section = {
+    key: 'goadmin-sso-account',
+    placement: 'account',
+    items: [
+      { name: 'Связь с AuthHub', href: '/auth/profile/settings#sso-settings-title' },
+      { name: 'Открыть AuthHub', href: '/sso-provider-account' },
+    ],
+  }
+  try {
+    mocks.page.props.adminMenu.sections = [section]
+    const enabledRoot = document.createElement('div')
+    const enabledApp = createApp(AdminHeader).use(createPinia())
+    apps.push(enabledApp)
+    enabledApp.mount(enabledRoot)
+    expect(
+      enabledRoot.querySelectorAll('a[href="/auth/profile/settings#sso-settings-title"]'),
+    ).toHaveLength(1)
+    expect(enabledRoot.querySelectorAll('a[href="/sso-provider-account"]')).toHaveLength(1)
+    expect(enabledRoot.querySelector('a[href="/sso/account"]')).toBeNull()
+
+    mocks.page.props.adminMenu.sections = []
+    const disabledRoot = document.createElement('div')
+    const disabledApp = createApp(AdminHeader).use(createPinia())
+    apps.push(disabledApp)
+    disabledApp.mount(disabledRoot)
+    expect(disabledRoot.querySelector('a[href="/sso-provider-account"]')).toBeNull()
+    expect(
+      disabledRoot.querySelector('a[href="/auth/profile/settings#sso-settings-title"]'),
+    ).toBeNull()
+  } finally {
+    mocks.page.props.adminMenu.sections = original
+  }
+})
+
 it('shares shell height/content tokens while preserving the original defaults', () => {
   const root = document.createElement('div')
   const app = createApp(AdminHeader).use(createPinia())
