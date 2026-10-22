@@ -1,5 +1,6 @@
 const fs = require('node:fs')
 const path = require('node:path')
+const { verifyThemeLayerOrder } = require('./theme-layer-order.cjs')
 const { adminPublicRoot } = require('./admin-paths.cjs')
 
 const templatesRoot = path.resolve(__dirname, '../../views')
@@ -27,4 +28,5 @@ for (const asset of assets) {
     throw new Error(`admin template requires non-empty build asset: ${asset}`)
   }
 }
-console.log(`Verified ${assets.size} admin template assets`)
+verifyThemeLayerOrder(fs.readFileSync(path.join(adminPublicRoot, 'dist/css/app.css'), 'utf8'))
+console.log(`Verified ${assets.size} admin template assets and CSS layer precedence`)

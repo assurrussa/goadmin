@@ -11,7 +11,12 @@ const delegatedProps = reactiveOmit(props, 'class')
 </script>
 
 <template>
-  <SelectGroup :class="cn('p-1 w-full', props.class)" v-bind="delegatedProps">
+  <SelectGroup
+    data-ui="select"
+    data-part="group"
+    :class="cn('p-1 w-full', props.class)"
+    v-bind="delegatedProps"
+  >
     <slot />
   </SelectGroup>
 </template>

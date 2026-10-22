@@ -12,6 +12,8 @@ const delegatedProps = reactiveOmit(props, 'class')
 
 <template>
   <TabsContent
+    data-ui="tabs"
+    data-part="content"
     :class="
       cn(
         'mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',

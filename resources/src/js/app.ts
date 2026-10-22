@@ -1,3 +1,5 @@
+// Establish the core layer order before component and extension styles.
+import '../css/app.css'
 import { initLocale } from '@/i18n'
 import { createApp, h, defineComponent, Fragment, ref } from 'vue'
 import { createInertiaApp, router, usePage } from '@inertiajs/vue3'
@@ -5,6 +7,8 @@ import { createPinia } from 'pinia'
 import { toInertiaPage } from '@/inertiaPage'
 import type { LayoutResolver, PageLoader, PageModule, PageWithLayout } from '@/inertiaPage'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
+import AdminRuntimeFrame from '@/components/layout/AdminRuntimeFrame.vue'
+import { installPresentation } from '@/presentation/context'
 import { useThemeStore } from '@/stores/theme'
 import { useAdminProfileStore } from '@/stores/adminProfile'
 import { useAuthUserStore } from '@/stores/authUser'
@@ -26,8 +30,6 @@ initLocale()
 axios.defaults.withCredentials = true
 axios.defaults.xsrfCookieName = import.meta.env.VITE_ADMIN_CSRF_COOKIE_NAME?.trim() || 'csrf_token'
 axios.defaults.xsrfHeaderName = 'X-CSRF-Token'
-
-import '../css/app.css'
 
 const renderAdminLayout: LayoutResolver = (render, page) =>
   render(AdminLayout, null, { default: () => page })
@@ -88,7 +90,7 @@ void createInertiaApp({
     const app = createApp({
       render: () =>
         h(Fragment, null, [
-          h(App, props),
+          h(AdminRuntimeFrame, null, { default: () => h(App, props) }),
           h(AuthFailureNotice, {
             message: authFailureMessage.value,
             loginRequired: authFailureLogin.value,
@@ -113,6 +115,7 @@ void createInertiaApp({
       )
     }
     extensions.install(app)
+    installPresentation(app, extensions.theme)
 
     // Инициализируем store после создания Pinia, но до монтирования
     if (typeof window !== 'undefined') {

@@ -1,5 +1,5 @@
 <template>
-  <FormLayout :loading="form.processing" :spacing="spacing" @submit="handleSubmit">
+  <FormLayout ref="formLayout" :loading="form.processing" :spacing="spacing" @submit="handleSubmit">
     <slot />
 
     <div
@@ -25,7 +25,7 @@
 <script setup lang="ts">
 import { t } from '@/i18n'
 
-import { computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 import FormLayout from '@/components/form/FormLayout.vue'
 
@@ -73,39 +73,42 @@ const toCamel = (key: string) => {
   return key[0].toLowerCase() + key.slice(1)
 }
 
-// Focus first field with error when errors change
-const focusFirstError = async (errors: Record<string, string> | undefined) => {
-  if (!props.focusOnError || !errors) return
-  const entries = Object.entries(errors)
-  if (!entries.length) return
-  await nextTick()
-  const rawKey = entries[0][0]
-  const candidates = [rawKey, toCamel(rawKey)]
-  let el: HTMLElement | null = null
-  for (const key of candidates) {
-    el = (document.querySelector(`[name="${key}"]`) ||
-      document.getElementById(key)) as HTMLElement | null
-    if (el) break
-  }
-  el?.focus()
-}
-
-// When errors update after submit, focus first error field (optional)
-watch(
-  () => props.form?.errors,
-  (errs) => {
-    focusFirstError(errs as Record<string, string>)
-  },
-  { deep: true },
+const formLayout = ref<InstanceType<typeof FormLayout> | null>(null)
+let unmounted = false
+const focusErrors = computed(() =>
+  props.form.errors && Object.keys(props.form.errors).length > 0
+    ? props.form.errors
+    : pageErrors.value,
 )
 
-// Also react to pageErrors when form.errors is empty (initial GET with errors)
-watch(
-  pageErrors,
-  (errs) => {
-    if (!props.form?.errors || Object.keys(props.form.errors).length === 0) {
-      focusFirstError(errs)
+// Inertia can deliver errors before processing ends and the fieldset is enabled.
+const focusFirstError = async () => {
+  if (!props.focusOnError || props.form.processing) return
+  await nextTick()
+  if (unmounted || !props.focusOnError || props.form.processing) return
+  const rawKey = Object.keys(focusErrors.value)[0]
+  const formElement = formLayout.value?.$el as HTMLFormElement | undefined
+  if (!rawKey || !formElement?.isConnected) return
+  const controls = Array.from(
+    formElement.querySelectorAll<HTMLElement>(
+      'input:not([type="hidden"]), select, textarea, button, a[href], [tabindex], [contenteditable="true"]',
+    ),
+  ).filter((element) => !element.matches(':disabled') && !element.closest('[hidden], [inert]'))
+  for (const key of [rawKey, toCamel(rawKey)]) {
+    const element =
+      controls.find((control) => control.getAttribute('name') === key) ??
+      controls.find((control) => control.id === key)
+    if (element) {
+      element.focus()
+      break
     }
+  }
+}
+
+watch(
+  [focusErrors, () => props.form.processing, () => props.focusOnError],
+  () => {
+    void focusFirstError()
   },
   { immediate: true, deep: true },
 )
@@ -148,6 +151,7 @@ onMounted(() => {
   }
 })
 onUnmounted(() => {
+  unmounted = true
   window.removeEventListener('beforeunload', beforeUnload)
   removeInertiaGuard?.()
 })

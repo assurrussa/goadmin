@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from 'vitest'
-import { createApp, h, type Component } from 'vue'
+import { createApp, h, nextTick, type Component } from 'vue'
 import { Button } from './button'
 import { Input } from './input'
 import { Textarea } from './textarea'
@@ -9,6 +9,7 @@ import AppButton from './AppButton.vue'
 import AppInput from './AppInput.vue'
 import AppCard from './AppCard.vue'
 import FormInput from '../form/FormInput.vue'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from './dropdown-menu'
 
 const apps: ReturnType<typeof createApp>[] = []
 afterEach(() => apps.splice(0).forEach((app) => app.unmount()))
@@ -132,3 +133,71 @@ it('forwards SelectTrigger control tokens while preserving explicit overrides', 
   expect(trigger.className).not.toContain('--goadmin-control-height')
   expect(trigger.className).not.toContain('--goadmin-control-radius')
 })
+
+it('exposes stable hooks on shared controls and card sections', () => {
+  for (const [component, family, part] of [
+    [Button, 'button', 'root'],
+    [AppButton, 'button', 'root'],
+    [Input, 'input', 'root'],
+    [AppInput, 'input', 'root'],
+    [Textarea, 'textarea', 'root'],
+    [Card, 'card', 'root'],
+    [AppCard, 'card', 'root'],
+    [CardHeader, 'card', 'header'],
+    [CardContent, 'card', 'content'],
+    [CardFooter, 'card', 'footer'],
+  ] as const) {
+    const element = mount(component).firstElementChild!
+    expect(element.getAttribute('data-ui')).toBe(family)
+    expect(element.getAttribute('data-part')).toBe(part)
+  }
+})
+
+it('AppCard retains Card semantic tokens and yields each color to explicit host classes', () => {
+  const card = mount(AppCard).firstElementChild!
+  for (const token of ['bg', 'text', 'border']) {
+    expect(card.className).toContain(`--goadmin-card-${token}`)
+  }
+  const override = mount(AppCard, {
+    class: 'bg-background text-error border-transparent',
+  }).firstElementChild!
+  for (const token of ['bg', 'text', 'border']) {
+    expect(override.className).not.toContain(`--goadmin-card-${token}`)
+  }
+  for (const name of ['bg-background', 'text-error', 'border-transparent']) {
+    expect(override.classList.contains(name)).toBe(true)
+  }
+})
+
+it.each([undefined, 'bg-background text-error border-transparent'])(
+  'portal menu colors use mergeable recipes without inline bypass: %s',
+  async (className) => {
+    mount(
+      DropdownMenu,
+      { defaultOpen: true },
+      {
+        default: () => [
+          h(DropdownMenuTrigger, {}, () => 'Open'),
+          h(DropdownMenuContent, { class: className }, () => 'Menu'),
+        ],
+      },
+    )
+    await nextTick()
+    await nextTick()
+    const content = document.body.querySelector<HTMLElement>(
+      '[data-ui="dropdown-menu"][data-part="content"]',
+    )!
+    expect(content).not.toBeNull()
+    expect(content.style.backgroundColor).toBe('')
+    expect(content.style.color).toBe('')
+    if (className) {
+      expect(content.className).not.toContain('--goadmin-menu-bg')
+      expect(content.className).not.toContain('--goadmin-menu-text')
+      expect(content.className).not.toContain('--goadmin-menu-border')
+      for (const name of className.split(' ')) expect(content.classList.contains(name)).toBe(true)
+    } else {
+      expect(content.className).toContain('--goadmin-menu-bg,hsl(var(--popover))')
+      expect(content.className).toContain('--goadmin-menu-text,hsl(var(--popover-foreground))')
+    }
+  },
+)

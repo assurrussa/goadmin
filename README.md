@@ -66,7 +66,12 @@ describe the prerequisites. From the repository root, run
 to validate the selected source candidates. This source build does not prove
 that a clean public consumer can resolve those dependencies.
 
-The built-in interface is currently Russian-only. Navigation and the home
+For repeatable real-backend comparison of the standard and topbar presentations,
+run `make starter-smoke KEEP=1` from the repository root. The
+[starter smoke guide](examples/starter/README.md#compare-presentation-packs-on-a-real-backend)
+describes its isolated data, selected modules, artifacts and cleanup command.
+
+The shared interface supports Russian and English. Navigation and the home
 screen use the signed-in administrator's permissions; optional host features
 appear only when registered and permitted.
 
@@ -335,7 +340,9 @@ Admin UI extensions can be supplied by one or more source manifests through
 `VITE_ADMIN_EXTENSION_MANIFESTS` (using the operating-system path delimiter).
 Every manifest uses `formatVersion: 1` and declares extensions with a stable
 `key`, `apiVersion: 1`, relative `sourceRoot`, SHA-256 source `fingerprint`, and
-optional `requires`. The build rejects missing, duplicate, or cyclic
+optional `requires` and `themeModule`. The latter selects one build-time
+[presentation pack](docs/theme-customization.md#build-time-presentation-packs) with
+typed admin/auth shells, while retaining shared pages and behavior. The build rejects missing, duplicate, or cyclic
 dependencies, duplicate feature or page keys, source symlinks, and fingerprint
 drift before Vite starts. It emits `dist/admin-extensions.manifest.json`
 without source paths. The materializer also registers every resolved

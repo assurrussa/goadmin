@@ -14,6 +14,8 @@ const forwardedProps = useForwardProps(delegatedProps)
 
 <template>
   <DialogTitle
+    data-ui="dialog"
+    data-part="title"
     v-bind="forwardedProps"
     :class="cn('text-lg font-semibold leading-none tracking-tight', props.class)"
   >

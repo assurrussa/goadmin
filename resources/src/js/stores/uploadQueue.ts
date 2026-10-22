@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { v4 as uuidv4 } from 'uuid'
 
-export type UploadStatus = 'uploading' | 'processing' | 'completed' | 'error'
+export type UploadStatus = 'uploading' | 'processing' | 'completed' | 'error' | 'unknown'
 
 export interface UploadItem {
   id: string
@@ -11,6 +11,9 @@ export interface UploadItem {
   error?: string
   createdAt: number
 }
+
+const timers = new WeakMap<object, Map<string, ReturnType<typeof setTimeout>>>()
+const rechecks = new WeakMap<object, Map<string, () => void>>()
 
 export const useUploadQueueStore = defineStore('uploadQueue', {
   state: () => ({
@@ -50,9 +53,7 @@ export const useUploadQueueStore = defineStore('uploadQueue', {
         return
       }
       item.status = status
-      if (error) {
-        item.error = error
-      }
+      item.error = error
     },
 
     complete(id: string): void {
@@ -77,7 +78,20 @@ export const useUploadQueueStore = defineStore('uploadQueue', {
       this.scheduleRemove(id)
     },
 
+    bindRecheck(id: string, recheck: () => void): void {
+      if (!rechecks.has(this)) rechecks.set(this, new Map())
+      rechecks.get(this)!.set(id, recheck)
+    },
+
+    recheck(id: string): void {
+      rechecks.get(this)?.get(id)?.()
+    },
+
     remove(id: string): void {
+      const timer = timers.get(this)?.get(id)
+      if (timer !== undefined) clearTimeout(timer)
+      timers.get(this)?.delete(id)
+      rechecks.get(this)?.delete(id)
       const index = this.uploads.findIndex((upload) => upload.id === id)
       if (index !== -1) {
         this.uploads.splice(index, 1)
@@ -85,6 +99,9 @@ export const useUploadQueueStore = defineStore('uploadQueue', {
     },
 
     clear(): void {
+      timers.get(this)?.forEach((timer) => clearTimeout(timer))
+      timers.delete(this)
+      rechecks.delete(this)
       this.uploads = []
     },
 
@@ -93,9 +110,15 @@ export const useUploadQueueStore = defineStore('uploadQueue', {
         this.remove(id)
         return
       }
-      window.setTimeout(() => {
-        this.remove(id)
-      }, this.dismissDelay)
+      if (!timers.has(this)) timers.set(this, new Map())
+      const pending = timers.get(this)!
+      if (pending.has(id)) return
+      pending.set(
+        id,
+        setTimeout(() => {
+          this.remove(id)
+        }, this.dismissDelay),
+      )
     },
   },
 })

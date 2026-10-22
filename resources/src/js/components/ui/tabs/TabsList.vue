@@ -12,6 +12,8 @@ const delegatedProps = reactiveOmit(props, 'class')
 
 <template>
   <TabsList
+    data-ui="tabs"
+    data-part="list"
     v-bind="delegatedProps"
     :class="
       cn(

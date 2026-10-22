@@ -207,13 +207,13 @@
           >
             <span>{{ t('Без ужимания видео') }}</span>
             <Checkbox
-              :checked="uploadVideoWithoutCompression"
+              :model-value="uploadVideoWithoutCompression"
               :title="
                 uploadVideoWithoutCompression
                   ? t('Видео загрузится как есть')
                   : t('Видео отправится в ресайзер')
               "
-              @update:checked="handleUploadVideoToggle"
+              @update:model-value="handleUploadVideoToggle"
             />
           </label>
           <AppBadge
@@ -536,12 +536,14 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { ImageCropper } from '../imageCropper'
 import {
   uploadFiles,
-  fetchUploadTask,
   reconcileUploadCompletion,
   type UncertainUploadCompletion,
 } from '@/services/fileUploadService'
-import type { UploadedFileSummary, UploadTaskStatusResponse } from '@/services/fileUploadService'
-import { useAdminWebSocket, type FileUploadStatusEvent } from '@/composables/useAdminWebSocket'
+import type { UploadedFileSummary } from '@/services/fileUploadService'
+import {
+  useUploadTaskTracker,
+  type UploadTaskObservation,
+} from '@/composables/useUploadTaskTracker'
 import { useUploadCompletion } from '@/composables/useUploadCompletion'
 import { useUploadQueueStore } from '@/stores/uploadQueue'
 import { RICH_TEXT_ATTACHMENT_MIME, type RichTextAttachmentPayload } from '@/constants/richText'
@@ -785,9 +787,8 @@ const handleUploadVideoToggle = (value: boolean | 'indeterminate') => {
   uploadVideoWithoutCompression.value = value === true
 }
 const normalizedEventFile = ref<UploadResult | null>(null)
-const currentTaskId = ref<number | null>(null)
 const unsubscribe = ref<(() => void) | null>(null)
-const { on, ensureConnected } = useAdminWebSocket()
+const taskTracker = useUploadTaskTracker()
 const uploadQueue = useUploadQueueStore()
 
 type UploadResult = UploadedFileSummary & {
@@ -804,15 +805,6 @@ type UploadResult = UploadedFileSummary & {
   updatedAt?: string
   data?: Record<string, unknown> | null
 }
-
-interface WaitForTaskOptions {
-  signal?: AbortSignal
-  attempts?: number
-  interval?: number
-  onStatusChange?: (status: string, payload?: UploadResult) => void
-}
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const uploadProgressPercent = computed(() => {
   if (!isUploading.value) {
@@ -925,14 +917,6 @@ const cleanupTaskSubscription = () => {
     unsubscribe.value()
     unsubscribe.value = null
   }
-  currentTaskId.value = null
-}
-
-const fetchTaskStatus = async (
-  taskId: number,
-  signal?: AbortSignal,
-): Promise<UploadTaskStatusResponse> => {
-  return fetchUploadTask(taskId, signal)
 }
 
 interface RawUploadedFile {
@@ -1005,124 +989,45 @@ const normalizeUploadedFile = (file?: UploadedFileSummary | null): UploadResult 
   }
 }
 
-const mapEventFileFromEvent = (event: FileUploadStatusEvent): UploadResult | undefined => {
-  const eventFile = event.file
-  if (!eventFile) {
-    return undefined
-  }
-
-  const metadata = (event.metadata ?? {}) as Record<string, unknown>
-  const fallbackUrl = typeof metadata.fileUrl === 'string' ? metadata.fileUrl : undefined
-
-  const normalized = normalizeUploadedFile({
-    id: eventFile.id,
-    entityId: (metadata.objectId as number | null) ?? null,
-    filename: eventFile.fileName,
-    originalName: eventFile.originalName ?? eventFile.fileName,
-    url: eventFile.url || fallbackUrl || '',
-    publicUrl: fallbackUrl ?? eventFile.url,
-    fullPath: fallbackUrl ?? eventFile.url,
-    fileType: eventFile.mimeType?.startsWith('image/')
-      ? 'image'
-      : eventFile.mimeType?.startsWith('video/')
-        ? 'video'
-        : 'file',
-    sortOrder: 0,
-    mimeType: eventFile.mimeType,
-    size: typeof eventFile.size === 'number' ? eventFile.size : undefined,
-    width: typeof eventFile.width === 'number' ? eventFile.width : undefined,
-    height: typeof eventFile.height === 'number' ? eventFile.height : undefined,
-  } as unknown as UploadedFileSummary)
-
-  return normalized
-}
-
-const waitForTaskCompletion = async (
-  taskId: number,
-  options: WaitForTaskOptions = {},
-): Promise<UploadResult> => {
-  const { attempts = 120, interval = 1000, onStatusChange, signal } = options
-  ensureConnected()
-
-  return new Promise<UploadResult>(async (resolve, reject) => {
-    let resolved = false
-
-    cleanupTaskSubscription()
-    currentTaskId.value = taskId
-
-    const reportStatus = (status: string | undefined, payload?: UploadResult) => {
-      if (!status) {
-        return
-      }
-      try {
-        onStatusChange?.(status.toLowerCase(), payload)
-      } catch (error) {
-        console.error('waitForTaskCompletion status handler failed:', error)
-      }
+const waitForTaskCompletion = (
+  observation: UploadTaskObservation,
+  signal: AbortSignal,
+  onStatusChange: (status: string, payload?: UploadResult) => void,
+): Promise<UploadResult> =>
+  new Promise((resolve, reject) => {
+    let settled = false
+    const cleanup = () => {
+      cleanupTaskSubscription()
+      signal.removeEventListener('abort', abort)
     }
-
-    reportStatus('queued')
-
-    unsubscribe.value = on('files.upload.status', (event) => {
-      if (event.eventType !== 'files.upload.status' || event.taskId !== taskId || resolved) {
-        return
-      }
-
-      const eventStatus = (event.status || '').toLowerCase()
-      const finalFile = mapEventFileFromEvent(event)
-      reportStatus(eventStatus, finalFile)
-
-      if (eventStatus === 'completed' && finalFile) {
-        resolved = true
-        cleanupTaskSubscription()
-        resolve(finalFile)
-      } else if (eventStatus === 'failed' || eventStatus === 'error') {
-        resolved = true
-        cleanupTaskSubscription()
-        reject(new Error(event.error || t('Обработка файла завершилась с ошибкой')))
-      }
-    })
-
-    try {
-      for (let attempt = 0; attempt < attempts; attempt++) {
-        if (resolved) {
-          return
-        }
-
-        signal?.throwIfAborted()
-        const { status, task, file } = await fetchTaskStatus(taskId, signal)
-        signal?.throwIfAborted()
-        if (resolved) return
-        const effectiveStatus = (task.status ?? status ?? '').toLowerCase()
-        const finalFile = normalizeUploadedFile(file ?? task.file)
-
-        reportStatus(effectiveStatus, finalFile)
-
-        if (effectiveStatus === 'completed' && finalFile) {
-          resolved = true
-          cleanupTaskSubscription()
-          resolve(finalFile)
-          return
-        }
-
-        if (effectiveStatus === 'failed' || effectiveStatus === 'error') {
-          throw new Error(task.error || t('Обработка файла завершилась с ошибкой'))
-        }
-
-        await sleep(interval)
-      }
-
-      if (!resolved) {
-        throw new Error(t('Превышено время ожидания обработки файла'))
-      }
-    } catch (error) {
-      if (!resolved) {
-        cleanupTaskSubscription()
-        reject(error instanceof Error ? error : new Error(String(error)))
-      }
+    const abort = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      reject(new Error('Upload cancelled'))
     }
+    signal.addEventListener('abort', abort, { once: true })
+    if (signal.aborted) {
+      abort()
+      return
+    }
+    const detach = observation.subscribe((snapshot) => {
+      if (settled) return
+      const file = normalizeUploadedFile(snapshot.file)
+      onStatusChange(snapshot.status, file)
+      if (snapshot.status === 'completed' && file) {
+        settled = true
+        cleanup()
+        resolve(file)
+      } else if (['failed', 'error', 'unknown'].includes(snapshot.status)) {
+        settled = true
+        cleanup()
+        reject(new Error(snapshot.error || 'Unable to confirm file processing.'))
+      }
+    }, abort)
+    if (settled) detach()
+    else unsubscribe.value = detach
   })
-}
 
 // Editor configuration. The allowlists are initialization-time schema inputs;
 // consumers should remount the editor when switching to another catalog policy.
@@ -1642,11 +1547,13 @@ const uploadMediaToServer = async (
   const filename = file?.name ?? pending?.completion.filename
   const uploadLabel = filename ? `${baseLabel}: ${filename}` : baseLabel
   let completion = pending?.completion
+  const ownerToken = taskTracker.capture()
   const originalEntityType = props.entityType
   const originalEntityId = props.entityId
   const controller = new AbortController()
   uploadController = controller
   let uploadQueueId: string | null = null
+  let handedOff = false
 
   try {
     if (!props.entityId) {
@@ -1693,6 +1600,15 @@ const uploadMediaToServer = async (
             },
           })
 
+    const acceptedTask = response.tasks[0]
+    const observation =
+      acceptedTask?.id && uploadQueueId
+        ? taskTracker.accept(ownerToken, acceptedTask, response.status, uploadQueueId, {
+            attempts: fileCategory === 'video' ? 180 : 120,
+            interval: fileCategory === 'video' ? 1500 : 1000,
+          })
+        : undefined
+    handedOff = !!observation
     if (response.uncertainCompletion) {
       completion = response.uncertainCompletion
       if (!pending) ownedCompletionLocation.value = completion.location
@@ -1701,6 +1617,7 @@ const uploadMediaToServer = async (
     if (!response.uncertainCompletion && response.error && completion) releaseCompletion(completion)
     if (
       unmounted ||
+      !taskTracker.isCurrent(ownerToken) ||
       !isCurrentScope.value ||
       originalEntityType !== props.entityType ||
       String(originalEntityId) !== String(props.entityId)
@@ -1711,10 +1628,6 @@ const uploadMediaToServer = async (
         response.error ||
           'Upload completion is unconfirmed. Check this upload before starting another.',
       )
-    }
-
-    if (uploadQueueId) {
-      uploadQueue.setStatus(uploadQueueId, 'processing')
     }
 
     uploadProgress.value = 35
@@ -1753,13 +1666,11 @@ const uploadMediaToServer = async (
     } else {
       uploadStage.value = 'processing'
       uploadProgress.value = 65
-      const attempts = fileCategory === 'video' ? 180 : 120
-      const interval = fileCategory === 'video' ? 1500 : 1000
-      finalFileSummary = await waitForTaskCompletion(task.id, {
-        signal: controller.signal,
-        attempts,
-        interval,
-        onStatusChange: (status, payload) => {
+      if (!observation) throw new Error('Upload cancelled')
+      finalFileSummary = await waitForTaskCompletion(
+        observation,
+        controller.signal,
+        (status, payload) => {
           if (status === 'queued') {
             uploadProgress.value = Math.max(uploadProgress.value, 55)
             uploadStage.value = 'processing'
@@ -1779,7 +1690,7 @@ const uploadMediaToServer = async (
             normalizedEventFile.value = payload
           }
         },
-      })
+      )
     }
 
     if (!finalFileSummary) {
@@ -1809,6 +1720,7 @@ const uploadMediaToServer = async (
 
     if (
       unmounted ||
+      !taskTracker.isCurrent(ownerToken) ||
       !isCurrentScope.value ||
       originalEntityType !== props.entityType ||
       String(originalEntityId) !== String(props.entityId)
@@ -1823,17 +1735,13 @@ const uploadMediaToServer = async (
     emit('upload-progress', 100)
     uploadedFiles.value.push(normalized.id)
 
-    if (uploadQueueId) {
-      uploadQueue.complete(uploadQueueId)
-    }
-
     return normalized
   } catch (error: unknown) {
     console.error('❌ Upload error:', error)
     const err = error as { response?: { data?: { error?: string } }; message?: string }
     const message = err?.response?.data?.error || err?.message || 'Upload failed'
     cleanupTaskSubscription()
-    if (uploadQueueId) {
+    if (!handedOff && taskTracker.isCurrent(ownerToken) && uploadQueueId) {
       uploadQueue.fail(uploadQueueId, message)
     }
     throw new Error(message)

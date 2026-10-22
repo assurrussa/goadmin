@@ -1,5 +1,5 @@
 <template>
-  <div class="data-grid space-y-6">
+  <div data-ui="datagrid" data-part="root" class="data-grid space-y-6">
     <DataGridHeader
       :meta="metaInfo"
       :config="config"

@@ -1,5 +1,9 @@
 <template>
-  <div class="flex flex-col gap-4 px-0 py-4 xl:flex-row xl:items-center xl:justify-between">
+  <div
+    data-ui="datagrid"
+    data-part="header"
+    class="flex flex-col gap-4 px-0 py-4 xl:flex-row xl:items-center xl:justify-between"
+  >
     <div class="mb-4 sm:mb-0">
       <h1 class="text-2xl font-semibold tracking-tight text-text-primary">
         {{ (props.meta?.title ? t(props.meta.title) : '') || t('Данные') }}

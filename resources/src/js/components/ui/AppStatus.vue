@@ -22,9 +22,13 @@ const dotColors: Record<Variant, string> = {
 
 <template>
   <span
+    data-ui="status"
+    data-part="root"
     :class="cn('inline-flex items-center gap-2 text-xs font-medium text-text-primary', props.class)"
   >
     <Circle
+      data-ui="status"
+      data-part="indicator"
       aria-hidden="true"
       :stroke-width="0"
       :class="cn('h-2 w-2 shrink-0 fill-current', dotColors[props.variant])"

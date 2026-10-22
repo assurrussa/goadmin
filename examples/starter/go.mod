@@ -4,7 +4,7 @@ go 1.27.2
 
 require (
 	github.com/assurrussa/goadmin v0.7.0
-	github.com/assurrussa/goauth v0.7.0
+	github.com/assurrussa/goauth v0.12.0
 	github.com/assurrussa/gonotify v0.6.0
 	github.com/gofiber/fiber/v3 v3.5.0
 )
@@ -31,6 +31,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.27 // indirect
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.103.1 // indirect
 	github.com/aws/smithy-go v1.27.1 // indirect
+	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/fasthttp/websocket v1.5.12 // indirect
 	github.com/fatih/color v1.19.0 // indirect
@@ -63,6 +64,7 @@ require (
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
+	github.com/pquerna/otp v1.5.0 // indirect
 	github.com/pressly/goose/v3 v3.27.1 // indirect
 	github.com/redis/go-redis/v9 v9.20.0 // indirect
 	github.com/savsgio/gotils v0.0.0-20250924091648-bce9a52d7761 // indirect

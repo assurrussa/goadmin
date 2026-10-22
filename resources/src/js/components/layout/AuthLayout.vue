@@ -1,66 +1,37 @@
+<script setup lang="ts">
+import { t } from '@/i18n'
+import { usePresentation } from '@/presentation/context'
+import LocaleSelect from './LocaleSelect.vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import { Moon, Sun } from 'lucide-vue-next'
+import { useThemeStore } from '@/stores/theme'
+const { authShell } = usePresentation()
+const themeStore = useThemeStore()
+</script>
 <template>
-  <div class="min-h-screen bg-background flex flex-col justify-center">
-    <div class="absolute top-4 right-4 z-50 flex gap-2">
+  <component :is="authShell">
+    <template #utilities>
       <LocaleSelect />
       <AppButton
         variant="ghost"
         size="icon-sm"
+        :aria-label="
+          themeStore.isDark ? t('Переключить на светлую тему') : t('Переключить на темную тему')
+        "
         :title="
           themeStore.isDark ? t('Переключить на светлую тему') : t('Переключить на темную тему')
         "
-        @click="handleThemeToggle"
+        @click="themeStore.toggle()"
       >
-        <Sun v-if="themeStore.isDark" class="h-5 w-5" />
-        <Moon v-else class="h-5 w-5" />
+        <Sun v-if="themeStore.isDark" class="h-5 w-5" /><Moon v-else class="h-5 w-5" />
       </AppButton>
-    </div>
-
-    <div class="w-full relative">
-      <div class="flex pt-5 pb-2 justify-center w-full items-center">
-        <span class="text-sm font-semibold text-text-secondary">
-          {{ t('Админка') }}
-        </span>
-      </div>
-
-      <h2 class="mt-6 text-center text-3xl font-semibold tracking-tight text-text-primary">
-        <slot name="title" />
-      </h2>
-
-      <p v-if="$slots.subtitle" class="mt-2 text-center text-sm text-text-secondary">
-        <slot name="subtitle" />
-      </p>
-    </div>
-
-    <div class="mt-8 px-4 sm:mx-auto sm:w-full sm:max-w-md sm:px-0">
-      <div class="card py-8 px-4 sm:px-10">
-        <slot />
-      </div>
-
-      <div v-if="$slots.footer" class="mt-6">
-        <slot name="footer" />
-      </div>
-    </div>
-
-    <NotificationsContainer />
-    <UploadQueueContainer />
-  </div>
+    </template>
+    <template #brand
+      ><span class="text-sm font-semibold text-text-secondary">{{ t('Админка') }}</span></template
+    >
+    <template #title><slot name="title" /></template>
+    <template v-if="$slots.subtitle" #subtitle><slot name="subtitle" /></template>
+    <template v-if="$slots.footer" #footer><slot name="footer" /></template>
+    <slot />
+  </component>
 </template>
-
-<script setup lang="ts">
-import { t } from '@/i18n'
-import LocaleSelect from './LocaleSelect.vue'
-
-import AppButton from '@/components/ui/AppButton.vue'
-import { Moon, Sun } from 'lucide-vue-next'
-import { useThemeStore } from '@/stores/theme'
-import NotificationsContainer from '@/components/NotificationsContainer.vue'
-import UploadQueueContainer from '@/components/UploadQueueContainer.vue'
-import { useFlashMessages } from '~/composables/useFlashMessages'
-
-useFlashMessages()
-const themeStore = useThemeStore()
-
-const handleThemeToggle = () => {
-  themeStore.toggle()
-}
-</script>

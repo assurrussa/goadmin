@@ -4,11 +4,11 @@
       :id="inputId"
       :aria-invalid="error ? 'true' : undefined"
       :aria-describedby="error ? `${inputId}-error` : helpText ? `${inputId}-help` : undefined"
-      :checked="modelValue || false"
+      :model-value="modelValue ?? false"
       :disabled="disabled"
       :required="required"
       :class="checkboxClasses"
-      @update:checked="handleUpdate"
+      @update:model-value="handleUpdate"
     />
 
     <label
@@ -98,7 +98,8 @@ const checkboxClasses = computed(() => {
 })
 
 // Event handlers
-const handleUpdate = (checked: boolean) => {
-  emit('update:modelValue', checked)
+const handleUpdate = (checked: boolean | 'indeterminate') => {
+  if (props.disabled) return
+  emit('update:modelValue', checked === true)
 }
 </script>

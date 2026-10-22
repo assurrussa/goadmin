@@ -143,7 +143,7 @@ const inputClasses = computed(() => {
   if (props.error) {
     classes.push('border-destructive/70 focus-visible:ring-destructive/40')
   } else if (props.readonly) {
-    classes.push('bg-surface-variant text-text-tertiary')
+    classes.push('bg-surface-variant text-text-secondary')
   }
 
   if (slots.leftIcon) {

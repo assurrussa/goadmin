@@ -1,0 +1,7 @@
+{
+  "name": "goadmin-private-starter-smoke",
+  "private": true,
+  "type": "module",
+  "scripts": {"test": "node --test *.test.mjs"},
+  "devDependencies": {"playwright": "1.64.0-alpha-1790635538000"}
+}

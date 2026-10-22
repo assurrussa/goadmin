@@ -1,0 +1,54 @@
+/* Only the selected example owns these presentation tokens. */
+@layer base {
+  html[data-admin-theme='example.topbar'] {
+    --hue-primary: 174;
+    --saturation-primary: 78%;
+    --primary-l: 26%;
+    --color-primary: hsl(174 78% 26%);
+    --color-primary-light: hsl(174 70% 34%);
+    --color-primary-lighter: hsl(174 62% 42%);
+    --color-primary-dark: hsl(174 78% 22%);
+    --color-primary-darker: hsl(174 78% 18%);
+    --color-primary-contrast: hsl(0 0% 100%);
+    --color-primary-foreground: hsl(0 0% 100%);
+    --color-focus-ring: hsl(174 78% 26%);
+    --color-ring: hsl(174 78% 26%);
+    --primary: 174 78% 26%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 174 78% 26%;
+    --goadmin-control-radius: 4px;
+    --goadmin-control-radius-xs: 4px;
+    --goadmin-card-radius: 8px;
+    --goadmin-content-max-width: 80rem;
+    --font-sans:
+      ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  html[data-admin-theme='example.topbar'].dark,
+  html[data-admin-theme='example.topbar'][data-theme-mode='dark'] {
+    --primary-l: 70%;
+    --color-primary: hsl(174 66% 70%);
+    --color-primary-light: hsl(174 66% 78%);
+    --color-primary-lighter: hsl(174 66% 84%);
+    --color-primary-dark: hsl(174 66% 60%);
+    --color-primary-darker: hsl(174 66% 50%);
+    --color-primary-contrast: hsl(174 45% 10%);
+    --color-primary-foreground: hsl(174 45% 10%);
+    --color-focus-ring: hsl(174 66% 70%);
+    --color-ring: hsl(174 66% 70%);
+    --primary: 174 66% 70%;
+    --primary-foreground: 174 45% 10%;
+    --ring: 174 66% 70%;
+  }
+}
+
+/* Component defaults remain below explicit utility classes in the cascade. */
+@layer components {
+  html[data-admin-theme='example.topbar'] :where([data-ui='card'][data-part='root']) {
+    --goadmin-card-border: color-mix(
+      in srgb,
+      var(--color-primary) 35%,
+      var(--color-border-primary)
+    );
+  }
+}

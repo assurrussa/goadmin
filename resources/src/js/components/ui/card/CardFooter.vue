@@ -8,7 +8,11 @@ const props = defineProps<{
 </script>
 
 <template>
-  <div :class="cn('flex items-center p-[var(--goadmin-card-padding,1.5rem)] pt-0', props.class)">
+  <div
+    data-ui="card"
+    data-part="footer"
+    :class="cn('flex items-center p-[var(--goadmin-card-padding,1.5rem)] pt-0', props.class)"
+  >
     <slot />
   </div>
 </template>

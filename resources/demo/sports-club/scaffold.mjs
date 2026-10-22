@@ -6,17 +6,18 @@ const require = createRequire(import.meta.url)
 const { materializeAdminExtensions } = require('../../scripts/materialize-admin-extensions.cjs')
 
 // Only this owned directory is written; the developer's generated host state is untouched.
-export function createDemoScaffold() {
+export function createDemoScaffold({ manifestPaths = [] } = {}) {
   const directory = mkdtempSync(path.join(tmpdir(), 'goadmin-club-demo-'))
   try {
     const result = materializeAdminExtensions({
       generatedRoot: directory,
-      manifestPaths: [],
-      legacyRoot: '',
+      manifestPaths,
+      legacyRoot: directory,
       includeLegacy: false,
     })
     return {
       directory,
+      sourceRoots: result.sourceRoots,
       aliases: [
         {
           find: '../../.admin-extensions/tailwind-sources.css',
