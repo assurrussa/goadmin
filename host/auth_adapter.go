@@ -3,6 +3,7 @@ package host
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/assurrussa/goauth"
 	"github.com/assurrussa/goauth/postgres"
@@ -26,6 +27,7 @@ type AuthAdapterConfig struct {
 // not construct concrete auth repositories or import goadmin implementation
 // packages.
 type AuthAdapter struct {
+	linkAuthMaxAge  time.Duration
 	inner           *internalauth.Adapter
 	admins          *adminrepo.Repo
 	database        StoragePgsqlClient
@@ -53,7 +55,8 @@ func NewAuthAdapter(config AuthAdapterConfig) (*AuthAdapter, error) {
 	}
 
 	return &AuthAdapter{
-		inner: inner, admins: admins, database: config.Database,
+		linkAuthMaxAge: config.Runtime.IdentityLinkAuthMaxAge,
+		inner:          inner, admins: admins, database: config.Database,
 		deliveryEnabled: config.Runtime.NotificationDelivery != goauth.NotificationDeliveryDisabled && config.NotificationSender != nil,
 	}, nil
 }

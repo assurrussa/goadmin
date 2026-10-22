@@ -19,6 +19,18 @@
       >
     </form>
     <p v-if="error" role="alert" class="mt-4 text-sm text-danger">{{ error }}</p>
+    <form
+      v-if="errorCode === 'local_auth_stale'"
+      method="post"
+      action="/sso-link/reauth"
+      class="mt-3"
+      @submit.prevent="reauthenticate"
+    >
+      <input type="hidden" name="csrf" :value="csrf" />
+      <input type="hidden" name="confirm" value="reauthenticate-local" />
+      <button type="submit" class="text-primary" :disabled="reauthSubmitting">Войти заново</button>
+    </form>
+    <p v-if="reauthError" role="alert" class="mt-3 text-sm text-danger">{{ reauthError }}</p>
     <a v-if="error" href="/sso-link" class="mt-3 block text-primary">Открыть новую форму</a>
     <a href="/" class="mt-4 block text-center text-primary">Отмена</a>
   </AuthLayout>
@@ -28,13 +40,34 @@ import { ref } from 'vue'
 import AuthLayout from '@/components/layout/AuthLayout.vue'
 import AppHead from '@/components/layout/AppHead.vue'
 import FormButton from '@/components/form/FormButton.vue'
+import {
+  localReauthenticationDestination,
+  requestLocalReauthentication,
+} from '@/auth/localReauthentication'
 const props = defineProps<{ issuer: string; subject: string; intent: string; csrf: string }>()
 const submitting = ref(false)
 const error = ref('')
+const errorCode = ref('')
+const reauthSubmitting = ref(false)
+const reauthError = ref('')
+async function reauthenticate() {
+  if (reauthSubmitting.value) return
+  reauthSubmitting.value = true
+  try {
+    if (await requestLocalReauthentication(props.csrf)) {
+      window.location.assign(localReauthenticationDestination)
+      return
+    }
+    reauthError.value = 'Не удалось начать локальный вход. Обновите страницу и попробуйте снова.'
+  } catch {
+    reauthError.value = 'Результат запроса неизвестен. Обновите страницу перед новой попыткой.'
+  }
+}
 async function confirmLink() {
   if (submitting.value) return
   submitting.value = true
   error.value = ''
+  errorCode.value = ''
   try {
     const response = await fetch('/sso-link', {
       method: 'POST',
@@ -65,6 +98,7 @@ async function confirmLink() {
       typeof body?.message === 'string'
         ? body.message
         : 'Привязка не подтверждена. Откройте новую форму или войдите локально заново.'
+    errorCode.value = typeof body?.code === 'string' ? body.code : ''
   } catch {
     error.value =
       'Результат запроса неизвестен. Не повторяйте отправку: откройте новую форму для проверки.'

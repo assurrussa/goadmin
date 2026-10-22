@@ -57,11 +57,21 @@ func TestAdapterBoundaryDoesNotCaptureHealthEndpoints(t *testing.T) {
 	app.Use(f.ingress)
 	app.Get("/healthz", func(c fiber.Ctx) error { return c.SendStatus(200) })
 	app.Get("/sso", func(c fiber.Ctx) error { return c.SendStatus(200) })
+	for _, path := range []string{linkPath, "/sso-account", "/sso-link/reauth"} {
+		app.All(path, func(c fiber.Ctx) error { return c.SendStatus(200) })
+	}
 	for _, tc := range []struct {
-		path   string
-		status int
-	}{{"/healthz", 200}, {"/sso", 404}} {
-		response, err := app.Test(httptest.NewRequestWithContext(t.Context(), "GET", "http://localhost"+tc.path, nil))
+		method, path string
+		status       int
+	}{
+		{http.MethodGet, "/healthz", 200},
+		{http.MethodGet, "/sso", 404},
+		{http.MethodGet, linkPath, 404},
+		{http.MethodPost, linkPath, 404},
+		{http.MethodGet, "/sso-account", 404},
+		{http.MethodPost, "/sso-link/reauth", 404},
+	} {
+		response, err := app.Test(httptest.NewRequestWithContext(t.Context(), tc.method, "http://localhost"+tc.path, nil))
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -2,10 +2,14 @@ package sso //nolint:testpackage // Tests exercise internal binding and recovery
 
 import "testing"
 
+const linkPath = "/sso-link"
+
 func TestSafeReturnPath(t *testing.T) {
 	const origin = testAdminOrigin
 	for _, tc := range []struct{ in, want string }{
 		{testReturnTarget, testReturnTarget},
+		{"/auth/profile/settings", "/auth/profile/settings"},
+		{linkPath, "/"},
 		{origin + testReturnTarget, testReturnTarget},
 		{"https://attacker.invalid/", "/"},
 		{"//attacker.invalid/", "/"},

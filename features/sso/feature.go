@@ -54,7 +54,8 @@ func (f *Feature) ingress(c fiber.Ctx) error {
 	r, err := adaptor.ConvertRequest(c, true)
 	if err != nil || !f.rp.Config.AllowsRequest(r) {
 		switch c.Path() {
-		case "/sso", "/login", callbackPath, "/sso/open", "/logout", "/sso-link", "/auth/session/recover":
+		case "/sso", "/login", callbackPath, "/sso/open", "/logout", "/sso-link",
+			"/sso-account", "/sso-link/reauth", "/auth/session/recover":
 			return c.SendStatus(http.StatusNotFound)
 		}
 		// The optional adapter does not own health endpoints or other host routing.
@@ -136,6 +137,12 @@ func (f *Feature) open(c fiber.Ctx) error {
 			return f.failure(c, http.StatusForbidden, "identity_not_linked",
 				"Аккаунт AuthHub не связан с местным администратором. Локальный вход отключён "+
 					"политикой сайта: обратитесь к администратору для настройки привязки.", false, target)
+		}
+		if eligibility, eligibilityErr := f.app.LocalIdentityLinkEligibility(c); eligibilityErr == nil &&
+			eligibility == host.IdentityLinkNotLocal {
+			return f.failure(c, http.StatusForbidden, "local_auth_required",
+				"Завершите текущий сеанс через меню профиля и войдите локально для привязки. "+
+					"Выход из AuthHub не выполняется автоматически.", false, target)
 		}
 		return f.failure(c, http.StatusForbidden, "identity_not_linked",
 			"Вы вошли в AuthHub, но эта учётная запись ещё не связана с локальным "+

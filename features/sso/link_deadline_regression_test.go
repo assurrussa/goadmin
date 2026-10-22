@@ -15,7 +15,10 @@ import (
 const (
 	testGenerationReason = "generation"
 	testSubjectReason    = "subject"
+	testIssuerReason     = "issuer"
 	testDifferentValue   = "different"
+	testLinkCSRFField    = "csrf"
+	testLinkCSRFCookie   = "csrf_token"
 )
 
 // The route reports a fixed reason without exposing either binding value.
@@ -123,7 +126,7 @@ func TestSDKBindingDifferenceCoversEveryPinnedField(t *testing.T) {
 		{testGenerationReason, func(b *browser.Binding) { b.Generation++ }},
 		{"login_generation", func(b *browser.Binding) { b.LoginGeneration++ }},
 		{"deadline", func(b *browser.Binding) { b.Deadline = b.Deadline.Add(time.Second) }},
-		{"issuer", func(b *browser.Binding) { b.Issuer = "https://other.test" }},
+		{testIssuerReason, func(b *browser.Binding) { b.Issuer = "https://other.test" }},
 		{testSubjectReason, func(b *browser.Binding) { b.Subject = testDifferentValue }},
 		{"project_id", func(b *browser.Binding) { b.ProjectID = testDifferentValue }},
 		{"client_id", func(b *browser.Binding) { b.ClientID = testDifferentValue }},

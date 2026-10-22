@@ -10,8 +10,9 @@ interface MockForm {
   reset: (...keys: string[]) => void
 }
 const requests = vi.hoisted(() => ({ post: vi.fn(), forms: [] as MockForm[] }))
+const pageState = vi.hoisted(() => ({ props: {} as Record<string, unknown> }))
 vi.mock('@inertiajs/vue3', () => ({
-  usePage: () => ({ props: {} }),
+  usePage: () => pageState,
   router: { on: () => () => {} },
   useForm: (data: Record<string, string>) => {
     let defaults = { ...data }
@@ -74,6 +75,51 @@ afterEach(() => {
   requests.forms.length = 0
   vi.useRealTimers()
   setAdminCapabilities({ props: {} })
+  pageState.props = {}
+  vi.unstubAllGlobals()
+})
+
+describe('optional SSO settings', () => {
+  it('does not load or show SSO when the adapter is absent', async () => {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    const { root } = mountSettings()
+    await nextTick()
+    expect(root.textContent).not.toContain('AuthHub SSO')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [
+      { linked: true, pending: false, localAuth: 'not_local' },
+      'Учётная запись AuthHub привязана.',
+      false,
+    ],
+    [
+      { linked: false, pending: false, localAuth: 'fresh' },
+      'Учётная запись AuthHub не привязана.',
+      true,
+    ],
+    [{ linked: false, pending: true, localAuth: 'stale' }, 'Завершите привязку', true],
+    [{ linked: false, pending: true, localAuth: 'not_local' }, 'войдите локально', false],
+  ] as const)('shows canonical account status %#', async (status, message, showLink) => {
+    pageState.props = { adminSSOEnabled: true }
+    const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => status })
+    vi.stubGlobal('fetch', fetch)
+    const { root } = mountSettings()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await nextTick()
+    expect(fetch).toHaveBeenCalledWith(
+      '/sso-account',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    )
+    expect(root.textContent).toContain(message)
+    expect(
+      root.querySelector('a[href="/sso-link"]') !== null ||
+        root.querySelector('a[href="/sso?redirectback=%2Fauth%2Fprofile%2Fsettings"]') !== null,
+    ).toBe(showLink)
+    if (status.linked) expect(root.textContent).not.toContain('Завершите привязку')
+  })
 })
 
 describe('profile email reauthentication', () => {

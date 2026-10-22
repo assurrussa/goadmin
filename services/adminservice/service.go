@@ -2,6 +2,7 @@ package adminservice
 
 import (
 	"context"
+	"database/sql"
 	"encoding/gob"
 	"errors"
 	"fmt"
@@ -86,6 +87,11 @@ type browserSession struct {
 type Option func(*Service) error
 
 type Service struct {
+	identityLinkAuthMaxAge time.Duration
+	identityLinkDB         *sql.DB
+	identityLinkSessions   interface {
+		IntrospectSession(ctx context.Context, sessionID string) (goauth.SessionSecurity, error)
+	}
 	externalAuthority ExternalSessionAuthority
 	localAdmission    LocalAdminAdmission
 	externalLinks     IdentityLinkResolver
@@ -465,6 +471,16 @@ func (s *Service) DelAdminAuth(c fiber.Ctx) error {
 }
 
 func (s *Service) delAdminAuth(c fiber.Ctx, userLogout bool) (result error) {
+	return s.delAdminAuthScoped(c, userLogout, false)
+}
+
+// LogoutLocalAdminAuth can only terminate a local native session. A concurrent
+// replacement with an external session fails closed and never revokes the RP.
+func (s *Service) LogoutLocalAdminAuth(c fiber.Ctx) error {
+	return s.delAdminAuthScoped(c, true, true)
+}
+
+func (s *Service) delAdminAuthScoped(c fiber.Ctx, userLogout, localOnly bool) (result error) {
 	if s == nil || s.store == nil {
 		return nil
 	}
@@ -478,6 +494,9 @@ func (s *Service) delAdminAuth(c fiber.Ctx, userLogout bool) (result error) {
 	defer sess.Release()
 	var external *ExternalBinding
 	original, ok := sess.Get(sessioncore.AuthAdminKey.String()).(*browserSession)
+	if localOnly && (!ok || original == nil || original.External != nil) {
+		return goauth.ErrSessionRevoked
+	}
 	if ok && original != nil && original.External != nil {
 		binding := *original.External
 		external = &binding
@@ -488,6 +507,9 @@ func (s *Service) delAdminAuth(c fiber.Ctx, userLogout bool) (result error) {
 		record, found, loadErr := s.states.Load(c, sess.ID())
 		if loadErr != nil {
 			return fmt.Errorf("load logout admin auth state: %w", loadErr)
+		}
+		if localOnly && found && record.External != nil {
+			return goauth.ErrSessionRevoked
 		}
 		if found {
 			sess.Set(sessioncore.AuthAdminKey.String(), &browserSession{

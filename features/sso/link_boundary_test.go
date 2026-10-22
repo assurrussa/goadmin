@@ -20,9 +20,10 @@ import (
 )
 
 const (
-	testNativeSession = "native-session"
-	testOrigin        = "https://seo.example"
-	testLinkURL       = "https://seo.example/sso-link"
+	testNativeSession    = "native-session"
+	testOrigin           = "https://seo.example"
+	testLinkURL          = "https://seo.example/sso-link"
+	testLinkConfirmField = "confirm"
 )
 
 type memoryIntents struct {
@@ -47,10 +48,27 @@ func (m *memoryIntents) consume(_ context.Context, secret, native string, local 
 }
 
 type fakeLinkAdmin struct {
-	actor  host.Actor
-	native host.CSRFRequest
-	err    error
-	linked []host.ExternalBinding
+	actor       host.Actor
+	native      host.CSRFRequest
+	err         error
+	linkErr     error
+	linked      []host.ExternalBinding
+	eligibility host.IdentityLinkEligibility
+	logouts     int
+	hasLink     bool
+}
+
+func (a *fakeLinkAdmin) LocalIdentityLinkEligibility(fiber.Ctx) (host.IdentityLinkEligibility, error) {
+	if a.eligibility != "" {
+		return a.eligibility, nil
+	}
+	return host.IdentityLinkFresh, nil
+}
+
+func (a *fakeLinkAdmin) LogoutLocalAdminAuth(fiber.Ctx) error { a.logouts++; return nil }
+
+func (a *fakeLinkAdmin) HasExternalAdminIdentity(fiber.Ctx, string, string) (bool, error) {
+	return a.hasLink, nil
 }
 
 func (a *fakeLinkAdmin) CurrentActor(_ context.Context) (host.Actor, bool) {
@@ -63,11 +81,18 @@ func (a *fakeLinkAdmin) AdminCSRFRequest(_ fiber.Ctx) (host.CSRFRequest, error) 
 
 func (a *fakeLinkAdmin) LinkExternalAdminIdentity(_ fiber.Ctx, b host.ExternalBinding) (goauth.IdentityLink, error) {
 	a.linked = append(a.linked, b)
+	if a.linkErr != nil {
+		return goauth.IdentityLink{}, a.linkErr
+	}
 	return goauth.IdentityLink{}, a.err
 }
 
-func linkFixture(t *testing.T) (*fiber.App, *fakeLinkAdmin, *memoryIntents, *fakeProtocol, string) {
+func linkFixture(t *testing.T, customCookie ...string) (*fiber.App, *fakeLinkAdmin, *memoryIntents, *fakeProtocol, string) {
 	t.Helper()
+	cookieName := testLinkCSRFCookie
+	if len(customCookie) != 0 {
+		cookieName = customCookie[0]
+	}
 	b, id, local, oldNow := snapshotFixture()
 	delta := time.Since(oldNow)
 	b.Deadline = b.Deadline.Add(delta)
@@ -80,7 +105,7 @@ func linkFixture(t *testing.T) (*fiber.App, *fakeLinkAdmin, *memoryIntents, *fak
 	p := &fakeProtocol{id: id, binding: b}
 	s := &Runtime{
 		Config:     Config{Origin: testOrigin, Issuer: id.Issuer, ClientID: id.ClientID, ProjectID: id.ProjectID},
-		csrfCookie: "csrf_token",
+		csrfCookie: cookieName,
 	}
 	bound, err := buildSnapshot(b, id, local, "", time.Now())
 	if err != nil {
@@ -123,7 +148,7 @@ func linkFixture(t *testing.T) (*fiber.App, *fakeLinkAdmin, *memoryIntents, *fak
 
 func linkRequest(t *testing.T, app *fiber.App, secret, csrf, origin string) *http.Response {
 	t.Helper()
-	form := url.Values{"intent": {secret}, "csrf": {csrf}, "confirm": {"link-this-identity"}}
+	form := url.Values{"intent": {secret}, testLinkCSRFField: {csrf}, testLinkConfirmField: {"link-this-identity"}}
 	r := httptest.NewRequestWithContext(
 		t.Context(), http.MethodPost, testLinkURL, strings.NewReader(form.Encode()),
 	)
@@ -216,23 +241,22 @@ func TestLinkPagePassesVerifiedIdentityAndNativeBoundIntentToRenderer(t *testing
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status %d", response.StatusCode)
 	}
-	var props struct {
-		Subject string `json:"subject"`
-		Intent  string `json:"intent"`
-		CSRF    string `json:"csrf"`
-	}
+	var props map[string]any
 	if err = json.NewDecoder(response.Body).Decode(&props); err != nil {
 		t.Fatal(err)
 	}
-	if props.Subject != protocol.id.Subject || len(props.Intent) != 43 || props.CSRF == "" {
+	subject, _ := props["subject"].(string)
+	intent, _ := props["intent"].(string)
+	csrfProp, _ := props["csrf"].(string)
+	if subject != protocol.id.Subject || len(intent) != 43 || csrfProp == "" || props[testLinkCSRFCookie] != csrfProp {
 		t.Fatal("lost verified page props")
 	}
 	if store.binding.LocalSubject.String() != admin.actor.SubjectID ||
-		store.native != admin.native.SessionID || store.secret != props.Intent {
+		store.native != admin.native.SessionID || store.secret != intent {
 		t.Fatal("intent lost native binding")
 	}
 	cookies := response.Cookies()
-	if len(cookies) != 1 || cookies[0].Value != props.CSRF || cookies[0].Name != "csrf_token" {
+	if len(cookies) != 1 || cookies[0].Value != csrfProp || cookies[0].Name != testLinkCSRFCookie {
 		t.Fatal("native CSRF cookie mismatch")
 	}
 }
@@ -244,5 +268,186 @@ func TestLinkReportsProviderUnavailableWithoutRetryingIntent(t *testing.T) {
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusServiceUnavailable || len(admin.linked) != 0 || !store.consumed {
 		t.Fatal("unavailable proof must fail closed with a consumed intent and retry-later status")
+	}
+}
+
+func TestStaleLocalLinkPromptsBeforeIntentOrMutation(t *testing.T) {
+	app, admin, store, _, csrf := linkFixture(t)
+	admin.eligibility = host.IdentityLinkStale
+	page, err := app.Test(httptest.NewRequestWithContext(t.Context(), http.MethodGet, testLinkURL, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer page.Body.Close()
+	var props map[string]any
+	if err := json.NewDecoder(page.Body).Decode(&props); err != nil {
+		t.Fatal(err)
+	}
+	if page.StatusCode != http.StatusOK || props["code"] != "local_auth_stale" || props["reauthCSRF"] == "" ||
+		props[testLinkCSRFCookie] != props["reauthCSRF"] {
+		t.Fatalf("stale GET did not offer explicit reauthentication: %v", props)
+	}
+	res := linkRequest(t, app, store.secret, csrf, testOrigin)
+	defer res.Body.Close()
+	var failure map[string]any
+	if err := json.NewDecoder(res.Body).Decode(&failure); err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != http.StatusForbidden || failure["code"] != "local_auth_stale" ||
+		store.consumeCalls != 0 || len(admin.linked) != 0 || admin.logouts != 0 {
+		t.Fatalf("stale POST consumed intent, linked, or logged out: %v", failure)
+	}
+}
+
+func TestStaleReauthenticationProofUsesConfiguredCookieName(t *testing.T) {
+	const cookieName = "custom_sso_csrf"
+	app, admin, intents, protocol, proof := linkFixture(t, cookieName)
+	_ = intents
+	_ = protocol
+	_ = proof
+	admin.eligibility = host.IdentityLinkStale
+	page, err := app.Test(httptest.NewRequestWithContext(t.Context(), http.MethodGet, testLinkURL, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer page.Body.Close()
+	var props map[string]any
+	if err := json.NewDecoder(page.Body).Decode(&props); err != nil {
+		t.Fatal(err)
+	}
+	if page.StatusCode != http.StatusOK || props[cookieName] == "" || props[cookieName] != props["reauthCSRF"] ||
+		len(page.Cookies()) != 1 || page.Cookies()[0].Name != cookieName || page.Cookies()[0].Value != props[cookieName] {
+		t.Fatal("configured CSRF cookie did not match the stale form and shared prop")
+	}
+}
+
+func TestExternalNativeSessionCannotEnterLinkLoop(t *testing.T) {
+	app, admin, store, _, _ := linkFixture(t)
+	admin.eligibility = host.IdentityLinkNotLocal
+	response, err := app.Test(httptest.NewRequestWithContext(t.Context(), http.MethodGet, testLinkURL, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	var props map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&props); err != nil {
+		t.Fatal(err)
+	}
+	linkAvailable, linkOK := props["linkAvailable"].(bool)
+	startAvailable, startOK := props["startAvailable"].(bool)
+	if response.StatusCode != http.StatusForbidden || props["code"] != "local_auth_required" ||
+		!linkOK || linkAvailable || !startOK || startAvailable || store.consumeCalls != 0 {
+		t.Fatalf("external native session offered linking: %v", props)
+	}
+}
+
+func TestExplicitLocalReauthenticationRequiresCSRFAndNeverLinks(t *testing.T) {
+	app, admin, store, _, csrf := linkFixture(t)
+	admin.eligibility = host.IdentityLinkStale
+	form := url.Values{"csrf": {csrf}, testLinkConfirmField: {"reauthenticate-local"}}
+	request := func(origin, token string) (int, string) {
+		form.Set("csrf", token)
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost,
+			testOrigin+"/sso-link/reauth", strings.NewReader(form.Encode()))
+		r.Header.Set("Origin", origin)
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		res, err := app.Test(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		return res.StatusCode, res.Header.Get("Location")
+	}
+	if status, _ := request(testOrigin, "bad"); status != http.StatusForbidden || admin.logouts != 0 {
+		t.Fatal("invalid CSRF triggered logout")
+	}
+	if status, _ := request("https://evil.invalid", csrf); status != http.StatusForbidden || admin.logouts != 0 {
+		t.Fatal("wrong Origin triggered logout")
+	}
+	status, location := request(testOrigin, csrf)
+	if status != http.StatusSeeOther || location != "/auth/login?local=1&redirectback=%2Fsso-link" ||
+		admin.logouts != 1 || store.consumeCalls != 0 || len(admin.linked) != 0 {
+		t.Fatal("explicit reauthentication did not return to a new form safely")
+	}
+}
+
+func TestExplicitLocalReauthenticationJSONResponseIsFixedAndLocalOnly(t *testing.T) {
+	app, admin, store, _, csrf := linkFixture(t)
+	admin.eligibility = host.IdentityLinkStale
+	form := url.Values{"csrf": {csrf}, testLinkConfirmField: {"reauthenticate-local"}}
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost,
+		testOrigin+"/sso-link/reauth", strings.NewReader(form.Encode()))
+	r.Header.Set("Origin", testOrigin)
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.Header.Set("Accept", "application/json")
+	res, err := app.Test(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	var body struct {
+		Next string `json:"next"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != http.StatusOK || body.Next != "/auth/login?local=1&redirectback=%2Fsso-link" ||
+		admin.logouts != 1 || store.consumeCalls != 0 || len(admin.linked) != 0 {
+		t.Fatalf("unexpected JSON reauthentication response: status=%d next=%q logouts=%d",
+			res.StatusCode, body.Next, admin.logouts)
+	}
+}
+
+func TestIdentityConflictIsDistinctFromStaleAndDependencyFailure(t *testing.T) {
+	app, admin, store, _, csrf := linkFixture(t)
+	admin.linkErr = goauth.ErrIdentityLinkConflict
+	res := linkRequest(t, app, store.secret, csrf, testOrigin)
+	defer res.Body.Close()
+	var failure map[string]any
+	if err := json.NewDecoder(res.Body).Decode(&failure); err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != http.StatusConflict || failure["code"] != "identity_link_conflict" || !store.consumed {
+		t.Fatalf("conflict classification: %v", failure)
+	}
+}
+
+func TestReadOnlyAccountStatusShowsPendingOnlyWithoutCanonicalLink(t *testing.T) {
+	app, admin, store, provider, _ := linkFixture(t)
+	for _, test := range []struct {
+		linked, verified, mismatch bool
+		pending                    bool
+	}{
+		{false, true, false, true},
+		{true, true, false, false},
+		{false, false, false, false},
+		{false, true, true, false},
+	} {
+		admin.hasLink = test.linked
+		provider.err = nil
+		provider.id.Subject = provider.binding.Subject
+		if !test.verified {
+			provider.err = browser.ErrDenied
+		}
+		if test.mismatch {
+			provider.id.Subject = "different-subject"
+		}
+		res, err := app.Test(httptest.NewRequestWithContext(t.Context(), http.MethodGet, testOrigin+"/sso-account", nil))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var status struct {
+			Linked    bool   `json:"linked"`
+			Pending   bool   `json:"pending"`
+			LocalAuth string `json:"localAuth"`
+		}
+		if err := json.NewDecoder(res.Body).Decode(&status); err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != http.StatusOK || status.Linked != test.linked ||
+			status.Pending != test.pending || status.LocalAuth != "fresh" || store.consumeCalls != 0 {
+			t.Fatalf("account status: %+v, case %+v", status, test)
+		}
 	}
 }
