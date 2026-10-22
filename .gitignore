@@ -13,3 +13,4 @@ resources/backend/internal/adminext/public/hot
 .go-cache/
 cover.html
 *.test
+output/playwright/starter-smoke/

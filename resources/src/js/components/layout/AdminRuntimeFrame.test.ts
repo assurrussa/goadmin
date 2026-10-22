@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createApp, h, nextTick, reactive, ref } from 'vue'
+import { createPinia } from 'pinia'
 import AdminRuntimeFrame from './AdminRuntimeFrame.vue'
 
 const mocks = vi.hoisted(() => ({
@@ -20,7 +21,7 @@ vi.mock('@/components/UploadQueueContainer.vue', () => ({
   default: { render: () => h('div', { 'data-uploads': '' }) },
 }))
 vi.mock('@/composables/useAdminCapabilities', () => ({
-  useAdminCapabilities: () => ({ uploads: true }),
+  useAdminCapabilities: () => ({ uploads: ref(true), realtime: ref(false) }),
 }))
 let app: ReturnType<typeof createApp> | undefined
 beforeEach(() => {
@@ -41,7 +42,7 @@ it('keeps one service owner through auth/admin page changes and cleans subscript
     render: () => h(AdminRuntimeFrame, null, { default: () => h('main', pageName.value) }),
   })
   const root = document.createElement('div')
-  app.mount(root)
+  app.use(createPinia()).mount(root)
   await nextTick()
   await nextTick()
   expect(mocks.success).toHaveBeenCalledExactlyOnceWith('Saved')
@@ -72,7 +73,7 @@ it('keeps one service owner through auth/admin page changes and cleans subscript
 
 it('ignores pending flash work after its frame unmounts', async () => {
   app = createApp(AdminRuntimeFrame)
-  app.mount(document.createElement('div'))
+  app.use(createPinia()).mount(document.createElement('div'))
   app.unmount()
   app = undefined
   await nextTick()

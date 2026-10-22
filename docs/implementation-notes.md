@@ -1,5 +1,50 @@
 # Implementation Notes
 
+## Real-host presentation acceptance (2026-10-22)
+
+The accepted follow-up uses two isolated source-candidate starter instances:
+standard and topbar, with core plus access, jobs, uploads, queues and realtime.
+Notifications/authmail and NotifyHub are deferred. Each instance owns fresh
+PostgreSQL/upload volumes and generated test secrets; existing starter settings
+and data are outside the test. Keep both instances available after the requested
+interactive acceptance run.
+
+The upload queue observes an acknowledged server task through Inertia
+navigation. Its application-scoped owner handles status events, bounded
+polling, unknown/recheck and teardown. Widgets continue to own field assignment
+and completion fences; task completion alone must not release recovery metadata
+or claim that a form was saved. Logout/owner changes invalidate stale work.
+
+The controller passed 106 focused lifecycle/widget tests, including red/green
+navigation and owner-change regressions. `make check` passed; after review and
+real-host fixes, the final `make resources` passed 108 manifest/build checks and
+781 unit tests plus types/lint/build. The unchanged Go pass was reused. The
+nested starter module was aligned to the root's already required GoAuth v0.12.0;
+its readonly tests passed.
+
+The repeatable entrypoint is `make starter-smoke KEEP=1`, with run-scoped
+cleanup and ignored diagnostics. Infrastructure checks pass eight Python tests
+and five browser-gate helper tests. The first Docker attempt exposed missing
+assets-stage contract-test inputs; these are now copied and inventory-tested.
+The real-host probe also exposed incorrect error focus: a named wrapper was
+selected before its input. `AdminForm` now selects an enabled control inside
+its own form after processing unlocks; six focused tests and independent source
+review passed. Visual inspection of the first all-green host run found that
+the topbar production CSS created its base layer before Tailwind's theme layer,
+so light fallback tokens
+overrode the pack accent and dark palette. Loading core CSS first fixes the
+precedence. A real production-build regression and computed-paint assertions
+now guard that ordering; attribute-only theme checks were insufficient.
+
+Fresh run `20261022t140046z-9e218af9` passed all seven scenario groups for both
+rebuilt packs, with genuine terminal WebSocket delivery across navigation,
+persisted file/recovery checks, server RBAC denial, profile validation/save and
+mobile/keyboard/mode/language acceptance. Both browser error lists are empty.
+The aggregate report records source/dependency/image identity and measured
+paint; screenshots were visually reviewed. Both isolated instances remain
+running for the requested comparison. See [presentation QA](presentation-packs-qa.md)
+for the evidence boundary. Nothing was published or deployed to production.
+
 ## Build-time admin presentation packs (2026-10-22)
 
 The agreed scope is a build-time theme pack with interchangeable admin/auth

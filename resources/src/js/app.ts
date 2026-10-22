@@ -1,3 +1,5 @@
+// Establish the core layer order before component and extension styles.
+import '../css/app.css'
 import { initLocale } from '@/i18n'
 import { createApp, h, defineComponent, Fragment, ref } from 'vue'
 import { createInertiaApp, router, usePage } from '@inertiajs/vue3'
@@ -28,8 +30,6 @@ initLocale()
 axios.defaults.withCredentials = true
 axios.defaults.xsrfCookieName = import.meta.env.VITE_ADMIN_CSRF_COOKIE_NAME?.trim() || 'csrf_token'
 axios.defaults.xsrfHeaderName = 'X-CSRF-Token'
-
-import '../css/app.css'
 
 const renderAdminLayout: LayoutResolver = (render, page) =>
   render(AdminLayout, null, { default: () => page })

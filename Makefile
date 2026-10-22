@@ -141,6 +141,17 @@ import-policy-site:
 	@test -d "$(SITE_REPO)" || (echo "SITE_REPO not found: $(SITE_REPO)" >&2; exit 1)
 	go run ./cmd/importpolicy --repo-root "$(SITE_REPO)" --consumers backend,fixtures/second-go-host --legacy-auth-roots backend,fixtures/oidc-pet-go
 
+.PHONY: starter-smoke starter-smoke-down starter-smoke-test
+starter-smoke:
+	@KEEP="$(KEEP)" python3 scripts/starter-smoke.py up
+
+starter-smoke-down:
+	@python3 scripts/starter-smoke.py down --run-id "$(RUN_ID)"
+
+starter-smoke-test:
+	@python3 scripts/starter-smoke_test.py
+	@node --test scripts/starter-smoke/*.test.mjs
+
 .PHONY: externalconsumer-candidates externalconsumer-anonymous-local externalconsumer-public-deps-local
 externalconsumer-anonymous-local:
 	bash scripts/anonymous-consumer.sh local

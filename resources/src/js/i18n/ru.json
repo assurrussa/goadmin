@@ -60,5 +60,9 @@
   "core.ui.video": "видео",
   "core.ui.words": "слов",
   "core.ui.❌ Invalid JSON:": "❌ Некорректный JSON:",
-  "core.ui.🎨 Format": "🎨 Форматировать"
+  "core.ui.🎨 Format": "🎨 Форматировать",
+  "core.ui.Check processing status": "Проверить статус обработки",
+  "core.ui.Processing status unknown. Check again.": "Статус обработки неизвестен. Проверьте ещё раз.",
+  "core.ui.Processing finished, but file details are unavailable.": "Обработка завершена, но данные файла недоступны.",
+  "core.ui.Processing status check timed out. Check again.": "Время проверки статуса обработки истекло. Проверьте ещё раз."
 }

@@ -66,7 +66,12 @@ describe the prerequisites. From the repository root, run
 to validate the selected source candidates. This source build does not prove
 that a clean public consumer can resolve those dependencies.
 
-The built-in interface is currently Russian-only. Navigation and the home
+For repeatable real-backend comparison of the standard and topbar presentations,
+run `make starter-smoke KEEP=1` from the repository root. The
+[starter smoke guide](examples/starter/README.md#compare-presentation-packs-on-a-real-backend)
+describes its isolated data, selected modules, artifacts and cleanup command.
+
+The shared interface supports Russian and English. Navigation and the home
 screen use the signed-in administrator's permissions; optional host features
 appear only when registered and permitted.
 

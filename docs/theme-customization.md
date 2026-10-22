@@ -253,6 +253,13 @@ pages. The [component catalog and browser fixture](presentation-demo.md) exercis
 actual source-manifest selection. Type-check, test and visually inspect a custom
 pack in both modes/languages and on desktop/mobile before adopting it.
 
+For real-backend acceptance of the standard and reference packs, use the
+[starter smoke command](../examples/starter/README.md#compare-presentation-packs-on-a-real-backend).
+It exercises the existing authenticated pages, profile writes, restricted
+permissions and upload/realtime lifecycle with isolated PostgreSQL instances.
+The synthetic presentation fixture remains useful for the larger visual matrix;
+it does not submit real forms.
+
 ## Component styling and interaction contract
 
 Stable `data-ui` families are `button`, `input`, `textarea`, `select`, `checkbox`,

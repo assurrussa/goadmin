@@ -27,7 +27,7 @@ The fixture keeps its generated sources temporary and isolated from host ENV
 unless manifests are explicitly supplied; its empty legacy root is independent
 of the command's working directory.
 
-## Executed checks
+## Initial fixture checks
 
 - `make check`: Go tidy/fmt/vet/lint and the full race+coverage pass succeeded.
   That invocation later stopped at a resource VM harness missing the new frame
@@ -49,7 +49,7 @@ The checked-in embedded output contains the standard presentation. Alternate
 builds verify local compatibility; they do not establish published-consumer or
 deployment readiness.
 
-## Browser acceptance
+## Initial fixture browser acceptance
 
 [Machine-readable results](screenshots/presentation-packs/browser-checks.json)
 contain 160 distinct runs: 10 routes × 2 packs × 2 modes × RU/EN × two viewports
@@ -107,7 +107,7 @@ Targeted evidence includes [keyboard navigation](screenshots/presentation-packs/
 [keyboard focus](screenshots/presentation-packs/default-light-keyboard-focus.png)
 and [readonly contrast](screenshots/presentation-packs/topbar-light-readonly-contrast.png).
 
-## Verification limits
+## Initial fixture verification limits
 
 This is one in-app browser environment with synthetic data. Host-supplied sample
 content remains Russian in some EN runs; shared UI language changes were checked.
@@ -119,3 +119,51 @@ physical devices and cross-browser testing were not performed.
 The second pack demonstrates the extension boundary. It is not a second polished
 product design. Standalone HTML error documents retain their independent neutral
 light/dark fallback and do not load pack CSS.
+
+## Real starter acceptance
+
+The follow-up used `make starter-smoke KEEP=1` and fresh isolated source builds,
+PostgreSQL and upload volumes for core plus `access,jobs,uploads,queues,realtime`.
+Run `20261022t140046z-9e218af9` passed all seven scenario groups per pack in
+Chromium 155.0.8059.12 (Playwright 1.64.0-alpha-1790635538000), with zero browser
+console errors or page errors. Its ignored artifacts are in
+`output/playwright/starter-smoke/20261022t140046z-9e218af9/`; `report.json` includes
+the source revision/dirty flag, resolved dependency versions/replacements, image
+IDs, scenario results and links to screenshots, traces and container diagnostics.
+
+Real first-admin setup, login/logout and protected-route denial passed. Profile
+checks verified server rejection of whitespace names, focus on the invalid
+control, correction, one flash and persistence after reload. A separately
+created administrator with only `queues:read` could view queues, had no admin
+menu and received HTTP 403 for a direct `/admins` request.
+
+The avatar scenario retained genuine terminal server responses until after an
+Inertia navigation unmounted the form. It released the unchanged WebSocket
+payload while terminal polling remained held, then verified the global queue,
+avatar URL, a non-empty stored image response and persistence after reload. Returning to the
+matching field explicitly reconciled its retained completion fence without
+another TUS create or PATCH. File readiness did not release the field fence or
+claim that a host form was saved.
+
+Mobile drawer focus wrapping, inert content, Escape focus restoration, absence
+of horizontal overflow, RU/EN persistence and light/dark persistence passed on
+both real hosts. Computed paint and desktop screenshots confirmed standard blue
+and topbar teal, with dark surfaces and light text after reload. This exposed
+and fixed production-only CSS layer ordering that the initial fixture had
+missed: core CSS now establishes `theme, base, components, utilities` before
+extension CSS. Both actual Vite production builds and the asset gate check it.
+
+`make check` passed before the final frontend corrections. The unchanged Go
+tidy/fmt/vet/lint/race+coverage pass was reused; the final `make resources` passed
+108 manifest/build checks, 781 unit tests across 70 files, types, lint, formatting
+and the default asset build. `make starter-smoke-test` passed eight Python and
+five JavaScript checks. The nested starter readonly Go tests passed after
+aligning its GoAuth requirement to the root's existing v0.12.0. The root module,
+public Go APIs and migrations did not change.
+
+The resolved runtime uses GoAuth v0.12.0, GoNotify v0.6.0, GoUploads v0.13.0 and
+GoWebSocket v0.2.1; goadmin is the local source replacement, not a published
+candidate. Both instances were retained at `http://localhost:18768` and
+`http://127.0.0.1:18769`. Mail/NotifyHub, MFA/recovery backend scenarios,
+cross-browser and physical-device acceptance remain outside this follow-up.
+These local checks do not establish release publication or production readiness.

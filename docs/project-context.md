@@ -515,6 +515,17 @@ is not terminal assignment. Rich-text insertion must return success before
 assignment events are emitted. Saving a host form is a separate host-owned
 commitment: the widget's model update does not claim that the form was saved.
 
+Acknowledged server tasks are observed by the application frame, independently
+of the page that submitted them. Navigation detaches a widget's local result
+observer; it does not cancel processing-status observation or mark the server
+task failed. The global queue reconciles WebSocket events with bounded serial
+status polling. Unavailable status is shown as unknown with an explicit recheck,
+which reads the same task and never resends the file or completion request.
+Image and video observation retain their respective waiting budgets. Logout,
+owner changes and frame teardown invalidate callbacks and release observers,
+polling and queue timers. Field assignment and recovery fences remain owned by
+the matching widget; global file readiness does not confirm insertion or save.
+
 Acknowledged chunk progress uses validated `Upload-Offset` values. PATCH must
 return 204 and advance by the exact chunk length. Missing, invalid, out-of-range
 or backward offsets fail explicitly; repeated conflicts are bounded. These

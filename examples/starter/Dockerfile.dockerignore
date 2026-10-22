@@ -2,10 +2,14 @@
 .go-cache
 .cache
 resources/node_modules
+**/node_modules
 resources/.vite
 resources/dist
 public/dist
 public/hot
+output/
+tmp/
+scripts/starter-smoke*
 **/.DS_Store
 
 .env

@@ -82,3 +82,46 @@ owned jobs runtime. `UPLOAD_ROOT` defaults to `/data/uploads`; finalized files
 live under `media/v1` and resolve from `ADMIN_URL/uploads`. Staging and unfinished
 records are never served as admin files or previews. Existing migration history
 is preserved; this starter does not reset host data.
+
+## Compare presentation packs on a real backend
+
+From the repository root, run the opt-in local acceptance command:
+
+```sh
+make starter-smoke KEEP=1
+```
+
+It builds the current source twice: the standard presentation at
+`http://localhost:18768` and the topbar reference at `http://127.0.0.1:18769`.
+The different hostnames isolate browser cookies when both are open together.
+Both instances enable core plus `access,jobs,uploads,queues,realtime`; each has
+its own fresh PostgreSQL and upload volumes. The command generates private test
+credentials and keys, without reading this starter's `.env`. Mail and NotifyHub
+are outside this acceptance profile.
+
+The browser checks first-admin registration, login/logout, profile validation
+and persistence, an actual restricted account, avatar processing across Inertia
+navigation, WebSocket delivery and responsive presentation. Theme checks measure
+the rendered accent, surfaces and text after toggling dark mode and reloading.
+Source builds and
+the report record the modules actually resolved; copied candidate sources alone
+are not evidence that a dependency override was selected. These are local
+candidate checks, not published-consumer or production validation.
+
+The command prints its `RUN_ID` and the ignored artifact directory
+`output/playwright/starter-smoke/<run-id>/`. Its `report.json` records the source
+revision, resolved dependency versions/replacements, image IDs and scenario
+results. The directory also holds screenshots, diagnostics and protected test
+credential files. `KEEP=1` retains
+the two instances for interactive inspection. Without `KEEP=1`, the command
+removes its own instances and volumes after the run. To remove a retained run:
+
+```sh
+make starter-smoke-down RUN_ID=<printed-run-id>
+```
+
+Cleanup targets only that recorded run. The smoke infrastructure's unit checks
+are available separately through `make starter-smoke-test` and do not start
+Docker. The source Docker build accepts `VITE_ADMIN_EXTENSION_MANIFESTS`; an
+empty value retains the standard presentation. Custom packs use the normal
+manifest validation and the same pinned client/backend sources.
