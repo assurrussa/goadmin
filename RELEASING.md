@@ -27,7 +27,7 @@ This module is published as `github.com/assurrussa/goadmin`.
 - The clean-history baseline was published as v0.7.0.
   Old history, PRs and tags remain in the private history archive; do not move
   or rewrite them. Verify the new remote tag and public module independently.
-- Current `go.mod` pins GoAuth v0.15.0, GoNotify v0.6.0 and gossoclient v0.6.0.
+- Current `go.mod` pins GoAuth v0.15.0, GoNotify v0.6.0 and gossoclient v0.6.1.
   GoInertia v0.11.1 retains protocol v2 by default, matching the embedded v2 frontend. GoCache
   resolves v0.2.2. GoDI and GoLogger retain their existing compatible pins.
 - `VERSION` is intentionally unset by default. Pass the exact planned or
@@ -44,13 +44,13 @@ This module is published as `github.com/assurrussa/goadmin`.
   published v0.13.0 and GoWebSocket to v0.2.1. The nested starter keeps explicit
   source-mode overrides; its published Docker build removes them all.
   Published verification rejects every replacement and legacy shared/Redis module.
-- The frontend advisory gate and its remaining moderate findings are reviewed
+- The frontend advisory gate and its current zero-finding result are reviewed
   in [docs/dependency-advisory-review.md](docs/dependency-advisory-review.md).
 
 ## v0.20.0 candidate
 
 - Align root and starter with published GoAuth v0.15.0; align the root SSO SDK
-  with published gossoclient v0.6.0. These pins do not enable mandatory MFA
+  with published gossoclient v0.6.1. These pins do not enable mandatory MFA
   or change host SSO policy.
 - Run `make publish-readiness VERSION=v0.20.0` on the final source tree,
   including the public-dependency clean-consumer probe. Only after a separately

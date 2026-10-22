@@ -11,7 +11,7 @@ require (
 	github.com/assurrussa/goinertia v0.11.1
 	github.com/assurrussa/gologger v0.1.0
 	github.com/assurrussa/gonotify v0.6.0
-	github.com/assurrussa/gossoclient v0.6.0
+	github.com/assurrussa/gossoclient v0.6.1
 	github.com/assurrussa/gouploads v0.13.0
 	github.com/assurrussa/gowebsocket v0.2.1
 	github.com/assurrussa/outbox v0.17.0
