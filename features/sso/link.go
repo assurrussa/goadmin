@@ -23,6 +23,8 @@ import (
 
 const linkJSONAccept = "application/json"
 
+const providerAccountPath = "/sso-provider-account"
+
 // LinkSchema is migrated by the host in the same dedicated schema as Schema.
 // Intent identifiers are hashed at rest; no provider tokens are stored here.
 func LinkSchema() string {
@@ -113,7 +115,13 @@ func (s *Runtime) LinkFeature(csrf *host.CSRFService) host.Feature {
 }
 
 func (f *linkFeature) Descriptor() host.FeatureDescriptor {
-	return host.FeatureDescriptor{Key: "goadmin-sso-link"}
+	return host.FeatureDescriptor{Key: "goadmin-sso-link", Menu: host.Menu{Sections: []host.Section{{
+		Key: "goadmin-sso-account", Title: "AuthHub", Placement: "account",
+		Items: []host.Item{
+			{Name: "Связь с AuthHub", Href: "/auth/profile/settings#sso-settings-title", Icon: "link"},
+			{Name: "Открыть AuthHub", Href: providerAccountPath, Icon: "user"},
+		},
+	}}}}
 }
 
 func (f *linkFeature) Build(host.Menu) host.ExtensionBuilder {
@@ -149,9 +157,36 @@ type linkHandler struct {
 func (h *linkHandler) RegisterGroupRoutes(router fiber.Router, _ ...fiber.Handler) {
 	router.Get("/sso-link", h.page)
 	router.Get("/sso-account", h.account)
+	router.Get(providerAccountPath, h.providerAccount)
 	// Core authentication, Origin/CSRF and role-preview mutation denial run first.
 	router.Post("/sso-link", h.confirm)
 	router.Post("/sso-link/reauth", h.reauthenticate)
+}
+
+// providerAccount is a separate, authenticated navigation destination. It
+// never changes the RP login flow or accepts a browser-supplied redirect URL.
+func (h *linkHandler) providerAccount(c fiber.Ctx) error {
+	c.Set("Cache-Control", "no-store")
+	if _, _, err := h.current(c); err != nil {
+		return c.SendStatus(http.StatusForbidden)
+	}
+	if h.service == nil || !h.service.Config.Enabled || h.service.Config.Validate() != nil {
+		return c.SendStatus(http.StatusServiceUnavailable)
+	}
+	query := url.Values{
+		"client_id":    {h.service.Config.ClientID},
+		"redirect_uri": {h.service.Config.Origin + callbackPath},
+	}
+	endpoint := h.service.Config.Issuer + "/sso/account"
+	if browser.ValidateIssuerEndpoint(h.service.Config.Issuer, endpoint) != nil {
+		return c.SendStatus(http.StatusServiceUnavailable)
+	}
+	target := endpoint + "?" + query.Encode()
+	if c.Get("X-Inertia") != "" {
+		c.Set("X-Inertia-Location", target)
+		return c.SendStatus(http.StatusConflict)
+	}
+	return c.Redirect().Status(http.StatusSeeOther).To(target)
 }
 
 func (h *linkHandler) current(c fiber.Ctx) (goauth.SubjectID, host.CSRFRequest, error) {

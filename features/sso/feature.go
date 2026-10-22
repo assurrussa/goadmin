@@ -55,7 +55,7 @@ func (f *Feature) ingress(c fiber.Ctx) error {
 	if err != nil || !f.rp.Config.AllowsRequest(r) {
 		switch c.Path() {
 		case "/sso", "/login", callbackPath, "/sso/open", "/logout", "/sso-link",
-			"/sso-account", "/sso-link/reauth", "/auth/session/recover":
+			"/sso-account", providerAccountPath, "/sso-link/reauth", "/auth/session/recover":
 			return c.SendStatus(http.StatusNotFound)
 		}
 		// The optional adapter does not own health endpoints or other host routing.

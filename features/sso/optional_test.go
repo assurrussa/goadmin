@@ -22,6 +22,42 @@ func TestDisabledRuntimeHasNoSideEffects(t *testing.T) {
 	}
 }
 
+func TestSharedAccountNavigationIsOptionalAndDistinctFromStatusRoute(t *testing.T) {
+	var disabled *Runtime
+	if modules := disabled.Modules(nil, nil, ""); len(modules) != 0 {
+		t.Fatalf("disabled SSO contributed modules: %d", len(modules))
+	}
+	runtime := &Runtime{Config: testConfig()}
+	modules := runtime.Modules(nil, nil, "")
+	if len(modules) != 2 {
+		t.Fatalf("enabled SSO modules: %d", len(modules))
+	}
+	foundRoute := false
+	for _, route := range modules[1].Descriptor().Routes {
+		if route == "GET "+providerAccountPath {
+			foundRoute = true
+		}
+	}
+	if !foundRoute {
+		t.Fatal("provider account route is not declared for host preflight")
+	}
+	menu := runtime.LinkFeature(nil).Descriptor().Menu
+	if len(menu.Sections) != 1 || menu.Sections[0].Placement != "account" || len(menu.Sections[0].Items) != 2 {
+		t.Fatalf("shared account navigation: %+v", menu)
+	}
+	links := map[string]string{}
+	for _, item := range menu.Sections[0].Items {
+		links[item.Name] = item.Href
+		if item.Href == "/sso-account" || item.Href == "/sso/account" {
+			t.Fatalf("status or legacy endpoint exposed as common navigation: %+v", item)
+		}
+	}
+	if links["Связь с AuthHub"] != "/auth/profile/settings#sso-settings-title" ||
+		links["Открыть AuthHub"] != providerAccountPath {
+		t.Fatalf("unexpected common destinations: %+v", links)
+	}
+}
+
 func TestSchemaCannotInjectSQL(t *testing.T) {
 	for _, s := range []string{`a"; DROP SCHEMA public; --`, "public.x", "a b", "../x", ""} {
 		if err := MigrateSchema(t.Context(), nil, s); err == nil {
@@ -57,7 +93,7 @@ func TestAdapterBoundaryDoesNotCaptureHealthEndpoints(t *testing.T) {
 	app.Use(f.ingress)
 	app.Get("/healthz", func(c fiber.Ctx) error { return c.SendStatus(200) })
 	app.Get("/sso", func(c fiber.Ctx) error { return c.SendStatus(200) })
-	for _, path := range []string{linkPath, "/sso-account", "/sso-link/reauth"} {
+	for _, path := range []string{linkPath, "/sso-account", providerAccountPath, "/sso-link/reauth"} {
 		app.All(path, func(c fiber.Ctx) error { return c.SendStatus(200) })
 	}
 	for _, tc := range []struct {
@@ -69,6 +105,7 @@ func TestAdapterBoundaryDoesNotCaptureHealthEndpoints(t *testing.T) {
 		{http.MethodGet, linkPath, 404},
 		{http.MethodPost, linkPath, 404},
 		{http.MethodGet, "/sso-account", 404},
+		{http.MethodGet, providerAccountPath, 404},
 		{http.MethodPost, "/sso-link/reauth", 404},
 	} {
 		response, err := app.Test(httptest.NewRequestWithContext(t.Context(), tc.method, "http://localhost"+tc.path, nil))
