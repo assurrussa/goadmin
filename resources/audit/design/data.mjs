@@ -53,6 +53,24 @@ const menu = [
   { name: 'Уведомления', href: '/notifications', icon: 'notifications' },
 ]
 
+// Every destination stays in this synthetic fixture; none can submit a mutation.
+export const longMenu = Array.from({ length: 20 }, (_, index) => {
+  const href = `/__design/long-menu/section-${index + 1}`
+  return {
+    name: `Раздел ${index + 1}: управление рабочими процессами`,
+    href,
+    icon: 'content',
+    children: Array.from({ length: 2 }, (_, group) => ({
+      name: `Группа ${group + 1}: настройки и наблюдение`,
+      href: `${href}/group-${group + 1}`,
+      children: Array.from({ length: 2 }, (_, leaf) => ({
+        name: `Пункт ${leaf + 1}: подробная информация`,
+        href: `${href}/group-${group + 1}/item-${leaf + 1}`,
+      })),
+    })),
+  }
+})
+
 export const permissions = [
   ['users', 'read', 'Просмотр пользователей'],
   ['users', 'update', 'Редактирование пользователей'],
@@ -356,6 +374,25 @@ export function makePage(url) {
     page.component = 'auth/LoginPage'
     page.props.title = 'Вход в систему'
     page.props.authuser = null
+  } else if (pathname === '/auth/mfa') {
+    page.component = 'auth/MFAPage'
+    page.props.title = 'Подтверждение входа'
+    page.props.authuser = null
+    page.props.challengeID = 'synthetic-design-challenge-not-a-credential'
+  } else if (pathname === '/auth/forgot-password') {
+    page.component = 'auth/ForgotPasswordPage'
+    page.props.title = 'Восстановление пароля'
+    page.props.authuser = null
+    page.props.formAction = '/auth/forgot-password'
+    page.props.loginURL = '/auth/login'
+  } else if (pathname === '/auth/reset-password') {
+    page.component = 'auth/ResetPasswordPage'
+    page.props.title = 'Сброс пароля'
+    page.props.authuser = null
+    page.props.token = 'synthetic-design-token-not-a-credential'
+    page.props.email = 'admin@example.invalid'
+    page.props.formAction = '/auth/reset-password'
+    page.props.loginURL = '/auth/login'
   } else if (pathname === '/users/1048/edit' || pathname === '/users/create') {
     page.component = 'users/EditPage'
     page.props.title = 'Редактирование пользователя'
@@ -407,6 +444,31 @@ export function makePage(url) {
   } else if (pathname === '/__design/components') {
     page.component = 'DesignComponents'
     page.props.title = 'Компоненты'
+  } else if (pathname === '/__design/long-menu' || pathname.startsWith('/__design/long-menu/')) {
+    page.component = 'dashboard/IndexPage'
+    page.props.title = 'Длинное вложенное меню'
+    page.props.adminMenu = {
+      sections: structuredClone(longMenu).map((item, index) => ({
+        key: `long-${index + 1}`,
+        title: `Длинный раздел навигации ${index + 1}`,
+        items: [item],
+      })),
+    }
+  } else if (pathname === '/__design/capabilities-limited') {
+    page.component = 'dashboard/IndexPage'
+    page.props.title = 'Ограниченные возможности'
+    page.props.adminCapabilities = {}
+    // The host owns permission/module filtering. The browser receives only the
+    // allowed links; hiding a control is never treated as endpoint authorization.
+    page.props.adminMenu.sections[0].items = menu.filter(
+      (item) =>
+        !['/notifications', '/queues', '/admins', '/roles', '/permissions'].includes(item.href),
+    )
+  } else if (pathname === '/__design/missing-menu') {
+    page.component = 'dashboard/IndexPage'
+    page.props.title = 'Меню не передано'
+    page.props.adminCapabilities = {}
+    delete page.props.adminMenu
   } else return null
   if (pathname !== '/users')
     page.props.adminBreadcrumbs = [

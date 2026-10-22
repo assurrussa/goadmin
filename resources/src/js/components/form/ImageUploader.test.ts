@@ -1,7 +1,12 @@
+import {
+  createUploadTestApp as createApp,
+  uploadTestOwner,
+} from '@/composables/__tests__/uploadTaskTrackerTestHarness'
 import { setLocale } from '@/i18n'
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
-import { createApp, h, nextTick, reactive } from 'vue'
+import { h, nextTick, reactive } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
+import { useUploadQueueStore } from '@/stores/uploadQueue'
 import { useAuthUserStore } from '@/stores/authUser'
 import ImageUploader from './ImageUploader.vue'
 import { setAdminCapabilities } from '@/composables/useAdminCapabilities'
@@ -46,6 +51,7 @@ afterEach(async () => {
   setAdminCapabilities({ props: {} })
   await new Promise((resolve) => setTimeout(resolve, 0))
   setActivePinia(createPinia())
+  useAuthUserStore().setAuthUser(uploadTestOwner)
   for (const id of [7, 8]) {
     for (const field of [undefined, 'avatar-lifecycle']) {
       const recovery = useUploadCompletion(
@@ -156,8 +162,12 @@ describe('image upload capabilities', () => {
     input.dispatchEvent(new Event('change'))
     await vi.waitFor(() => expect(update).toHaveBeenCalledTimes(1))
     expect(mocks.upload).toHaveBeenCalledTimes(1)
-    expect(mocks.poll).toHaveBeenCalledWith(42, { signal: expect.any(AbortSignal) })
-    expect(unsubscribe).toHaveBeenCalled()
+    expect(mocks.poll).toHaveBeenCalledWith(42, {
+      signal: expect.any(AbortSignal),
+      maxAttempts: 120,
+      intervalMs: 1000,
+    })
+    expect(unsubscribe).not.toHaveBeenCalled()
     expect(input.disabled).toBe(false)
   })
 
@@ -186,7 +196,7 @@ describe('image upload capabilities', () => {
     listener(event)
     listener(event)
     await vi.waitFor(() => expect(update).toHaveBeenCalledTimes(1))
-    expect(unsubscribe).toHaveBeenCalledTimes(1)
+    expect(unsubscribe).not.toHaveBeenCalled()
     expect(root.textContent).not.toContain('status temporarily unavailable')
   })
   it('disables upload controls and does not connect when uploads are absent', () => {
@@ -215,9 +225,13 @@ describe('image upload capabilities', () => {
     await vi.waitFor(() =>
       expect(update).toHaveBeenCalledWith(expect.objectContaining({ id: 42, url: '/avatar.png' })),
     )
-    expect(mocks.poll).toHaveBeenCalledWith(42, { signal: expect.any(AbortSignal) })
+    expect(mocks.poll).toHaveBeenCalledWith(42, {
+      signal: expect.any(AbortSignal),
+      maxAttempts: 120,
+      intervalMs: 1000,
+    })
     expect(mocks.connect).not.toHaveBeenCalled()
-    expect(mocks.on).not.toHaveBeenCalled()
+    expect(mocks.on).toHaveBeenCalledTimes(1)
   })
 
   it('retains an unconfirmed session and blocks fresh uploads until an explicit recheck succeeds', async () => {
@@ -315,7 +329,7 @@ describe('image upload capabilities', () => {
     )
     expect(mocks.reconcile).toHaveBeenCalledWith(completion, { signal: expect.any(AbortSignal) })
     expect(mocks.upload).toHaveBeenCalledTimes(1)
-    expect(mocks.on).not.toHaveBeenCalled()
+    expect(mocks.on).toHaveBeenCalledTimes(1)
     expect(mocks.poll).not.toHaveBeenCalled()
     expect(input.disabled).toBe(false)
     expect(root.textContent).not.toContain('Check upload')
@@ -785,7 +799,7 @@ describe('image upload capabilities', () => {
       await vi.waitFor(() => expect(changed).toBe(true))
       await nextTick()
       expect(update).not.toHaveBeenCalled()
-      useAuthUserStore(pinia).setAuthUser(null)
+      useAuthUserStore(pinia).setAuthUser(uploadTestOwner)
       const original = useUploadCompletion(
         () => 'admin',
         () => 7,
@@ -802,3 +816,173 @@ describe('image upload capabilities', () => {
 // Existing English control selectors run under the explicit English UI locale.
 beforeEach(() => setLocale('en'))
 afterEach(() => setLocale('ru'))
+
+it('keeps observing an accepted server task after the field unmounts on navigation', async () => {
+  setAdminCapabilities({ props: { adminCapabilities: { uploads: true, realtime: false } } })
+  mocks.upload.mockResolvedValue({ status: 'queued', tasks: [{ id: 942, status: 'queued' }] })
+  let finish!: (result: unknown) => void
+  mocks.poll.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+  )
+  const visible = reactive({ field: true })
+  const update = vi.fn()
+  const pinia = createPinia()
+  const app = createApp({
+    render: () =>
+      visible.field
+        ? h(ImageUploader, {
+            objectType: 'admin',
+            objectId: 7,
+            'onUpdate:modelValue': update,
+          })
+        : h('main', 'Next page'),
+  }).use(pinia)
+  apps.push(app)
+  const root = document.createElement('div')
+  app.mount(root)
+  const input = root.querySelector<HTMLInputElement>('input[type=file]')!
+  Object.defineProperty(input, 'files', {
+    value: [new File(['image'], 'avatar.png', { type: 'image/png' })],
+  })
+  input.dispatchEvent(new Event('change'))
+  await vi.waitFor(() => expect(mocks.poll).toHaveBeenCalled())
+  visible.field = false
+  await nextTick()
+  finish({
+    status: 'completed',
+    task: { id: 942 },
+    file: { id: 942, filename: 'avatar.png', url: '/avatar.png' },
+  })
+  await vi.waitFor(() => expect(useUploadQueueStore(pinia).uploads[0]?.status).toBe('completed'))
+  expect(update).not.toHaveBeenCalled()
+})
+
+it.each(['completed', 'failed', 'queued'])(
+  'tracks late accepted %s after the field unmounts before the response arrives',
+  async (status) => {
+    setAdminCapabilities({ props: { adminCapabilities: { uploads: true, realtime: false } } })
+    let accept!: (value: unknown) => void
+    mocks.upload.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          accept = resolve
+        }),
+    )
+    if (status === 'queued')
+      mocks.poll.mockResolvedValue({
+        status: 'completed',
+        task: { id: 943, status: 'completed' },
+        file: { id: 943, filename: 'avatar.png', url: '/avatar.png' },
+      })
+    const visible = reactive({ field: true })
+    const update = vi.fn()
+    const pinia = createPinia()
+    const app = createApp({
+      render: () =>
+        visible.field
+          ? h(ImageUploader, {
+              objectType: 'admin',
+              objectId: 7,
+              'onUpdate:modelValue': update,
+            })
+          : h('main', 'Next page'),
+    }).use(pinia)
+    apps.push(app)
+    const root = document.createElement('div')
+    app.mount(root)
+    const input = root.querySelector<HTMLInputElement>('input[type=file]')!
+    Object.defineProperty(input, 'files', {
+      value: [new File(['image'], 'avatar.png', { type: 'image/png' })],
+    })
+    input.dispatchEvent(new Event('change'))
+    await vi.waitFor(() => expect(mocks.upload).toHaveBeenCalled())
+    visible.field = false
+    await nextTick()
+    accept({
+      status,
+      tasks: [
+        {
+          id: 943,
+          status,
+          file:
+            status === 'completed'
+              ? { id: 943, filename: 'avatar.png', url: '/avatar.png' }
+              : undefined,
+          error: 'Server rejection',
+        },
+      ],
+    })
+    await vi.waitFor(() =>
+      expect(useUploadQueueStore(pinia).uploads[0]?.status).toBe(
+        status === 'failed' ? 'error' : 'completed',
+      ),
+    )
+    expect(update).not.toHaveBeenCalled()
+    if (status === 'queued') expect(mocks.poll).toHaveBeenCalledTimes(1)
+    else expect(mocks.poll).not.toHaveBeenCalled()
+  },
+)
+
+it.each(['reject', 'uncertain-response'])(
+  'removes an unobserved TUS queue row after navigation cancellation (%s)',
+  async (result) => {
+    const completion = {
+      location: `/tus/navigation-${++nextSession}`,
+      filename: 'avatar.png',
+      entityType: 'admin',
+      entityId: 7,
+    }
+    let finish!: (value: unknown) => void
+    mocks.upload.mockImplementation(
+      ({ signal, onCompletionSession }) =>
+        new Promise((resolve, reject) => {
+          onCompletionSession(completion)
+          finish = resolve
+          signal.addEventListener(
+            'abort',
+            () => {
+              if (result === 'reject') reject(new DOMException('Cancelled', 'AbortError'))
+              else
+                resolve({
+                  status: 'completion_unknown',
+                  tasks: [],
+                  uncertainCompletion: completion,
+                })
+            },
+            { once: true },
+          )
+        }),
+    )
+    const visible = reactive({ field: true })
+    const pinia = createPinia()
+    const app = createApp({
+      render: () =>
+        visible.field ? h(ImageUploader, { objectType: 'admin', objectId: 7 }) : h('main'),
+    }).use(pinia)
+    apps.push(app)
+    const root = document.createElement('div')
+    app.mount(root)
+    const input = root.querySelector<HTMLInputElement>('input[type=file]')!
+    Object.defineProperty(input, 'files', {
+      value: [new File(['image'], 'avatar.png', { type: 'image/png' })],
+    })
+    input.dispatchEvent(new Event('change'))
+    await vi.waitFor(() => expect(mocks.upload).toHaveBeenCalled())
+    expect(useUploadQueueStore(pinia).uploads).toHaveLength(1)
+    visible.field = false
+    await nextTick()
+    await vi.waitFor(() => expect(useUploadQueueStore(pinia).uploads).toEqual([]))
+    finish({ status: 'error', tasks: [] })
+    setActivePinia(pinia)
+    const recovery = useUploadCompletion(
+      () => 'admin',
+      () => 7,
+      () => 'image-uploader',
+    )
+    expect(recovery.pending.value?.completion.location).toBe(completion.location)
+    expect(mocks.poll).not.toHaveBeenCalled()
+  },
+)

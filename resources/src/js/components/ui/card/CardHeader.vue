@@ -8,7 +8,11 @@ const props = defineProps<{
 </script>
 
 <template>
-  <div :class="cn('flex flex-col gap-y-1.5 p-[var(--goadmin-card-padding,1.5rem)]', props.class)">
+  <div
+    data-ui="card"
+    data-part="header"
+    :class="cn('flex flex-col gap-y-1.5 p-[var(--goadmin-card-padding,1.5rem)]', props.class)"
+  >
     <slot />
   </div>
 </template>

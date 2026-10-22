@@ -81,3 +81,29 @@ test('curated captures use viewport images including the README hero', async () 
   assert.equal(screenshotOptions.fullPage, false)
   assert.ok(!shots.some((s) => s[1] === 'queue' || s[1] === 'settings'))
 })
+
+test('demo sources ignore host manifest environment unless explicitly requested', async () => {
+  const { createDemoScaffold } = await import('./scaffold.mjs')
+  const previous = process.env.VITE_ADMIN_EXTENSION_MANIFESTS
+  process.env.VITE_ADMIN_EXTENSION_MANIFESTS = 'missing-host-manifest.json'
+  let empty, selected
+  try {
+    empty = createDemoScaffold()
+    assert.deepEqual(empty.sourceRoots, [])
+    selected = createDemoScaffold({
+      manifestPaths: [
+        new URL('../../examples/theme-topbar/extension.json', import.meta.url).pathname,
+      ],
+    })
+    assert.equal(selected.sourceRoots.length, 1)
+    assert.match(
+      readFileSync(new URL(`file://${selected.directory}/generated.ts`), 'utf8'),
+      /selectedThemeModuleKey: string \| null = "example\.topbar\/theme"/,
+    )
+  } finally {
+    empty?.cleanup()
+    selected?.cleanup()
+    if (previous === undefined) delete process.env.VITE_ADMIN_EXTENSION_MANIFESTS
+    else process.env.VITE_ADMIN_EXTENSION_MANIFESTS = previous
+  }
+})

@@ -103,6 +103,8 @@ const extraClass = computed(() => {
     :variant="variantMap[variant]"
     :size="sizeMap[size]"
     :disabled="disabled || loading"
+    :aria-busy="loading || undefined"
+    :data-loading="loading ? '' : undefined"
     :class="cn(extraClass, props.class)"
   >
     <slot />

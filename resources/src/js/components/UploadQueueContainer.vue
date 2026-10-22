@@ -8,6 +8,9 @@
         <div
           v-for="upload in uploads"
           :key="upload.id"
+          data-upload-task
+          :data-upload-status="upload.status"
+          :data-upload-id="upload.id"
           class="rounded-xl border border-border-primary bg-card bg-opacity-100 p-4 shadow-2xl"
         >
           <div class="flex items-start gap-3">
@@ -73,6 +76,15 @@
                 ></div>
               </div>
               <div class="mt-1 text-[11px] text-text-tertiary">{{ upload.progress }}%</div>
+              <AppButton
+                v-if="upload.status === 'unknown'"
+                data-upload-recheck
+                variant="ghost"
+                size="xs"
+                @click="store.recheck(upload.id)"
+              >
+                {{ t('core.ui.Check processing status', 'Check processing status') }}
+              </AppButton>
             </div>
           </div>
         </div>
@@ -82,6 +94,7 @@
 </template>
 
 <script setup lang="ts">
+import { t } from '@/i18n'
 import { storeToRefs } from 'pinia'
 import AppButton from '@/components/ui/AppButton.vue'
 import { useUploadQueueStore, type UploadItem } from '@/stores/uploadQueue'
@@ -123,6 +136,11 @@ const statusLabel = (upload: UploadItem) => {
   if (upload.status === 'error') {
     return upload.error ? `Error: ${upload.error}` : 'Upload failed'
   }
+  if (upload.status === 'unknown')
+    return t(
+      'core.ui.Processing status unknown. Check again.',
+      'Processing status unknown. Check again.',
+    )
   if (upload.status === 'processing') {
     return 'Processing file'
   }

@@ -1,5 +1,7 @@
 <template>
   <div
+    data-ui="datagrid"
+    data-part="table"
     class="rounded-[var(--goadmin-card-radius,var(--radius-xl,0.75rem))] overflow-hidden bg-card"
   >
     <div class="relative w-full overflow-auto">
@@ -32,6 +34,8 @@
               "
             >
               <button
+                data-ui="datagrid"
+                data-part="sort"
                 v-if="column.sortable"
                 type="button"
                 class="flex w-full items-center space-x-1 px-6 py-3 text-left uppercase tracking-wider hover:bg-surface-variant transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"

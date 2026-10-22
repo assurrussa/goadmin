@@ -703,5 +703,9 @@
   "core.ui.video": "video",
   "core.ui.words": "words",
   "core.ui.❌ Invalid JSON:": "❌ Invalid JSON:",
-  "core.ui.🎨 Format": "🎨 Format"
+  "core.ui.🎨 Format": "🎨 Format",
+  "core.ui.Check processing status": "Check processing status",
+  "core.ui.Processing status unknown. Check again.": "Processing status unknown. Check again.",
+  "core.ui.Processing finished, but file details are unavailable.": "Processing finished, but file details are unavailable.",
+  "core.ui.Processing status check timed out. Check again.": "Processing status check timed out. Check again."
 }

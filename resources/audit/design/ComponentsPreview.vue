@@ -5,8 +5,8 @@
       <h2 class="text-lg font-semibold">Вкладки</h2>
       <Tabs default-value="details">
         <TabsList aria-label="Разделы карточки">
-          <TabsTrigger value="details">Основное</TabsTrigger>
-          <TabsTrigger value="history">История</TabsTrigger>
+          <TabsTrigger id="design-tab-details" value="details">Основное</TabsTrigger>
+          <TabsTrigger id="design-tab-history" value="history">История</TabsTrigger>
           <TabsTrigger value="disabled" disabled>Недоступно</TabsTrigger>
         </TabsList>
         <TabsContent value="details">Данные пользователя и настройки доступа.</TabsContent>
@@ -26,6 +26,23 @@
         <AppButton id="design-success" variant="success">Успех</AppButton>
         <AppButton id="design-warning" variant="warning">Предупреждение</AppButton>
         <AppButton id="design-danger" variant="danger">Удаление</AppButton>
+        <AppButton id="design-secondary" variant="secondary">Вторичное</AppButton>
+        <AppButton id="design-outline" variant="outline">Контурное</AppButton>
+        <AppButton id="design-ghost" variant="ghost">Прозрачное</AppButton>
+        <AppButton id="design-link" variant="link">Ссылка</AppButton>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <AppButton id="design-loading" loading>Обработка</AppButton>
+        <AppButton id="design-button-disabled" disabled>Недоступно</AppButton>
+        <AppButton id="design-as-child" as-child variant="outline"
+          ><a href="#design-name">К полю имени</a></AppButton
+        >
+        <AppButton id="design-as-child-disabled" as-child disabled
+          ><a href="#design-name">Недоступная ссылка</a></AppButton
+        >
+        <AppButton id="design-as-child-loading" as-child loading
+          ><a href="#design-name">Ссылка загружается</a></AppButton
+        >
       </div>
       <FormInput id="design-name" v-model="name" label="Имя" />
       <FormInput id="design-error" label="Email" model-value="invalid" error="Проверьте адрес" />
@@ -41,10 +58,86 @@
         model-value="Недоступное значение"
         disabled
       />
+      <FormInput
+        id="design-readonly-invalid"
+        label="Только чтение с ошибкой"
+        model-value="Недопустимое значение"
+        readonly
+        error="Значение требует проверки"
+      />
+      <FormSelect
+        id="design-select"
+        v-model="selection"
+        label="Раздел"
+        :options="selectOptions"
+        placeholder="Выберите раздел"
+      />
+      <FormSelect
+        id="design-select-error"
+        label="Раздел с ошибкой"
+        :options="selectOptions"
+        error="Выберите доступный раздел"
+      />
+      <FormSelect
+        id="design-select-disabled"
+        label="Недоступный выбор"
+        model-value="overview"
+        :options="selectOptions"
+        disabled
+      />
+      <FormCheckbox
+        id="design-checkbox"
+        v-model="checked"
+        label="Получать обновления (только состояние страницы)"
+      />
+      <FormCheckbox
+        id="design-checkbox-disabled"
+        :model-value="true"
+        label="Недоступный флажок"
+        disabled
+      />
+      <FormCheckbox
+        id="design-checkbox-error"
+        :model-value="false"
+        label="Обязательное подтверждение"
+        error="Нужно подтверждение"
+      />
       <div style="--color-error: rgb(126, 34, 206)">
         <FormInput id="design-host-error" label="Цвет хоста" error="Ошибка с цветом хоста" />
       </div>
       <AppButton id="design-override" class="h-16 rounded-none">Переопределённый размер</AppButton>
+      <DropdownMenu>
+        <DropdownMenuTrigger as-child
+          ><AppButton id="design-dropdown" variant="outline"
+            >Состояния меню</AppButton
+          ></DropdownMenuTrigger
+        >
+        <DropdownMenuContent>
+          <DropdownMenuLabel>Только локальная демонстрация</DropdownMenuLabel>
+          <DropdownMenuItem @select="lastAction = 'Выбран обычный пункт'"
+            >Обычный пункт</DropdownMenuItem
+          >
+          <DropdownMenuItem disabled>Недоступный пункт</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuCheckboxItem v-model="dropdownChecked"
+            >Показывать сведения</DropdownMenuCheckboxItem
+          >
+          <DropdownMenuRadioGroup v-model="density">
+            <DropdownMenuRadioItem value="comfortable">Обычная плотность</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="compact">Компактная плотность</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>Вложенное меню</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuItem @select="lastAction = 'Выбран вложенный пункт'"
+                >Вложенный пункт</DropdownMenuItem
+              >
+              <DropdownMenuItem disabled>Недоступный вложенный пункт</DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <p v-if="lastAction" role="status" class="text-sm text-text-secondary">{{ lastAction }}</p>
       <Dialog>
         <DialogTrigger as-child><AppButton>Открыть диалог</AppButton></DialogTrigger>
         <DialogContent>
@@ -93,11 +186,27 @@ import { onBeforeUnmount, ref } from 'vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppStatus from '@/components/ui/AppStatus.vue'
 import FormInput from '@/components/form/FormInput.vue'
+import FormSelect from '@/components/form/FormSelect.vue'
+import FormCheckbox from '@/components/form/FormCheckbox.vue'
 import RichTextEditor from '@/components/form/RichTextEditor.vue'
 import ImageCropper from '@/components/imageCropper/ImageCropper.vue'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import trainingImage from '../../demo/sports-club/training.svg?url'
 import { Card } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuCheckboxItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+} from '@/components/ui/dropdown-menu'
 import {
   Dialog,
   DialogTrigger,
@@ -110,6 +219,16 @@ import {
 } from '@/components/ui/dialog'
 
 const name = ref('Анна Волкова')
+const selection = ref<string | number | bigint | null>('overview')
+const selectOptions = [
+  { value: 'overview', label: 'Обзор', group: 'Рабочие разделы' },
+  { value: 'settings', label: 'Настройки', group: 'Рабочие разделы' },
+  { value: 'unavailable', label: 'Недоступно', disabled: true, group: 'Другие разделы' },
+]
+const checked = ref(true)
+const dropdownChecked = ref(true)
+const density = ref('comfortable')
+const lastAction = ref('')
 const document = ref('<p>Описание пользователя и рабочие заметки.</p>')
 const showCropper = ref(false)
 const croppedUrl = ref('')

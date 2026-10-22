@@ -191,10 +191,9 @@ import axios from 'axios'
 import { useNotifications } from '@/composables/useNotifications'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 import { useUploadCompletion } from '@/composables/useUploadCompletion'
-import { pollUploadTask } from '@/services/pollUploadTask'
+import { useUploadTaskTracker } from '@/composables/useUploadTaskTracker'
 import { useUploadQueueStore } from '@/stores/uploadQueue'
 import {
-  useAdminWebSocket,
   FILE_UPLOAD_STATUS_EVENT,
   type FileUploadStatusEvent,
 } from '@/composables/useAdminWebSocket'
@@ -291,6 +290,7 @@ const previewUrl = ref<string | null>(props.modelValue?.url ?? null)
 const uploadProgress = ref<number | null>(null)
 const latestTempPreview = ref<string | null>(null)
 const showSuccessIndicator = ref(false)
+let successTimer: ReturnType<typeof setTimeout> | undefined
 const currentTaskId = ref<number | null>(null)
 const currentUploadId = ref<string | null>(null)
 const unsubscribe = ref<(() => void) | null>(null)
@@ -298,16 +298,11 @@ const showImageCropper = ref(false)
 const cropperImageUrl = ref<string | null>(null)
 const cropperFileName = ref('')
 const cropEnabled = ref(props.cropEnabled ?? props.enableCropper)
-let pollController: AbortController | null = null
-const { uploads, realtime } = useAdminCapabilities()
+const { uploads } = useAdminCapabilities()
 
-const { on, ensureConnected } = useAdminWebSocket()
+const taskTracker = useUploadTaskTracker()
 const { success: notifySuccess, error: notifyError } = useNotifications()
 const uploadQueue = useUploadQueueStore()
-
-if (typeof window !== 'undefined' && uploads.value && realtime.value) {
-  ensureConnected()
-}
 
 watch(
   () => props.modelValue,
@@ -451,15 +446,13 @@ const mapEventFile = (file: FileUploadEventFile): UploadedFile => ({
 })
 
 const detachListener = () => {
-  pollController?.abort()
-  pollController = null
   if (unsubscribe.value) {
     unsubscribe.value()
     unsubscribe.value = null
   }
 }
 
-const handleFileStatusEvent = (event: FileUploadStatusEvent, confirmedTerminal = true) => {
+const handleFileStatusEvent = (event: FileUploadStatusEvent) => {
   if (
     unmounted ||
     !isCurrentScope.value ||
@@ -491,26 +484,21 @@ const handleFileStatusEvent = (event: FileUploadStatusEvent, confirmedTerminal =
     }
     currentTaskId.value = null
     detachListener()
-    if (currentUploadId.value) {
-      uploadQueue.complete(currentUploadId.value)
-      currentUploadId.value = null
-    }
+    currentUploadId.value = null
 
     showSuccessIndicator.value = true
-    window.setTimeout(() => {
+    clearTimeout(successTimer)
+    successTimer = setTimeout(() => {
       showSuccessIndicator.value = false
     }, 3000)
   } else if (event.status === 'failed') {
-    if (confirmedTerminal && assignmentCompletion) releaseCompletion(assignmentCompletion)
+    if (assignmentCompletion) releaseCompletion(assignmentCompletion)
     error.value = event.error || 'File processing failed after upload.'
     emit('error', error.value)
     currentTaskId.value = null
     detachListener()
     previewUrl.value = currentFile.value?.url ?? null
-    if (currentUploadId.value) {
-      uploadQueue.fail(currentUploadId.value, error.value)
-      currentUploadId.value = null
-    }
+    currentUploadId.value = null
   }
 }
 
@@ -613,6 +601,7 @@ const setPreviewFromFile = (file: File) => {
 
 const uploadFile = async (file: File | undefined, reconcile = false) => {
   if (reconcile ? !canCheckUpload.value || !uncertainUpload.value : !canInteract.value) return
+  const ownerToken = taskTracker.capture()
   const originalEntityType = props.objectType
   const originalEntityId = props.objectId
   let completion = reconcile ? uncertainUpload.value?.completion : undefined
@@ -641,6 +630,19 @@ const uploadFile = async (file: File | undefined, reconcile = false) => {
   }
   currentUploadId.value = uploadQueue.start(props.uploadLabel ?? t('Загрузка файла'), 0)
 
+  const queueId = currentUploadId.value
+  let handedOff = false
+  const isLocalScopeCurrent = () =>
+    !unmounted &&
+    taskTracker.isCurrent(ownerToken) &&
+    isCurrentScope.value &&
+    originalEntityType === props.objectType &&
+    String(originalEntityId) === String(props.objectId)
+  const removeUnobservedRow = () => {
+    if (handedOff) return
+    uploadQueue.remove(queueId)
+    if (currentUploadId.value === queueId) currentUploadId.value = null
+  }
   try {
     const response =
       reconcile && uncertainUpload.value
@@ -675,6 +677,12 @@ const uploadFile = async (file: File | undefined, reconcile = false) => {
               }
             },
           })
+    // Acceptance belongs to the frame even if progress/await just unmounted this field.
+    const acceptedTask = response.tasks[0]
+    const observation = acceptedTask?.id
+      ? taskTracker.accept(ownerToken, acceptedTask, response.status, queueId)
+      : undefined
+    handedOff = !!observation
     if (uploadProgress.value !== null && uploadProgress.value < 100) {
       uploadProgress.value = 100
       emit('progress', 100)
@@ -692,13 +700,10 @@ const uploadFile = async (file: File | undefined, reconcile = false) => {
       retainCompletion(completion, file)
     }
     if (!response.uncertainCompletion && response.error && completion) releaseCompletion(completion)
-    if (
-      unmounted ||
-      !isCurrentScope.value ||
-      originalEntityType !== props.objectType ||
-      String(originalEntityId) !== String(props.objectId)
-    )
+    if (!isLocalScopeCurrent()) {
+      removeUnobservedRow()
       return
+    }
     const terminalTask = response.tasks[0]
     if (
       terminalTask?.id &&
@@ -735,93 +740,54 @@ const uploadFile = async (file: File | undefined, reconcile = false) => {
     detachListener()
     taskEntity = { type: originalEntityType, id: String(originalEntityId) }
     currentTaskId.value = task.id
-    if ((task.status === 'completed' || response.status === 'completed') && task.file?.url) {
-      handleFileStatusEvent({
-        eventId: `reconcile-${task.id}`,
-        eventType: FILE_UPLOAD_STATUS_EVENT,
-        taskId: task.id,
-        status: 'completed',
-        file: {
-          id: task.file.id,
-          fileName: task.file.filename,
-          originalName: task.file.originalName,
-          url: task.file.url,
-          size: task.file.size ?? 0,
-          mimeType: task.file.mimeType ?? '',
-        },
+    if (observation) {
+      const detach = observation.subscribe((snapshot) => {
+        if (snapshot.status === 'unknown') {
+          if (
+            !unmounted &&
+            taskTracker.isCurrent(ownerToken) &&
+            isCurrentScope.value &&
+            taskEntity?.type === props.objectType &&
+            taskEntity?.id === String(props.objectId)
+          ) {
+            error.value =
+              snapshot.error ??
+              t(
+                'core.ui.Processing status unknown. Check again.',
+                'Processing status unknown. Check again.',
+              )
+            emit('error', error.value)
+          }
+          return
+        }
+        const file = snapshot.file
+        handleFileStatusEvent({
+          eventId: `task-${task.id}`,
+          eventType: FILE_UPLOAD_STATUS_EVENT,
+          taskId: task.id,
+          status: snapshot.status === 'error' ? 'failed' : snapshot.status,
+          error: snapshot.error,
+          file: file
+            ? {
+                id: file.id,
+                fileName: file.filename,
+                originalName: file.originalName,
+                url: file.url,
+                size: file.size ?? 0,
+                mimeType: file.mimeType ?? '',
+              }
+            : undefined,
+        })
       })
+      if (currentTaskId.value === null) detach()
+      else unsubscribe.value = detach
+    }
+    if (currentTaskId.value !== null && !requireAssignmentConfirmation) emit('success', response)
+  } catch (e: unknown) {
+    if (!isLocalScopeCurrent()) {
+      removeUnobservedRow()
       return
     }
-    if (realtime.value) {
-      ensureConnected()
-      unsubscribe.value = on('files.upload.status', handleFileStatusEvent)
-    }
-    // WebSocket delivery is advisory: a terminal event may precede subscription
-    // or be lost during reconnect. Read-only polling reconciles the same task.
-    {
-      const controller = new AbortController()
-      pollController = controller
-      void pollUploadTask(task.id, { signal: controller.signal })
-        .then((result) => {
-          if (controller.signal.aborted) return
-          const file = result.file ?? result.task.file
-          if (result.status === 'completed' && !file?.url) {
-            throw new Error(t('Обработка файла завершена, но адрес изображения недоступен.'))
-          }
-          handleFileStatusEvent({
-            eventId: `poll-${task.id}`,
-            eventType: FILE_UPLOAD_STATUS_EVENT,
-            taskId: task.id,
-            status: result.status === 'error' ? 'failed' : result.status,
-            error: result.error ?? result.task.error,
-            file: file
-              ? {
-                  id: file.id,
-                  fileName: file.filename,
-                  originalName: file.originalName,
-                  url: file.url,
-                  size: file.size ?? 0,
-                  mimeType: file.mimeType ?? '',
-                }
-              : undefined,
-          })
-        })
-        .catch((reason: unknown) => {
-          if (controller.signal.aborted) return
-          if (
-            unmounted ||
-            !isCurrentScope.value ||
-            taskEntity?.type !== props.objectType ||
-            taskEntity?.id !== String(props.objectId)
-          )
-            return
-          if (unsubscribe.value && currentTaskId.value === task.id) {
-            // Losing the status request is not a terminal task failure. Keep
-            // the live listener and durable fence for a later terminal event.
-            error.value =
-              reason instanceof Error ? reason.message : t('Не удалось проверить статус файла.')
-            emit('error', error.value)
-            return
-          }
-          handleFileStatusEvent(
-            {
-              eventId: `poll-${task.id}`,
-              eventType: FILE_UPLOAD_STATUS_EVENT,
-              taskId: task.id,
-              status: 'failed',
-              error:
-                reason instanceof Error ? reason.message : t('Не удалось проверить статус файла.'),
-            },
-            false,
-          )
-        })
-    }
-
-    if (!requireAssignmentConfirmation) emit('success', response)
-    if (currentUploadId.value) {
-      uploadQueue.setStatus(currentUploadId.value, 'processing')
-    }
-  } catch (e: unknown) {
     console.error('File upload error:', e)
     const errorMessage =
       (e as { response?: { data?: { error?: string; message?: string } }; message?: string })
@@ -836,7 +802,7 @@ const uploadFile = async (file: File | undefined, reconcile = false) => {
       previewUrl.value = currentFile.value?.url ?? null
       latestTempPreview.value = null
     }
-    if (currentUploadId.value) {
+    if (!handedOff && currentUploadId.value) {
       uploadQueue.fail(currentUploadId.value, errorMessage)
       currentUploadId.value = null
     }
@@ -894,6 +860,7 @@ const removeImage = async () => {
 
 onUnmounted(() => {
   unmounted = true
+  clearTimeout(successTimer)
   uploadController?.abort()
   detachListener()
 })

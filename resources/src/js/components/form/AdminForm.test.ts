@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createApp, reactive } from 'vue'
+import { createApp, h, nextTick, reactive } from 'vue'
 import AdminForm from './AdminForm.vue'
 
 const mocks = vi.hoisted(() => ({
@@ -12,7 +12,10 @@ vi.mock('@inertiajs/vue3', () => ({
   router: { on: mocks.on },
 }))
 
+const apps: ReturnType<typeof createApp>[] = []
 afterEach(() => {
+  apps.splice(0).forEach((app) => app.unmount())
+  document.body.innerHTML = ''
   vi.unstubAllGlobals()
   mocks.on.mockReset()
   mocks.remove.mockReset()
@@ -41,4 +44,85 @@ describe('AdminForm unsaved changes guard', () => {
     app.unmount()
     expect(mocks.remove).toHaveBeenCalledOnce()
   })
+})
+
+function mountFields(
+  form: { errors: Record<string, string>; processing: boolean },
+  focusOnError = true,
+) {
+  const root = document.createElement('div')
+  document.body.append(root)
+  const app = createApp({
+    render: () =>
+      h(
+        AdminForm,
+        { form, focusOnError },
+        {
+          default: () =>
+            h('div', { name: 'name' }, [h('input', { name: 'name', 'aria-label': 'Name' })]),
+        },
+      ),
+  })
+  apps.push(app)
+  app.mount(root)
+  return { app, root, input: root.querySelector<HTMLInputElement>('input[name="name"]')! }
+}
+
+it('focuses the real named input after processing unlocks its fieldset', async () => {
+  const form = reactive({ errors: {} as Record<string, string>, processing: true })
+  const { root, input } = mountFields(form)
+  form.errors = { name: 'Required' }
+  await nextTick()
+  await nextTick()
+  expect(root.querySelector('fieldset')?.disabled).toBe(true)
+  expect(document.activeElement).not.toBe(input)
+  form.processing = false
+  await nextTick()
+  await nextTick()
+  expect(document.activeElement).toBe(input)
+})
+
+it('scopes error focus to its own form when another form has the same field name', async () => {
+  const first = mountFields(reactive({ errors: {}, processing: false }))
+  const form = reactive({ errors: {} as Record<string, string>, processing: false })
+  const second = mountFields(form)
+  first.input.focus()
+  form.errors = { name: 'Required' }
+  await nextTick()
+  await nextTick()
+  expect(document.activeElement).toBe(second.input)
+})
+
+it('honors focusOnError=false when errors arrive before processing ends', async () => {
+  const form = reactive({ errors: {} as Record<string, string>, processing: true })
+  const { input } = mountFields(form, false)
+  form.errors = { name: 'Required' }
+  await nextTick()
+  form.processing = false
+  await nextTick()
+  await nextTick()
+  expect(document.activeElement).not.toBe(input)
+})
+
+it('does not focus without errors when processing ends', async () => {
+  const form = reactive({ errors: {}, processing: true })
+  const { input } = mountFields(form)
+  form.processing = false
+  await nextTick()
+  await nextTick()
+  expect(document.activeElement).not.toBe(input)
+})
+
+it('does not focus a different matching field after the form unmounts', async () => {
+  const form = reactive({ errors: {} as Record<string, string>, processing: false })
+  const { app } = mountFields(form)
+  form.errors = { name: 'Required' }
+  await nextTick()
+  app.unmount()
+  apps.splice(apps.indexOf(app), 1)
+  const outside = document.createElement('input')
+  outside.name = 'name'
+  document.body.append(outside)
+  await nextTick()
+  expect(document.activeElement).not.toBe(outside)
 })

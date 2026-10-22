@@ -2,13 +2,16 @@ import { registerTranslations } from '@/i18n'
 import type { App } from 'vue'
 import type { AdminExtension } from '@/extensions/types'
 import type { AdminWebSocketHandler } from '@/websocket/types'
-import { extensionModules } from '@admin-extensions-generated'
+import { extensionModules, selectedThemeModuleKey } from '@admin-extensions-generated'
+import { resolveTheme } from '@/presentation/selection'
+import type { AdminThemePack } from '@/presentation/types'
 
 type ExtensionModule = {
   default?: AdminExtension
 }
 
 type LoadedExtensions = {
+  theme?: AdminThemePack
   install: (app: App) => void
   webSocketHandlers: AdminWebSocketHandler[]
 }
@@ -20,6 +23,7 @@ export const loadExtensions = (): LoadedExtensions => {
     .filter((ext): ext is AdminExtension => Boolean(ext))
 
   return {
+    theme: resolveTheme(modules, selectedThemeModuleKey),
     install(app: App) {
       extensions.forEach((ext) => {
         if (ext.translations) registerTranslations(ext.translations)

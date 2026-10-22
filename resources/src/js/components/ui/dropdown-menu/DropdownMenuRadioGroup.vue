@@ -9,7 +9,7 @@ const forwarded = useForwardPropsEmits(props, emits)
 </script>
 
 <template>
-  <DropdownMenuRadioGroup v-bind="forwarded">
+  <DropdownMenuRadioGroup data-ui="dropdown-menu" data-part="radio-group" v-bind="forwarded">
     <slot />
   </DropdownMenuRadioGroup>
 </template>

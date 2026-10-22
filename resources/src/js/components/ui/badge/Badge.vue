@@ -11,7 +11,7 @@ const props = defineProps<{
 </script>
 
 <template>
-  <div :class="cn(badgeVariants({ variant }), props.class)">
+  <div data-ui="badge" data-part="root" :class="cn(badgeVariants({ variant }), props.class)">
     <slot />
   </div>
 </template>

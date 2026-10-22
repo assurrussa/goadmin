@@ -53,7 +53,7 @@ test('validation and navigation synchronize auth from the live Inertia page', as
   )
   const inertiaPageModule = { exports: {} }
   vm.runInNewContext(compile(path.join(__dirname, '../src/js/inertiaPage.ts')), inertiaPageModule)
-  const calls = { connected: 0, disconnected: 0, login: 0 }
+  const calls = { connected: 0, disconnected: 0, login: 0, presentation: 0 }
   const authStore = {
     authUser: null,
     setAuthUser(user) {
@@ -80,6 +80,14 @@ test('validation and navigation synchronize auth from the live Inertia page', as
   let mountedApp
   let bootstrap
   const component = { render: () => vue.h('input', { name: 'draft' }) }
+  // Keep the actual Inertia App mounted beneath the new runtime frame. A leaf
+  // UI stub here would erase the page and invalidate the draft-preservation test.
+  const runtimeFrame = {
+    setup(_props, { slots }) {
+      return () => slots.default?.()
+    },
+  }
+  const selectedTheme = { id: 'fixture.theme', apiVersion: 1 }
   const modules = {
     vue: {
       ...vue,
@@ -98,6 +106,14 @@ test('validation and navigation synchronize auth from the live Inertia page', as
     pinia,
     '@/inertiaPage': inertiaPageModule.exports,
     '@/components/layout/AdminLayout.vue': { default: component },
+    '@/components/layout/AdminRuntimeFrame.vue': { default: runtimeFrame },
+    '@/presentation/context': {
+      installPresentation(app, theme) {
+        assert.equal(app, mountedApp)
+        assert.equal(theme, selectedTheme)
+        calls.presentation++
+      },
+    },
     '@/components/system/InertiaFallbackPage.vue': { default: component },
     '@/components/system/AuthFailureNotice.vue': { default: component },
     '@/stores/theme': { useThemeStore: () => ({ init() {} }) },
@@ -127,7 +143,7 @@ test('validation and navigation synchronize auth from the live Inertia page', as
       },
     },
     axios: { default: { defaults: {} } },
-    '@/extensions': { extensions: { install() {}, webSocketHandlers: {} } },
+    '@/extensions': { extensions: { install() {}, webSocketHandlers: {}, theme: selectedTheme } },
     '@admin-extensions-generated': { extensionPages: {} },
     '../css/app.css': {},
   }
@@ -185,6 +201,7 @@ test('validation and navigation synchronize auth from the live Inertia page', as
     assertUser(initialUser)
     assert.equal(calls.connected, 1)
     assert.equal(calls.disconnected, 0)
+    assert.equal(calls.presentation, 1)
   })
 
   await t.test(

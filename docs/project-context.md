@@ -225,6 +225,15 @@ public host SDK surface. Theme persistence and system preference keep the same
 runtime contract. The [UI previews](presentation-demo.md) describe the synthetic
 visual fixture and its backend limitations.
 
+Build-time presentation packs select optional typed admin/auth shells through
+`AdminExtension.theme` and a source-manifest `themeModule`. No pack uses the
+standard shells; multiple selections fail before Vite starts. Page logic,
+mobile navigation behavior, flash/notification/upload services and auth bootstrap
+remain core-owned. The supported frontend facade is `@admin-core/presentation`;
+semantic component hooks and the topbar reference are documented in
+[theme customization](theme-customization.md). This adds no public Go import path
+or runtime design selector. Standalone errors keep their independent fallback.
+
 Menu sections accept `Placement`: empty or `sidebar` keeps sidebar navigation;
 `account` renders flat root-relative links in the profile dropdown. Both use the
 existing permission-filtered menu. Routes still enforce their own permissions.
@@ -505,6 +514,17 @@ confirmed result releases the exact session. A queued task's file/temporary URL
 is not terminal assignment. Rich-text insertion must return success before
 assignment events are emitted. Saving a host form is a separate host-owned
 commitment: the widget's model update does not claim that the form was saved.
+
+Acknowledged server tasks are observed by the application frame, independently
+of the page that submitted them. Navigation detaches a widget's local result
+observer; it does not cancel processing-status observation or mark the server
+task failed. The global queue reconciles WebSocket events with bounded serial
+status polling. Unavailable status is shown as unknown with an explicit recheck,
+which reads the same task and never resends the file or completion request.
+Image and video observation retain their respective waiting budgets. Logout,
+owner changes and frame teardown invalidate callbacks and release observers,
+polling and queue timers. Field assignment and recovery fences remain owned by
+the matching widget; global file readiness does not confirm insertion or save.
 
 Acknowledged chunk progress uses validated `Upload-Offset` values. PATCH must
 return 204 and advance by the exact chunk length. Missing, invalid, out-of-range

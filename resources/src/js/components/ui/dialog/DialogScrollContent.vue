@@ -25,12 +25,16 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 <template>
   <DialogPortal>
     <DialogOverlay
-      class="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[var(--color-overlay)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+      data-ui="dialog"
+      data-part="overlay"
+      class="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[var(--goadmin-dialog-overlay,var(--color-overlay))] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
     >
       <DialogContent
+        data-ui="dialog"
+        data-part="content"
         :class="
           cn(
-            'relative z-50 grid w-[calc(100%-2rem)] max-w-lg my-8 gap-4 rounded-xl border border-border bg-card text-card-foreground p-6 shadow-lg duration-200',
+            'relative z-50 grid w-[calc(100%-2rem)] max-w-lg my-8 gap-4 rounded-[var(--goadmin-dialog-radius,var(--radius-xl))] border border-[var(--goadmin-dialog-border,var(--color-border))] bg-[var(--goadmin-dialog-bg,var(--color-card))] text-[var(--goadmin-dialog-text,var(--color-card-foreground))] p-[var(--goadmin-dialog-padding,1.5rem)] shadow-[var(--goadmin-dialog-shadow,0_10px_15px_-3px_rgb(0_0_0/0.1),0_4px_6px_-4px_rgb(0_0_0/0.1))] duration-200',
             props.class,
           )
         "
@@ -51,6 +55,8 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
         <slot />
 
         <DialogClose
+          data-ui="dialog"
+          data-part="close"
           class="absolute top-4 right-4 p-0.5 transition-colors rounded-md hover:bg-secondary"
         >
           <X class="w-4 h-4" />

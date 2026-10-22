@@ -1,8 +1,13 @@
+import {
+  createUploadTestApp as createApp,
+  uploadTestOwner,
+} from '@/composables/__tests__/uploadTaskTrackerTestHarness'
 import { setLocale } from '@/i18n'
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
-import { createApp, h, nextTick, reactive } from 'vue'
+import { h, nextTick, reactive } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { Editor as CoreEditor } from '@tiptap/core'
+import { useUploadQueueStore } from '@/stores/uploadQueue'
 import { useAuthUserStore } from '@/stores/authUser'
 import RichTextEditor from './RichTextEditor.vue'
 
@@ -43,6 +48,7 @@ afterEach(async () => {
   apps.splice(0).forEach((app) => app.unmount())
   await new Promise((resolve) => setTimeout(resolve, 0))
   setActivePinia(createPinia())
+  useAuthUserStore().setAuthUser(uploadTestOwner)
   for (const id of [7, 8]) {
     for (const field of [undefined, 'body', 'summary']) {
       const recovery = useUploadCompletion(
@@ -676,7 +682,7 @@ describe('unconfirmed rich text uploads', () => {
       await nextTick()
       expect(inserted).not.toHaveBeenCalled()
       expect(root.querySelector('video')).toBeNull()
-      useAuthUserStore(pinia).setAuthUser(null)
+      useAuthUserStore(pinia).setAuthUser(uploadTestOwner)
       const original = useUploadCompletion(
         () => 'rich-text',
         () => 7,
@@ -915,4 +921,98 @@ describe('Tiptap 3 mounted editor contract', () => {
       el.remove()
     }
   })
+})
+
+it.each(['completed', 'failed'])(
+  'keeps late accepted video %s in the queue after navigating away',
+  async (status) => {
+    let accept!: (value: unknown) => void
+    mocks.upload.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          accept = resolve
+        }),
+    )
+    const visible = reactive({ field: true })
+    const uploaded = vi.fn()
+    const pinia = createPinia()
+    const app = createApp({
+      render: () =>
+        visible.field
+          ? h(RichTextEditor, {
+              entityId: 7,
+              'onFile-upload': uploaded,
+            })
+          : h('main', 'Next page'),
+    }).use(pinia)
+    apps.push(app)
+    const root = document.createElement('div')
+    app.mount(root)
+    const input = root.querySelector<HTMLInputElement>('input[type=file]')!
+    Object.defineProperty(input, 'files', {
+      value: [new File(['video'], 'clip.mp4', { type: 'video/mp4' })],
+    })
+    input.dispatchEvent(new Event('change'))
+    await vi.waitFor(() => expect(mocks.upload).toHaveBeenCalled())
+    visible.field = false
+    await nextTick()
+    accept({
+      status,
+      tasks: [
+        {
+          id: 944,
+          status,
+          file:
+            status === 'completed'
+              ? { id: 944, filename: 'clip.mp4', url: '/clip.mp4' }
+              : undefined,
+          error: 'Server rejection',
+        },
+      ],
+    })
+    await vi.waitFor(() =>
+      expect(useUploadQueueStore(pinia).uploads[0]?.status).toBe(
+        status === 'completed' ? 'completed' : 'error',
+      ),
+    )
+    expect(uploaded).not.toHaveBeenCalled()
+    expect(mocks.task).not.toHaveBeenCalled()
+  },
+)
+
+it('settles local processing when owner changes without remount and allows original owner recovery', async () => {
+  const completion = {
+    location: `/tus/owner-cancel-${++nextSession}`,
+    filename: 'clip.mp4',
+    fileCategory: 'video',
+    entityType: 'rich-text',
+    entityId: 7,
+  }
+  mocks.upload.mockImplementation(async (request) => {
+    request.onCompletionSession(completion)
+    return { status: 'queued', tasks: [{ id: 945, status: 'queued' }] }
+  })
+  mocks.task.mockImplementation(() => new Promise(() => {}))
+  const pinia = createPinia()
+  const app = createApp(RichTextEditor, { entityId: 7 }).use(pinia)
+  apps.push(app)
+  const root = document.createElement('div')
+  app.mount(root)
+  const input = root.querySelector<HTMLInputElement>('input[type=file]')!
+  Object.defineProperty(input, 'files', {
+    value: [new File(['video'], 'clip.mp4', { type: 'video/mp4' })],
+  })
+  input.dispatchEvent(new Event('change'))
+  await vi.waitFor(() => expect(mocks.task).toHaveBeenCalled())
+  useAuthUserStore(pinia).setAuthUser({ ...uploadTestOwner, id: 'other' })
+  await nextTick()
+  useAuthUserStore(pinia).setAuthUser(uploadTestOwner)
+  await nextTick()
+  const check = Array.from(root.querySelectorAll('button')).find((button) =>
+    button.textContent?.includes('Check upload'),
+  )!
+  expect(check).toBeDefined()
+  await vi.waitFor(() => expect(check.disabled).toBe(false))
+  expect(useUploadQueueStore(pinia).uploads).toEqual([])
+  expect(mocks.reconcile).not.toHaveBeenCalled()
 })

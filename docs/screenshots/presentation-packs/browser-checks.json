@@ -1,0 +1,4075 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-10-22",
+  "sourceState": "working tree",
+  "browser": "Codex in-app browser; one browser environment",
+  "matrix": {
+    "packs": [
+      "default",
+      "example.topbar"
+    ],
+    "modes": [
+      "light",
+      "dark"
+    ],
+    "locales": [
+      "ru",
+      "en"
+    ],
+    "viewports": [
+      {
+        "width": 1440,
+        "height": 1024
+      },
+      {
+        "width": 390,
+        "height": 844
+      }
+    ],
+    "routes": [
+      {
+        "screen": "users",
+        "path": "/users"
+      },
+      {
+        "screen": "form",
+        "path": "/users/1048/edit"
+      },
+      {
+        "screen": "login",
+        "path": "/auth/login"
+      },
+      {
+        "screen": "mfa",
+        "path": "/auth/mfa"
+      },
+      {
+        "screen": "forgot",
+        "path": "/auth/forgot-password"
+      },
+      {
+        "screen": "reset",
+        "path": "/auth/reset-password"
+      },
+      {
+        "screen": "notifications",
+        "path": "/notifications"
+      },
+      {
+        "screen": "dialog",
+        "path": "/__design/dialog"
+      },
+      {
+        "screen": "components",
+        "path": "/__design/components"
+      },
+      {
+        "screen": "long-menu",
+        "path": "/__design/long-menu"
+      }
+    ],
+    "runs": 160
+  },
+  "runs": [
+    {
+      "profile": "default",
+      "screen": "components",
+      "path": "/__design/components",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Компоненты и состояния",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "dialog",
+      "path": "/__design/dialog",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Настройки пользователя",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "forgot",
+      "path": "/auth/forgot-password",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Восстановление пароля",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "form",
+      "path": "/users/1048/edit",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "HomeEdit user Вернуться назадEditName *Last name E-mail *Nickname Save",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "login",
+      "path": "/auth/login",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Sign in",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "long-menu",
+      "path": "/__design/long-menu",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Длинное вложенное меню",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "mfa",
+      "path": "/auth/mfa",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Sign-in confirmation",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "notifications",
+      "path": "/notifications",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Notification center",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "reset",
+      "path": "/auth/reset-password",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Сброс пароля",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "users",
+      "path": "/users",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 8,
+      "title": "Users",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "components",
+      "path": "/__design/components",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Компоненты и состояния",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "dialog",
+      "path": "/__design/dialog",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Настройки пользователя",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "forgot",
+      "path": "/auth/forgot-password",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Восстановление пароля",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "form",
+      "path": "/users/1048/edit",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "HomeEdit user Вернуться назадEditName *Last name E-mail *Nickname Save",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "login",
+      "path": "/auth/login",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Sign in",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "long-menu",
+      "path": "/__design/long-menu",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Длинное вложенное меню",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "mfa",
+      "path": "/auth/mfa",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Sign-in confirmation",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "notifications",
+      "path": "/notifications",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Notification center",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "reset",
+      "path": "/auth/reset-password",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Сброс пароля",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "users",
+      "path": "/users",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 8,
+      "title": "Users",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "components",
+      "path": "/__design/components",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Компоненты и состояния",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "dialog",
+      "path": "/__design/dialog",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Настройки пользователя",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "forgot",
+      "path": "/auth/forgot-password",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Восстановление пароля",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "form",
+      "path": "/users/1048/edit",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "HomeEdit user Вернуться назадEditName *Last name E-mail *Nickname Save",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "login",
+      "path": "/auth/login",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Sign in",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "long-menu",
+      "path": "/__design/long-menu",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Длинное вложенное меню",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "mfa",
+      "path": "/auth/mfa",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Sign-in confirmation",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "notifications",
+      "path": "/notifications",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Notification center",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "reset",
+      "path": "/auth/reset-password",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Сброс пароля",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "users",
+      "path": "/users",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 8,
+      "title": "Users",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "components",
+      "path": "/__design/components",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Компоненты и состояния",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "dialog",
+      "path": "/__design/dialog",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Настройки пользователя",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "forgot",
+      "path": "/auth/forgot-password",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Восстановление пароля",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "form",
+      "path": "/users/1048/edit",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "HomeEdit user Вернуться назадEditName *Last name E-mail *Nickname Save",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "login",
+      "path": "/auth/login",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Sign in",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "long-menu",
+      "path": "/__design/long-menu",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Длинное вложенное меню",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "mfa",
+      "path": "/auth/mfa",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Sign-in confirmation",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "notifications",
+      "path": "/notifications",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Notification center",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "reset",
+      "path": "/auth/reset-password",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Сброс пароля",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "users",
+      "path": "/users",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 8,
+      "title": "Users",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "components",
+      "path": "/__design/components",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Компоненты и состояния",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "dialog",
+      "path": "/__design/dialog",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Настройки пользователя",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "forgot",
+      "path": "/auth/forgot-password",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Восстановление пароля",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "form",
+      "path": "/users/1048/edit",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "ГлавнаяРедактирование пользователя Вернуться назадРедактированиеИмя *Фамилия Электронная почта *Псевдоним Сохранить",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "login",
+      "path": "/auth/login",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Вход в систему",
+      "width": 1440,
+      "capture": "default-ru-desktop-dark-login.png"
+    },
+    {
+      "profile": "default",
+      "screen": "long-menu",
+      "path": "/__design/long-menu",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Длинное вложенное меню",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "mfa",
+      "path": "/auth/mfa",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Подтверждение входа",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "notifications",
+      "path": "/notifications",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Центр уведомлений",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "reset",
+      "path": "/auth/reset-password",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Сброс пароля",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "users",
+      "path": "/users",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 8,
+      "title": "Пользователи",
+      "width": 1440,
+      "capture": "default-ru-desktop-dark-users.png"
+    },
+    {
+      "profile": "default",
+      "screen": "components",
+      "path": "/__design/components",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Компоненты и состояния",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "dialog",
+      "path": "/__design/dialog",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Настройки пользователя",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "forgot",
+      "path": "/auth/forgot-password",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Восстановление пароля",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "form",
+      "path": "/users/1048/edit",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "ГлавнаяРедактирование пользователя Вернуться назадРедактированиеИмя *Фамилия Электронная почта *Псевдоним Сохранить",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "login",
+      "path": "/auth/login",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Вход в систему",
+      "width": 1440,
+      "capture": "default-ru-desktop-light-login.png"
+    },
+    {
+      "profile": "default",
+      "screen": "long-menu",
+      "path": "/__design/long-menu",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Длинное вложенное меню",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "mfa",
+      "path": "/auth/mfa",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Подтверждение входа",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "notifications",
+      "path": "/notifications",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Центр уведомлений",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "reset",
+      "path": "/auth/reset-password",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Сброс пароля",
+      "width": 1440
+    },
+    {
+      "profile": "default",
+      "screen": "users",
+      "path": "/users",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 8,
+      "title": "Пользователи",
+      "width": 1440,
+      "capture": "default-ru-desktop-light-users.png"
+    },
+    {
+      "profile": "default",
+      "screen": "components",
+      "path": "/__design/components",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Компоненты и состояния",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "dialog",
+      "path": "/__design/dialog",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Настройки пользователя",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "forgot",
+      "path": "/auth/forgot-password",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Восстановление пароля",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "form",
+      "path": "/users/1048/edit",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "ГлавнаяРедактирование пользователя Вернуться назадРедактированиеИмя *Фамилия Электронная почта *Псевдоним Сохранить",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "login",
+      "path": "/auth/login",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Вход в систему",
+      "width": 390,
+      "capture": "default-ru-mobile-dark-login.png"
+    },
+    {
+      "profile": "default",
+      "screen": "long-menu",
+      "path": "/__design/long-menu",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Длинное вложенное меню",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "mfa",
+      "path": "/auth/mfa",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Подтверждение входа",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "notifications",
+      "path": "/notifications",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Центр уведомлений",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "reset",
+      "path": "/auth/reset-password",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Сброс пароля",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "users",
+      "path": "/users",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "default",
+      "rows": 8,
+      "title": "Пользователи",
+      "width": 390,
+      "capture": "default-ru-mobile-dark-users.png"
+    },
+    {
+      "profile": "default",
+      "screen": "components",
+      "path": "/__design/components",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Компоненты и состояния",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "dialog",
+      "path": "/__design/dialog",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Настройки пользователя",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "forgot",
+      "path": "/auth/forgot-password",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Восстановление пароля",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "form",
+      "path": "/users/1048/edit",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "ГлавнаяРедактирование пользователя Вернуться назадРедактированиеИмя *Фамилия Электронная почта *Псевдоним Сохранить",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "login",
+      "path": "/auth/login",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Вход в систему",
+      "width": 390,
+      "capture": "default-ru-mobile-light-login.png"
+    },
+    {
+      "profile": "default",
+      "screen": "long-menu",
+      "path": "/__design/long-menu",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Длинное вложенное меню",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "mfa",
+      "path": "/auth/mfa",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Подтверждение входа",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "notifications",
+      "path": "/notifications",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Центр уведомлений",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "reset",
+      "path": "/auth/reset-password",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 0,
+      "title": "Сброс пароля",
+      "width": 390
+    },
+    {
+      "profile": "default",
+      "screen": "users",
+      "path": "/users",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "default",
+      "rows": 8,
+      "title": "Пользователи",
+      "width": 390,
+      "capture": "default-ru-mobile-light-users.png"
+    },
+    {
+      "profile": "topbar",
+      "screen": "components",
+      "path": "/__design/components",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Компоненты и состояния",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "dialog",
+      "path": "/__design/dialog",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Настройки пользователя",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "forgot",
+      "path": "/auth/forgot-password",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Восстановление пароля",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "form",
+      "path": "/users/1048/edit",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "HomeEdit user Вернуться назадEditName *Last name E-mail *Nickname Save",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "login",
+      "path": "/auth/login",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Sign in",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "long-menu",
+      "path": "/__design/long-menu",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Длинное вложенное меню",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "mfa",
+      "path": "/auth/mfa",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Sign-in confirmation",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "notifications",
+      "path": "/notifications",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Notification center",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "reset",
+      "path": "/auth/reset-password",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Сброс пароля",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "users",
+      "path": "/users",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 8,
+      "title": "Users",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "components",
+      "path": "/__design/components",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Компоненты и состояния",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "dialog",
+      "path": "/__design/dialog",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Настройки пользователя",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "forgot",
+      "path": "/auth/forgot-password",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Восстановление пароля",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "form",
+      "path": "/users/1048/edit",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "HomeEdit user Вернуться назадEditName *Last name E-mail *Nickname Save",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "login",
+      "path": "/auth/login",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Sign in",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "long-menu",
+      "path": "/__design/long-menu",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Длинное вложенное меню",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "mfa",
+      "path": "/auth/mfa",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Sign-in confirmation",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "notifications",
+      "path": "/notifications",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Notification center",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "reset",
+      "path": "/auth/reset-password",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Сброс пароля",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "users",
+      "path": "/users",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 8,
+      "title": "Users",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "components",
+      "path": "/__design/components",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Компоненты и состояния",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "dialog",
+      "path": "/__design/dialog",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Настройки пользователя",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "forgot",
+      "path": "/auth/forgot-password",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Восстановление пароля",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "form",
+      "path": "/users/1048/edit",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "HomeEdit user Вернуться назадEditName *Last name E-mail *Nickname Save",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "login",
+      "path": "/auth/login",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Sign in",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "long-menu",
+      "path": "/__design/long-menu",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Длинное вложенное меню",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "mfa",
+      "path": "/auth/mfa",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Sign-in confirmation",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "notifications",
+      "path": "/notifications",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Notification center",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "reset",
+      "path": "/auth/reset-password",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Сброс пароля",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "users",
+      "path": "/users",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 8,
+      "title": "Users",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "components",
+      "path": "/__design/components",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Компоненты и состояния",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "dialog",
+      "path": "/__design/dialog",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Настройки пользователя",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "forgot",
+      "path": "/auth/forgot-password",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Восстановление пароля",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "form",
+      "path": "/users/1048/edit",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "HomeEdit user Вернуться назадEditName *Last name E-mail *Nickname Save",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "login",
+      "path": "/auth/login",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Sign in",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "long-menu",
+      "path": "/__design/long-menu",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Длинное вложенное меню",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "mfa",
+      "path": "/auth/mfa",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Sign-in confirmation",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "notifications",
+      "path": "/notifications",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Notification center",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "reset",
+      "path": "/auth/reset-password",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Сброс пароля",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "users",
+      "path": "/users",
+      "dpr": 1,
+      "height": 844,
+      "locale": "en",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 8,
+      "title": "Users",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "components",
+      "path": "/__design/components",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Компоненты и состояния",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "dialog",
+      "path": "/__design/dialog",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Настройки пользователя",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "forgot",
+      "path": "/auth/forgot-password",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Восстановление пароля",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "form",
+      "path": "/users/1048/edit",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "ГлавнаяРедактирование пользователя Вернуться назадРедактированиеИмя *Фамилия Электронная почта *Псевдоним Сохранить",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "login",
+      "path": "/auth/login",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Вход в систему",
+      "width": 1440,
+      "capture": "topbar-ru-desktop-dark-login.png"
+    },
+    {
+      "profile": "topbar",
+      "screen": "long-menu",
+      "path": "/__design/long-menu",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Длинное вложенное меню",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "mfa",
+      "path": "/auth/mfa",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Подтверждение входа",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "notifications",
+      "path": "/notifications",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Центр уведомлений",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "reset",
+      "path": "/auth/reset-password",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Сброс пароля",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "users",
+      "path": "/users",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 8,
+      "title": "Пользователи",
+      "width": 1440,
+      "capture": "topbar-ru-desktop-dark-users.png"
+    },
+    {
+      "profile": "topbar",
+      "screen": "components",
+      "path": "/__design/components",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Компоненты и состояния",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "dialog",
+      "path": "/__design/dialog",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Настройки пользователя",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "forgot",
+      "path": "/auth/forgot-password",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Восстановление пароля",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "form",
+      "path": "/users/1048/edit",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "ГлавнаяРедактирование пользователя Вернуться назадРедактированиеИмя *Фамилия Электронная почта *Псевдоним Сохранить",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "login",
+      "path": "/auth/login",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Вход в систему",
+      "width": 1440,
+      "capture": "topbar-ru-desktop-light-login.png"
+    },
+    {
+      "profile": "topbar",
+      "screen": "long-menu",
+      "path": "/__design/long-menu",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Длинное вложенное меню",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "mfa",
+      "path": "/auth/mfa",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Подтверждение входа",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "notifications",
+      "path": "/notifications",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Центр уведомлений",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "reset",
+      "path": "/auth/reset-password",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Сброс пароля",
+      "width": 1440
+    },
+    {
+      "profile": "topbar",
+      "screen": "users",
+      "path": "/users",
+      "dpr": 1,
+      "height": 1024,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 8,
+      "title": "Пользователи",
+      "width": 1440,
+      "capture": "topbar-ru-desktop-light-users.png"
+    },
+    {
+      "profile": "topbar",
+      "screen": "components",
+      "path": "/__design/components",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Компоненты и состояния",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "dialog",
+      "path": "/__design/dialog",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Настройки пользователя",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "forgot",
+      "path": "/auth/forgot-password",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Восстановление пароля",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "form",
+      "path": "/users/1048/edit",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "ГлавнаяРедактирование пользователя Вернуться назадРедактированиеИмя *Фамилия Электронная почта *Псевдоним Сохранить",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "login",
+      "path": "/auth/login",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Вход в систему",
+      "width": 390,
+      "capture": "topbar-ru-mobile-dark-login.png"
+    },
+    {
+      "profile": "topbar",
+      "screen": "long-menu",
+      "path": "/__design/long-menu",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Длинное вложенное меню",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "mfa",
+      "path": "/auth/mfa",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Подтверждение входа",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "notifications",
+      "path": "/notifications",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Центр уведомлений",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "reset",
+      "path": "/auth/reset-password",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Сброс пароля",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "users",
+      "path": "/users",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "dark",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 8,
+      "title": "Пользователи",
+      "width": 390,
+      "capture": "topbar-ru-mobile-dark-users.png"
+    },
+    {
+      "profile": "topbar",
+      "screen": "components",
+      "path": "/__design/components",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Компоненты и состояния",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "dialog",
+      "path": "/__design/dialog",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Настройки пользователя",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "forgot",
+      "path": "/auth/forgot-password",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Восстановление пароля",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "form",
+      "path": "/users/1048/edit",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "ГлавнаяРедактирование пользователя Вернуться назадРедактированиеИмя *Фамилия Электронная почта *Псевдоним Сохранить",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "login",
+      "path": "/auth/login",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Вход в систему",
+      "width": 390,
+      "capture": "topbar-ru-mobile-light-login.png"
+    },
+    {
+      "profile": "topbar",
+      "screen": "long-menu",
+      "path": "/__design/long-menu",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Длинное вложенное меню",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "mfa",
+      "path": "/auth/mfa",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Подтверждение входа",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "notifications",
+      "path": "/notifications",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Центр уведомлений",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "reset",
+      "path": "/auth/reset-password",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 0,
+      "title": "Сброс пароля",
+      "width": 390
+    },
+    {
+      "profile": "topbar",
+      "screen": "users",
+      "path": "/users",
+      "dpr": 1,
+      "height": 844,
+      "locale": "ru",
+      "mode": "light",
+      "overflow": false,
+      "pack": "example.topbar",
+      "rows": 8,
+      "title": "Пользователи",
+      "width": 390,
+      "capture": "topbar-ru-mobile-light-users.png"
+    }
+  ],
+  "checks": [
+    {
+      "name": "default-light-mobile-open",
+      "passed": true,
+      "detail": {
+        "active": "Закрыть меню",
+        "focusedInside": true,
+        "inert": false,
+        "locked": "hidden",
+        "role": "dialog"
+      }
+    },
+    {
+      "name": "default-light-mobile-reverse-tab",
+      "passed": true,
+      "detail": {
+        "inside": true,
+        "tag": "A"
+      }
+    },
+    {
+      "name": "default-light-mobile-forward-tab",
+      "passed": true,
+      "detail": "Закрыть меню"
+    },
+    {
+      "name": "default-light-mobile-escape-restore",
+      "passed": true,
+      "detail": {
+        "active": "Открыть меню",
+        "inert": true,
+        "overflow": ""
+      }
+    },
+    {
+      "name": "default-dark-mobile-open",
+      "passed": true,
+      "detail": {
+        "active": "Закрыть меню",
+        "focusedInside": true,
+        "inert": false,
+        "locked": "hidden",
+        "role": "dialog"
+      }
+    },
+    {
+      "name": "default-dark-mobile-reverse-tab",
+      "passed": true,
+      "detail": {
+        "inside": true,
+        "tag": "A"
+      }
+    },
+    {
+      "name": "default-dark-mobile-forward-tab",
+      "passed": true,
+      "detail": "Закрыть меню"
+    },
+    {
+      "name": "default-dark-mobile-escape-restore",
+      "passed": true,
+      "detail": {
+        "active": "Открыть меню",
+        "inert": true,
+        "overflow": ""
+      }
+    },
+    {
+      "name": "topbar-light-mobile-open",
+      "passed": true,
+      "detail": {
+        "active": "Закрыть меню",
+        "focusedInside": true,
+        "inert": false,
+        "locked": "hidden",
+        "role": "dialog"
+      }
+    },
+    {
+      "name": "topbar-light-mobile-reverse-tab",
+      "passed": true,
+      "detail": {
+        "inside": true,
+        "tag": "A"
+      }
+    },
+    {
+      "name": "topbar-light-mobile-forward-tab",
+      "passed": true,
+      "detail": "Закрыть меню"
+    },
+    {
+      "name": "topbar-light-mobile-escape-restore",
+      "passed": true,
+      "detail": {
+        "active": "Открыть меню",
+        "inert": true,
+        "overflow": ""
+      }
+    },
+    {
+      "name": "topbar-dark-mobile-open",
+      "passed": true,
+      "detail": {
+        "active": "Закрыть меню",
+        "focusedInside": true,
+        "inert": false,
+        "locked": "hidden",
+        "role": "dialog"
+      }
+    },
+    {
+      "name": "topbar-dark-mobile-reverse-tab",
+      "passed": true,
+      "detail": {
+        "inside": true,
+        "tag": "A"
+      }
+    },
+    {
+      "name": "topbar-dark-mobile-forward-tab",
+      "passed": true,
+      "detail": "Закрыть меню"
+    },
+    {
+      "name": "topbar-dark-mobile-escape-restore",
+      "passed": true,
+      "detail": {
+        "active": "Открыть меню",
+        "inert": true,
+        "overflow": ""
+      }
+    },
+    {
+      "name": "topbar three-level menu retains parent destinations",
+      "passed": true,
+      "detail": {
+        "focus": "Группа 1: настройки и наблюдение",
+        "links": [
+          {
+            "href": "/__design/long-menu/section-20",
+            "text": "Раздел 20: управление рабочими процессами"
+          },
+          {
+            "href": "/__design/long-menu/section-20/group-1",
+            "text": "Группа 1: настройки и наблюдение"
+          },
+          {
+            "href": "/__design/long-menu/section-20/group-1/item-1",
+            "text": "Пункт 1: подробная информация"
+          },
+          {
+            "href": "/__design/long-menu/section-20/group-1/item-2",
+            "text": "Пункт 2: подробная информация"
+          }
+        ],
+        "menus": 3
+      }
+    },
+    {
+      "name": "default/light control cursor/state/focus/override",
+      "passed": true,
+      "detail": {
+        "styles": [
+          {
+            "bg": "rgb(36, 98, 198)",
+            "checked": null,
+            "color": "rgb(255, 255, 255)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-primary",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(39, 155, 97)",
+            "checked": null,
+            "color": "rgb(13, 14, 18)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-success",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(230, 155, 26)",
+            "checked": null,
+            "color": "rgb(13, 14, 18)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-warning",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(200, 25, 25)",
+            "checked": null,
+            "color": "rgb(250, 250, 250)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-danger",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(36, 98, 198)",
+            "checked": null,
+            "color": "rgb(255, 255, 255)",
+            "cursor": "progress",
+            "disabled": true,
+            "height": "36px",
+            "id": "design-loading",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(36, 98, 198)",
+            "checked": null,
+            "color": "rgb(255, 255, 255)",
+            "cursor": "not-allowed",
+            "disabled": true,
+            "height": "36px",
+            "id": "design-button-disabled",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(36, 98, 198)",
+            "checked": null,
+            "color": "rgb(255, 255, 255)",
+            "cursor": "not-allowed",
+            "disabled": true,
+            "height": "36px",
+            "id": "design-as-child-disabled",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(36, 98, 198)",
+            "checked": null,
+            "color": "rgb(255, 255, 255)",
+            "cursor": "progress",
+            "disabled": true,
+            "height": "36px",
+            "id": "design-as-child-loading",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(255, 255, 255)",
+            "checked": null,
+            "color": "rgb(35, 39, 47)",
+            "cursor": "text",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-name",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(231, 234, 238)",
+            "checked": null,
+            "color": "rgb(85, 91, 104)",
+            "cursor": "text",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-readonly",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": true
+          },
+          {
+            "bg": "rgb(255, 255, 255)",
+            "checked": null,
+            "color": "rgb(35, 39, 47)",
+            "cursor": "text",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-error",
+            "invalid": "true",
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgba(0, 0, 0, 0)",
+            "checked": null,
+            "color": "rgb(35, 39, 47)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-select",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(36, 98, 198)",
+            "checked": "true",
+            "color": "rgb(255, 255, 255)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "16px",
+            "id": "design-checkbox",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(36, 98, 198)",
+            "checked": "true",
+            "color": "rgb(255, 255, 255)",
+            "cursor": "not-allowed",
+            "disabled": true,
+            "height": "16px",
+            "id": "design-checkbox-disabled",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(36, 98, 198)",
+            "checked": null,
+            "color": "rgb(255, 255, 255)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "64px",
+            "id": "design-override",
+            "invalid": null,
+            "radius": "0px",
+            "readonly": false
+          }
+        ],
+        "focus": {
+          "id": "design-primary",
+          "outline": "none",
+          "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(36, 98, 198) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+          "visible": true
+        },
+        "hover": "brightness(0.97)"
+      }
+    },
+    {
+      "name": "default/light primary/semantic button contrast",
+      "passed": true,
+      "detail": [
+        {
+          "id": "design-primary",
+          "ratio": 5.77,
+          "color": "rgb(255, 255, 255)",
+          "bg": "rgb(36, 98, 198)"
+        },
+        {
+          "id": "design-success",
+          "ratio": 5.46,
+          "color": "rgb(13, 14, 18)",
+          "bg": "rgb(39, 155, 97)"
+        },
+        {
+          "id": "design-warning",
+          "ratio": 8.33,
+          "color": "rgb(13, 14, 18)",
+          "bg": "rgb(230, 155, 26)"
+        },
+        {
+          "id": "design-danger",
+          "ratio": 5.57,
+          "color": "rgb(250, 250, 250)",
+          "bg": "rgb(200, 25, 25)"
+        }
+      ]
+    },
+    {
+      "name": "default/light checkbox mouse/keyboard controlled state",
+      "passed": true,
+      "detail": {
+        "initial": true,
+        "afterClick": false,
+        "afterSpace": true,
+        "disabledChecked": true
+      }
+    },
+    {
+      "name": "default/dark control cursor/state/focus/override",
+      "passed": true,
+      "detail": {
+        "styles": [
+          {
+            "bg": "rgb(143, 178, 234)",
+            "checked": null,
+            "color": "rgb(25, 29, 36)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-primary",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(39, 155, 97)",
+            "checked": null,
+            "color": "rgb(13, 14, 18)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-success",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(230, 155, 26)",
+            "checked": null,
+            "color": "rgb(13, 14, 18)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-warning",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(239, 128, 128)",
+            "checked": null,
+            "color": "rgb(37, 24, 24)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-danger",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(143, 178, 234)",
+            "checked": null,
+            "color": "rgb(25, 29, 36)",
+            "cursor": "progress",
+            "disabled": true,
+            "height": "36px",
+            "id": "design-loading",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(143, 178, 234)",
+            "checked": null,
+            "color": "rgb(25, 29, 36)",
+            "cursor": "not-allowed",
+            "disabled": true,
+            "height": "36px",
+            "id": "design-button-disabled",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(143, 178, 234)",
+            "checked": null,
+            "color": "rgb(25, 29, 36)",
+            "cursor": "not-allowed",
+            "disabled": true,
+            "height": "36px",
+            "id": "design-as-child-disabled",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(143, 178, 234)",
+            "checked": null,
+            "color": "rgb(25, 29, 36)",
+            "cursor": "progress",
+            "disabled": true,
+            "height": "36px",
+            "id": "design-as-child-loading",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(32, 34, 40)",
+            "checked": null,
+            "color": "rgb(235, 237, 239)",
+            "cursor": "text",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-name",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(45, 49, 57)",
+            "checked": null,
+            "color": "rgb(186, 189, 197)",
+            "cursor": "text",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-readonly",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": true
+          },
+          {
+            "bg": "rgb(32, 34, 40)",
+            "checked": null,
+            "color": "rgb(235, 237, 239)",
+            "cursor": "text",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-error",
+            "invalid": "true",
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgba(0, 0, 0, 0)",
+            "checked": null,
+            "color": "rgb(235, 237, 239)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-select",
+            "invalid": null,
+            "radius": "8px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(143, 178, 234)",
+            "checked": "true",
+            "color": "rgb(25, 29, 36)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "16px",
+            "id": "design-checkbox",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(143, 178, 234)",
+            "checked": "true",
+            "color": "rgb(25, 29, 36)",
+            "cursor": "not-allowed",
+            "disabled": true,
+            "height": "16px",
+            "id": "design-checkbox-disabled",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(143, 178, 234)",
+            "checked": null,
+            "color": "rgb(25, 29, 36)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "64px",
+            "id": "design-override",
+            "invalid": null,
+            "radius": "0px",
+            "readonly": false
+          }
+        ],
+        "focus": {
+          "id": "design-primary",
+          "outline": "none",
+          "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(143, 178, 234) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+          "visible": true
+        },
+        "hover": "brightness(0.97)"
+      }
+    },
+    {
+      "name": "default/dark primary/semantic button contrast",
+      "passed": true,
+      "detail": [
+        {
+          "id": "design-primary",
+          "ratio": 7.83,
+          "color": "rgb(25, 29, 36)",
+          "bg": "rgb(143, 178, 234)"
+        },
+        {
+          "id": "design-success",
+          "ratio": 5.46,
+          "color": "rgb(13, 14, 18)",
+          "bg": "rgb(39, 155, 97)"
+        },
+        {
+          "id": "design-warning",
+          "ratio": 8.33,
+          "color": "rgb(13, 14, 18)",
+          "bg": "rgb(230, 155, 26)"
+        },
+        {
+          "id": "design-danger",
+          "ratio": 6.6,
+          "color": "rgb(37, 24, 24)",
+          "bg": "rgb(239, 128, 128)"
+        }
+      ]
+    },
+    {
+      "name": "default/dark checkbox mouse/keyboard controlled state",
+      "passed": true,
+      "detail": {
+        "initial": true,
+        "afterClick": false,
+        "afterSpace": true,
+        "disabledChecked": true
+      }
+    },
+    {
+      "name": "topbar/light control cursor/state/focus/override",
+      "passed": true,
+      "detail": {
+        "styles": [
+          {
+            "bg": "rgb(15, 118, 108)",
+            "checked": null,
+            "color": "rgb(255, 255, 255)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-primary",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(39, 155, 97)",
+            "checked": null,
+            "color": "rgb(13, 14, 18)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-success",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(230, 155, 26)",
+            "checked": null,
+            "color": "rgb(13, 14, 18)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-warning",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(200, 25, 25)",
+            "checked": null,
+            "color": "rgb(250, 250, 250)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-danger",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(15, 118, 108)",
+            "checked": null,
+            "color": "rgb(255, 255, 255)",
+            "cursor": "progress",
+            "disabled": true,
+            "height": "36px",
+            "id": "design-loading",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(15, 118, 108)",
+            "checked": null,
+            "color": "rgb(255, 255, 255)",
+            "cursor": "not-allowed",
+            "disabled": true,
+            "height": "36px",
+            "id": "design-button-disabled",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(15, 118, 108)",
+            "checked": null,
+            "color": "rgb(255, 255, 255)",
+            "cursor": "not-allowed",
+            "disabled": true,
+            "height": "36px",
+            "id": "design-as-child-disabled",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(15, 118, 108)",
+            "checked": null,
+            "color": "rgb(255, 255, 255)",
+            "cursor": "progress",
+            "disabled": true,
+            "height": "36px",
+            "id": "design-as-child-loading",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(255, 255, 255)",
+            "checked": null,
+            "color": "rgb(35, 39, 47)",
+            "cursor": "text",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-name",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(231, 234, 238)",
+            "checked": null,
+            "color": "rgb(85, 91, 104)",
+            "cursor": "text",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-readonly",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": true
+          },
+          {
+            "bg": "rgb(255, 255, 255)",
+            "checked": null,
+            "color": "rgb(35, 39, 47)",
+            "cursor": "text",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-error",
+            "invalid": "true",
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgba(0, 0, 0, 0)",
+            "checked": null,
+            "color": "rgb(35, 39, 47)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-select",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(15, 118, 108)",
+            "checked": "true",
+            "color": "rgb(255, 255, 255)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "16px",
+            "id": "design-checkbox",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(15, 118, 108)",
+            "checked": "true",
+            "color": "rgb(255, 255, 255)",
+            "cursor": "not-allowed",
+            "disabled": true,
+            "height": "16px",
+            "id": "design-checkbox-disabled",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(15, 118, 108)",
+            "checked": null,
+            "color": "rgb(255, 255, 255)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "64px",
+            "id": "design-override",
+            "invalid": null,
+            "radius": "0px",
+            "readonly": false
+          }
+        ],
+        "focus": {
+          "id": "design-primary",
+          "outline": "none",
+          "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(15, 118, 108) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+          "visible": true
+        },
+        "hover": "brightness(0.97)"
+      }
+    },
+    {
+      "name": "topbar/light primary/semantic button contrast",
+      "passed": true,
+      "detail": [
+        {
+          "id": "design-primary",
+          "ratio": 5.49,
+          "color": "rgb(255, 255, 255)",
+          "bg": "rgb(15, 118, 108)"
+        },
+        {
+          "id": "design-success",
+          "ratio": 5.46,
+          "color": "rgb(13, 14, 18)",
+          "bg": "rgb(39, 155, 97)"
+        },
+        {
+          "id": "design-warning",
+          "ratio": 8.33,
+          "color": "rgb(13, 14, 18)",
+          "bg": "rgb(230, 155, 26)"
+        },
+        {
+          "id": "design-danger",
+          "ratio": 5.57,
+          "color": "rgb(250, 250, 250)",
+          "bg": "rgb(200, 25, 25)"
+        }
+      ]
+    },
+    {
+      "name": "topbar/light checkbox mouse/keyboard controlled state",
+      "passed": true,
+      "detail": {
+        "initial": true,
+        "afterClick": false,
+        "afterSpace": true,
+        "disabledChecked": true
+      }
+    },
+    {
+      "name": "topbar/dark control cursor/state/focus/override",
+      "passed": true,
+      "detail": {
+        "styles": [
+          {
+            "bg": "rgb(128, 229, 219)",
+            "checked": null,
+            "color": "rgb(14, 37, 35)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-primary",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(39, 155, 97)",
+            "checked": null,
+            "color": "rgb(13, 14, 18)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-success",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(230, 155, 26)",
+            "checked": null,
+            "color": "rgb(13, 14, 18)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-warning",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(239, 128, 128)",
+            "checked": null,
+            "color": "rgb(37, 24, 24)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-danger",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(128, 229, 219)",
+            "checked": null,
+            "color": "rgb(14, 37, 35)",
+            "cursor": "progress",
+            "disabled": true,
+            "height": "36px",
+            "id": "design-loading",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(128, 229, 219)",
+            "checked": null,
+            "color": "rgb(14, 37, 35)",
+            "cursor": "not-allowed",
+            "disabled": true,
+            "height": "36px",
+            "id": "design-button-disabled",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(128, 229, 219)",
+            "checked": null,
+            "color": "rgb(14, 37, 35)",
+            "cursor": "not-allowed",
+            "disabled": true,
+            "height": "36px",
+            "id": "design-as-child-disabled",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(128, 229, 219)",
+            "checked": null,
+            "color": "rgb(14, 37, 35)",
+            "cursor": "progress",
+            "disabled": true,
+            "height": "36px",
+            "id": "design-as-child-loading",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(32, 34, 40)",
+            "checked": null,
+            "color": "rgb(235, 237, 239)",
+            "cursor": "text",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-name",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(45, 49, 57)",
+            "checked": null,
+            "color": "rgb(186, 189, 197)",
+            "cursor": "text",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-readonly",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": true
+          },
+          {
+            "bg": "rgb(32, 34, 40)",
+            "checked": null,
+            "color": "rgb(235, 237, 239)",
+            "cursor": "text",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-error",
+            "invalid": "true",
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgba(0, 0, 0, 0)",
+            "checked": null,
+            "color": "rgb(235, 237, 239)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "36px",
+            "id": "design-select",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(128, 229, 219)",
+            "checked": "true",
+            "color": "rgb(14, 37, 35)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "16px",
+            "id": "design-checkbox",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(128, 229, 219)",
+            "checked": "true",
+            "color": "rgb(14, 37, 35)",
+            "cursor": "not-allowed",
+            "disabled": true,
+            "height": "16px",
+            "id": "design-checkbox-disabled",
+            "invalid": null,
+            "radius": "4px",
+            "readonly": false
+          },
+          {
+            "bg": "rgb(128, 229, 219)",
+            "checked": null,
+            "color": "rgb(14, 37, 35)",
+            "cursor": "pointer",
+            "disabled": false,
+            "height": "64px",
+            "id": "design-override",
+            "invalid": null,
+            "radius": "0px",
+            "readonly": false
+          }
+        ],
+        "focus": {
+          "id": "design-primary",
+          "outline": "none",
+          "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(128, 229, 219) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+          "visible": true
+        },
+        "hover": "brightness(0.97)"
+      }
+    },
+    {
+      "name": "topbar/dark primary/semantic button contrast",
+      "passed": true,
+      "detail": [
+        {
+          "id": "design-primary",
+          "ratio": 10.82,
+          "color": "rgb(14, 37, 35)",
+          "bg": "rgb(128, 229, 219)"
+        },
+        {
+          "id": "design-success",
+          "ratio": 5.46,
+          "color": "rgb(13, 14, 18)",
+          "bg": "rgb(39, 155, 97)"
+        },
+        {
+          "id": "design-warning",
+          "ratio": 8.33,
+          "color": "rgb(13, 14, 18)",
+          "bg": "rgb(230, 155, 26)"
+        },
+        {
+          "id": "design-danger",
+          "ratio": 6.6,
+          "color": "rgb(37, 24, 24)",
+          "bg": "rgb(239, 128, 128)"
+        }
+      ]
+    },
+    {
+      "name": "topbar/dark checkbox mouse/keyboard controlled state",
+      "passed": true,
+      "detail": {
+        "initial": true,
+        "afterClick": false,
+        "afterSpace": true,
+        "disabledChecked": true
+      }
+    },
+    {
+      "name": "default/light/1440 dialog focus loop and Escape",
+      "passed": true,
+      "detail": {
+        "initialFocus": "comparison-dialog-name",
+        "shiftTab": "Закрыть",
+        "tab": "comparison-dialog-name",
+        "escapeFocus": "Открыть диалог",
+        "withinViewport": true,
+        "capture": "default-light-desktop-dialog.png"
+      }
+    },
+    {
+      "name": "default/dark/1440 dialog focus loop and Escape",
+      "passed": true,
+      "detail": {
+        "initialFocus": "comparison-dialog-name",
+        "shiftTab": "Закрыть",
+        "tab": "comparison-dialog-name",
+        "escapeFocus": "Открыть диалог",
+        "withinViewport": true,
+        "capture": "default-dark-desktop-dialog.png"
+      }
+    },
+    {
+      "name": "default/light/390 dialog focus loop and Escape",
+      "passed": true,
+      "detail": {
+        "initialFocus": "comparison-dialog-name",
+        "shiftTab": "Закрыть",
+        "tab": "comparison-dialog-name",
+        "escapeFocus": "Открыть диалог",
+        "withinViewport": true,
+        "capture": "default-light-mobile-dialog.png"
+      }
+    },
+    {
+      "name": "default/dark/390 dialog focus loop and Escape",
+      "passed": true,
+      "detail": {
+        "initialFocus": "comparison-dialog-name",
+        "shiftTab": "Закрыть",
+        "tab": "comparison-dialog-name",
+        "escapeFocus": "Открыть диалог",
+        "withinViewport": true,
+        "capture": "default-dark-mobile-dialog.png"
+      }
+    },
+    {
+      "name": "topbar/light/1440 dialog focus loop and Escape",
+      "passed": true,
+      "detail": {
+        "initialFocus": "comparison-dialog-name",
+        "shiftTab": "Закрыть",
+        "tab": "comparison-dialog-name",
+        "escapeFocus": "Открыть диалог",
+        "withinViewport": true,
+        "capture": "topbar-light-desktop-dialog.png"
+      }
+    },
+    {
+      "name": "topbar/dark/1440 dialog focus loop and Escape",
+      "passed": true,
+      "detail": {
+        "initialFocus": "comparison-dialog-name",
+        "shiftTab": "Закрыть",
+        "tab": "comparison-dialog-name",
+        "escapeFocus": "Открыть диалог",
+        "withinViewport": true,
+        "capture": "topbar-dark-desktop-dialog.png"
+      }
+    },
+    {
+      "name": "topbar/light/390 dialog focus loop and Escape",
+      "passed": true,
+      "detail": {
+        "initialFocus": "comparison-dialog-name",
+        "shiftTab": "Закрыть",
+        "tab": "comparison-dialog-name",
+        "escapeFocus": "Открыть диалог",
+        "withinViewport": true,
+        "capture": "topbar-light-mobile-dialog.png"
+      }
+    },
+    {
+      "name": "topbar/dark/390 dialog focus loop and Escape",
+      "passed": true,
+      "detail": {
+        "initialFocus": "comparison-dialog-name",
+        "shiftTab": "Закрыть",
+        "tab": "comparison-dialog-name",
+        "escapeFocus": "Открыть диалог",
+        "withinViewport": true,
+        "capture": "topbar-dark-mobile-dialog.png"
+      }
+    },
+    {
+      "name": "default/light design-as-child-disabled blocks click and Enter",
+      "passed": true,
+      "detail": {
+        "focus": "design-as-child-disabled",
+        "hash": ""
+      }
+    },
+    {
+      "name": "default/light design-as-child-loading blocks click and Enter",
+      "passed": true,
+      "detail": {
+        "focus": "design-as-child-loading",
+        "hash": ""
+      }
+    },
+    {
+      "name": "default/light preference survives reload",
+      "passed": true,
+      "detail": {
+        "mode": "light"
+      }
+    },
+    {
+      "name": "default/light table actions and row selection",
+      "passed": true,
+      "detail": {
+        "cursors": {
+          "checkbox": "pointer",
+          "locale": "pointer",
+          "select": [
+            "pointer"
+          ],
+          "sort": "pointer"
+        },
+        "selected": "true"
+      }
+    },
+    {
+      "name": "default/dark design-as-child-disabled blocks click and Enter",
+      "passed": true,
+      "detail": {
+        "focus": "design-as-child-disabled",
+        "hash": ""
+      }
+    },
+    {
+      "name": "default/dark design-as-child-loading blocks click and Enter",
+      "passed": true,
+      "detail": {
+        "focus": "design-as-child-loading",
+        "hash": ""
+      }
+    },
+    {
+      "name": "default/dark preference survives reload",
+      "passed": true,
+      "detail": {
+        "mode": "dark"
+      }
+    },
+    {
+      "name": "default/dark table actions and row selection",
+      "passed": true,
+      "detail": {
+        "cursors": {
+          "checkbox": "pointer",
+          "locale": "pointer",
+          "select": [
+            "pointer"
+          ],
+          "sort": "pointer"
+        },
+        "selected": "true"
+      }
+    },
+    {
+      "name": "topbar/light design-as-child-disabled blocks click and Enter",
+      "passed": true,
+      "detail": {
+        "focus": "design-as-child-disabled",
+        "hash": ""
+      }
+    },
+    {
+      "name": "topbar/light design-as-child-loading blocks click and Enter",
+      "passed": true,
+      "detail": {
+        "focus": "design-as-child-loading",
+        "hash": ""
+      }
+    },
+    {
+      "name": "topbar/light preference survives reload",
+      "passed": true,
+      "detail": {
+        "mode": "light"
+      }
+    },
+    {
+      "name": "topbar/light table actions and row selection",
+      "passed": true,
+      "detail": {
+        "cursors": {
+          "checkbox": "pointer",
+          "locale": "pointer",
+          "select": [
+            "pointer"
+          ],
+          "sort": "pointer"
+        },
+        "selected": "true"
+      }
+    },
+    {
+      "name": "topbar/dark design-as-child-disabled blocks click and Enter",
+      "passed": true,
+      "detail": {
+        "focus": "design-as-child-disabled",
+        "hash": ""
+      }
+    },
+    {
+      "name": "topbar/dark design-as-child-loading blocks click and Enter",
+      "passed": true,
+      "detail": {
+        "focus": "design-as-child-loading",
+        "hash": ""
+      }
+    },
+    {
+      "name": "topbar/dark preference survives reload",
+      "passed": true,
+      "detail": {
+        "mode": "dark"
+      }
+    },
+    {
+      "name": "topbar/dark table actions and row selection",
+      "passed": true,
+      "detail": {
+        "cursors": {
+          "checkbox": "pointer",
+          "locale": "pointer",
+          "select": [
+            "pointer"
+          ],
+          "sort": "pointer"
+        },
+        "selected": "true"
+      }
+    },
+    {
+      "name": "topbar horizontal keyboard scroll",
+      "passed": true,
+      "detail": {
+        "active": {
+          "bottom": 109,
+          "height": 36,
+          "left": 1054.8984375,
+          "right": 1323.90625,
+          "top": 73,
+          "width": 269.0078125,
+          "x": 1054.8984375,
+          "y": 73
+        },
+        "focus": "Длинный раздел навигации 20",
+        "max": 4229,
+        "nav": {
+          "bottom": 117,
+          "height": 52,
+          "left": 112,
+          "right": 1328,
+          "top": 65,
+          "width": 1216,
+          "x": 112,
+          "y": 65
+        },
+        "scroll": 4225.5,
+        "verticalScroll": 0
+      }
+    },
+    {
+      "name": "topbar nested menu Escape restores trigger",
+      "passed": true,
+      "detail": {
+        "focus": "Длинный раздел навигации 20",
+        "menus": 0
+      }
+    },
+    {
+      "name": "default/light capabilities-limited",
+      "passed": true,
+      "detail": {
+        "empty": false,
+        "links": [
+          "/",
+          "/users",
+          "/",
+          "/users",
+          "/",
+          "/users"
+        ],
+        "navLinks": 4,
+        "overflow": false,
+        "title": "Ограниченные возможности"
+      }
+    },
+    {
+      "name": "default/light missing-menu",
+      "passed": true,
+      "detail": {
+        "empty": false,
+        "links": [
+          "/"
+        ],
+        "navLinks": 0,
+        "overflow": false,
+        "title": "Меню не передано"
+      }
+    },
+    {
+      "name": "default/light users-empty",
+      "passed": true,
+      "detail": {
+        "empty": true,
+        "links": [
+          "/",
+          "/users",
+          "/admins",
+          "/roles",
+          "/permissions",
+          "/queues",
+          "/notifications",
+          "/notifications",
+          "/",
+          "/",
+          "/users",
+          "/admins",
+          "/roles",
+          "/permissions",
+          "/queues",
+          "/notifications"
+        ],
+        "navLinks": 14,
+        "overflow": false,
+        "title": "Пользователи"
+      }
+    },
+    {
+      "name": "default/dark capabilities-limited",
+      "passed": true,
+      "detail": {
+        "empty": false,
+        "links": [
+          "/",
+          "/users",
+          "/",
+          "/users",
+          "/",
+          "/users"
+        ],
+        "navLinks": 4,
+        "overflow": false,
+        "title": "Ограниченные возможности"
+      }
+    },
+    {
+      "name": "default/dark missing-menu",
+      "passed": true,
+      "detail": {
+        "empty": false,
+        "links": [
+          "/"
+        ],
+        "navLinks": 0,
+        "overflow": false,
+        "title": "Меню не передано"
+      }
+    },
+    {
+      "name": "default/dark users-empty",
+      "passed": true,
+      "detail": {
+        "empty": true,
+        "links": [
+          "/",
+          "/users",
+          "/admins",
+          "/roles",
+          "/permissions",
+          "/queues",
+          "/notifications",
+          "/notifications",
+          "/",
+          "/",
+          "/users",
+          "/admins",
+          "/roles",
+          "/permissions",
+          "/queues",
+          "/notifications"
+        ],
+        "navLinks": 14,
+        "overflow": false,
+        "title": "Пользователи"
+      }
+    },
+    {
+      "name": "topbar/light capabilities-limited",
+      "passed": true,
+      "detail": {
+        "empty": false,
+        "links": [
+          "/",
+          "/users",
+          "/",
+          "/users"
+        ],
+        "navLinks": 2,
+        "overflow": false,
+        "title": "Ограниченные возможности"
+      }
+    },
+    {
+      "name": "topbar/light missing-menu",
+      "passed": true,
+      "detail": {
+        "empty": false,
+        "links": [
+          "/"
+        ],
+        "navLinks": 0,
+        "overflow": false,
+        "title": "Меню не передано"
+      }
+    },
+    {
+      "name": "topbar/light users-empty",
+      "passed": true,
+      "detail": {
+        "empty": true,
+        "links": [
+          "/notifications",
+          "/",
+          "/",
+          "/users",
+          "/admins",
+          "/roles",
+          "/permissions",
+          "/queues",
+          "/notifications"
+        ],
+        "navLinks": 7,
+        "overflow": false,
+        "title": "Пользователи"
+      }
+    },
+    {
+      "name": "topbar/dark capabilities-limited",
+      "passed": true,
+      "detail": {
+        "empty": false,
+        "links": [
+          "/",
+          "/users",
+          "/",
+          "/users"
+        ],
+        "navLinks": 2,
+        "overflow": false,
+        "title": "Ограниченные возможности"
+      }
+    },
+    {
+      "name": "topbar/dark missing-menu",
+      "passed": true,
+      "detail": {
+        "empty": false,
+        "links": [
+          "/"
+        ],
+        "navLinks": 0,
+        "overflow": false,
+        "title": "Меню не передано"
+      }
+    },
+    {
+      "name": "topbar/dark users-empty",
+      "passed": true,
+      "detail": {
+        "empty": true,
+        "links": [
+          "/notifications",
+          "/",
+          "/",
+          "/users",
+          "/admins",
+          "/roles",
+          "/permissions",
+          "/queues",
+          "/notifications"
+        ],
+        "navLinks": 7,
+        "overflow": false,
+        "title": "Пользователи"
+      }
+    },
+    {
+      "name": "default/light select and keyboard tabs",
+      "passed": true,
+      "detail": {
+        "disabledOption": "true",
+        "selection": "Настройки",
+        "history": "true",
+        "disabledTabSelected": "false",
+        "returnToDetails": "true"
+      }
+    },
+    {
+      "name": "default/dark select and keyboard tabs",
+      "passed": true,
+      "detail": {
+        "disabledOption": "true",
+        "selection": "Настройки",
+        "history": "true",
+        "disabledTabSelected": "false",
+        "returnToDetails": "true"
+      }
+    },
+    {
+      "name": "topbar/light select and keyboard tabs",
+      "passed": true,
+      "detail": {
+        "disabledOption": "true",
+        "selection": "Настройки",
+        "history": "true",
+        "disabledTabSelected": "false",
+        "returnToDetails": "true"
+      }
+    },
+    {
+      "name": "topbar/dark select and keyboard tabs",
+      "passed": true,
+      "detail": {
+        "disabledOption": "true",
+        "selection": "Настройки",
+        "history": "true",
+        "disabledTabSelected": "false",
+        "returnToDetails": "true"
+      }
+    },
+    {
+      "name": "fresh final browser console",
+      "passed": true,
+      "detail": {
+        "warnings": 0,
+        "errors": 0
+      }
+    },
+    {
+      "name": "default/light editable and readonly text contrast",
+      "passed": true,
+      "detail": [
+        {
+          "bg": "rgb(255, 255, 255)",
+          "color": "rgb(35, 39, 47)",
+          "cursor": "text",
+          "id": "design-name",
+          "readonly": false,
+          "ratio": 14.97
+        },
+        {
+          "bg": "rgb(231, 234, 238)",
+          "color": "rgb(85, 91, 104)",
+          "cursor": "text",
+          "id": "design-readonly",
+          "readonly": true,
+          "ratio": 5.65
+        }
+      ]
+    },
+    {
+      "name": "default/dark editable and readonly text contrast",
+      "passed": true,
+      "detail": [
+        {
+          "bg": "rgb(32, 34, 40)",
+          "color": "rgb(235, 237, 239)",
+          "cursor": "text",
+          "id": "design-name",
+          "readonly": false,
+          "ratio": 13.55
+        },
+        {
+          "bg": "rgb(45, 49, 57)",
+          "color": "rgb(186, 189, 197)",
+          "cursor": "text",
+          "id": "design-readonly",
+          "readonly": true,
+          "ratio": 6.94
+        }
+      ]
+    },
+    {
+      "name": "topbar/light editable and readonly text contrast",
+      "passed": true,
+      "detail": [
+        {
+          "bg": "rgb(255, 255, 255)",
+          "color": "rgb(35, 39, 47)",
+          "cursor": "text",
+          "id": "design-name",
+          "readonly": false,
+          "ratio": 14.97
+        },
+        {
+          "bg": "rgb(231, 234, 238)",
+          "color": "rgb(85, 91, 104)",
+          "cursor": "text",
+          "id": "design-readonly",
+          "readonly": true,
+          "ratio": 5.65
+        }
+      ]
+    },
+    {
+      "name": "topbar/dark editable and readonly text contrast",
+      "passed": true,
+      "detail": [
+        {
+          "bg": "rgb(32, 34, 40)",
+          "color": "rgb(235, 237, 239)",
+          "cursor": "text",
+          "id": "design-name",
+          "readonly": false,
+          "ratio": 13.55
+        },
+        {
+          "bg": "rgb(45, 49, 57)",
+          "color": "rgb(186, 189, 197)",
+          "cursor": "text",
+          "id": "design-readonly",
+          "readonly": true,
+          "ratio": 6.94
+        }
+      ]
+    }
+  ]
+}

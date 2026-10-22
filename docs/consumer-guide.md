@@ -63,7 +63,7 @@ login page offers first-admin registration; use the configured setup token.
 There is no bundled administrator password.
 
 With `ADMIN_MODULES` empty, expect login/logout, first-admin setup, basic
-profile and the admin shell. The built-in interface is currently Russian-only;
+profile and the admin shell. The shared interface supports Russian and English;
 navigation follows the signed-in administrator's permissions. Optional module
 screens appear only when enabled and permitted. The starter does not create a
 sample business entity for you.
