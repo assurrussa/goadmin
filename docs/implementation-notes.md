@@ -1,5 +1,30 @@
 # Implementation Notes
 
+## Build-time admin presentation packs (2026-10-22)
+
+The agreed scope is a build-time theme pack with interchangeable admin/auth
+shells over shared page logic and interaction behavior. The existing design is
+the default; a top-navigation/split-auth example proves the replacement boundary.
+Light/dark remains an independent user preference. Standalone HTML errors retain
+their neutral fallback; public-site themes and runtime design selection are out
+of scope. Existing CSS presets, host overrides and explicit page layouts remain
+compatible.
+
+Implemented through `@admin-core/presentation`, optional `AdminExtension.theme`
+and one declared source-manifest `themeModule`. Core-owned navigation, flash,
+notifications and upload lifecycle sit outside the replaceable shells. Shared
+controls expose semantic tokens/hooks and enforce interaction states. The
+reference includes two shells and CSS, with no business-page copies.
+
+Verification completed: Go tidy/fmt/vet/lint/race+coverage during `make check`,
+the repaired and rerun resource gate (107 manifest tests, 753 unit tests,
+types/lint/build), isolated reference and legacy CSS-preset builds, 160 browser
+states and 76 interaction/style checks. Final browser checks also fixed controlled
+checkbox bindings, clipped keyboard focus in the horizontal menu and readonly
+text contrast. See [presentation QA](presentation-packs-qa.md) for evidence,
+the initial resource-harness failure and verification limits. No publication or
+deployment is claimed.
+
 ## Atomic admin role mutations (2026-10-05)
 
 Attach, detach and explicit replacement acquire canonical actor/target subject

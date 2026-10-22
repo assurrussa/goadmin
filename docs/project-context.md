@@ -225,6 +225,15 @@ public host SDK surface. Theme persistence and system preference keep the same
 runtime contract. The [UI previews](presentation-demo.md) describe the synthetic
 visual fixture and its backend limitations.
 
+Build-time presentation packs select optional typed admin/auth shells through
+`AdminExtension.theme` and a source-manifest `themeModule`. No pack uses the
+standard shells; multiple selections fail before Vite starts. Page logic,
+mobile navigation behavior, flash/notification/upload services and auth bootstrap
+remain core-owned. The supported frontend facade is `@admin-core/presentation`;
+semantic component hooks and the topbar reference are documented in
+[theme customization](theme-customization.md). This adds no public Go import path
+or runtime design selector. Standalone errors keep their independent fallback.
+
 Menu sections accept `Placement`: empty or `sidebar` keeps sidebar navigation;
 `account` renders flat root-relative links in the profile dropdown. Both use the
 existing permission-filtered menu. Routes still enforce their own permissions.

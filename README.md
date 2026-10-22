@@ -335,7 +335,9 @@ Admin UI extensions can be supplied by one or more source manifests through
 `VITE_ADMIN_EXTENSION_MANIFESTS` (using the operating-system path delimiter).
 Every manifest uses `formatVersion: 1` and declares extensions with a stable
 `key`, `apiVersion: 1`, relative `sourceRoot`, SHA-256 source `fingerprint`, and
-optional `requires`. The build rejects missing, duplicate, or cyclic
+optional `requires` and `themeModule`. The latter selects one build-time
+[presentation pack](docs/theme-customization.md#build-time-presentation-packs) with
+typed admin/auth shells, while retaining shared pages and behavior. The build rejects missing, duplicate, or cyclic
 dependencies, duplicate feature or page keys, source symlinks, and fingerprint
 drift before Vite starts. It emits `dist/admin-extensions.manifest.json`
 without source paths. The materializer also registers every resolved

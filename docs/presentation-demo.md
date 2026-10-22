@@ -1,5 +1,37 @@
 # Admin UI previews
 
+## Build-time presentation packs
+
+The default sidebar presentation and the topbar/split-auth reference use the same
+pages, core controls and runtime services. Start the default preview as shown
+below. To run the reference alongside it, from the repository root:
+
+```sh
+VITE_ADMIN_EXTENSION_MANIFESTS=resources/examples/theme-topbar/extension.json \
+  GOADMIN_DESIGN_PORT=8769 node resources/audit/design/server.mjs
+```
+
+Open [the topbar users page](http://127.0.0.1:8769/users) or
+[split login](http://127.0.0.1:8769/auth/login). The fixture materializes the real
+source manifests and installs the selected presentation through the actual
+extension loader. Its registry and Tailwind sources are temporary; it does not
+replace the developer's generated host state. Manifest paths are relative to the
+command's working directory.
+
+Both previews also provide `/auth/mfa`, `/auth/forgot-password` and
+`/auth/reset-password`. `/__design/components` is the shared catalog of button,
+field, checkbox, select, tab, dropdown, dialog and editor states. Its actions only
+change local demonstration state. `/__design/long-menu` has twenty long sections
+and three levels of links for scrolling and keyboard checks;
+`/__design/capabilities-limited` supplies an explicitly limited capability map
+and host-filtered menu, while `/__design/missing-menu` omits the menu altogether.
+Neither fixture claims to enforce real backend authorization.
+
+See [the presentation contract](theme-customization.md#build-time-presentation-packs)
+for creating a pack and [presentation QA](presentation-packs-qa.md) for the current
+verification evidence. The earlier galleries below document the original visual
+refresh; they are not the theme-pack acceptance matrix.
+
 ## Default light and dark themes
 
 The default theme uses neutral light surfaces, graphite dark surfaces and a

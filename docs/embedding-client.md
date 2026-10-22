@@ -86,6 +86,19 @@ have a zero modification time even after their contents change. Hashed chunks
 keep the normal static-file policy. Hosts serving their own embedded FS must
 use the same policy or version the entry URLs.
 
+## Select a presentation pack
+
+A source extension may declare one `themeModule` and export a typed
+`AdminExtension.theme`. The build selects admin/auth shells without replacing
+business pages or core lifecycle. Include at most one pack in the project's
+normal manifest list; no pack retains the standard design. Existing CSS-only
+extensions remain valid. See [theme customization](theme-customization.md) for
+the supported facade, shell slots, styling hooks and reference pack.
+
+A pack is client source: rebuild it from the same pinned GoAdmin version and
+embed the resulting bundle with the matching templates. It adds no Go module
+selection, infrastructure dependency, runtime design picker or backend permission.
+
 ## Add, change, or remove a page
 
 To add a page, create its Vue file, register the authorized GET route using

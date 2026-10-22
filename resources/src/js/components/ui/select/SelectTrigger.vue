@@ -15,10 +15,12 @@ const forwardedProps = useForwardProps(delegatedProps)
 
 <template>
   <SelectTrigger
+    data-ui="select"
+    data-part="trigger"
     v-bind="forwardedProps"
     :class="
       cn(
-        'flex h-[var(--goadmin-control-height,2.25rem)] w-full items-center justify-between whitespace-nowrap rounded-[var(--goadmin-control-radius,var(--radius-md,0.375rem))] border border-input bg-transparent px-3 py-2 text-sm shadow-none ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate text-start',
+        'flex h-[var(--goadmin-control-height,2.25rem)] w-full items-center justify-between whitespace-nowrap rounded-[var(--goadmin-control-radius,var(--radius-md,0.375rem))] border border-[var(--goadmin-control-border,var(--color-input))] bg-[var(--goadmin-control-bg,transparent)] px-3 py-2 text-sm shadow-none ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate text-start',
         props.class,
       )
     "

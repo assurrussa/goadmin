@@ -1,0 +1,15 @@
+{
+  "formatVersion": 1,
+  "extensions": [
+    {
+      "key": "example.topbar",
+      "apiVersion": 1,
+      "sourceRoot": "src",
+      "fingerprint": "sha256:3140050810abcdf52e66220cd58014e41c5faf242507a077503802a169410626",
+      "requires": [
+        "goadmin.core"
+      ],
+      "themeModule": "extensions/theme.ts"
+    }
+  ]
+}

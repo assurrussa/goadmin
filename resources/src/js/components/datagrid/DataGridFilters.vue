@@ -1,5 +1,10 @@
 <template>
-  <Card v-if="filterableColumns.length > 0" class="border-transparent">
+  <Card
+    data-ui="datagrid"
+    data-part="filters"
+    v-if="filterableColumns.length > 0"
+    class="border-transparent"
+  >
     <CardContent class="p-6">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-base font-semibold text-text-primary">{{ t('Фильтры') }}</h3>

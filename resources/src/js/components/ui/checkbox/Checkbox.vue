@@ -16,6 +16,8 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 
 <template>
   <CheckboxRoot
+    data-ui="checkbox"
+    data-part="root"
     v-bind="forwarded"
     :class="
       cn(

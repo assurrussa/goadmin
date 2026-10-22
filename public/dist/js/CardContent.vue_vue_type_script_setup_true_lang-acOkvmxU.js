@@ -1,1 +1,0 @@
-import{L as r}from"./app.js";import{d as n,P as o,a0 as t,a7 as c,z as l,O as p}from"./editor-BMLT2hBV.js";const f=n({__name:"CardContent",props:{class:{type:[Boolean,null,String,Object,Array]}},setup(a){const e=a;return(s,m)=>(o(),t("div",{class:c(l(r)("p-[var(--goadmin-card-padding,1.5rem)] pt-0",e.class))},[p(s.$slots,"default")],2))}});export{f as _};

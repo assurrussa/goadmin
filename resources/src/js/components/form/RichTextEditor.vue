@@ -207,13 +207,13 @@
           >
             <span>{{ t('Без ужимания видео') }}</span>
             <Checkbox
-              :checked="uploadVideoWithoutCompression"
+              :model-value="uploadVideoWithoutCompression"
               :title="
                 uploadVideoWithoutCompression
                   ? t('Видео загрузится как есть')
                   : t('Видео отправится в ресайзер')
               "
-              @update:checked="handleUploadVideoToggle"
+              @update:model-value="handleUploadVideoToggle"
             />
           </label>
           <AppBadge

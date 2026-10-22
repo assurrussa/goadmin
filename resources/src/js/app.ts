@@ -5,6 +5,8 @@ import { createPinia } from 'pinia'
 import { toInertiaPage } from '@/inertiaPage'
 import type { LayoutResolver, PageLoader, PageModule, PageWithLayout } from '@/inertiaPage'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
+import AdminRuntimeFrame from '@/components/layout/AdminRuntimeFrame.vue'
+import { installPresentation } from '@/presentation/context'
 import { useThemeStore } from '@/stores/theme'
 import { useAdminProfileStore } from '@/stores/adminProfile'
 import { useAuthUserStore } from '@/stores/authUser'
@@ -88,7 +90,7 @@ void createInertiaApp({
     const app = createApp({
       render: () =>
         h(Fragment, null, [
-          h(App, props),
+          h(AdminRuntimeFrame, null, { default: () => h(App, props) }),
           h(AuthFailureNotice, {
             message: authFailureMessage.value,
             loginRequired: authFailureLogin.value,
@@ -113,6 +115,7 @@ void createInertiaApp({
       )
     }
     extensions.install(app)
+    installPresentation(app, extensions.theme)
 
     // Инициализируем store после создания Pinia, но до монтирования
     if (typeof window !== 'undefined') {

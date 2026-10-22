@@ -495,3 +495,102 @@
     color: var(--color-info-foreground);
   }
 }
+
+/* Native and Reka portal controls share interaction defaults. Base-layer rules
+ * deliberately yield to explicit host utility classes. ARIA alone cannot make
+ * arbitrary host controls inert; shared primitives own activation guards. */
+@layer base {
+  :where(
+    button,
+    a[href],
+    select,
+    summary,
+    input[type='button'],
+    input[type='submit'],
+    input[type='reset'],
+    input[type='checkbox'],
+    input[type='radio'],
+    input[type='file'],
+    input[type='range'],
+    input[type='color'],
+    input[type='image'],
+    input[type='date'],
+    input[type='datetime-local'],
+    input[type='month'],
+    input[type='week'],
+    input[type='time'],
+    [role='button'],
+    [role='tab'],
+    [role='checkbox'],
+    [role='radio'],
+    [role='switch'],
+    [role='combobox'],
+    [role='option'],
+    [role^='menuitem']
+  ) {
+    cursor: pointer;
+  }
+
+  :where(
+    input:not([type]),
+    input[type='text'],
+    input[type='search'],
+    input[type='email'],
+    input[type='password'],
+    input[type='tel'],
+    input[type='url'],
+    input[type='number'],
+    textarea,
+    [contenteditable='true']
+  ) {
+    cursor: text;
+  }
+
+  :where(
+      button,
+      a[href],
+      input,
+      textarea,
+      select,
+      summary,
+      [tabindex],
+      [role='button']
+    ):focus-visible {
+    outline: var(--outline-focus);
+    outline-offset: 2px;
+  }
+
+  :where(
+      button,
+      a[href],
+      select,
+      summary,
+      [role='button'],
+      [role='tab'],
+      [role='option'],
+      [role^='menuitem']
+    ):not(:disabled, [aria-disabled='true'], [data-disabled]):hover {
+    filter: brightness(var(--goadmin-control-hover-brightness, 0.97));
+  }
+
+  :where(
+      button,
+      a[href],
+      select,
+      summary,
+      [role='button'],
+      [role='tab'],
+      [role='option'],
+      [role^='menuitem']
+    ):not(:disabled, [aria-disabled='true'], [data-disabled]):active {
+    filter: brightness(var(--goadmin-control-active-brightness, 0.94));
+  }
+
+  :where(:disabled, [aria-disabled='true'], [data-disabled]) {
+    cursor: not-allowed;
+  }
+
+  :where([data-ui='button'][data-loading]) {
+    cursor: progress;
+  }
+}

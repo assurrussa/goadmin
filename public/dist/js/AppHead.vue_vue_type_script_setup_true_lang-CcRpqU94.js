@@ -1,0 +1,1 @@
+import{t as e,a5 as o}from"./app.js";import{d as s,x as l,U as n,V as i,A as d,F as t}from"./editor-BN-M4tx-.js";const m=s({__name:"AppHead",props:{title:String},setup(a){return(r,f)=>(l(),n(t(o),{title:a.title?`${t(e)(a.title)} — ${t(e)("Админка")}`:t(e)("Админка")},{default:i(()=>[d(r.$slots,"default")]),_:3},8,["title"]))}});export{m as _};

@@ -4,6 +4,7 @@ import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { homedir } from 'node:os'
@@ -17,7 +18,9 @@ const baseline = sourceRoot !== root
 const port = Number(process.env.GOADMIN_DESIGN_PORT || 8768)
 if (!Number.isInteger(port) || port < 1 || port > 65535)
   throw new Error('Invalid GOADMIN_DESIGN_PORT')
-const scaffold = createDemoScaffold()
+const require = createRequire(import.meta.url)
+const { adminExtensionManifestPaths } = require('../../scripts/admin-paths.cjs')
+const scaffold = createDemoScaffold({ manifestPaths: adminExtensionManifestPaths })
 process.once('exit', scaffold.cleanup)
 
 // Reuse the actual canonical inline initializer without persisting an unset preference.
@@ -51,6 +54,13 @@ const pageModules = {
   'users/IndexPage': '/src/js/Pages/users/IndexPage.vue',
   'users/EditPage': '/src/js/Pages/users/EditPage.vue',
   'auth/LoginPage': '/src/js/Pages/auth/LoginPage.vue',
+  ...(!baseline
+    ? {
+        'auth/MFAPage': '/src/js/Pages/auth/MFAPage.vue',
+        'auth/ForgotPasswordPage': '/src/js/Pages/auth/ForgotPasswordPage.vue',
+        'auth/ResetPasswordPage': '/src/js/Pages/auth/ResetPasswordPage.vue',
+      }
+    : {}),
   'permissions/IndexPage': '/src/js/Pages/permissions/IndexPage.vue',
   'roles/IndexPage': '/src/js/Pages/roles/IndexPage.vue',
   'roles/ViewPage': '/src/js/Pages/roles/ViewPage.vue',
@@ -72,13 +82,20 @@ const components = Object.keys(pageModules)
   .map((name, index) => `${JSON.stringify(name)}:Page${index}`)
   .join(',')
 const entry = `${imports}
-import {createApp,h} from 'vue';import {createInertiaApp} from '@inertiajs/vue3';import {createPinia} from 'pinia';
+import {createApp,h} from 'vue';import {createInertiaApp,router} from '@inertiajs/vue3';import {createPinia} from 'pinia';
 import AdminLayout from '/src/js/components/layout/AdminLayout.vue';import {toInertiaPage} from '/src/js/inertiaPage.ts';
 import {useAuthUserStore} from '/src/js/stores/authUser.ts';import {useThemeStore} from '/src/js/stores/theme.ts';
 import {initLocale} from '/src/js/i18n/index.ts';import {setAdminCapabilities} from '/src/js/composables/useAdminCapabilities.ts';import '/src/css/app.css';
+${
+  !baseline
+    ? `import {extensions} from '/src/js/extensions/index.ts';
+import {installPresentation} from '/src/js/presentation/context.ts';
+import AdminRuntimeFrame from '/src/js/components/layout/AdminRuntimeFrame.vue';`
+    : ''
+}
 const page=window.__DESIGN_PAGE__;initLocale();setAdminCapabilities(page);const pages={${components}};
 for(const [name,component] of Object.entries(pages)){if(!name.startsWith('auth/'))component.layout=(render,page)=>render(AdminLayout,null,{default:()=>page})}
-await createInertiaApp({page,resolve:(name)=>toInertiaPage(pages[name]),setup({el,App,props,plugin}){const pinia=createPinia();const app=createApp({render:()=>h(App,props)}).use(plugin).use(pinia);useAuthUserStore(pinia).setAuthUser(page.props.authuser);useThemeStore(pinia).init();app.mount(el)}});`
+await createInertiaApp({page,resolve:(name)=>toInertiaPage(pages[name]),setup({el,App,props,plugin}){const pinia=createPinia();const app=createApp({render:()=>${!baseline ? 'h(AdminRuntimeFrame,null,{default:()=>h(App,props)})' : 'h(App,props)'}}).use(plugin).use(pinia);${!baseline ? 'extensions.install(app);installPresentation(app,extensions.theme);' : ''}useAuthUserStore(pinia).setAuthUser(page.props.authuser);router.on('success',event=>{setAdminCapabilities(event.detail.page);useAuthUserStore(pinia).setAuthUser(event.detail.page.props.authuser)});useThemeStore(pinia).init();app.mount(el)}});`
 const requests = new Map()
 const json = (res, data, status = 200) => {
   res.statusCode = status
@@ -126,12 +143,41 @@ const server = await createServer({
   },
   plugins: [
     {
-      name: 'goadmin-design-baseline-utilities',
+      name: 'goadmin-design-fixture-utilities',
       enforce: 'pre',
       transform(code, id) {
-        if (baseline && id.split('?')[0] === path.join(sourceRoot, 'src/css/app.css')) {
-          return `${code}\n@source ${JSON.stringify(path.join(sourceRoot, 'src'))};\n`
+        if (id.split('?')[0] === path.join(sourceRoot, 'src/css/app.css')) {
+          // Production excludes audit sources; this dedicated fixture includes
+          // its catalog without changing the production CSS or generated state.
+          const fixtureCSS = code.replace(/@source not ['"]\.\.\/\.\.\/audit\/design['"];?/g, '')
+          return `${fixtureCSS}\n${[
+            path.join(sourceRoot, 'src'),
+            directory,
+            ...scaffold.sourceRoots,
+          ]
+            .map((root) => `@source ${JSON.stringify(root)};`)
+            .join('\n')}\n`
         }
+      },
+    },
+    {
+      name: 'goadmin-design-extension-dependencies',
+      async resolveId(source, importer) {
+        if (
+          !importer ||
+          source.startsWith('.') ||
+          source.startsWith('/') ||
+          source.startsWith('\0')
+        )
+          return null
+        const importerPath = importer.split('?')[0]
+        if (
+          ![scaffold.directory, ...scaffold.sourceRoots].some(
+            (root) => importerPath === root || importerPath.startsWith(root + path.sep),
+          )
+        )
+          return null
+        return this.resolve(source, path.join(root, 'src/js/app.ts'), { skipSelf: true })
       },
     },
     vue(),
@@ -199,9 +245,17 @@ const server = await createServer({
               return json(res, { error: 'Synthetic data endpoint failure' }, 500)
             return json(res, gridData(gridRoute, req.url))
           }
-          if (baseline && pathname === '/__design/components') {
+          if (
+            baseline &&
+            [
+              '/__design/components',
+              '/auth/mfa',
+              '/auth/forgot-password',
+              '/auth/reset-password',
+            ].includes(pathname)
+          ) {
             res.statusCode = 404
-            res.end('Component fixture unavailable for baseline source')
+            res.end('Fixture unavailable for baseline source')
             return
           }
           const page = makePage(req.url)
@@ -227,6 +281,7 @@ const server = await createServer({
     alias: [
       ...scaffold.aliases,
       { find: /^\/src\//, replacement: `${path.join(sourceRoot, 'src')}/` },
+      { find: '@admin-core', replacement: path.join(sourceRoot, 'src/js') },
       { find: '@', replacement: path.join(sourceRoot, 'src/js') },
       { find: '~', replacement: path.join(sourceRoot, 'src/js') },
     ],
@@ -235,7 +290,7 @@ const server = await createServer({
     host: '127.0.0.1',
     port,
     strictPort: true,
-    fs: { allow: [root, sourceRoot, scaffold.directory] },
+    fs: { allow: [root, sourceRoot, scaffold.directory, ...scaffold.sourceRoots] },
   },
 })
 try {

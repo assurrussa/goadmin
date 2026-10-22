@@ -25,6 +25,7 @@ const createManifest = (root, key, sourceRoot, options = {}) => {
             sourceRoot: path.relative(root, sourceRoot),
             fingerprint: options.fingerprint ?? fingerprintSource(sourceRoot),
             requires: options.requires ?? [],
+            ...(options.themeModule !== undefined ? { themeModule: options.themeModule } : {}),
           },
         ],
       },
@@ -65,6 +66,7 @@ test('materializes deterministic multi-root module and path-free bundle manifest
   assert.match(generated, /"content\/Index": \(\) => import\("\.\/roots\/gocms\/Pages\/content\/Index\.vue"\)/)
   assert.match(generated, /"settings\/Index": \(\) => import\("\.\/roots\/host\.settings\/Pages\/settings\/Index\.vue"\)/)
   assert.match(generated, /"gocms\/install": extension/)
+  assert.match(generated, /export const selectedThemeModuleKey: string \| null = null/)
   assert.deepEqual(
     result.bundleManifest.extensions.map((extension) => extension.key),
     ['gocms', 'host.settings'],
@@ -79,6 +81,103 @@ test('materializes deterministic multi-root module and path-free bundle manifest
     `@source ${JSON.stringify(contentRoot.split(path.sep).join('/'))};\n` +
       `@source ${JSON.stringify(hostRoot.split(path.sep).join('/'))};\n`,
   )
+})
+
+test('selects one existing theme module independently of manifest order without duplicate imports', (t) => {
+  const root = fixture(t)
+  const firstRoot = path.join(root, 'first')
+  const themeRoot = path.join(root, 'theme')
+  write(path.join(firstRoot, 'extensions/ordinary.ts'), 'export default {}\n')
+  write(path.join(themeRoot, 'extensions/nested/theme.ts'), 'export default { theme: {} }\n')
+  write(path.join(themeRoot, 'extensions/other.ts'), 'export default {}\n')
+  const manifests = [
+    createManifest(root, 'aaa', firstRoot),
+    createManifest(root, 'zzz.theme', themeRoot, { themeModule: 'extensions/nested/theme.ts' }),
+  ]
+  const materialize = (manifestPaths, name) => materializeAdminExtensions({
+    generatedRoot: path.join(root, name),
+    legacyRoot: path.join(root, 'missing'),
+    manifestPaths,
+  })
+  const first = materialize(manifests, 'generated-first')
+  const second = materialize([...manifests].reverse(), 'generated-second')
+  const generated = fs.readFileSync(first.generatedModulePath, 'utf8')
+  assert.equal(generated, fs.readFileSync(second.generatedModulePath, 'utf8'))
+  assert.match(generated, /export const selectedThemeModuleKey: string \| null = "zzz\.theme\/nested\/theme"/)
+  assert.equal(generated.match(/import \* as .*extensions\/nested\/theme\.ts/g).length, 1)
+  assert.match(generated, /"zzz\.theme\/nested\/theme": extension/)
+  assert.deepEqual(first.bundleManifest, second.bundleManifest)
+  assert.equal(JSON.stringify(first.bundleManifest).includes('themeModule'), false)
+})
+
+test('rejects multiple selected theme modules before replacing generated output', (t) => {
+  const root = fixture(t)
+  const sourceRoot = path.join(root, 'source')
+  write(path.join(sourceRoot, 'extensions/theme.ts'), 'export default {}\n')
+  const generatedRoot = path.join(root, 'generated')
+  write(path.join(generatedRoot, 'sentinel'), 'preserved')
+  assert.throws(() => materializeAdminExtensions({
+    generatedRoot,
+    legacyRoot: path.join(root, 'missing'),
+    manifestPaths: ['first', 'second'].map((key) => createManifest(root, key, sourceRoot, {
+      themeModule: 'extensions/theme.ts',
+    })),
+  }), /multiple admin theme modules selected: first, second/)
+  assert.equal(fs.readFileSync(path.join(generatedRoot, 'sentinel'), 'utf8'), 'preserved')
+})
+
+test('rejects unsafe or unsupported theme module paths and missing modules', (t) => {
+  const root = fixture(t)
+  const sourceRoot = path.join(root, 'source')
+  write(path.join(sourceRoot, 'extensions/theme.ts'), 'export default {}\n')
+  for (const themeModule of [
+    null, 42, '', '/extensions/theme.ts', 'C:\\extensions\\theme.ts',
+    '../extensions/theme.ts', 'extensions/../theme.ts', 'extensions/./theme.ts',
+    'extensions//theme.ts', 'extensions\\theme.ts', 'theme.ts',
+    'extensions/theme.js', 'extensions/theme.d.ts', 'extensions/theme\0.ts',
+  ]) {
+    assert.throws(() => materializeAdminExtensions({
+      generatedRoot: path.join(root, 'generated'),
+      legacyRoot: path.join(root, 'missing'),
+      manifestPaths: [createManifest(root, 'theme', sourceRoot, { themeModule })],
+    }), /themeModule must be a relative .ts module under extensions\//, String(themeModule))
+  }
+  for (const themeModule of ['extensions/missing.ts', 'extensions/directory.ts']) {
+    fs.mkdirSync(path.join(sourceRoot, 'extensions/directory.ts'), { recursive: true })
+    assert.throws(() => materializeAdminExtensions({
+      generatedRoot: path.join(root, 'generated'),
+      legacyRoot: path.join(root, 'missing'),
+      manifestPaths: [createManifest(root, 'theme', sourceRoot, { themeModule })],
+    }), /themeModule does not exist or is not a file/)
+  }
+})
+
+test('rejects theme module symlinks including a symlinked ancestor', (t) => {
+  const root = fixture(t)
+  const sourceRoot = path.join(root, 'source')
+  write(path.join(sourceRoot, 'extensions/real/theme.ts'), 'export default {}\n')
+  fs.symlinkSync('real/theme.ts', path.join(sourceRoot, 'extensions/alias.ts'))
+  fs.symlinkSync('real', path.join(sourceRoot, 'extensions/alias-dir'))
+  for (const themeModule of ['extensions/alias.ts', 'extensions/alias-dir/theme.ts']) {
+    assert.throws(() => materializeAdminExtensions({
+      generatedRoot: path.join(root, 'generated'),
+      legacyRoot: path.join(root, 'missing'),
+      manifestPaths: [createManifest(root, 'theme', sourceRoot, {
+        themeModule,
+        fingerprint: `sha256:${'0'.repeat(64)}`,
+      })],
+    }), /themeModule must not contain symlinks/)
+  }
+})
+
+test('legacy extension modules keep working without selecting a theme', (t) => {
+  const root = fixture(t)
+  write(path.join(root, 'src/js/extensions/theme.ts'), 'export default {}\n')
+  const result = materializeAdminExtensions({ generatedRoot: path.join(root, 'generated'), legacyRoot: root })
+  const generated = fs.readFileSync(result.generatedModulePath, 'utf8')
+  assert.match(generated, /"host\/theme": extension/)
+  assert.match(generated, /export const selectedThemeModuleKey: string \| null = null/)
+  assert.equal(result.bundleManifest.extensions[0].key, 'host')
 })
 
 test('rejects duplicate extension and page keys before Vite starts', (t) => {
