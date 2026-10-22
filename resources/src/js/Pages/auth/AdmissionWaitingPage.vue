@@ -41,7 +41,10 @@ const safePath = computed(() =>
     <AppHead :title="t('Admission waiting title')" />
     <template #title>{{ t('Admission waiting title') }}</template>
     <p role="status">{{ t('Admission waiting ' + known) }}</p>
-    <a :href="safePath" class="mt-4 inline-block rounded-lg bg-primary px-4 py-2 text-white">
+    <a
+      :href="safePath"
+      class="mt-4 inline-block rounded-lg bg-primary px-4 py-2 text-primary-foreground"
+    >
       {{ t('Admission retry') }}
     </a>
   </AuthLayout>

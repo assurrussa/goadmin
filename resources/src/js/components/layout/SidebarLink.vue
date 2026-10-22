@@ -4,8 +4,8 @@
     :class="[
       'group relative flex w-full items-center px-3 py-2 text-sm font-medium rounded-lg border border-transparent transition duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
       active
-        ? 'bg-primary/10 text-primary-dark dark:text-primary-light border-primary/70 shadow-[0_0_8px_rgba(21,107,233,0.32)]'
-        : 'text-text-secondary hover:text-text-primary hover:bg-surface-variant hover:border-border-primary hover:shadow-sm',
+        ? 'bg-primary/10 text-primary-dark dark:text-primary-light'
+        : 'text-text-secondary hover:text-text-primary hover:bg-surface-variant',
     ]"
   >
     <component

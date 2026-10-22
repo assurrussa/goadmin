@@ -2192,7 +2192,7 @@ onBeforeUnmount(() => {
   overflow: visible;
   background-color: var(--color-card);
   border: 1px solid var(--color-border-primary);
-  border-radius: 0.5rem;
+  border-radius: var(--goadmin-card-radius, var(--radius-lg));
   position: relative;
 }
 
@@ -2204,8 +2204,9 @@ onBeforeUnmount(() => {
   background-color: var(--color-card);
   border-bottom: 1px solid var(--color-border-primary);
   padding: 0.75rem;
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--color-text-primary) 12%, transparent);
-  border-radius: 0.5rem 0.5rem 0 0;
+  box-shadow: none;
+  border-radius: var(--goadmin-card-radius, var(--radius-lg))
+    var(--goadmin-card-radius, var(--radius-lg)) 0 0;
 }
 
 .toolbar-content {

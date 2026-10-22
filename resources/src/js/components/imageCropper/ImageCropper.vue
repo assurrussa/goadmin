@@ -260,7 +260,7 @@ const adjustFileExtension = (fileName: string, mimeType: string): string => {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.8);
+  background: var(--color-overlay, rgba(0, 0, 0, 0.65));
   display: flex;
   justify-content: center;
   align-items: center;
@@ -270,7 +270,7 @@ const adjustFileExtension = (fileName: string, mimeType: string): string => {
 .modal-content {
   position: relative;
   background: var(--color-card, white);
-  border-radius: 0.5rem;
+  border-radius: var(--goadmin-card-radius, var(--radius-lg, 0.75rem));
   max-width: 800px;
   max-height: 80vh;
   width: 90%;
@@ -316,7 +316,7 @@ const adjustFileExtension = (fileName: string, mimeType: string): string => {
 
 .close-btn:hover {
   color: var(--color-text-primary, #000);
-  background: var(--color-surface-hover, #e9ecef);
+  background: var(--color-surface-variant, #e9ecef);
 }
 
 .close-btn.is-disabled {

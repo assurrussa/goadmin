@@ -1,5 +1,7 @@
 <template>
-  <div class="rounded-md border border-border-primary overflow-hidden bg-card">
+  <div
+    class="rounded-[var(--goadmin-card-radius,var(--radius-xl,0.75rem))] overflow-hidden bg-card"
+  >
     <div class="relative w-full overflow-auto">
       <Table>
         <TableHeader class="bg-surface">
@@ -54,7 +56,7 @@
             <!-- Sticky Actions Column Header -->
             <TableHead
               v-if="hasAnyActions"
-              class="relative px-6 py-3 sticky right-0 bg-surface z-20 whitespace-nowrap h-auto border-l border-border-primary shadow-[-12px_0_18px_-16px_rgba(15,23,42,0.35)]"
+              class="relative px-6 py-3 sticky right-0 bg-surface z-20 whitespace-nowrap h-auto"
             >
               <span class="sr-only">{{ t('Действия') }}</span>
             </TableHead>
@@ -83,13 +85,13 @@
               class="px-6 py-4 whitespace-nowrap text-sm text-text-primary"
             >
               <!-- Badge for select type -->
-              <AppBadge
+              <AppStatus
                 v-if="column.type === 'select' && column.badges"
                 :variant="getBadgeVariant(getColumnValue(item, column.key), column.badges)"
                 class="inline-flex"
               >
                 {{ getBadgeLabel(getColumnValue(item, column.key), column.badges) }}
-              </AppBadge>
+              </AppStatus>
               <!-- Boolean values -->
               <span
                 v-else-if="column.type === 'boolean'"
@@ -122,7 +124,7 @@
             <!-- Sticky Actions Column Cell -->
             <TableCell
               v-if="hasAnyActions"
-              class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium sticky right-0 bg-card z-10 border-l border-border-primary shadow-[-12px_0_18px_-16px_rgba(15,23,42,0.35)]"
+              class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium sticky right-0 bg-card z-10"
             >
               <div v-if="item.actions?.length" class="flex items-center justify-end gap-1">
                 <template v-for="action in item.actions" :key="action.key">
@@ -198,7 +200,7 @@ import {
   Trash2,
   XCircle,
 } from 'lucide-vue-next'
-import AppBadge from '@/components/ui/AppBadge.vue'
+import AppStatus from '@/components/ui/AppStatus.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import { Checkbox } from '@/components/ui/checkbox'
 import { isRichTextJSON, renderRichTextPreview } from './richTextPreview'
@@ -256,13 +258,10 @@ const getActionClass = (action: { key: string; variant?: string }) => {
   if (action.variant === 'danger' || action.key === 'delete') {
     return 'text-destructive hover:text-destructive'
   }
-  if (action.key === 'edit') {
-    return 'text-warning hover:text-warning'
-  }
   if (action.key === 'show' || action.key === 'view') {
-    return 'text-info hover:text-info'
+    return 'text-primary hover:text-primary-dark'
   }
-  return 'text-primary hover:text-primary'
+  return 'text-text-secondary hover:text-text-primary'
 }
 
 // Helper function to safely get item ID

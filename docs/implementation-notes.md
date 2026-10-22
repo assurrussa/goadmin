@@ -1437,3 +1437,69 @@ should not restart authorization. Browser confirmation of that behavior is pendi
 Evidence and remaining gates are listed in docs/sso-adapter.md. This is not yet
 released or production-verified. The application still owns local admission and
 its existing ENV mapping; do not expose secrets through props or diagnostics.
+
+## Admin visual refresh — 2026-10-22
+
+Agreed direction: make the default light and dark themes quieter and more
+consistent, using neutral light surfaces, graphite dark surfaces and a restrained
+blue accent. Preserve navigation, workflows and current information density;
+allow local improvements to grouping, heading hierarchy and action bars.
+Existing host theme overrides and density presets remain supported.
+
+The user selected concept 2's tonal surfaces with concept 3's dot-and-text
+statuses. The [combined visual target](screenshots/design-refresh/selected-light-dark.png)
+was generated and shown before implementation. The earlier selection-pending
+state is superseded. Preserve badge counts and role/category labels separately
+from state indicators. Validate real tables, forms, auth and overlay states,
+then run targeted resource checks and one final `make check`.
+
+Baseline captured from the real users page, DataGrid and AdminLayout at
+1440 × 1024 with synthetic `example.invalid` identities and optional capabilities
+disabled. Both themes render without browser warnings/errors or document
+horizontal overflow. This is visual-fixture evidence, not authenticated-host or
+backend acceptance.
+
+Implemented the shared default palette, system typography, flat controls/cards,
+tonal DataGrid filters, quieter action bars and internal dot-and-text statuses.
+Auth, profile, queue, rich-text, dialog/sheet and standalone error surfaces use
+the same direction. Existing host geometry/radius/shadow variables, explicit
+classes, presets and theme persistence remain supported. Counts and role/category
+labels retain badges. Embedded production assets were rebuilt from source.
+
+Visual QA corrected faint/round row checkboxes, then compared both themes again.
+Independent review found and prompted fixes for hardcoded white text on dark
+primary actions and loss of host `--color-error` overrides. The compiled-CSS
+regression check and actual browser override checks pass. No new dependencies,
+public SDK surfaces, backend behavior or consumer deployment are included.
+
+`make check` passed tidy/format/vet/lint and the full Go race/coverage pass, then
+stopped on an assertion of old exact HSL values. Replaced that assertion with
+12 dark text/surface contrast checks while retaining semantic assertions.
+`make resources` subsequently passed all 102 Node contract tests, 676 UI tests,
+ESLint, formatting, Vue/host type checks, production build and template-asset
+verification. The already-passed unchanged Go checks were reused.
+
+Seventeen browser checks passed, including filtering/selection, form typing,
+readonly/disabled/error states, host overrides, dialog/mobile-menu keyboard
+focus, theme/locale persistence and responsive layouts (1440/834/390px).
+The final fresh preview has no console warnings/errors in either theme.
+See [design QA](../design-qa.md) and the [current visual gallery](presentation-demo.md).
+Synthetic visual checks do not establish authenticated-host/backend acceptance;
+the standalone error template was source-reviewed without a browser capture.
+No publication or deployment was performed.
+
+Review artifacts, in their displayed selection order:
+
+- Baseline: [light](screenshots/design-refresh/users-before-light.png) and
+  [dark](screenshots/design-refresh/users-before-dark.png).
+- [Concept 1](screenshots/design-refresh/concept-1-light-dark.png): fine dividers
+  and flat surfaces.
+- [Concept 2](screenshots/design-refresh/concept-2-light-dark.png): subtle tonal
+  layers.
+- [Concept 3](screenshots/design-refresh/concept-3-light-dark.png): typography,
+  navigation marker and understated dot/text statuses.
+
+Each concept is one generated image showing light on the left and dark on the
+right. These are built-in Image Gen visual proposals grounded in the browser
+captures, not implemented screens or pixel-exact specifications. Retain source
+content and component behaviour when implementing the selected direction.

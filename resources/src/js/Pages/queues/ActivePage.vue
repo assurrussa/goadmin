@@ -30,13 +30,13 @@
           </p>
         </div>
         <div class="flex gap-3">
-          <div class="px-4 py-3 rounded-lg bg-card border border-border-primary shadow-sm">
+          <div class="px-4 py-3 rounded-lg bg-card border border-border-secondary">
             <p class="text-xs text-text-tertiary">{{ t('В очереди') }}</p>
             <p class="text-2xl font-semibold text-text-primary">{{ counters.jobs }}</p>
           </div>
-          <div class="px-4 py-3 rounded-lg bg-danger/10 border border-danger/30 shadow-sm">
-            <p class="text-xs text-danger">{{ t('С ошибкой') }}</p>
-            <p class="text-2xl font-semibold text-danger">{{ counters.failed }}</p>
+          <div class="px-4 py-3 rounded-lg bg-error/5 border border-error/20">
+            <p class="text-xs text-error">{{ t('С ошибкой') }}</p>
+            <p class="text-2xl font-semibold text-error">{{ counters.failed }}</p>
           </div>
         </div>
       </div>

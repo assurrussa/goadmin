@@ -12,7 +12,7 @@
           <!-- Аватар -->
           <div class="flex-shrink-0 h-24 w-24">
             <div
-              class="relative h-24 w-24 rounded-full overflow-hidden shadow-lg bg-gradient-to-br from-primary to-primary-light flex items-center justify-center"
+              class="relative h-24 w-24 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center"
             >
               <img
                 v-if="(uploads || remote?.fields.avatar) && avatarUrl"
@@ -21,7 +21,7 @@
                 :alt="t('Аватар профиля')"
                 class="h-full w-full object-cover"
               />
-              <span v-else class="text-3xl font-bold text-primary-contrast">
+              <span v-else class="text-3xl font-semibold text-primary">
                 {{ userInitials }}
               </span>
             </div>

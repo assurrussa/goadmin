@@ -1,6 +1,6 @@
 <template>
   <div
-    class="mb-6 mt-2 flex flex-wrap items-center gap-2 rounded-2xl border border-border-primary/80 bg-card px-3 py-2 shadow-sm sm:px-4 sm:py-3"
+    class="mb-6 mt-2 flex flex-wrap items-center gap-2 border-b border-border-secondary py-2 sm:py-3"
   >
     <BackPage :href="backHref" variant="action" :use-history="useHistory">
       <ArrowLeft class="h-4 w-4" />

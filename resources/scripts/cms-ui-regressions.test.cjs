@@ -41,10 +41,52 @@ test('gives programmatic media inputs stable form identities', () => {
 })
 
 test('uses readable dark-theme semantic tokens', () => {
-  assert.match(appCSS, /--color-text-secondary: hsl\([^;]*78%\)/)
-  assert.match(appCSS, /--color-text-tertiary: hsl\([^;]*66%\)/)
-  assert.match(appCSS, /--color-text-disabled: hsl\([^;]*54%\)/)
-  assert.match(appCSS, /--color-border-primary: hsl\([^;]*38%\)/)
+  const root = appCSS.match(/:root\s*\{([^}]+)\}/)?.[1]
+  const dark = appCSS.match(/\.dark,\s*\[data-theme-mode='dark'\]\s*\{([^}]+)\}/)?.[1]
+  assert.ok(root && dark, 'canonical root and manual dark palettes must exist')
+  const declarations = (block) =>
+    Object.fromEntries(
+      [...block.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((match) => [match[1], match[2]]),
+    )
+  const tokens = { ...declarations(root), ...declarations(dark) }
+  const resolve = (value, seen = new Set()) =>
+    value.replace(/var\((--[\w-]+)\)/g, (_, name) => {
+      assert.ok(tokens[name], `missing token ${name}`)
+      assert.ok(!seen.has(name), `cyclic token ${name}`)
+      return resolve(tokens[name], new Set([...seen, name]))
+    })
+  const luminance = (name) => {
+    assert.ok(tokens[name], `missing token ${name}`)
+    const value = resolve(tokens[name])
+    const hsl = value.match(/^hsl\(\s*([\d.]+)[,\s]+([\d.]+)%[,\s]+([\d.]+)%\s*\)$/)
+    assert.ok(hsl, `${name} must resolve to an opaque HSL color, got ${value}`)
+    const [, hue, saturation, lightness] = hsl.map(Number)
+    assert.ok(hue >= 0 && hue <= 360 && saturation <= 100 && lightness <= 100)
+    const s = saturation / 100
+    const l = lightness / 100
+    const a = s * Math.min(l, 1 - l)
+    const channel = (n) => {
+      const k = (n + hue / 30) % 12
+      const c = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))
+      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+    }
+    return 0.2126 * channel(0) + 0.7152 * channel(8) + 0.0722 * channel(4)
+  }
+  // Normal-size text must remain readable on every canonical dark surface.
+  for (const text of ['primary', 'secondary', 'tertiary']) {
+    for (const background of ['background', 'card', 'surface', 'surface-variant']) {
+      const foreground = luminance(`--color-text-${text}`)
+      const backdrop = luminance(`--color-${background}`)
+      const ratio =
+        (Math.max(foreground, backdrop) + 0.05) / (Math.min(foreground, backdrop) + 0.05)
+      assert.ok(ratio >= 4.5, `${text} text on ${background}: ${ratio.toFixed(2)}:1 is below 4.5:1`)
+    }
+  }
+  // Inactive controls are exempt from normal text contrast. Borders are not text.
+  // Validate their tokens and disabled wiring without imposing a text threshold.
+  luminance('--color-text-disabled')
+  luminance('--color-border-primary')
+  assert.match(appCSS, /input:disabled,[\s\S]*color: var\(--color-text-disabled\)/)
   assert.match(appCSS, /html\.dark,[\s\S]*color-scheme: dark/)
   assert.match(
     appCSS,

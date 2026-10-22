@@ -189,7 +189,11 @@ async function submit(event: Event) {
             autocomplete="off"
             class="block w-full rounded border p-2"
         /></label>
-        <button type="submit" :disabled="!subject" class="rounded bg-primary px-4 py-2 text-white">
+        <button
+          type="submit"
+          :disabled="!subject"
+          class="rounded bg-primary px-4 py-2 text-primary-foreground"
+        >
           {{ t('Отправить приглашение') }}
         </button>
       </fieldset>

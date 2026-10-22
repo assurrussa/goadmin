@@ -1,7 +1,7 @@
 <template>
-  <Card class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-5 py-4">
+  <div class="flex flex-col gap-4 px-0 py-4 xl:flex-row xl:items-center xl:justify-between">
     <div class="mb-4 sm:mb-0">
-      <h1 class="text-2xl font-bold text-text-primary">
+      <h1 class="text-2xl font-semibold tracking-tight text-text-primary">
         {{ (props.meta?.title ? t(props.meta.title) : '') || t('Данные') }}
       </h1>
       <p v-if="props.meta?.description" class="mt-1 text-sm text-text-secondary">
@@ -9,7 +9,7 @@
       </p>
     </div>
 
-    <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+    <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
       <!-- Поиск -->
       <div v-if="config.behaviour?.searchable" class="relative">
         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -24,7 +24,7 @@
       </div>
 
       <!-- Дополнительные действия -->
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         <!-- Кнопка обновления -->
         <AppButton
           v-if="config.behaviour?.refreshable"
@@ -55,14 +55,13 @@
         </AppButton>
       </div>
     </div>
-  </Card>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { t } from '@/i18n'
 
 import type { Config, Meta } from '@/composables/useDataGrid.ts'
-import { Card } from '@/components/ui/card'
 import { Download, Plus, RefreshCcw, Search } from 'lucide-vue-next'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppInput from '@/components/ui/AppInput.vue'

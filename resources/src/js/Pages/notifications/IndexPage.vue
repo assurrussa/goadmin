@@ -121,12 +121,9 @@
                     <p class="font-semibold text-text-primary">
                       {{ notification.title }}
                     </p>
-                    <AppBadge
-                      :variant="levelVariant(notification.level).variant"
-                      class="text-[11px] uppercase tracking-wide"
-                    >
+                    <AppStatus :variant="levelVariant(notification.level).variant">
                       {{ levelVariant(notification.level).label }}
-                    </AppBadge>
+                    </AppStatus>
                   </div>
                   <p class="text-xs text-text-tertiary">
                     {{ formatDateTime(notification.createdAt) }}
@@ -240,6 +237,7 @@ import { router, useForm } from '@inertiajs/vue3'
 import AppHead from '@/components/layout/AppHead.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
+import AppStatus from '@/components/ui/AppStatus.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import type { AdminNotification } from '@/types/models'
 import { Card } from '@/components/ui/card'

@@ -18,7 +18,7 @@
       </Link>
     </div>
 
-    <Card class="bg-gradient-to-br from-primary/10 via-surface to-card border-border-primary p-6">
+    <Card class="border-border-primary p-6">
       <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <p class="text-xs font-semibold uppercase tracking-widest text-primary">
@@ -30,17 +30,17 @@
           </p>
         </div>
         <div class="flex gap-3">
-          <div class="px-4 py-3 rounded-lg bg-card border border-border-primary shadow-sm">
+          <div class="px-4 py-3 rounded-lg bg-card border border-border-secondary">
             <p class="text-xs text-text-tertiary">{{ t('В очереди') }}</p>
             <p class="text-2xl font-semibold text-text-primary">{{ counters.jobs }}</p>
             <Link class="text-sm text-primary hover:text-primary-dark" href="/queues/jobs">{{
               t('Смотреть')
             }}</Link>
           </div>
-          <div class="px-4 py-3 rounded-lg bg-danger/10 border border-danger/30 shadow-sm">
-            <p class="text-xs text-danger">{{ t('С ошибкой') }}</p>
-            <p class="text-2xl font-semibold text-danger">{{ counters.failed }}</p>
-            <Link class="text-sm text-danger hover:text-danger/80" href="/queues/jobs-failed">{{
+          <div class="px-4 py-3 rounded-lg bg-error/5 border border-error/20">
+            <p class="text-xs text-error">{{ t('С ошибкой') }}</p>
+            <p class="text-2xl font-semibold text-error">{{ counters.failed }}</p>
+            <Link class="text-sm text-error hover:text-error/80" href="/queues/jobs-failed">{{
               t('Смотреть')
             }}</Link>
           </div>

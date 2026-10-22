@@ -1,4 +1,46 @@
-# Sports club presentation demo
+# Admin UI previews
+
+## Default light and dark themes
+
+The default theme uses neutral light surfaces, graphite dark surfaces and a
+restrained blue accent. State indicators use a colored dot with a readable label;
+counts and role/category labels retain badges. The existing layout, information
+density, light/dark preference and host CSS overrides remain in place.
+
+These screenshots show the real users page and shared components with synthetic
+accounts, captured at **1440 × 1024**, 1× device scale:
+
+![Default light theme, users table](screenshots/design-refresh/users-after-light.png)
+
+![Default dark theme, users table](screenshots/design-refresh/users-after-dark.png)
+
+Run the read-only visual fixture from the repository root:
+
+```sh
+npm ci --prefix resources
+node resources/audit/design/server.mjs
+```
+
+Open <http://127.0.0.1:8768/users>. Additional routes are
+`/users/1048/edit`, `/auth/login` and `/__design/components` (form states, buttons,
+rich text and a dialog). Use the real header controls to change theme or language.
+Stop with Ctrl-C. The server binds only to localhost and uses temporary extension
+sources; it does not overwrite the developer's extension registry.
+
+This fixture exercises real Vue screens without an authenticated backend.
+Filtering and search read deterministic local data; submissions return 405.
+Export, other sidebar destinations, authentication and persistent saves are not
+implemented. The create route displays the same edit-form sample. It is visual
+acceptance evidence, not a host integration or backend acceptance test.
+
+Additional captures: [form](screenshots/design-refresh/form-light.png),
+[dark dialog](screenshots/design-refresh/dialog-dark.png),
+[mobile login](screenshots/design-refresh/login-mobile.png),
+[mobile users](screenshots/design-refresh/users-mobile-light.png) and
+[tablet users](screenshots/design-refresh/users-tablet.png).
+See the [design QA report](../design-qa.md) for comparison evidence and limits.
+
+## Sports club presentation demo
 
 Northline is a fictional sports club workspace demonstrating the real GoAdmin
 Vue shell, navigation, cards, buttons, inputs and badges. Data is deterministic
@@ -58,7 +100,12 @@ binary. Browser/platform font changes can change pixels. The committed
 `capture-manifest.json` records the actual Playwright package version, Chromium
 version and viewport used for this gallery.
 
-## Gallery
+## Sports club gallery — earlier visual baseline
+
+These seven captures predate the default-theme refresh. They illustrate the
+demo's capabilities and optional presets, not the current default appearance.
+Running the demo uses the current shared components; regenerate its gallery to
+capture a later visual baseline.
 
 Seven curated viewport images show capabilities rather than every available page.
 Desktop dashboards use **1440 × 1100**, tables/forms/access use **1440 × 1000**,
@@ -66,7 +113,7 @@ and mobile uses **390 × 844**. Captures use `fullPage: false`, including the RE
 hero, so the shared fixed sidebar fills the viewport naturally. Scroll locally to
 explore the rest of each page; production positioning is unchanged.
 
-### Overview · compact · light (README hero)
+### Overview · compact · light
 
 ![Compact light sports club overview with synthetic notification and queue indicators](screenshots/dashboard-compact-light.png)
 

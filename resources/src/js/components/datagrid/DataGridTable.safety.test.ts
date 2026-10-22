@@ -251,6 +251,32 @@ afterEach(() => {
 })
 
 describe('DataGridTable actual primitives, native semantics and lifecycle', () => {
+  it('keeps status labels readable independently of color, including computed and unknown values', () => {
+    const { element } = mountTable({
+      config: {
+        columns: [
+          {
+            key: 'state',
+            label: 'State',
+            title: 'State',
+            type: 'select',
+            badges: { active: { label: 'Активен', variant: 'success' } },
+          },
+        ],
+      },
+      items: [
+        { item: { id: 1, state: 'inactive' }, values: { state: 'active' }, actions: [] },
+        { item: { id: 2, state: 'unknown-state' }, actions: [] },
+      ],
+    })
+    const cells = element.querySelectorAll('tbody td')
+    expect(cells[0].textContent?.trim()).toBe('Активен')
+    expect(cells[1].textContent?.trim()).toBe('unknown-state')
+    for (const cell of cells) {
+      expect(cell.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
+    }
+  })
+
   it.each([
     ['2026-01-15T12:30:00Z', true],
     [{ Time: '2026-01-15T12:30:00Z', Valid: true }, true],

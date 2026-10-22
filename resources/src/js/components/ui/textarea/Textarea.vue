@@ -24,7 +24,7 @@ const modelValue = useVModel(props, 'modelValue', emits, {
     v-model="modelValue"
     :class="
       cn(
-        'flex min-h-[var(--goadmin-textarea-min-height,60px)] w-full rounded-[var(--goadmin-control-radius,var(--radius-md,0.375rem))] border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+        'flex min-h-[var(--goadmin-textarea-min-height,60px)] w-full rounded-[var(--goadmin-control-radius,var(--radius-md,0.375rem))] border border-input bg-transparent px-3 py-2 text-sm shadow-none placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
         props.class,
       )
     "
