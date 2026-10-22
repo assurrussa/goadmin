@@ -7,6 +7,7 @@
         v-for="tab in tabs"
         :key="tab.href"
         :href="tab.href"
+        :aria-current="isActive(tab.href) ? 'page' : undefined"
         class="px-3 py-2 rounded-lg text-sm font-medium border transition-colors"
         :class="
           isActive(tab.href)
@@ -30,13 +31,13 @@
           </p>
         </div>
         <div class="flex gap-3">
-          <div class="px-4 py-3 rounded-lg bg-card border border-border-primary shadow-sm">
+          <div class="px-4 py-3 rounded-lg bg-card border border-border-secondary">
             <p class="text-xs text-text-tertiary">{{ t('В очереди') }}</p>
             <p class="text-2xl font-semibold text-text-primary">{{ counters.jobs }}</p>
           </div>
-          <div class="px-4 py-3 rounded-lg bg-danger/10 border border-danger/30 shadow-sm">
-            <p class="text-xs text-danger">{{ t('С ошибкой') }}</p>
-            <p class="text-2xl font-semibold text-danger">{{ counters.failed }}</p>
+          <div class="px-4 py-3 rounded-lg bg-error/5 border border-error/20">
+            <p class="text-xs text-error">{{ t('С ошибкой') }}</p>
+            <p class="text-2xl font-semibold text-error">{{ counters.failed }}</p>
           </div>
         </div>
       </div>
@@ -97,10 +98,11 @@ const counters = reactive({
 const pageTitle = computed(() => props.title || t('Активные задачи'))
 const jobsApi = computed(() => props.jobsApiUrl || '/queues/jobs')
 const isActive = (href: string) => {
+  const pathname = page.url.split(/[?#]/)[0]
   if (href === '/queues') {
-    return page.url === '/queues'
+    return pathname === '/queues'
   }
-  return page.url.startsWith(href)
+  return pathname === href || pathname.startsWith(`${href}/`)
 }
 const clamp = (value: number) => (value < 0 ? 0 : value)
 

@@ -3,7 +3,9 @@
   <PageActionBar back-href="/roles" :label="t('Просмотр')" />
 
   <div class="space-y-6">
-    <div class="bg-card border border-border-primary shadow-sm sm:rounded-lg overflow-hidden">
+    <div
+      class="bg-card border border-border-primary rounded-[var(--goadmin-card-radius,var(--radius-xl,0.75rem))] overflow-hidden"
+    >
       <div class="px-4 py-5 sm:p-6">
         <dl class="divide-y divide-border-secondary">
           <div class="py-4 grid grid-cols-3 gap-4">
@@ -38,7 +40,7 @@
 
     <div
       v-if="canAssignInPreview"
-      class="bg-card border border-border-primary shadow-sm sm:rounded-2xl overflow-hidden"
+      class="bg-card border border-border-primary rounded-[var(--goadmin-card-radius,var(--radius-xl,0.75rem))] overflow-hidden"
     >
       <div class="px-5 py-4 border-b border-border-secondary bg-surface-variant/40 space-y-1">
         <p class="text-xs uppercase tracking-wide text-text-tertiary mb-1">
@@ -143,7 +145,9 @@
       </div>
     </div>
 
-    <div class="bg-card border border-border-primary shadow-sm sm:rounded-2xl overflow-hidden">
+    <div
+      class="bg-card border border-border-primary rounded-[var(--goadmin-card-radius,var(--radius-xl,0.75rem))] overflow-hidden"
+    >
       <div
         class="px-5 py-4 border-b border-border-secondary flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between bg-surface-variant/40"
       >

@@ -2,7 +2,7 @@
   <AppHead :title="props.title" />
   <div class="space-y-4">
     <section
-      class="rounded-xl border border-border-primary bg-card px-5 py-4 text-sm shadow-sm"
+      class="rounded-xl border border-border-primary bg-card px-5 py-4 text-sm"
       :aria-label="t('Как работают роли')"
     >
       <h2 class="font-semibold text-text-primary">{{ t('Роли складываются по разрешениям') }}</h2>

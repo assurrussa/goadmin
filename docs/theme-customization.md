@@ -2,9 +2,10 @@
 
 Stage one covers the administration shell. Stage two adds dimensions and radius
 for the shared components listed below. Neither stage promises arbitrary
-replacement or styling of every form or page layout. Without a theme file,
-geometry, shadows and radius retain their previous defaults. Auth, permissions,
-CSRF and navigation semantics are unchanged.
+replacement or styling of every form or page layout. Without a theme file, the default appearance uses neutral light and graphite dark
+surfaces, a system font stack, restrained blue accents and semantic status colors.
+The shell, shared controls and static cards have no shadows; floating menus retain
+subtle elevation. Auth, permissions, CSRF and navigation semantics are unchanged.
 
 ## Project-owned CSS
 
@@ -32,13 +33,13 @@ independent of that choice. Use `:root.dark` and
 | `--goadmin-sidebar-collapsed-width` | `5rem` | Collapsed desktop sidebar and content offset |
 | `--goadmin-content-max-width` | `80rem` | Header row and main content |
 | `--goadmin-menu-radius` | `1rem` | Profile dropdown trigger |
-| `--goadmin-header-shadow` | Previous Tailwind `shadow-sm` | Header shadow |
-| `--goadmin-sidebar-shadow` | Previous Tailwind `shadow-lg` | Sidebar shadow |
+| `--goadmin-header-shadow` | `none` | Header shadow |
+| `--goadmin-sidebar-shadow` | `none` | Sidebar shadow |
 
-The two original Tailwind shadows are preserved in internal fallback variables;
-they differ from the existing card-level `--shadow-sm`/`--shadow-lg` values.
-Override only the documented shell variables. Existing utility classes and
-internal fallback variable names are not a stable customization API.
+Override the documented shell shadow variables to add elevation. Their internal
+fallbacks default to `none`; floating-menu elevation remains independent. Existing
+utility classes and internal fallback variable names are not a stable customization
+API.
 
 Existing color/font variables are reused: `--hue-primary`,
 `--saturation-primary`, `--hue-neutral`, `--font-sans`, and semantic `--color-*`
@@ -48,14 +49,14 @@ fit. Custom colors are not automatically contrast-certified.
 
 ## Stage two: shared controls and cards
 
-| Variable | Previous default |
+| Variable | Default |
 | --- | --- |
 | `--goadmin-control-height-xs` | `1.75rem` (28px) |
 | `--goadmin-control-height-sm` | `2rem` (32px) |
 | `--goadmin-control-height` | `2.25rem` (36px), md/default and default icons |
 | `--goadmin-control-height-lg` | `2.5rem` (40px) |
 | `--goadmin-control-height-xl` | `2.75rem` (44px), AppButton xl |
-| `--goadmin-control-radius` | Existing `--radius-md` (currently 12px); final fallback `0.375rem` |
+| `--goadmin-control-radius` | Existing `--radius-md` (currently 8px); final fallback `0.375rem` |
 | `--goadmin-control-radius-xs` | `0.25rem` (4px), xs buttons |
 | `--goadmin-textarea-min-height` | `60px` |
 | `--goadmin-card-radius` | Existing `--radius-xl` (currently 12px); final fallback `0.75rem` |
@@ -70,9 +71,9 @@ horizontal padding, colors, shadows, error/readonly/disabled states or transitio
 FormInput icon/loading rows follow its selected sm/md/lg height. Icon buttons stay
 square. `AppButton rounded=true` remains a pill; explicit class overrides retain
 priority through the existing `cn`/Tailwind merge behavior. CardContent/Footer keep
-zero top padding, unless an explicit host class overrides it. Existing theme radius
-variables remain the fallback, rather than silently changing the current 12px
-controls to a literal 6px radius.
+zero top padding, unless an explicit host class overrides it. Theme radius variables remain the fallback: default controls use 8px corners and
+cards use 12px corners. The documented `--goadmin-*` radius variables and explicit
+classes retain priority over these defaults.
 
 ## Opt-in example
 

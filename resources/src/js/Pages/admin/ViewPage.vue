@@ -9,10 +9,8 @@
         <div class="flex flex-col sm:flex-row sm:items-center gap-6">
           <!-- Аватар -->
           <div class="flex-shrink-0">
-            <div
-              class="h-24 w-24 bg-gradient-to-br from-primary to-primary-light rounded-full flex items-center justify-center shadow-lg"
-            >
-              <span class="text-3xl font-bold text-primary-contrast">
+            <div class="h-24 w-24 bg-primary/10 rounded-full flex items-center justify-center">
+              <span class="text-3xl font-semibold text-primary">
                 {{ userInitials }}
               </span>
             </div>
@@ -24,13 +22,9 @@
               <h1 class="text-2xl font-bold text-text-primary">
                 {{ fullName }}
               </h1>
-              <AppBadge :variant="accountStatusVariant" class="gap-1.5">
-                <span
-                  class="w-1.5 h-1.5 rounded-full"
-                  :class="accountStatusVariant === 'success' ? 'bg-success' : 'bg-error'"
-                ></span>
+              <AppStatus :variant="accountStatusVariant">
                 {{ accountStatusLabel }}
-              </AppBadge>
+              </AppStatus>
             </div>
 
             <div class="flex items-center text-text-secondary mb-4">
@@ -116,20 +110,16 @@
 
           <div class="flex items-center justify-between">
             <span class="text-text-secondary font-medium">{{ t('Статус') }}</span>
-            <AppBadge :variant="accountStatusVariant" class="gap-1.5">
-              <span
-                class="w-1.5 h-1.5 rounded-full"
-                :class="accountStatusVariant === 'success' ? 'bg-success' : 'bg-error'"
-              ></span>
+            <AppStatus :variant="accountStatusVariant">
               {{ accountStatusLabel }}
-            </AppBadge>
+            </AppStatus>
           </div>
 
           <div class="flex items-center justify-between">
             <span class="text-text-secondary font-medium">{{ t('core.ui.Email', 'Email') }}</span>
-            <AppBadge :variant="emailConfirmed ? 'success' : 'warning'">
+            <AppStatus :variant="emailConfirmed ? 'success' : 'warning'">
               {{ emailConfirmed ? t('Подтверждён') : t('Не подтверждён') }}
-            </AppBadge>
+            </AppStatus>
           </div>
 
           <div class="flex items-center justify-between">
@@ -274,6 +264,7 @@ import { useRolePreviewAction } from '@/composables/useRolePreviewAction'
 import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
+import AppStatus from '@/components/ui/AppStatus.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import { Link } from '@inertiajs/vue3'
 import {

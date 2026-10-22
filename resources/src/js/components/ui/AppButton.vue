@@ -73,10 +73,10 @@ const extraClass = computed(() => {
   if (props.loading) classes.push('opacity-70')
 
   if (props.variant === 'success') {
-    classes.push('bg-success text-text-white hover:bg-success/90')
+    classes.push('bg-success text-success-foreground hover:bg-success/90')
   }
   if (props.variant === 'warning') {
-    classes.push('bg-warning text-text-white hover:bg-warning/90')
+    classes.push('bg-warning text-warning-foreground hover:bg-warning/90')
   }
 
   if (props.size === 'xl') {

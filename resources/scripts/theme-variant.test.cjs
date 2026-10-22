@@ -11,9 +11,11 @@ test('dark utilities follow the shell selectors instead of the operating system'
     .readFileSync(path.join(__dirname, '../src/css/app.css'), 'utf8')
     .replace(/^@import .*;$/gm, '')
   const compiler = await compile(`${source}\n@tailwind utilities;`)
-  const css = compiler.build(['dark:bg-card', 'dark:text-card-foreground'])
+  const css = compiler.build(['dark:bg-card', 'dark:text-card-foreground', 'text-error'])
   assert.match(css, /\.dark\\:bg-card/)
   assert.match(css, /\.dark\\:text-card-foreground/)
   assert.match(css, /:where\(\.dark, \.dark \*, \[data-theme-mode=['"]dark['"]\], \[data-theme-mode=['"]dark['"]\] \*\)/)
   assert.doesNotMatch(css, /prefers-color-scheme/)
+  // Host overrides of --color-error must continue to reach form errors and required markers.
+  assert.match(css, /\.text-error\s*\{\s*color:\s*var\(--color-error\)/)
 })

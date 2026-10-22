@@ -4,9 +4,9 @@
 projects integrate it through the stable `github.com/assurrussa/goadmin/host`
 facade instead of copying admin internals.
 
-![GoAdmin sports club dashboard with compact light theme, attendance and upcoming training](docs/screenshots/dashboard-compact-light.png)
+![GoAdmin default light theme: real users page with synthetic accounts and dot-and-text statuses](docs/screenshots/design-refresh/users-after-light.png)
 
-[Explore the screenshot gallery and run the local presentation demo](docs/presentation-demo.md).
+[Compare the default light/dark themes and run the local UI demos](docs/presentation-demo.md).
 
 - **Embed in your Go host:** use the [supported host facade](docs/consumer-guide.md), with [prebuilt UI assets](host/assets.go) embedded in the module; no separate Node server is needed in production.
 - **Choose your capabilities:** enable [explicit optional modules](docs/consumer-guide.md#know-which-parts-are-required) and adapt the UI through [theme extensions](docs/theme-customization.md).

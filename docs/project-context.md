@@ -214,6 +214,17 @@ pipeline. No media editor/player contract changes are included.
 
 ## Admin client bundle
 
+The default UI uses neutral white/gray light surfaces, graphite dark surfaces,
+a restrained blue accent and system fonts. Shared controls have an 8px radius;
+cards have a 12px radius. Shell shadows default to none. Existing `--goadmin-*`
+geometry, control/card overrides, explicit component classes and optional density
+and branding manifests remain supported; see [theme customization](theme-customization.md).
+Categorical DataGrid and built-in state indicators use an internal dot-and-text
+`AppStatus`; counts and role/category badges remain distinct. This does not add a
+public host SDK surface. Theme persistence and system preference keep the same
+runtime contract. The [UI previews](presentation-demo.md) describe the synthetic
+visual fixture and its backend limitations.
+
 Menu sections accept `Placement`: empty or `sidebar` keeps sidebar navigation;
 `account` renders flat root-relative links in the profile dropdown. Both use the
 existing permission-filtered menu. Routes still enforce their own permissions.

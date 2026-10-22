@@ -1,90 +1,106 @@
 <template>
-  <div class="image-cropper-modal" @click="handleBackdropClick">
-    <div class="modal-content" @click.stop>
-      <div class="modal-header">
-        <h3 class="modal-title">{{ t('Обрезать изображение') }}</h3>
-        <AppButton
-          @click="closeModal"
-          variant="ghost"
-          size="icon-sm"
-          :aria-label="t('Закрыть')"
-          :disabled="isProcessing"
-          :class="{ 'opacity-60 cursor-not-allowed': isProcessing }"
-        >
-          &times;
-        </AppButton>
-      </div>
-
-      <div class="modal-body">
-        <div class="crop-container">
-          <img ref="imageRef" :src="imageUrl" :alt="fileName" class="crop-image" />
+  <DialogRoot :open="true" @update:open="(open) => !open && closeModal()">
+    <DialogPortal>
+      <DialogOverlay class="image-cropper-overlay" />
+      <DialogContent
+        class="modal-content"
+        :aria-describedby="undefined"
+        @escape-key-down="guardProcessing"
+        @pointer-down-outside="guardProcessing"
+        @close-auto-focus="restoreFocus"
+      >
+        <div class="modal-header">
+          <DialogTitle as="h3" class="modal-title">{{ t('Обрезать изображение') }}</DialogTitle>
+          <AppButton
+            @click="closeModal"
+            variant="ghost"
+            size="icon-sm"
+            :aria-label="t('Закрыть')"
+            :disabled="isProcessing"
+            :class="{ 'opacity-60 cursor-not-allowed': isProcessing }"
+          >
+            <X class="h-4 w-4" aria-hidden="true" />
+          </AppButton>
         </div>
 
-        <div class="crop-controls">
-          <div class="control-group">
-            <label class="control-label">{{ t('Соотношение сторон:') }}</label>
-            <select
-              v-model="aspectRatio"
-              @change="updateAspectRatio"
-              class="select select-sm"
-              :disabled="isProcessing"
-            >
-              <option
-                v-for="option in availableAspectRatios"
-                :key="option.value"
-                :value="option.value"
+        <div class="modal-body">
+          <div class="crop-container">
+            <img ref="imageRef" :src="imageUrl" :alt="fileName" class="crop-image" />
+          </div>
+
+          <div class="crop-controls">
+            <div class="control-group">
+              <label :for="`${controlId}-ratio`" class="control-label">{{
+                t('Соотношение сторон:')
+              }}</label>
+              <select
+                :id="`${controlId}-ratio`"
+                v-model="aspectRatio"
+                @change="updateAspectRatio"
+                class="select select-sm"
+                :disabled="isProcessing"
               >
-                {{ option.label }}
-              </option>
-            </select>
-          </div>
+                <option
+                  v-for="option in availableAspectRatios"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </option>
+              </select>
+            </div>
 
-          <div class="control-group">
-            <label class="control-label">{{ t('Качество JPEG:') }}</label>
-            <input
-              v-model="jpegQuality"
-              type="range"
-              min="0.1"
-              max="1"
-              step="0.1"
-              class="quality-slider"
-              :disabled="isProcessing"
-            />
-            <span class="quality-value">{{ Math.round(jpegQuality * 100) }}%</span>
+            <div class="control-group">
+              <label :for="`${controlId}-quality`" class="control-label">{{
+                t('Качество JPEG:')
+              }}</label>
+              <input
+                :id="`${controlId}-quality`"
+                v-model="jpegQuality"
+                type="range"
+                min="0.1"
+                max="1"
+                step="0.1"
+                class="quality-slider"
+                :disabled="isProcessing"
+              />
+              <span class="quality-value">{{ Math.round(jpegQuality * 100) }}%</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="modal-footer">
-        <AppButton @click="closeModal" variant="secondary" type="button" :disabled="isProcessing">
-          {{ t('Отмена') }}
-        </AppButton>
-        <AppButton @click="cropImage" variant="primary" type="button" :disabled="isProcessing">
-          <span v-if="isProcessing" class="inline-flex items-center gap-2">
-            <Loader2 class="h-4 w-4 animate-spin" aria-hidden="true" />
-            {{ t('Обработка...') }}
-          </span>
-          <span v-else>{{ t('Обрезать') }}</span>
-        </AppButton>
-      </div>
-
-      <div v-if="isProcessing" class="processing-overlay" role="status" aria-live="polite">
-        <div class="processing-card">
-          <span class="inline-spinner" aria-hidden="true"></span>
-          <span>{{ t('Готовим изображение...') }}</span>
+        <div class="modal-footer">
+          <AppButton @click="closeModal" variant="secondary" type="button" :disabled="isProcessing">
+            {{ t('Отмена') }}
+          </AppButton>
+          <AppButton @click="cropImage" variant="primary" type="button" :disabled="isProcessing">
+            <span v-if="isProcessing" class="inline-flex items-center gap-2">
+              <Loader2 class="h-4 w-4 animate-spin" aria-hidden="true" />
+              {{ t('Обработка...') }}
+            </span>
+            <span v-else>{{ t('Обрезать') }}</span>
+          </AppButton>
         </div>
-      </div>
-    </div>
-  </div>
+
+        <div v-if="isProcessing" class="processing-overlay" role="status" aria-live="polite">
+          <div class="processing-card">
+            <span class="inline-spinner" aria-hidden="true"></span>
+            <span>{{ t('Готовим изображение...') }}</span>
+          </div>
+        </div>
+      </DialogContent>
+    </DialogPortal>
+  </DialogRoot>
 </template>
 
 <script setup lang="ts">
 import { t } from '@/i18n'
 
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, useId } from 'vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import Cropper from 'cropperjs'
-import { Loader2 } from 'lucide-vue-next'
+import { Loader2, X } from 'lucide-vue-next'
+import { DialogRoot, DialogPortal, DialogOverlay, DialogContent, DialogTitle } from 'reka-ui'
 import 'cropperjs/dist/cropper.css'
 
 type GetCroppedCanvasOptions = Parameters<Cropper['getCroppedCanvas']>[0]
@@ -122,6 +138,8 @@ const props = withDefaults(defineProps<Props>(), {
   maxHeight: 1200,
 })
 const emit = defineEmits<Emits>()
+const controlId = useId()
+const triggerElement = typeof document === 'undefined' ? null : document.activeElement
 
 const imageRef = ref<HTMLImageElement>()
 const aspectRatio = ref(String(props.defaultAspectRatio))
@@ -228,11 +246,13 @@ const closeModal = () => {
   emit('close')
 }
 
-const handleBackdropClick = () => {
-  if (isProcessing.value) {
-    return
-  }
-  closeModal()
+const guardProcessing = (event: Event) => {
+  if (isProcessing.value) event.preventDefault()
+}
+
+const restoreFocus = (event: Event) => {
+  event.preventDefault()
+  if (triggerElement instanceof HTMLElement && triggerElement.isConnected) triggerElement.focus()
 }
 
 const adjustFileExtension = (fileName: string, mimeType: string): string => {
@@ -254,23 +274,21 @@ const adjustFileExtension = (fileName: string, mimeType: string): string => {
 </script>
 
 <style scoped>
-.image-cropper-modal {
+.image-cropper-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 10000;
+  inset: 0;
+  background: var(--color-overlay, rgba(0, 0, 0, 0.65));
+  z-index: 9999;
 }
 
 .modal-content {
-  position: relative;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10000;
   background: var(--color-card, white);
-  border-radius: 0.5rem;
+  border-radius: var(--goadmin-card-radius, var(--radius-lg, 0.75rem));
   max-width: 800px;
   max-height: 80vh;
   width: 90%;
@@ -316,7 +334,7 @@ const adjustFileExtension = (fileName: string, mimeType: string): string => {
 
 .close-btn:hover {
   color: var(--color-text-primary, #000);
-  background: var(--color-surface-hover, #e9ecef);
+  background: var(--color-surface-variant, #e9ecef);
 }
 
 .close-btn.is-disabled {

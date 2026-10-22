@@ -149,9 +149,9 @@
                   <HelpTooltip :text="stateSummary.description" />
                 </div>
                 <div class="w-fit">
-                  <AppBadge :variant="stateSummary.variant" class="w-fit whitespace-nowrap">
+                  <AppStatus :variant="stateSummary.variant" class="w-fit whitespace-nowrap">
                     {{ stateSummary.badge }}
-                  </AppBadge>
+                  </AppStatus>
                 </div>
               </div>
             </div>
@@ -175,9 +175,9 @@
                 </div>
                 <div class="min-w-0 flex flex-wrap items-center gap-3 md:justify-end">
                   <div v-if="row.badge" class="w-fit shrink-0">
-                    <AppBadge :variant="row.badge.variant" class="w-fit whitespace-nowrap">
+                    <AppStatus :variant="row.badge.variant" class="w-fit whitespace-nowrap">
                       {{ row.badge.label }}
-                    </AppBadge>
+                    </AppStatus>
                   </div>
                   <p
                     :class="[row.valueClass, row.badge ? 'pl-1.5' : '']"
@@ -202,7 +202,7 @@ import { computed } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'
-import AppBadge from '@/components/ui/AppBadge.vue'
+import AppStatus from '@/components/ui/AppStatus.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { TooltipProvider } from '@/components/ui/tooltip'

@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 /* Presentation fixtures must not add styles to the embedded production build. */
 @source not '../../demo';
+@source not '../../audit/design';
 @import '../../.admin-extensions/tailwind-sources.css';
 @import 'nprogress/nprogress.css';
 
@@ -8,72 +9,58 @@
 @custom-variant dark (&:where(.dark, .dark *, [data-theme-mode='dark'], [data-theme-mode='dark'] *));
 
 @theme {
-  --color-primary: hsl(204 70% 46%);
-  --color-primary-foreground: hsl(204 30% 98%);
-  --color-secondary: hsl(214 24% 96%);
-  --color-secondary-foreground: hsl(214 18% 24%);
-  --color-destructive: hsl(0 78% 52%);
+  --color-foreground: hsl(220 15% 16%);
+  --color-error: hsl(0 78% 44%);
+  --color-primary: hsl(217 69% 46%);
+  --color-primary-foreground: hsl(0 0% 100%);
+  --color-secondary: hsl(220 20% 95%);
+  --color-secondary-foreground: hsl(220 15% 16%);
+  --color-destructive: hsl(0 78% 44%);
   --color-destructive-foreground: hsl(0 0% 98%);
-  --color-muted: hsl(214 20% 92%);
-  --color-muted-foreground: hsl(214 12% 52%);
-  --color-accent: hsl(214 24% 96%);
-  --color-accent-foreground: hsl(214 18% 24%);
-  --color-card: hsl(214 20% 100%);
-  --color-card-foreground: hsl(214 22% 12%);
-  --color-popover: hsl(214 20% 100%);
-  --color-popover-foreground: hsl(214 22% 12%);
-  --color-border: hsl(214 18% 86%);
-  --color-input: hsl(214 18% 86%);
-  --color-ring: hsl(204 70% 52%);
+  --color-muted: hsl(220 16% 92%);
+  --color-muted-foreground: hsl(220 10% 37%);
+  --color-accent: hsl(220 20% 95%);
+  --color-accent-foreground: hsl(220 15% 16%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(220 15% 16%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(220 15% 16%);
+  --color-border: hsl(220 17% 91%);
+  --color-input: hsl(220 17% 91%);
+  --color-ring: hsl(217 69% 46%);
   --color-success: hsl(150 60% 38%);
-  --color-success-foreground: hsl(0 0% 98%);
+  --color-success-foreground: hsl(220 18% 6%);
   --color-warning: hsl(38 80% 50%);
-  --color-warning-foreground: hsl(0 0% 98%);
+  --color-warning-foreground: hsl(220 18% 6%);
   --color-info: hsl(198 80% 48%);
   --color-info-foreground: hsl(0 0% 98%);
   --color-text-white: hsl(0 0% 100%);
-  --color-background: hsl(214 28% 98%);
-  --color-surface: hsl(214 24% 96%);
-  --color-surface-variant: hsl(214 20% 92%);
-  --color-card-hover: hsl(214 24% 97%);
-  --color-primary-light: hsl(204 70% 58%);
-  --color-primary-lighter: hsl(204 70% 70%);
-  --color-primary-dark: hsl(204 70% 36%);
-  --color-primary-darker: hsl(204 70% 28%);
-  --color-primary-contrast: hsl(204 30% 98%);
-  --color-text-primary: hsl(214 22% 12%);
-  --color-text-secondary: hsl(214 18% 32%);
-  --color-text-tertiary: hsl(214 12% 44%);
-  --color-text-disabled: hsl(214 12% 70%);
-  --color-border-primary: hsl(214 18% 86%);
-  --color-border-secondary: hsl(214 18% 92%);
-}
-
-@theme dark {
-  --color-primary: hsl(204 70% 60%);
-  --color-primary-foreground: hsl(204 20% 98%);
-  --color-background: hsl(214 18% 10%);
-  --color-surface: hsl(214 16% 14%);
-  --color-surface-variant: hsl(214 16% 18%);
-  --color-card: hsl(214 16% 20%);
-  --color-card-hover: hsl(214 16% 24%);
-  --color-text-primary: hsl(214 14% 92%);
-  --color-text-secondary: hsl(214 12% 78%);
-  --color-text-tertiary: hsl(214 10% 66%);
-  --color-text-disabled: hsl(214 10% 54%);
-  --color-border-primary: hsl(214 12% 38%);
-  --color-border-secondary: hsl(214 12% 30%);
-  --color-error: hsl(0 78% 52%);
+  --color-background: hsl(220 20% 97%);
+  --color-surface: hsl(220 20% 95%);
+  --color-surface-variant: hsl(220 16% 92%);
+  --color-card-hover: hsl(220 20% 97%);
+  --color-primary-light: hsl(217 69% 58%);
+  --color-primary-lighter: hsl(217 69% 70%);
+  --color-primary-dark: hsl(217 69% 36%);
+  --color-primary-darker: hsl(217 69% 28%);
+  --color-primary-contrast: hsl(0 0% 100%);
+  --color-text-primary: hsl(220 15% 16%);
+  --color-text-secondary: hsl(220 10% 37%);
+  --color-text-tertiary: hsl(220 9% 43%);
+  --color-text-disabled: hsl(220 8% 64%);
+  --color-border-primary: hsl(220 17% 91%);
+  --color-border-secondary: hsl(220 16% 94%);
 }
 
 @layer base {
   :root {
-    --font-sans: 'Space Grotesk', 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-sans:
+      ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
-    --hue-primary: 204;
-    --saturation-primary: 70%;
-    --hue-neutral: 214;
-    --saturation-neutral: 14%;
+    --hue-primary: 217;
+    --saturation-primary: 69%;
+    --hue-neutral: 220;
+    --saturation-neutral: 10%;
     --hue-success: 150;
     --saturation-success: 60%;
     --hue-error: 0;
@@ -87,52 +74,50 @@
     --color-primary-lighter: hsl(var(--primary-h), var(--primary-s), 70%);
     --color-primary-dark: hsl(var(--primary-h), var(--primary-s), 36%);
     --color-primary-darker: hsl(var(--primary-h), var(--primary-s), 28%);
-    --color-primary-contrast: hsl(var(--primary-h), 30%, 98%);
+    --color-primary-contrast: hsl(0, 0%, 100%);
 
     --neutral-h: var(--hue-neutral);
     --neutral-s: var(--saturation-neutral);
-    --color-background: hsl(var(--neutral-h), 28%, 98%);
-    --color-surface: hsl(var(--neutral-h), 24%, 96%);
-    --color-surface-variant: hsl(var(--neutral-h), 20%, 92%);
-    --color-card: hsl(var(--neutral-h), 20%, 100%);
-    --color-card-hover: hsl(var(--neutral-h), 24%, 97%);
+    --color-background: hsl(var(--neutral-h), 20%, 97%);
+    --color-surface: hsl(var(--neutral-h), 20%, 95%);
+    --color-surface-variant: hsl(var(--neutral-h), 16%, 92%);
+    --color-card: hsl(var(--neutral-h), 0%, 100%);
+    --color-card-hover: hsl(var(--neutral-h), 20%, 97%);
 
-    --color-text-primary: hsl(var(--neutral-h), 22%, 12%);
-    --color-text-secondary: hsl(var(--neutral-h), 18%, 32%);
-    --color-text-tertiary: hsl(var(--neutral-h), 12%, 44%);
-    --color-text-disabled: hsl(var(--neutral-h), 12%, 70%);
+    --color-text-primary: hsl(var(--neutral-h), 15%, 16%);
+    --color-text-secondary: hsl(var(--neutral-h), 10%, 37%);
+    --color-text-tertiary: hsl(var(--neutral-h), 9%, 43%);
+    --color-text-disabled: hsl(var(--neutral-h), 8%, 64%);
     --color-text-white: #ffffff;
 
-    --color-border-primary: hsl(var(--neutral-h), 18%, 86%);
-    --color-border-secondary: hsl(var(--neutral-h), 18%, 92%);
+    --color-border-primary: hsl(var(--neutral-h), 17%, 91%);
+    --color-border-secondary: hsl(var(--neutral-h), 16%, 94%);
     --color-border-focus: var(--color-primary);
 
     --color-success: hsl(var(--hue-success), var(--saturation-success), 38%);
     --color-warning: hsl(38, 80%, 50%);
-    --color-error: hsl(var(--hue-error), var(--saturation-error), 52%);
+    --color-error: hsl(var(--hue-error), var(--saturation-error), 44%);
     --color-info: hsl(198, 80%, 48%);
 
     --color-badge-success-bg: hsl(var(--hue-success) var(--saturation-success) 94% / 0.9);
     --color-badge-success-border: hsl(var(--hue-success) var(--saturation-success) 42% / 0.35);
-    --color-badge-success-text: hsl(var(--hue-success) var(--saturation-success) 34%);
+    --color-badge-success-text: hsl(var(--hue-success) var(--saturation-success) 32%);
     --color-badge-warning-bg: hsl(38 80% 94% / 0.9);
     --color-badge-warning-border: hsl(38 80% 48% / 0.35);
-    --color-badge-warning-text: hsl(38 80% 38%);
+    --color-badge-warning-text: hsl(38 80% 34%);
     --color-badge-error-bg: hsl(var(--hue-error) var(--saturation-error) 94% / 0.9);
     --color-badge-error-border: hsl(var(--hue-error) var(--saturation-error) 52% / 0.35);
     --color-badge-error-text: hsl(var(--hue-error) var(--saturation-error) 42%);
     --color-badge-info-bg: hsl(198 80% 94% / 0.9);
     --color-badge-info-border: hsl(198 80% 48% / 0.35);
-    --color-badge-info-text: hsl(198 80% 38%);
+    --color-badge-info-text: hsl(198 80% 36%);
     --color-badge-primary-bg: hsl(var(--primary-h) var(--primary-s) 94% / 0.9);
     --color-badge-primary-border: hsl(var(--primary-h) var(--primary-s) 46% / 0.35);
     --color-badge-primary-text: hsl(var(--primary-h) var(--primary-s) 38%);
 
-    /* Preserve the shell's original Tailwind utility shadows, independently of
-       the existing card shadow variables below. */
-    --goadmin-default-header-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-    --goadmin-default-sidebar-shadow:
-      0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    /* Host shell shadow variables still override these default fallbacks. */
+    --goadmin-default-header-shadow: none;
+    --goadmin-default-sidebar-shadow: none;
     --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
     --shadow-md: 0 10px 20px rgba(15, 23, 42, 0.1);
     --shadow-lg: 0 18px 40px rgba(15, 23, 42, 0.14);
@@ -141,20 +126,21 @@
     --transition-medium: 0.25s ease;
     --transition-slow: 0.4s ease;
 
-    --color-primary-rgb: 27, 109, 229;
-    --color-background-rgb: 248, 249, 252;
+    --color-primary-rgb: 37, 99, 200;
+    --color-background-rgb: 246, 247, 249;
     --color-overlay: rgba(15, 23, 42, 0.45);
 
     --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 12px;
 
     --color-a11y-dark: hsl(var(--neutral-h), 24%, 8%);
     --color-a11y-dark-secondary: hsl(var(--neutral-h), 20%, 20%);
-    --color-a11y-light: hsl(var(--neutral-h), 24%, 96%);
+    --color-a11y-light: hsl(var(--neutral-h), 20%, 95%);
     --color-a11y-light-secondary: hsl(var(--neutral-h), 20%, 80%);
 
-    --color-focus-ring: hsl(var(--primary-h), var(--primary-s), 52%);
+    --color-focus-ring: var(--color-primary);
     --outline-focus: 2px solid var(--color-focus-ring);
 
     --color-category-gym-bg: #ffebee;
@@ -168,55 +154,74 @@
     --color-category-yoga-bg: #ede7f6;
     --color-category-yoga-text: #5e35b1;
 
+    /* Semantic utilities follow the runtime palette and host overrides. */
+    --color-foreground: var(--color-text-primary);
+    --color-card-foreground: var(--color-text-primary);
+    --color-popover: var(--color-card);
+    --color-popover-foreground: var(--color-text-primary);
+    --color-primary-foreground: var(--color-primary-contrast);
+    --color-secondary: var(--color-surface);
+    --color-secondary-foreground: var(--color-text-primary);
+    --color-muted: var(--color-surface-variant);
+    --color-muted-foreground: var(--color-text-secondary);
+    --color-accent: var(--color-surface);
+    --color-accent-foreground: var(--color-text-primary);
+    --color-destructive: var(--color-error);
+    --color-destructive-foreground: hsl(0, 0%, 98%);
+    --color-border: var(--color-border-primary);
+    --color-input: var(--color-border-primary);
+    --color-ring: var(--color-focus-ring);
+
     /* shadcn-vue tokens (HSL components) */
-    --background: var(--neutral-h) 28% 98%;
-    --foreground: var(--neutral-h) 22% 12%;
-    --card: var(--neutral-h) 20% 100%;
-    --card-foreground: var(--neutral-h) 22% 12%;
-    --popover: var(--neutral-h) 20% 100%;
-    --popover-foreground: var(--neutral-h) 22% 12%;
-    --primary: var(--primary-h) var(--primary-s) 46%;
-    --primary-foreground: var(--primary-h) 30% 98%;
-    --secondary: var(--neutral-h) 24% 96%;
-    --secondary-foreground: var(--neutral-h) 18% 24%;
-    --muted: var(--neutral-h) 20% 92%;
-    --muted-foreground: var(--neutral-h) 12% 52%;
-    --accent: var(--neutral-h) 24% 96%;
-    --accent-foreground: var(--neutral-h) 18% 24%;
-    --destructive: var(--hue-error) var(--saturation-error) 52%;
+    --background: var(--neutral-h) 20% 97%;
+    --foreground: var(--neutral-h) 15% 16%;
+    --card: var(--neutral-h) 0% 100%;
+    --card-foreground: var(--neutral-h) 15% 16%;
+    --popover: var(--neutral-h) 0% 100%;
+    --popover-foreground: var(--neutral-h) 15% 16%;
+    --primary: var(--primary-h) var(--primary-s) var(--primary-l);
+    --primary-foreground: 0 0% 100%;
+    --secondary: var(--neutral-h) 20% 95%;
+    --secondary-foreground: var(--neutral-h) 15% 16%;
+    --muted: var(--neutral-h) 16% 92%;
+    --muted-foreground: var(--neutral-h) 10% 37%;
+    --accent: var(--neutral-h) 20% 95%;
+    --accent-foreground: var(--neutral-h) 15% 16%;
+    --destructive: var(--hue-error) var(--saturation-error) 44%;
     --destructive-foreground: 0 0% 98%;
-    --border: var(--neutral-h) 18% 86%;
-    --input: var(--neutral-h) 18% 86%;
-    --ring: var(--primary-h) var(--primary-s) 52%;
+    --border: var(--neutral-h) 17% 91%;
+    --input: var(--neutral-h) 17% 91%;
+    --ring: var(--primary-h) var(--primary-s) 46%;
     --radius: var(--radius-md);
   }
 
   .dark,
   [data-theme-mode='dark'] {
-    --primary-l: 60%;
+    --color-error: hsl(var(--hue-error), var(--saturation-error), 72%);
+    --primary-l: 74%;
     --color-primary: hsl(var(--primary-h), var(--primary-s), var(--primary-l));
-    --color-primary-light: hsl(var(--primary-h), var(--primary-s), 72%);
-    --color-primary-lighter: hsl(var(--primary-h), var(--primary-s), 82%);
-    --color-primary-dark: hsl(var(--primary-h), var(--primary-s), 48%);
-    --color-primary-darker: hsl(var(--primary-h), var(--primary-s), 34%);
-    --color-primary-contrast: hsl(var(--primary-h), 20%, 12%);
+    --color-primary-light: hsl(var(--primary-h), var(--primary-s), 80%);
+    --color-primary-lighter: hsl(var(--primary-h), var(--primary-s), 86%);
+    --color-primary-dark: hsl(var(--primary-h), var(--primary-s), 64%);
+    --color-primary-darker: hsl(var(--primary-h), var(--primary-s), 54%);
+    --color-primary-contrast: hsl(var(--neutral-h), 18%, 12%);
 
-    --color-background: hsl(var(--neutral-h), 18%, 10%);
-    --color-surface: hsl(var(--neutral-h), 16%, 14%);
-    --color-surface-variant: hsl(var(--neutral-h), 16%, 18%);
-    --color-card: hsl(var(--neutral-h), 16%, 20%);
-    --color-card-hover: hsl(var(--neutral-h), 16%, 24%);
+    --color-background: hsl(var(--neutral-h), 10%, 10%);
+    --color-surface: hsl(var(--neutral-h), 12%, 17%);
+    --color-surface-variant: hsl(var(--neutral-h), 12%, 20%);
+    --color-card: hsl(var(--neutral-h), 11%, 14%);
+    --color-card-hover: hsl(var(--neutral-h), 12%, 18%);
 
-    --color-text-primary: hsl(var(--neutral-h), 14%, 92%);
-    --color-text-secondary: hsl(var(--neutral-h), 12%, 78%);
-    --color-text-tertiary: hsl(var(--neutral-h), 10%, 66%);
-    --color-text-disabled: hsl(var(--neutral-h), 10%, 54%);
+    --color-text-primary: hsl(var(--neutral-h), 10%, 93%);
+    --color-text-secondary: hsl(var(--neutral-h), 9%, 75%);
+    --color-text-tertiary: hsl(var(--neutral-h), 8%, 65%);
+    --color-text-disabled: hsl(var(--neutral-h), 7%, 50%);
 
-    --color-border-primary: hsl(var(--neutral-h), 12%, 38%);
-    --color-border-secondary: hsl(var(--neutral-h), 12%, 30%);
+    --color-border-primary: hsl(var(--neutral-h), 10%, 23%);
+    --color-border-secondary: hsl(var(--neutral-h), 10%, 20%);
 
-    --color-primary-rgb: 96, 146, 250;
-    --color-background-rgb: 16, 18, 24;
+    --color-primary-rgb: 143, 178, 234;
+    --color-background-rgb: 23, 24, 28;
     --color-overlay: rgba(0, 0, 0, 0.55);
 
     --color-a11y-dark: hsl(var(--neutral-h), 16%, 94%);
@@ -224,7 +229,7 @@
     --color-a11y-light: hsl(var(--neutral-h), 16%, 8%);
     --color-a11y-light-secondary: hsl(var(--neutral-h), 12%, 20%);
 
-    --color-focus-ring: hsl(var(--primary-h), var(--primary-s), 72%);
+    --color-focus-ring: var(--color-primary);
 
     /*
      * Tailwind v4 utilities such as text-card-foreground resolve the
@@ -233,16 +238,16 @@
      */
     --color-foreground: var(--color-text-primary);
     --color-card-foreground: var(--color-text-primary);
-    --color-popover: var(--color-surface-variant);
+    --color-popover: var(--color-card);
     --color-popover-foreground: var(--color-text-primary);
-    --color-primary-foreground: hsl(var(--primary-h), 20%, 98%);
+    --color-primary-foreground: var(--color-primary-contrast);
     --color-secondary: var(--color-surface-variant);
     --color-secondary-foreground: var(--color-text-primary);
     --color-muted: var(--color-surface-variant);
     --color-muted-foreground: var(--color-text-secondary);
     --color-accent: var(--color-card-hover);
     --color-accent-foreground: var(--color-text-primary);
-    --color-destructive-foreground: hsl(0, 0%, 98%);
+    --color-destructive-foreground: hsl(var(--hue-error), 20%, 12%);
     --color-border: var(--color-border-primary);
     --color-input: var(--color-border-primary);
     --color-ring: var(--color-focus-ring);
@@ -275,30 +280,36 @@
     --color-badge-primary-text: hsl(var(--primary-h) var(--primary-s) 76%);
 
     /* shadcn-vue tokens (HSL components) */
-    --background: var(--neutral-h) 18% 10%;
-    --foreground: var(--neutral-h) 14% 92%;
-    --card: var(--neutral-h) 16% 20%;
-    --card-foreground: var(--neutral-h) 14% 92%;
-    --popover: var(--neutral-h) 16% 18%;
-    --popover-foreground: var(--neutral-h) 14% 92%;
-    --primary: var(--primary-h) var(--primary-s) 60%;
-    --primary-foreground: var(--primary-h) 20% 98%;
-    --secondary: var(--neutral-h) 16% 18%;
-    --secondary-foreground: var(--neutral-h) 12% 72%;
-    --muted: var(--neutral-h) 16% 18%;
-    --muted-foreground: var(--neutral-h) 10% 52%;
-    --accent: var(--neutral-h) 16% 20%;
-    --accent-foreground: var(--neutral-h) 12% 72%;
-    --destructive: var(--hue-error) var(--saturation-error) 58%;
-    --destructive-foreground: 0 0% 98%;
-    --border: var(--neutral-h) 12% 26%;
-    --input: var(--neutral-h) 12% 26%;
-    --ring: var(--primary-h) var(--primary-s) 72%;
+    --background: var(--neutral-h) 10% 10%;
+    --foreground: var(--neutral-h) 10% 93%;
+    --card: var(--neutral-h) 11% 14%;
+    --card-foreground: var(--neutral-h) 10% 93%;
+    --popover: var(--neutral-h) 11% 14%;
+    --popover-foreground: var(--neutral-h) 10% 93%;
+    --primary: var(--primary-h) var(--primary-s) var(--primary-l);
+    --primary-foreground: var(--neutral-h) 18% 12%;
+    --secondary: var(--neutral-h) 12% 20%;
+    --secondary-foreground: var(--neutral-h) 10% 93%;
+    --muted: var(--neutral-h) 12% 20%;
+    --muted-foreground: var(--neutral-h) 9% 75%;
+    --accent: var(--neutral-h) 12% 18%;
+    --accent-foreground: var(--neutral-h) 10% 93%;
+    --destructive: var(--hue-error) var(--saturation-error) 72%;
+    --destructive-foreground: var(--hue-error) 20% 12%;
+    --border: var(--neutral-h) 10% 23%;
+    --input: var(--neutral-h) 10% 23%;
+    --ring: var(--primary-h) var(--primary-s) 74%;
     --radius: var(--radius-md);
   }
 }
 
 @layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
+  }
+
   html {
     color-scheme: light;
     font-family: var(--font-sans);
@@ -313,18 +324,6 @@
   body {
     min-height: 100%;
     background-color: var(--color-background);
-    background-image:
-      radial-gradient(
-        1200px circle at 110% -10%,
-        rgba(var(--color-primary-rgb), 0.08),
-        transparent 60%
-      ),
-      radial-gradient(
-        900px circle at -10% 120%,
-        rgba(var(--color-primary-rgb), 0.06),
-        transparent 55%
-      );
-    background-attachment: fixed;
     color: var(--color-text-primary);
   }
 
@@ -362,17 +361,7 @@
     background-color: var(--color-card);
     border: 1px solid var(--color-border-primary);
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    transition:
-      box-shadow var(--transition-fast),
-      transform var(--transition-fast),
-      background-color var(--transition-medium),
-      border-color var(--transition-medium);
-  }
-
-  .card:hover {
-    background-color: var(--color-card-hover);
-    box-shadow: var(--shadow-md);
+    box-shadow: none;
   }
 
   .menu-surface {
@@ -454,9 +443,7 @@
 }
 
 #nprogress .peg {
-  box-shadow:
-    0 0 10px rgba(var(--color-primary-rgb), 0.35),
-    0 0 5px rgba(var(--color-primary-rgb), 0.2) !important;
+  box-shadow: none !important;
 }
 
 #nprogress .spinner-icon {
@@ -464,45 +451,47 @@
   border-left-color: var(--color-primary) !important;
 }
 
-/* Custom button variants with proper theme support */
-.btn-outline-theme {
-  color: hsl(var(--foreground)) !important;
-  border-color: hsl(var(--input)) !important;
+/* Component-layer defaults leave explicit host utility classes in control. */
+@layer components {
+  .btn-outline-theme {
+    color: var(--color-text-primary);
+    border-color: var(--color-input);
+  }
+
+  .btn-outline-theme:hover {
+    background-color: var(--color-accent);
+    color: var(--color-accent-foreground);
+  }
+
+  .btn-ghost-theme {
+    color: var(--color-text-primary);
+  }
+
+  .btn-ghost-theme:hover {
+    background-color: var(--color-accent);
+    color: var(--color-accent-foreground);
+  }
 }
 
-.btn-outline-theme:hover {
-  background-color: hsl(var(--accent)) !important;
-  color: hsl(var(--accent-foreground)) !important;
-}
+@layer utilities {
+  .text-danger {
+    color: var(--color-badge-error-text);
+  }
 
-.btn-ghost-theme {
-  color: hsl(var(--foreground)) !important;
-}
+  .text-info {
+    color: var(--color-badge-info-text);
+  }
 
-.btn-ghost-theme:hover {
-  background-color: hsl(var(--accent)) !important;
-  color: hsl(var(--accent-foreground)) !important;
-}
+  .text-warning {
+    color: var(--color-badge-warning-text);
+  }
 
-/* Custom text color utilities for semantic colors */
-.text-danger {
-  color: hsl(var(--hue-error) var(--saturation-error) 58%) !important;
-}
+  .text-success {
+    color: var(--color-badge-success-text);
+  }
 
-.text-info {
-  color: hsl(198 80% 58%) !important;
-}
-
-.text-warning {
-  color: hsl(38 80% 58%) !important;
-}
-
-.text-success {
-  color: hsl(var(--hue-success) var(--saturation-success) 58%) !important;
-}
-
-/* Badge info variant */
-.bg-info {
-  background-color: hsl(198 80% 48%) !important;
-  color: hsl(0 0% 98%) !important;
+  .bg-info {
+    background-color: var(--color-info);
+    color: var(--color-info-foreground);
+  }
 }

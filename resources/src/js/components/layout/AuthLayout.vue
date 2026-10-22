@@ -17,14 +17,12 @@
 
     <div class="w-full relative">
       <div class="flex pt-5 pb-2 justify-center w-full items-center">
-        <span
-          class="px-4 py-1.5 rounded-full border border-border-primary bg-card text-sm font-semibold text-text-primary"
-        >
+        <span class="text-sm font-semibold text-text-secondary">
           {{ t('Админка') }}
         </span>
       </div>
 
-      <h2 class="mt-6 text-center text-3xl font-bold tracking-tight text-text-primary">
+      <h2 class="mt-6 text-center text-3xl font-semibold tracking-tight text-text-primary">
         <slot name="title" />
       </h2>
 
@@ -33,7 +31,7 @@
       </p>
     </div>
 
-    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+    <div class="mt-8 px-4 sm:mx-auto sm:w-full sm:max-w-md sm:px-0">
       <div class="card py-8 px-4 sm:px-10">
         <slot />
       </div>
