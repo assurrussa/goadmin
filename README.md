@@ -30,9 +30,12 @@ Deployed dependency versions and binary sizes were not verified. Frontend asset
 sizes are not whole-application footprints; these observations do not establish
 minimum requirements or performance guarantees.
 
-Install the public release with `go get github.com/assurrussa/goadmin@v0.13.0`.
-Its dependency graph uses GoAuth v0.11.0, GoNotify v0.6.0, GoUploads v0.13.0 and
-GoWebSocket v0.2.1 without sibling replacements.
+After publication, install this release with
+`go get github.com/assurrussa/goadmin@v0.20.0`. Its planned dependency graph
+uses GoAuth v0.15.0, gossoclient v0.6.1, GoNotify v0.6.0, GoUploads v0.13.0
+and GoWebSocket v0.2.1 without sibling replacements. Until publication,
+[v0.19.0](https://github.com/assurrussa/goadmin/releases/tag/v0.19.0) is the
+latest tagged GoAdmin release.
 
 ## Before integrating
 
@@ -52,8 +55,8 @@ The [standalone starter](examples/starter/README.md) runs the embedded admin,
 PostgreSQL with Docker Compose. Redis is an optional profile; mail modules use
 NotifyHub when explicitly enabled. Copy
 `examples/starter/.env.example` to `examples/starter/.env`, fill every required
-value, then run `GOADMIN_VERSION=v0.13.0 docker compose up --build` from
-`examples/starter`. This builds the starter against the published GoAdmin library
+value, then run `GOADMIN_VERSION=v0.20.0 docker compose up --build` after
+v0.20.0 is published, from `examples/starter`. This builds the starter against the published GoAdmin library
 and uses the release's embedded UI; it requires no sibling checkouts. Open
 `http://localhost:8080`; the login page offers first-admin registration until
 an administrator exists. No administrator password is bundled.
@@ -257,7 +260,8 @@ Verification is local by default. Hosted CI is manual-only, with no automatic
 push or pull-request runs. See [local checks and manual CI](docs/ci.md) for
 tool versions, disposable PostgreSQL/Redis setup, and the proven CI baseline.
 
-This checkout pins published `goauth v0.12.0` and `gonotify v0.6.0`, including
+This checkout pins published `goauth v0.15.0`, `gossoclient v0.6.1` and
+`gonotify v0.6.0`, including
 the shared transaction and optional-delivery API. Uploads resolve
 `gouploads v0.13.0` and WebSockets resolve `gowebsocket v0.2.1`. Outbox core and
 its PostgreSQL backend both resolve `v0.17.0`, and GoCache resolves `v0.2.2`.

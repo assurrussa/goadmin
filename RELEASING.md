@@ -4,13 +4,13 @@ This module is published as `github.com/assurrussa/goadmin`.
 
 ## Current Baseline
 
-- The latest published baseline is [v0.13.0](https://github.com/assurrussa/goadmin/releases/tag/v0.13.0).
-  The selected next candidate is `v0.14.0`; selection does not claim release
+- The latest published baseline is [v0.19.0](https://github.com/assurrussa/goadmin/releases/tag/v0.19.0).
+  The selected next candidate is `v0.20.0`; selection does not claim release
   readiness, publication, host acceptance or deployment.
 
 - Go 1.27.2 is the minimum. Modular host assembly is a breaking source API:
   migrate hosts to `host.New`, explicit modules and `host.AdminConfig`.
-- The current root module pins published GoAuth `v0.12.0` (schema 14), including the
+- The current root module pins published GoAuth `v0.15.0` (schema 14), including the
   companion MFA and assisted-recovery APIs, without a sibling replacement. Verify the resulting
   natural dependency graph with the release gates below.
 - GoNotify v0.5.0 changes `host.NotificationManager` to
@@ -27,7 +27,7 @@ This module is published as `github.com/assurrussa/goadmin`.
 - The clean-history baseline was published as v0.7.0.
   Old history, PRs and tags remain in the private history archive; do not move
   or rewrite them. Verify the new remote tag and public module independently.
-- Current `go.mod` pins GoAuth v0.12.0 and GoNotify v0.6.0.
+- Current `go.mod` pins GoAuth v0.15.0, GoNotify v0.6.0 and gossoclient v0.6.1.
   GoInertia v0.11.1 retains protocol v2 by default, matching the embedded v2 frontend. GoCache
   resolves v0.2.2. GoDI and GoLogger retain their existing compatible pins.
 - `VERSION` is intentionally unset by default. Pass the exact planned or
@@ -44,10 +44,20 @@ This module is published as `github.com/assurrussa/goadmin`.
   published v0.13.0 and GoWebSocket to v0.2.1. The nested starter keeps explicit
   source-mode overrides; its published Docker build removes them all.
   Published verification rejects every replacement and legacy shared/Redis module.
-- The frontend advisory gate and its remaining moderate findings are reviewed
+- The frontend advisory gate and its current zero-finding result are reviewed
   in [docs/dependency-advisory-review.md](docs/dependency-advisory-review.md).
 
-## v0.14.0 candidate
+## v0.20.0 candidate
+
+- Align root and starter with published GoAuth v0.15.0; align the root SSO SDK
+  with published gossoclient v0.6.1. These pins do not enable mandatory MFA
+  or change host SSO policy.
+- Run `make publish-readiness VERSION=v0.20.0` on the final source tree,
+  including the public-dependency clean-consumer probe. Only after a separately
+  authorized tag is published, run `make release-readiness VERSION=v0.20.0`
+  against that exact tag. Do not infer deployment from library publication.
+
+## v0.14.0 historical candidate
 
 - Adds the explicit, optional `features/admission` component. Hosts choose
   invitation-only or project-pending mode; no existing host enables it automatically.
@@ -60,13 +70,14 @@ This module is published as `github.com/assurrussa/goadmin`.
   it does not modify existing accounts or enable SSO admission. Preserve a
   restorable backup and allow ordinary PostgreSQL DDL locks during migration.
 - Requires the strict provisioning API selected for GoAuth `v0.12.0` (schema 14).
-  Publication and the final dependency pin must be verified before this release.
-  A local candidate replacement is development evidence only.
+  Publication and the final dependency pin were proposed prerequisites; a
+  local candidate replacement was development evidence only.
 - See [SSO admission](docs/sso-admission.md) for the host-owned proof adapter,
   moderation, invitation binding and off-mode contract. Actual host enrollment
   acceptance is separate from synthetic component tests.
-- Use `make publish-readiness VERSION=v0.14.0`, followed by the exact published
-  consumer gate. Do not claim deployment from this library release.
+- The candidate prescribed `make publish-readiness VERSION=v0.14.0`, followed
+  by the exact published consumer gate. This is historical planning, not
+  evidence of publication and not the v0.20.0 gate.
 
 ## v0.13.0 historical scope
 

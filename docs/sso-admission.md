@@ -78,7 +78,7 @@ canonical membership/RBAC and the existing external proof/revocation rules.
 ## Candidate verification and release
 
 The component requires GoAuth v0.12.0 or newer for strict provisioning.
-This branch pins the published v0.12.0 module without local replacements.
+This branch pins the published v0.15.0 module without local replacements.
 Construction fails closed on an older Runtime. Candidate source comparisons may
 use an explicitly selected temporary modfile; they are not publication evidence.
 Before release, verify the embedded admin assets and run the clean consumer gate

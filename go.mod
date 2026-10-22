@@ -6,12 +6,12 @@ tool github.com/assurrussa/goadmin/tools/toolsmocks
 
 require (
 	github.com/Masterminds/squirrel v1.5.4
-	github.com/assurrussa/goauth v0.12.0
+	github.com/assurrussa/goauth v0.15.0
 	github.com/assurrussa/godi v0.9.3
 	github.com/assurrussa/goinertia v0.11.1
 	github.com/assurrussa/gologger v0.1.0
 	github.com/assurrussa/gonotify v0.6.0
-	github.com/assurrussa/gossoclient v0.5.0
+	github.com/assurrussa/gossoclient v0.6.1
 	github.com/assurrussa/gouploads v0.13.0
 	github.com/assurrussa/gowebsocket v0.2.1
 	github.com/assurrussa/outbox v0.17.0

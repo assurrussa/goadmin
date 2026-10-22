@@ -4,7 +4,7 @@ go 1.27.2
 
 require (
 	github.com/assurrussa/goadmin v0.7.0
-	github.com/assurrussa/goauth v0.12.0
+	github.com/assurrussa/goauth v0.15.0
 	github.com/assurrussa/gonotify v0.6.0
 	github.com/gofiber/fiber/v3 v3.5.0
 )

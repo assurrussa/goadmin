@@ -1,10 +1,12 @@
 # Frontend dependency advisory review
 
-Reviewed on 2026-10-19 for the Tiptap migration candidate. The baseline
+Reviewed on 2026-10-19 for the Tiptap migration candidate and rechecked on
+2026-10-22 for the GoAdmin v0.20.0 candidate. The baseline
 `npm audit --json` reported 35 moderate dependency records, representing one
 unique advisory (GHSA-cp6q-959q-f8rh), with no low/high/critical findings.
 After migrating the coherent Tiptap graph from 2.27.3 to 3.32.0, the same
-command reports **0 vulnerabilities at every severity**. No suppression,
+command reports **0 vulnerabilities at every severity** after the Vitest patch
+described below. No suppression,
 severity reduction, forced upgrade or incompatible override is used.
 
 ## Removed advisory paths
@@ -40,8 +42,15 @@ The current graph removes these paths rather than suppressing the advisory:
 
 `markdown-it` moves from 14.3.0 to 14.3.2 within its declared compatible range,
 removing [GHSA-253c-mchw-3w2r](https://github.com/advisories/GHSA-253c-mchw-3w2r).
-The bounded test-tool migration now selects Vitest 4.1.11 and its compatible
-transitive graph. Vue runtime is 3.5.42; compiler packages may resolve compatible
+The bounded test-tool migration initially selected Vitest 4.1.11. For the
+v0.20.0 candidate, Vitest and its matching development-only @vitest packages
+move to 4.1.12. This removes two subsequently reported moderate advisories
+in @vitest/mocker,
+[GHSA-qxg6-89mg-rqv8](https://github.com/advisories/GHSA-qxg6-89mg-rqv8)
+and [GHSA-xp26-3454-mjgp](https://github.com/advisories/GHSA-xp26-3454-mjgp).
+The 2026-10-22 full `npm audit --json` reports zero vulnerabilities at every
+severity; `npm audit --omit=dev --audit-level=low` also reports zero production
+dependency vulnerabilities. Vue runtime is 3.5.42; compiler packages may resolve compatible
 3.5.43 patches. The lockfile selects shell-quote 1.12.0 (within its existing
 1.x range), source-map-js 1.2.2 and postcss-selector-parser 7.1.6. These remove
 [Vue SSR](https://github.com/advisories/GHSA-g2v6-rqmx-r4w6),
@@ -49,7 +58,7 @@ transitive graph. Vue runtime is 3.5.42; compiler packages may resolve compatibl
 [source-map-js](https://github.com/advisories/GHSA-68fv-2mgg-jv7q) and
 [selector parsing](https://github.com/advisories/GHSA-rj75-hqrm-r3gf) advisory paths.
 Vitest 4 removes Tinypool rather than overriding its incompatible major.
-Vitest/mocker 4.1.11 addresses
+Vitest/mocker 4.1.11 addressed
 [GHSA-82fw-gwwq-j7x9](https://github.com/advisories/GHSA-82fw-gwwq-j7x9).
 That earlier cleanup used no editor or frontend framework major, `npm audit fix --force`, override,
 advisory ignore, dependency exclusion or severity reduction is used.

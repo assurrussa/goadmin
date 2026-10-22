@@ -123,7 +123,7 @@ node-version-check:
 	@node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (!((major === 22 && minor >= 13) || major >= 24)) { console.error(`Node.js 22.13+ on the 22.x line or >=24 is required, got $${process.versions.node}`); process.exit(2) }'
 
 resources: node-version-check
-	cd resources && npm ci && npm run test:manifest && npm run test:unit && npm exec -- eslint . && npm exec -- prettier --check src/ && npm run type-check && npm run build-only
+	cd resources && npm ci && npm run test:manifest && node scripts/materialize-admin-extensions.cjs && npm run test:unit && npm exec -- eslint . && npm exec -- prettier --check src/ && npm run type-check && npm run build-only
 
 resources-audit: node-version-check
 	cd resources && npm audit --audit-level=high
