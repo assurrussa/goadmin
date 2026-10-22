@@ -1,0 +1,36 @@
+// Fixture-only renderer: execute the real standalone error template, never a copy.
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"html/template"
+	"os"
+	"strings"
+)
+
+func main() {
+	if len(os.Args) != 2 {
+		panic("expected error template path")
+	}
+	tpl, err := template.New("error").Funcs(template.FuncMap{
+		"asset": func(name string) string { return "/public/" + name },
+	}).ParseFiles(os.Args[1])
+	if err != nil {
+		panic(err)
+	}
+	result := make(map[int]string)
+	for _, code := range []int{401, 403, 404, 419, 429, 500, 503} {
+		var output strings.Builder
+		if err := tpl.ExecuteTemplate(&output, "error.gohtml", map[string]any{
+			"code": code,
+		}); err != nil {
+			panic(err)
+		}
+		result[code] = output.String()
+	}
+	if err := json.NewEncoder(os.Stdout).Encode(result); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}

@@ -415,6 +415,8 @@
           v-model="rawJSON"
           @input="updateFromRawJSON"
           class="json-textarea"
+          :aria-label="t('core.ui.Raw JSON Editor', 'Raw JSON Editor')"
+          :aria-invalid="Boolean(jsonError)"
           :placeholder="t('core.ui.Edit raw JSON content...', 'Edit raw JSON content...')"
           :class="{ 'json-error': jsonError }"
         ></textarea>

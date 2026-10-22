@@ -1,0 +1,1766 @@
+{
+  "startingCommit": "13df47c",
+  "baselineCommit": "654d3f3",
+  "checks": [
+    {
+      "check": "cropper traps reverse Tab",
+      "passed": true
+    },
+    {
+      "check": "cropper Escape closes and restores opener",
+      "passed": true
+    },
+    {
+      "check": "cropper emits actual PNG output",
+      "passed": true
+    },
+    {
+      "check": "grid recovers after failed request via real retry",
+      "passed": true
+    },
+    {
+      "check": "grid loading resolves into actual rows",
+      "passed": true
+    },
+    {
+      "check": "Tabs arrow key selects history and skips disabled item",
+      "passed": true
+    },
+    {
+      "check": "editor invalid JSON shows error and valid input clears it",
+      "passed": true
+    },
+    {
+      "check": "mobile editor formatting expands",
+      "passed": true
+    },
+    {
+      "check": "runtime system mode leaves preference unset",
+      "passed": true
+    },
+    {
+      "check": "real page does not persist system preference on startup",
+      "passed": true
+    },
+    {
+      "check": "manual choice overrides current system mode on real page",
+      "passed": true
+    },
+    {
+      "check": "queue route tabs have exactly one current page",
+      "passed": true
+    }
+  ],
+  "queueTabs": [
+    {
+      "route": "/queues",
+      "current": [
+        "/queues"
+      ]
+    },
+    {
+      "route": "/queues/jobs",
+      "current": [
+        "/queues/jobs"
+      ]
+    },
+    {
+      "route": "/queues/jobs-failed",
+      "current": [
+        "/queues/jobs-failed"
+      ]
+    }
+  ],
+  "layoutRuns": [
+    {
+      "name": "dashboard-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "dashboard",
+      "locale": "ru"
+    },
+    {
+      "name": "dashboard-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "dashboard",
+      "locale": "ru"
+    },
+    {
+      "name": "permissions-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "permissions",
+      "locale": "ru"
+    },
+    {
+      "name": "permissions-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "permissions",
+      "locale": "ru"
+    },
+    {
+      "name": "roles-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "roles",
+      "locale": "ru"
+    },
+    {
+      "name": "roles-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "roles",
+      "locale": "ru"
+    },
+    {
+      "name": "role-view-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "role-view",
+      "locale": "ru"
+    },
+    {
+      "name": "role-view-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "role-view",
+      "locale": "ru"
+    },
+    {
+      "name": "role-edit-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "role-edit",
+      "locale": "ru"
+    },
+    {
+      "name": "role-edit-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "role-edit",
+      "locale": "ru"
+    },
+    {
+      "name": "profile-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "profile",
+      "locale": "ru"
+    },
+    {
+      "name": "profile-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "profile",
+      "locale": "ru"
+    },
+    {
+      "name": "profile-edit-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "profile-edit",
+      "locale": "ru"
+    },
+    {
+      "name": "profile-edit-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "profile-edit",
+      "locale": "ru"
+    },
+    {
+      "name": "profile-settings-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "profile-settings",
+      "locale": "ru"
+    },
+    {
+      "name": "profile-settings-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "profile-settings",
+      "locale": "ru"
+    },
+    {
+      "name": "notifications-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "notifications",
+      "locale": "ru"
+    },
+    {
+      "name": "notifications-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "notifications",
+      "locale": "ru"
+    },
+    {
+      "name": "queues-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "queues",
+      "locale": "ru"
+    },
+    {
+      "name": "queues-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "queues",
+      "locale": "ru"
+    },
+    {
+      "name": "queues-active-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "queues-active",
+      "locale": "ru"
+    },
+    {
+      "name": "queues-active-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "queues-active",
+      "locale": "ru"
+    },
+    {
+      "name": "queues-failed-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "queues-failed",
+      "locale": "ru"
+    },
+    {
+      "name": "queues-failed-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "queues-failed",
+      "locale": "ru"
+    },
+    {
+      "name": "dashboard-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "dashboard",
+      "locale": "ru"
+    },
+    {
+      "name": "dashboard-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "dashboard",
+      "locale": "ru"
+    },
+    {
+      "name": "permissions-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "permissions",
+      "locale": "ru"
+    },
+    {
+      "name": "permissions-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "permissions",
+      "locale": "ru"
+    },
+    {
+      "name": "roles-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "roles",
+      "locale": "ru"
+    },
+    {
+      "name": "roles-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "roles",
+      "locale": "ru"
+    },
+    {
+      "name": "role-view-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "role-view",
+      "locale": "ru"
+    },
+    {
+      "name": "role-view-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "role-view",
+      "locale": "ru"
+    },
+    {
+      "name": "role-edit-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "role-edit",
+      "locale": "ru"
+    },
+    {
+      "name": "role-edit-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "role-edit",
+      "locale": "ru"
+    },
+    {
+      "name": "profile-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "profile",
+      "locale": "ru"
+    },
+    {
+      "name": "profile-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "profile",
+      "locale": "ru"
+    },
+    {
+      "name": "profile-edit-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "profile-edit",
+      "locale": "ru"
+    },
+    {
+      "name": "profile-edit-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "profile-edit",
+      "locale": "ru"
+    },
+    {
+      "name": "profile-settings-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "profile-settings",
+      "locale": "ru"
+    },
+    {
+      "name": "profile-settings-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "profile-settings",
+      "locale": "ru"
+    },
+    {
+      "name": "notifications-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "notifications",
+      "locale": "ru"
+    },
+    {
+      "name": "notifications-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "notifications",
+      "locale": "ru"
+    },
+    {
+      "name": "queues-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "queues",
+      "locale": "ru"
+    },
+    {
+      "name": "queues-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "queues",
+      "locale": "ru"
+    },
+    {
+      "name": "queues-active-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "queues-active",
+      "locale": "ru"
+    },
+    {
+      "name": "queues-active-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "queues-active",
+      "locale": "ru"
+    },
+    {
+      "name": "queues-failed-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "queues-failed",
+      "locale": "ru"
+    },
+    {
+      "name": "queues-failed-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "queues-failed",
+      "locale": "ru"
+    },
+    {
+      "name": "dashboard-en-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "dashboard",
+      "locale": "en"
+    },
+    {
+      "name": "dashboard-en-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "dashboard",
+      "locale": "en"
+    },
+    {
+      "name": "permissions-en-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "permissions",
+      "locale": "en"
+    },
+    {
+      "name": "permissions-en-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "permissions",
+      "locale": "en"
+    },
+    {
+      "name": "roles-en-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "roles",
+      "locale": "en"
+    },
+    {
+      "name": "roles-en-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "roles",
+      "locale": "en"
+    },
+    {
+      "name": "role-view-en-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "role-view",
+      "locale": "en"
+    },
+    {
+      "name": "role-view-en-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "role-view",
+      "locale": "en"
+    },
+    {
+      "name": "role-edit-en-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "role-edit",
+      "locale": "en"
+    },
+    {
+      "name": "role-edit-en-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "role-edit",
+      "locale": "en"
+    },
+    {
+      "name": "profile-en-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "profile",
+      "locale": "en"
+    },
+    {
+      "name": "profile-en-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "profile",
+      "locale": "en"
+    },
+    {
+      "name": "profile-edit-en-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "profile-edit",
+      "locale": "en"
+    },
+    {
+      "name": "profile-edit-en-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "profile-edit",
+      "locale": "en"
+    },
+    {
+      "name": "profile-settings-en-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "profile-settings",
+      "locale": "en"
+    },
+    {
+      "name": "profile-settings-en-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "profile-settings",
+      "locale": "en"
+    },
+    {
+      "name": "notifications-en-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "notifications",
+      "locale": "en"
+    },
+    {
+      "name": "notifications-en-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "notifications",
+      "locale": "en"
+    },
+    {
+      "name": "queues-en-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "queues",
+      "locale": "en"
+    },
+    {
+      "name": "queues-en-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "queues",
+      "locale": "en"
+    },
+    {
+      "name": "queues-active-en-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "queues-active",
+      "locale": "en"
+    },
+    {
+      "name": "queues-active-en-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "queues-active",
+      "locale": "en"
+    },
+    {
+      "name": "queues-failed-en-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "screen": "queues-failed",
+      "locale": "en"
+    },
+    {
+      "name": "queues-failed-en-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "screen": "queues-failed",
+      "locale": "en"
+    },
+    {
+      "name": "dashboard-mobile-en-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "dashboard",
+      "locale": "en"
+    },
+    {
+      "name": "dashboard-mobile-en-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "dashboard",
+      "locale": "en"
+    },
+    {
+      "name": "permissions-mobile-en-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "permissions",
+      "locale": "en"
+    },
+    {
+      "name": "permissions-mobile-en-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "permissions",
+      "locale": "en"
+    },
+    {
+      "name": "roles-mobile-en-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "roles",
+      "locale": "en"
+    },
+    {
+      "name": "roles-mobile-en-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "roles",
+      "locale": "en"
+    },
+    {
+      "name": "role-view-mobile-en-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "role-view",
+      "locale": "en"
+    },
+    {
+      "name": "role-view-mobile-en-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "role-view",
+      "locale": "en"
+    },
+    {
+      "name": "role-edit-mobile-en-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "role-edit",
+      "locale": "en"
+    },
+    {
+      "name": "role-edit-mobile-en-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "role-edit",
+      "locale": "en"
+    },
+    {
+      "name": "profile-mobile-en-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "profile",
+      "locale": "en"
+    },
+    {
+      "name": "profile-mobile-en-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "profile",
+      "locale": "en"
+    },
+    {
+      "name": "profile-edit-mobile-en-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "profile-edit",
+      "locale": "en"
+    },
+    {
+      "name": "profile-edit-mobile-en-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "profile-edit",
+      "locale": "en"
+    },
+    {
+      "name": "profile-settings-mobile-en-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "profile-settings",
+      "locale": "en"
+    },
+    {
+      "name": "profile-settings-mobile-en-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "profile-settings",
+      "locale": "en"
+    },
+    {
+      "name": "notifications-mobile-en-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "notifications",
+      "locale": "en"
+    },
+    {
+      "name": "notifications-mobile-en-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "notifications",
+      "locale": "en"
+    },
+    {
+      "name": "queues-mobile-en-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "queues",
+      "locale": "en"
+    },
+    {
+      "name": "queues-mobile-en-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "queues",
+      "locale": "en"
+    },
+    {
+      "name": "queues-active-mobile-en-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "queues-active",
+      "locale": "en"
+    },
+    {
+      "name": "queues-active-mobile-en-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "queues-active",
+      "locale": "en"
+    },
+    {
+      "name": "queues-failed-mobile-en-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "screen": "queues-failed",
+      "locale": "en"
+    },
+    {
+      "name": "queues-failed-mobile-en-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "screen": "queues-failed",
+      "locale": "en"
+    }
+  ],
+  "stateRuns": [
+    {
+      "name": "users-empty-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "scenario": "empty",
+      "rows": 0,
+      "status": "Нет данныхНет данных для отображения Создать пользователя"
+    },
+    {
+      "name": "users-empty-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "scenario": "empty",
+      "rows": 0,
+      "status": "Нет данныхНет данных для отображения Создать пользователя"
+    },
+    {
+      "name": "users-filtered-empty-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "scenario": "filtered-empty",
+      "rows": 0,
+      "status": "Ничего не найденоИзмените поиск или фильтры и попробуйте снова."
+    },
+    {
+      "name": "users-filtered-empty-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "scenario": "filtered-empty",
+      "rows": 0,
+      "status": "Ничего не найденоИзмените поиск или фильтры и попробуйте снова."
+    },
+    {
+      "name": "users-long-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "scenario": "long",
+      "rows": 8,
+      "status": ""
+    },
+    {
+      "name": "users-long-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "scenario": "long",
+      "rows": 8,
+      "status": ""
+    },
+    {
+      "name": "users-error-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "scenario": "error",
+      "alert": "Не удалось загрузить данные. Проверьте соединение и повторите попытку.Повторить",
+      "rows": 0,
+      "status": ""
+    },
+    {
+      "name": "users-error-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "scenario": "error",
+      "alert": "Не удалось загрузить данные. Проверьте соединение и повторите попытку.Повторить",
+      "rows": 0,
+      "status": ""
+    },
+    {
+      "name": "users-loading-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "scenario": "loading",
+      "rows": 0,
+      "status": "Загрузка..."
+    },
+    {
+      "name": "users-loading-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "scenario": "loading",
+      "rows": 0,
+      "status": "Загрузка..."
+    },
+    {
+      "name": "users-empty-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "scenario": "empty",
+      "rows": 0,
+      "status": "Нет данныхНет данных для отображения Создать пользователя"
+    },
+    {
+      "name": "users-empty-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "scenario": "empty",
+      "rows": 0,
+      "status": "Нет данныхНет данных для отображения Создать пользователя"
+    },
+    {
+      "name": "users-filtered-empty-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "scenario": "filtered-empty",
+      "rows": 0,
+      "status": "Ничего не найденоИзмените поиск или фильтры и попробуйте снова."
+    },
+    {
+      "name": "users-filtered-empty-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "scenario": "filtered-empty",
+      "rows": 0,
+      "status": "Ничего не найденоИзмените поиск или фильтры и попробуйте снова."
+    },
+    {
+      "name": "users-long-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "scenario": "long",
+      "rows": 8,
+      "status": ""
+    },
+    {
+      "name": "users-long-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "scenario": "long",
+      "rows": 8,
+      "status": ""
+    },
+    {
+      "name": "users-error-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "scenario": "error",
+      "alert": "Не удалось загрузить данные. Проверьте соединение и повторите попытку.Повторить",
+      "rows": 0,
+      "status": ""
+    },
+    {
+      "name": "users-error-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "scenario": "error",
+      "alert": "Не удалось загрузить данные. Проверьте соединение и повторите попытку.Повторить",
+      "rows": 0,
+      "status": ""
+    },
+    {
+      "name": "users-loading-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "scenario": "loading",
+      "rows": 0,
+      "status": "Загрузка..."
+    },
+    {
+      "name": "users-loading-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "scenario": "loading",
+      "rows": 0,
+      "status": "Загрузка..."
+    }
+  ],
+  "errorRuns": [
+    {
+      "name": "error-401-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "code": 401,
+      "title": "Требуется авторизация"
+    },
+    {
+      "name": "error-403-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "code": 403,
+      "title": "Доступ запрещен"
+    },
+    {
+      "name": "error-404-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "code": 404,
+      "title": "Страница не найдена"
+    },
+    {
+      "name": "error-419-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "code": 419,
+      "title": "Срок действия страницы истек"
+    },
+    {
+      "name": "error-429-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "code": 429,
+      "title": "Слишком много запросов"
+    },
+    {
+      "name": "error-500-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "code": 500,
+      "title": "Внутренняя ошибка сервера"
+    },
+    {
+      "name": "error-503-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390,
+      "code": 503,
+      "title": "Произошла ошибка"
+    },
+    {
+      "name": "error-401-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "code": 401,
+      "title": "Требуется авторизация"
+    },
+    {
+      "name": "error-403-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "code": 403,
+      "title": "Доступ запрещен"
+    },
+    {
+      "name": "error-404-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "code": 404,
+      "title": "Страница не найдена"
+    },
+    {
+      "name": "error-419-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "code": 419,
+      "title": "Срок действия страницы истек"
+    },
+    {
+      "name": "error-429-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "code": 429,
+      "title": "Слишком много запросов"
+    },
+    {
+      "name": "error-500-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "code": 500,
+      "title": "Внутренняя ошибка сервера"
+    },
+    {
+      "name": "error-503-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390,
+      "code": 503,
+      "title": "Произошла ошибка"
+    },
+    {
+      "name": "error-404-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "code": 404,
+      "title": "Страница не найдена"
+    },
+    {
+      "name": "error-500-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440,
+      "code": 500,
+      "title": "Внутренняя ошибка сервера"
+    },
+    {
+      "name": "error-404-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "code": 404,
+      "title": "Страница не найдена"
+    },
+    {
+      "name": "error-500-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440,
+      "code": 500,
+      "title": "Внутренняя ошибка сервера"
+    }
+  ],
+  "beforeAfterRuns": [
+    {
+      "name": "before-dashboard-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "name": "before-dashboard-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "name": "before-form-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "name": "before-form-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "name": "before-login-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "name": "before-login-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "name": "before-dialog-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "name": "before-dialog-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "name": "after-dashboard-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "name": "after-dashboard-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "name": "after-form-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "name": "after-form-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "name": "after-login-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "name": "after-login-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "name": "after-dialog-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "name": "after-dialog-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    }
+  ],
+  "finalQueueRecaptures": [
+    {
+      "name": "queues-active-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "name": "queues-active-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "name": "queues-active-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390
+    },
+    {
+      "name": "queues-active-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390
+    },
+    {
+      "name": "queues-failed-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "name": "queues-failed-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "name": "queues-failed-mobile-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390
+    },
+    {
+      "name": "queues-failed-mobile-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390
+    },
+    {
+      "name": "queues-active-en-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "name": "queues-active-en-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "name": "queues-active-mobile-en-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390
+    },
+    {
+      "name": "queues-active-mobile-en-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390
+    },
+    {
+      "name": "queues-failed-en-light",
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "name": "queues-failed-en-dark",
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "name": "queues-failed-mobile-en-light",
+      "height": 844,
+      "overflow": false,
+      "theme": "light",
+      "width": 390
+    },
+    {
+      "name": "queues-failed-mobile-en-dark",
+      "height": 844,
+      "overflow": false,
+      "theme": "dark",
+      "width": 390
+    }
+  ],
+  "finalQueueConsoleWarningsErrors": [],
+  "finalFreshRuns": [
+    {
+      "route": "/",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "route": "/permissions",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "route": "/roles",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "route": "/roles/1",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "route": "/roles/1/edit",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "route": "/auth/profile",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "route": "/auth/profile/edit",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "route": "/auth/profile/settings",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "route": "/notifications",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "route": "/queues",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "route": "/queues/jobs",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "route": "/queues/jobs-failed",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "route": "/users",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "route": "/__design/components",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "route": "/",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "route": "/permissions",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "route": "/roles",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "route": "/roles/1",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "route": "/roles/1/edit",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "route": "/auth/profile",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "route": "/auth/profile/edit",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "route": "/auth/profile/settings",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "route": "/notifications",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "route": "/queues",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "route": "/queues/jobs",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "route": "/queues/jobs-failed",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "route": "/users",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "route": "/__design/components",
+      "deviceScaleFactor": 1,
+      "height": 1024,
+      "overflow": false,
+      "theme": "dark",
+      "width": 1440
+    }
+  ],
+  "finalFreshWarningsErrors": []
+}

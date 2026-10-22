@@ -1440,6 +1440,14 @@ its existing ENV mapping; do not expose secrets through props or diagnostics.
 
 ## Admin visual refresh — 2026-10-22
 
+Completion pass after `13df47c` is complete for the agreed local visual scope:
+dashboard/access/profile/notifications/queue pages, tabs, editor/cropper, the
+standalone error template, empty/loading/error/long-value states and system-theme
+behavior without a saved choice. The earlier pass covered only its listed
+screens; this pass supplies the previously missing evidence. The selected
+design, density and host overrides are retained. No publication or consumer
+integration is included.
+
 Agreed direction: make the default light and dark themes quieter and more
 consistent, using neutral light surfaces, graphite dark surfaces and a restrained
 blue accent. Preserve navigation, workflows and current information density;
@@ -1472,8 +1480,8 @@ primary actions and loss of host `--color-error` overrides. The compiled-CSS
 regression check and actual browser override checks pass. No new dependencies,
 public SDK surfaces, backend behavior or consumer deployment are included.
 
-`make check` passed tidy/format/vet/lint and the full Go race/coverage pass, then
-stopped on an assertion of old exact HSL values. Replaced that assertion with
+During the first pass, `make check` passed tidy/format/vet/lint and the full Go
+race/coverage pass, then stopped on an assertion of old exact HSL values. Replaced that assertion with
 12 dark text/surface contrast checks while retaining semantic assertions.
 `make resources` subsequently passed all 102 Node contract tests, 676 UI tests,
 ESLint, formatting, Vue/host type checks, production build and template-asset
@@ -1482,11 +1490,41 @@ verification. The already-passed unchanged Go checks were reused.
 Seventeen browser checks passed, including filtering/selection, form typing,
 readonly/disabled/error states, host overrides, dialog/mobile-menu keyboard
 focus, theme/locale persistence and responsive layouts (1440/834/390px).
-The final fresh preview has no console warnings/errors in either theme.
+The first pass's final fresh preview had no console warnings/errors in either
+theme.
 See [design QA](../design-qa.md) and the [current visual gallery](presentation-demo.md).
 Synthetic visual checks do not establish authenticated-host/backend acceptance;
-the standalone error template was source-reviewed without a browser capture.
-No publication or deployment was performed.
+the error template's initial source-only review is superseded by the completion
+captures below. No publication or deployment was performed.
+
+The completion fixture uses actual page components and response shapes, serves
+five real grid data routes, renders the standalone error template through Go's
+`html/template`, and reuses the canonical theme initializer without forcing a
+saved light preference. Historical-source rendering from `654d3f3` supplies
+matching before/after dashboard/form/login/dialog comparisons. Fixture data,
+theme controls and scenario switches remain outside the production bundle.
+
+Confirmed acceptance findings were corrected: ImageCropper now uses existing
+dialog primitives for focus containment, Escape/return and processing guards;
+queue tabs match route boundaries and identify one current item; notification
+headers/dividers and role cards follow the flat neutral surfaces. Raw JSON input
+has an accessible label/invalid state. No public API or dependency was added.
+
+The completion gate `make check` exited 0: full Go race/coverage plus
+tidy/format/vet/lint, 102 Node contract tests, 691 UI tests across 60 files,
+ESLint/Prettier, Vue/host types, production build and three template assets.
+New tests cover cropper focus/processing, all three queue pages with query/hash
+URLs, and canonical system/manual theme behavior.
+
+Browser evidence now includes 96 layout captures (12 remaining screens × two
+themes × desktop/mobile × Russian/English), 20 table-state captures, 18 actual
+error-template captures, real tabs/JSON/crop interactions and 12 additional
+assertions. Both system modes/change events are unit-tested; the browser checks
+unset/current-system behavior and manual priority without changing OS settings.
+A clean post-build preview rendered 14 routes in both themes with no document
+overflow or captured console warnings/errors. Final source/artifact review found
+no substantive issue; every manifest/relative JS asset resolves. Gallery and QA
+contain full/focused comparisons, finding history and explicit scope limits.
 
 Review artifacts, in their displayed selection order:
 

@@ -14,24 +14,47 @@ accounts, captured at **1440 × 1024**, 1× device scale:
 
 ![Default dark theme, users table](screenshots/design-refresh/users-after-dark.png)
 
-Run the read-only visual fixture from the repository root:
+Run the read-only visual fixture from the repository root. It requires the
+repository's Go toolchain as well as Node: Go renders the real standalone error
+template at startup, using the normal shared Go caches.
 
 ```sh
 npm ci --prefix resources
 node resources/audit/design/server.mjs
 ```
 
-Open <http://127.0.0.1:8768/users>. Additional routes are
-`/users/1048/edit`, `/auth/login` and `/__design/components` (form states, buttons,
-rich text and a dialog). Use the real header controls to change theme or language.
+Open [the users page](http://127.0.0.1:8768/users) or
+[dashboard](http://127.0.0.1:8768/). The fixture also serves:
+
+- `/permissions`, `/roles`, `/roles/1`, `/roles/1/edit`;
+- `/auth/profile`, `/auth/profile/edit`, `/auth/profile/settings`;
+- `/notifications`, `/queues`, `/queues/jobs`, `/queues/jobs-failed`;
+- `/users/1048/edit`, `/auth/login`, `/__design/dialog`;
+- `/__design/components`: real tabs, form states, buttons, rich-text/JSON editor
+  and image cropping. Cropping produces a local preview and does not upload it.
+
+Use the real header controls to change theme or language.
 Stop with Ctrl-C. The server binds only to localhost and uses temporary extension
 sources; it does not overwrite the developer's extension registry.
 
 This fixture exercises real Vue screens without an authenticated backend.
 Filtering and search read deterministic local data; submissions return 405.
-Export, other sidebar destinations, authentication and persistent saves are not
-implemented. The create route displays the same edit-form sample. It is visual
+Export, unlisted sidebar destinations, authentication and persistent saves are
+not implemented. The create route displays the same edit-form sample. It is visual
 acceptance evidence, not a host integration or backend acceptance test.
+
+Table scenarios: `/__design/users-empty` is an unfiltered empty table;
+`/users?scenario=empty` has no matching results; `scenario=long` supplies long
+values; `scenario=loading` delays the first data request by 12 seconds;
+`scenario=error` always fails; `scenario=recovery` fails once and then succeeds
+through the real Retry action. Opening a scenario afresh resets its request
+counter. These query switches belong only to the fixture.
+
+`/__design/theme` provides explicit light/dark controls and **System preference
+(unset)**, which removes the local choice. The application then follows its
+canonical system-theme behavior without saving a manual preference.
+`/__design/error/{code}` renders the actual self-contained Go error template for
+401, 403, 404, 419, 429, 500 and 503, returning the corresponding HTTP status.
 
 Additional captures: [form](screenshots/design-refresh/form-light.png),
 [dark dialog](screenshots/design-refresh/dialog-dark.png),
@@ -39,6 +62,56 @@ Additional captures: [form](screenshots/design-refresh/form-light.png),
 [mobile users](screenshots/design-refresh/users-mobile-light.png) and
 [tablet users](screenshots/design-refresh/users-tablet.png).
 See the [design QA report](../design-qa.md) for comparison evidence and limits.
+
+### Completed screen gallery
+
+The remaining screen matrix contains 96 captures: twelve screens, both themes,
+1440px/390px widths and Russian/English UI. Server-supplied titles and synthetic
+data retain their original language when switching the UI locale.
+
+- Dashboard, permissions, roles: [Russian](screenshots/design-refresh/acceptance/mobile-review-ru-1.png),
+  [English](screenshots/design-refresh/acceptance/mobile-review-en-1.png).
+- Role view/edit, profile: [Russian](screenshots/design-refresh/acceptance/mobile-review-ru-2.png),
+  [English](screenshots/design-refresh/acceptance/mobile-review-en-2.png).
+- Profile edit/settings, notifications: [Russian](screenshots/design-refresh/acceptance/mobile-review-ru-3.png),
+  [English](screenshots/design-refresh/acceptance/mobile-review-en-3.png).
+- Queue dashboard/active/failed: [Russian](screenshots/design-refresh/acceptance/mobile-review-ru-4.png),
+  [English](screenshots/design-refresh/acceptance/mobile-review-en-4.png).
+
+Each contact sheet shows three complete mobile screens, light above dark.
+Full-size desktop examples:
+[dashboard](screenshots/design-refresh/acceptance/dashboard-light.png),
+[permissions](screenshots/design-refresh/acceptance/permissions-dark.png),
+[role](screenshots/design-refresh/acceptance/role-view-light.png),
+[profile settings](screenshots/design-refresh/acceptance/profile-settings-dark.png),
+[notifications](screenshots/design-refresh/acceptance/notifications-light.png)
+and [failed queue](screenshots/design-refresh/acceptance/queues-failed-dark.png).
+Special states:
+[cropper](screenshots/design-refresh/acceptance/cropper-mobile-dark.png),
+[invalid JSON](screenshots/design-refresh/acceptance/editor-json-error-mobile-light.png),
+[empty data](screenshots/design-refresh/acceptance/users-empty-light.png),
+[loading](screenshots/design-refresh/acceptance/users-loading-mobile-dark.png),
+[request error](screenshots/design-refresh/acceptance/users-error-mobile-light.png)
+and [standalone errors](screenshots/design-refresh/acceptance/errors-review-1.png).
+The [capture index](screenshots/design-refresh/acceptance/browser-checks.json)
+records the routes, dimensions, states and checked interactions.
+
+Before/after comparisons include the actual dashboard, form, login and dialog,
+using source from `654d3f3` and current source with matching fixture data.
+See [dashboard light](screenshots/design-refresh/acceptance/comparison-dashboard-light.png)
+and [dark](screenshots/design-refresh/acceptance/comparison-dashboard-dark.png).
+To reproduce a separate historical-source preview:
+
+```sh
+goadmin_baseline=$(mktemp -d)
+git archive 654d3f3 resources/src views | tar -x -C "$goadmin_baseline"
+ln -s "$PWD/resources/node_modules" "$goadmin_baseline/resources/node_modules"
+GOADMIN_DESIGN_SOURCE_ROOT="$goadmin_baseline/resources" \
+  GOADMIN_DESIGN_PORT=8769 node resources/audit/design/server.mjs
+```
+
+The server still uses current fixture data and installed dependencies; this is
+a visual source comparison, not historical release/build reproducibility.
 
 ## Sports club presentation demo
 

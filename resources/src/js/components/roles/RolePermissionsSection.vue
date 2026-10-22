@@ -276,12 +276,12 @@ const domainActionVariant = (domain: string) => {
 
 const domainCardClass = (domain: string) => {
   if (isDomainSelected(domain)) {
-    return 'border border-success/35 rounded-2xl overflow-hidden bg-success/5 shadow-sm'
+    return 'border border-success/35 rounded-xl overflow-hidden bg-success/5'
   }
   if (isDomainPartiallySelected(domain)) {
-    return 'border border-warning/35 rounded-2xl overflow-hidden bg-warning/5 shadow-sm'
+    return 'border border-warning/35 rounded-xl overflow-hidden bg-warning/5'
   }
-  return 'border border-border-secondary rounded-2xl overflow-hidden bg-surface'
+  return 'border border-border-secondary rounded-xl overflow-hidden bg-surface'
 }
 
 const domainHeaderClass = (domain: string) => {
@@ -310,7 +310,7 @@ const permissionRowClass = (key: string) => {
 
 const wrapperClass = computed(() =>
   props.variant === 'card'
-    ? 'bg-card border border-border-primary shadow-sm sm:rounded-2xl overflow-hidden'
+    ? 'bg-card border border-border-primary rounded-[var(--goadmin-card-radius,var(--radius-xl,0.75rem))] overflow-hidden'
     : 'space-y-4',
 )
 

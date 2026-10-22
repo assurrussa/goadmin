@@ -2,6 +2,18 @@
   <div class="space-y-6">
     <h1 class="text-2xl font-semibold text-text-primary">Компоненты и состояния</h1>
     <Card class="p-6 space-y-4">
+      <h2 class="text-lg font-semibold">Вкладки</h2>
+      <Tabs default-value="details">
+        <TabsList aria-label="Разделы карточки">
+          <TabsTrigger value="details">Основное</TabsTrigger>
+          <TabsTrigger value="history">История</TabsTrigger>
+          <TabsTrigger value="disabled" disabled>Недоступно</TabsTrigger>
+        </TabsList>
+        <TabsContent value="details">Данные пользователя и настройки доступа.</TabsContent>
+        <TabsContent value="history">Изменения профиля и последние действия.</TabsContent>
+      </Tabs>
+    </Card>
+    <Card class="p-6 space-y-4">
       <div class="flex flex-wrap gap-4">
         <AppStatus variant="success">Активен</AppStatus>
         <AppStatus variant="secondary">Неактивен</AppStatus>
@@ -47,16 +59,44 @@
         </DialogContent>
       </Dialog>
     </Card>
-    <RichTextEditor v-model="document" :allow-file-upload="false" />
+    <Card class="p-6 space-y-4">
+      <h2 class="text-lg font-semibold">Изображение</h2>
+      <AppButton id="design-open-cropper" @click="showCropper = true"
+        >Обрезать изображение</AppButton
+      >
+      <p v-if="cropResult" role="status">{{ cropResult }}</p>
+      <img
+        v-if="croppedUrl"
+        :src="croppedUrl"
+        alt="Результат обрезки"
+        class="max-w-full rounded-lg"
+      />
+    </Card>
+    <section class="space-y-4" aria-label="Редактор текста">
+      <h2 class="text-lg font-semibold">Редактор текста</h2>
+      <RichTextEditor v-model="document" :allow-file-upload="false" />
+    </section>
+    <ImageCropper
+      v-if="showCropper"
+      :image-url="trainingImage"
+      file-name="training.png"
+      :max-width="640"
+      :max-height="640"
+      @close="showCropper = false"
+      @crop="onCrop"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, ref } from 'vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppStatus from '@/components/ui/AppStatus.vue'
 import FormInput from '@/components/form/FormInput.vue'
 import RichTextEditor from '@/components/form/RichTextEditor.vue'
+import ImageCropper from '@/components/imageCropper/ImageCropper.vue'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import trainingImage from '../../demo/sports-club/training.svg?url'
 import { Card } from '@/components/ui/card'
 import {
   Dialog,
@@ -71,4 +111,16 @@ import {
 
 const name = ref('Анна Волкова')
 const document = ref('<p>Описание пользователя и рабочие заметки.</p>')
+const showCropper = ref(false)
+const croppedUrl = ref('')
+const cropResult = ref('')
+function onCrop(file: File) {
+  if (croppedUrl.value) URL.revokeObjectURL(croppedUrl.value)
+  croppedUrl.value = URL.createObjectURL(file)
+  cropResult.value = `Готово: ${file.name}, ${file.type}, ${file.size} байт`
+  showCropper.value = false
+}
+onBeforeUnmount(() => {
+  if (croppedUrl.value) URL.revokeObjectURL(croppedUrl.value)
+})
 </script>

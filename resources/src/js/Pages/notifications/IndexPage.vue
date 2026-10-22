@@ -3,10 +3,7 @@
 
   <p v-if="!notificationsEnabled" class="text-text-secondary">{{ t('Уведомления недоступны.') }}</p>
 
-  <Card
-    v-if="notificationsEnabled"
-    class="overflow-hidden border-border-primary bg-gradient-to-br from-card via-surface to-surface-variant"
-  >
+  <Card v-if="notificationsEnabled" class="overflow-hidden border-border-primary bg-card">
     <div
       class="p-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-border-secondary"
     >
@@ -92,7 +89,7 @@
     <div class="p-5">
       <template v-if="hasNotifications">
         <div
-          class="divide-y divide-border-secondary border border-border-secondary rounded-2xl overflow-hidden bg-card"
+          class="divide-y divide-border-secondary border border-border-secondary rounded-xl overflow-hidden bg-card"
         >
           <article
             v-for="notification in notifications"
@@ -407,13 +404,13 @@ const levelVariant = (level: string) => {
 const notificationTone = (level: string) => {
   const normalized = level?.toLowerCase()
   const tones: Record<string, string> = {
-    success: 'border-l-4 border-success/60',
-    warning: 'border-l-4 border-warning/70',
-    error: 'border-l-4 border-destructive/70',
-    danger: 'border-l-4 border-destructive/70',
-    info: 'border-l-4 border-info/60',
+    success: 'border-l-4 border-l-success/60',
+    warning: 'border-l-4 border-l-warning/70',
+    error: 'border-l-4 border-l-destructive/70',
+    danger: 'border-l-4 border-l-destructive/70',
+    info: 'border-l-4 border-l-info/60',
   }
-  return tones[normalized] ?? 'border-l-4 border-primary/50'
+  return tones[normalized] ?? 'border-l-4 border-l-primary/50'
 }
 
 const hasPayloadLink = (payload?: Record<string, unknown> | null) => {

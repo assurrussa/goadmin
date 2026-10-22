@@ -7,6 +7,7 @@
         v-for="tab in tabs"
         :key="tab.href"
         :href="tab.href"
+        :aria-current="isActive(tab.href) ? 'page' : undefined"
         class="px-3 py-2 rounded-lg text-sm font-medium border transition-colors"
         :class="
           isActive(tab.href)
@@ -97,10 +98,11 @@ const counters = reactive({
 const pageTitle = computed(() => props.title || t('Активные задачи'))
 const jobsApi = computed(() => props.jobsApiUrl || '/queues/jobs')
 const isActive = (href: string) => {
+  const pathname = page.url.split(/[?#]/)[0]
   if (href === '/queues') {
-    return page.url === '/queues'
+    return pathname === '/queues'
   }
-  return page.url.startsWith(href)
+  return pathname === href || pathname.startsWith(`${href}/`)
 }
 const clamp = (value: number) => (value < 0 ? 0 : value)
 
