@@ -220,6 +220,10 @@
       "src/js/app.ts"
     ]
   },
+  "_localReauthentication-D_kjQ6w8.js": {
+    "file": "js/localReauthentication-D_kjQ6w8.js",
+    "name": "localReauthentication"
+  },
   "_pencil-BsY1iNCe.js": {
     "file": "js/pencil-BsY1iNCe.js",
     "name": "pencil",
@@ -454,20 +458,21 @@
     ]
   },
   "src/js/Pages/auth/SSOErrorPage.vue": {
-    "file": "js/SSOErrorPage-Rr_hoIwA.js",
+    "file": "js/SSOErrorPage-ButnJg09.js",
     "name": "SSOErrorPage",
     "src": "src/js/Pages/auth/SSOErrorPage.vue",
     "isDynamicEntry": true,
     "imports": [
+      "_editor-BMLT2hBV.js",
       "_SSOButton.vue_vue_type_script_setup_true_lang-CZwCGED2.js",
       "_AuthLayout.vue_vue_type_script_setup_true_lang-DdaMBcVF.js",
       "_AppHead.vue_vue_type_script_setup_true_lang-DcNoFzGz.js",
-      "_editor-BMLT2hBV.js",
+      "_localReauthentication-D_kjQ6w8.js",
       "src/js/app.ts"
     ]
   },
   "src/js/Pages/auth/SSOLinkPage.vue": {
-    "file": "js/SSOLinkPage-BMx37S69.js",
+    "file": "js/SSOLinkPage-Ru2S1CO8.js",
     "name": "SSOLinkPage",
     "src": "src/js/Pages/auth/SSOLinkPage.vue",
     "isDynamicEntry": true,
@@ -476,6 +481,7 @@
       "_AuthLayout.vue_vue_type_script_setup_true_lang-DdaMBcVF.js",
       "_AppHead.vue_vue_type_script_setup_true_lang-DcNoFzGz.js",
       "_FormButton.vue_vue_type_script_setup_true_lang-BCDSWXOM.js",
+      "_localReauthentication-D_kjQ6w8.js",
       "src/js/app.ts"
     ]
   },

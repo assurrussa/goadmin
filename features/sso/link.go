@@ -228,7 +228,7 @@ func (h *linkHandler) page(c fiber.Ctx) error {
 	}
 	return h.render(c, "auth/SSOLinkPage", map[string]any{
 		titleProp: "Привязка SSO", "issuer": id.Issuer, "subject": id.Subject,
-		"intent": secret, "csrf": csrf,
+		"intent": secret, "csrf": csrf, h.service.csrfCookie: csrf,
 	})
 }
 
@@ -378,7 +378,7 @@ func (h *linkHandler) staleFailure(c fiber.Ctx, native host.CSRFRequest) error {
 	c.Cookie(&fiber.Cookie{Name: h.service.csrfCookie, Value: token.Token, Path: "/", Secure: true, SameSite: "Lax"})
 	return h.render(c, "auth/SSOErrorPage", map[string]any{
 		titleProp: "Повторный локальный вход", errorCodeProp: "local_auth_stale", messageProp: message,
-		"reauthCSRF": token.Token,
+		"reauthCSRF": token.Token, h.service.csrfCookie: token.Token,
 	})
 }
 
@@ -413,7 +413,11 @@ func (h *linkHandler) reauthenticate(c fiber.Ctx) error {
 	if err := h.admin.LogoutLocalAdminAuth(c); err != nil {
 		return c.SendStatus(http.StatusServiceUnavailable)
 	}
-	return c.Redirect().Status(http.StatusSeeOther).To("/auth/login?local=1&redirectback=%2Fsso-link")
+	constNext := "/auth/login?local=1&redirectback=%2Fsso-link"
+	if c.Get("Accept") == "application/json" {
+		return c.JSON(fiber.Map{"next": constNext})
+	}
+	return c.Redirect().Status(http.StatusSeeOther).To(constNext)
 }
 
 // Compare all original SDK fields, including the fixed deadline. time.Time's

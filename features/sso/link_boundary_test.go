@@ -20,9 +20,10 @@ import (
 )
 
 const (
-	testNativeSession = "native-session"
-	testOrigin        = "https://seo.example"
-	testLinkURL       = "https://seo.example/sso-link"
+	testNativeSession    = "native-session"
+	testOrigin           = "https://seo.example"
+	testLinkURL          = "https://seo.example/sso-link"
+	testLinkConfirmField = "confirm"
 )
 
 type memoryIntents struct {
@@ -86,8 +87,12 @@ func (a *fakeLinkAdmin) LinkExternalAdminIdentity(_ fiber.Ctx, b host.ExternalBi
 	return goauth.IdentityLink{}, a.err
 }
 
-func linkFixture(t *testing.T) (*fiber.App, *fakeLinkAdmin, *memoryIntents, *fakeProtocol, string) {
+func linkFixture(t *testing.T, customCookie ...string) (*fiber.App, *fakeLinkAdmin, *memoryIntents, *fakeProtocol, string) {
 	t.Helper()
+	cookieName := testLinkCSRFCookie
+	if len(customCookie) != 0 {
+		cookieName = customCookie[0]
+	}
 	b, id, local, oldNow := snapshotFixture()
 	delta := time.Since(oldNow)
 	b.Deadline = b.Deadline.Add(delta)
@@ -100,7 +105,7 @@ func linkFixture(t *testing.T) (*fiber.App, *fakeLinkAdmin, *memoryIntents, *fak
 	p := &fakeProtocol{id: id, binding: b}
 	s := &Runtime{
 		Config:     Config{Origin: testOrigin, Issuer: id.Issuer, ClientID: id.ClientID, ProjectID: id.ProjectID},
-		csrfCookie: testLinkCSRFCookie,
+		csrfCookie: cookieName,
 	}
 	bound, err := buildSnapshot(b, id, local, "", time.Now())
 	if err != nil {
@@ -143,7 +148,7 @@ func linkFixture(t *testing.T) (*fiber.App, *fakeLinkAdmin, *memoryIntents, *fak
 
 func linkRequest(t *testing.T, app *fiber.App, secret, csrf, origin string) *http.Response {
 	t.Helper()
-	form := url.Values{"intent": {secret}, testLinkCSRFField: {csrf}, "confirm": {"link-this-identity"}}
+	form := url.Values{"intent": {secret}, testLinkCSRFField: {csrf}, testLinkConfirmField: {"link-this-identity"}}
 	r := httptest.NewRequestWithContext(
 		t.Context(), http.MethodPost, testLinkURL, strings.NewReader(form.Encode()),
 	)
@@ -236,23 +241,22 @@ func TestLinkPagePassesVerifiedIdentityAndNativeBoundIntentToRenderer(t *testing
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status %d", response.StatusCode)
 	}
-	var props struct {
-		Subject string `json:"subject"`
-		Intent  string `json:"intent"`
-		CSRF    string `json:"csrf"`
-	}
+	var props map[string]any
 	if err = json.NewDecoder(response.Body).Decode(&props); err != nil {
 		t.Fatal(err)
 	}
-	if props.Subject != protocol.id.Subject || len(props.Intent) != 43 || props.CSRF == "" {
+	subject, _ := props["subject"].(string)
+	intent, _ := props["intent"].(string)
+	csrfProp, _ := props["csrf"].(string)
+	if subject != protocol.id.Subject || len(intent) != 43 || csrfProp == "" || props[testLinkCSRFCookie] != csrfProp {
 		t.Fatal("lost verified page props")
 	}
 	if store.binding.LocalSubject.String() != admin.actor.SubjectID ||
-		store.native != admin.native.SessionID || store.secret != props.Intent {
+		store.native != admin.native.SessionID || store.secret != intent {
 		t.Fatal("intent lost native binding")
 	}
 	cookies := response.Cookies()
-	if len(cookies) != 1 || cookies[0].Value != props.CSRF || cookies[0].Name != testLinkCSRFCookie {
+	if len(cookies) != 1 || cookies[0].Value != csrfProp || cookies[0].Name != testLinkCSRFCookie {
 		t.Fatal("native CSRF cookie mismatch")
 	}
 }
@@ -279,7 +283,8 @@ func TestStaleLocalLinkPromptsBeforeIntentOrMutation(t *testing.T) {
 	if err := json.NewDecoder(page.Body).Decode(&props); err != nil {
 		t.Fatal(err)
 	}
-	if page.StatusCode != http.StatusOK || props["code"] != "local_auth_stale" || props["reauthCSRF"] == "" {
+	if page.StatusCode != http.StatusOK || props["code"] != "local_auth_stale" || props["reauthCSRF"] == "" ||
+		props[testLinkCSRFCookie] != props["reauthCSRF"] {
 		t.Fatalf("stale GET did not offer explicit reauthentication: %v", props)
 	}
 	res := linkRequest(t, app, store.secret, csrf, testOrigin)
@@ -291,6 +296,28 @@ func TestStaleLocalLinkPromptsBeforeIntentOrMutation(t *testing.T) {
 	if res.StatusCode != http.StatusForbidden || failure["code"] != "local_auth_stale" ||
 		store.consumeCalls != 0 || len(admin.linked) != 0 || admin.logouts != 0 {
 		t.Fatalf("stale POST consumed intent, linked, or logged out: %v", failure)
+	}
+}
+
+func TestStaleReauthenticationProofUsesConfiguredCookieName(t *testing.T) {
+	const cookieName = "custom_sso_csrf"
+	app, admin, intents, protocol, proof := linkFixture(t, cookieName)
+	_ = intents
+	_ = protocol
+	_ = proof
+	admin.eligibility = host.IdentityLinkStale
+	page, err := app.Test(httptest.NewRequestWithContext(t.Context(), http.MethodGet, testLinkURL, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer page.Body.Close()
+	var props map[string]any
+	if err := json.NewDecoder(page.Body).Decode(&props); err != nil {
+		t.Fatal(err)
+	}
+	if page.StatusCode != http.StatusOK || props[cookieName] == "" || props[cookieName] != props["reauthCSRF"] ||
+		len(page.Cookies()) != 1 || page.Cookies()[0].Name != cookieName || page.Cookies()[0].Value != props[cookieName] {
+		t.Fatal("configured CSRF cookie did not match the stale form and shared prop")
 	}
 }
 
@@ -317,7 +344,7 @@ func TestExternalNativeSessionCannotEnterLinkLoop(t *testing.T) {
 func TestExplicitLocalReauthenticationRequiresCSRFAndNeverLinks(t *testing.T) {
 	app, admin, store, _, csrf := linkFixture(t)
 	admin.eligibility = host.IdentityLinkStale
-	form := url.Values{"csrf": {csrf}, "confirm": {"reauthenticate-local"}}
+	form := url.Values{"csrf": {csrf}, testLinkConfirmField: {"reauthenticate-local"}}
 	request := func(origin, token string) (int, string) {
 		form.Set("csrf", token)
 		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost,
@@ -341,6 +368,33 @@ func TestExplicitLocalReauthenticationRequiresCSRFAndNeverLinks(t *testing.T) {
 	if status != http.StatusSeeOther || location != "/auth/login?local=1&redirectback=%2Fsso-link" ||
 		admin.logouts != 1 || store.consumeCalls != 0 || len(admin.linked) != 0 {
 		t.Fatal("explicit reauthentication did not return to a new form safely")
+	}
+}
+
+func TestExplicitLocalReauthenticationJSONResponseIsFixedAndLocalOnly(t *testing.T) {
+	app, admin, store, _, csrf := linkFixture(t)
+	admin.eligibility = host.IdentityLinkStale
+	form := url.Values{"csrf": {csrf}, testLinkConfirmField: {"reauthenticate-local"}}
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost,
+		testOrigin+"/sso-link/reauth", strings.NewReader(form.Encode()))
+	r.Header.Set("Origin", testOrigin)
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.Header.Set("Accept", "application/json")
+	res, err := app.Test(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	var body struct {
+		Next string `json:"next"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != http.StatusOK || body.Next != "/auth/login?local=1&redirectback=%2Fsso-link" ||
+		admin.logouts != 1 || store.consumeCalls != 0 || len(admin.linked) != 0 {
+		t.Fatalf("unexpected JSON reauthentication response: status=%d next=%q logouts=%d",
+			res.StatusCode, body.Next, admin.logouts)
 	}
 }
 

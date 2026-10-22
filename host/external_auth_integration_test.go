@@ -144,6 +144,17 @@ func TestExternalAssemblyCanonicalLinkMembershipAndRegrant(t *testing.T) {
 	response, body = assemblyGet(t, runtime, "/sso-fixture/link-status", cookies)
 	require.Equal(t, http.StatusOK, response.StatusCode, string(body))
 	require.Equal(t, "unlinked", string(body))
+	// A native form's body-only proof never reaches the registered logout route:
+	// the assembled host's shared CSRF middleware requires the header as well.
+	missingHeader := httptest.NewRequestWithContext(t.Context(), http.MethodPost,
+		assemblyAdminOrigin+"/sso-fixture/local-reauth", strings.NewReader("csrf="+cookies["csrf_token"].Value))
+	missingHeader.Header.Set("Origin", assemblyAdminOrigin)
+	missingHeader.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	response, _ = assemblyRequest(t, runtime, missingHeader, cookies)
+	require.NotEqual(t, http.StatusNoContent, response.StatusCode)
+	response, body = assemblyGet(t, runtime, "/sso-fixture/link-status", cookies)
+	require.Equal(t, http.StatusOK, response.StatusCode, string(body))
+	require.Equal(t, "unlinked", string(body), "body-only CSRF unexpectedly logged out the local session")
 	enrollment := httptest.NewRequestWithContext(t.Context(), http.MethodPost, assemblyAdminOrigin+"/sso-fixture/enroll", nil)
 	enrollment.Header.Set("Origin", assemblyAdminOrigin)
 	enrollment.Header.Set("X-CSRF-Token", cookies["csrf_token"].Value)
