@@ -147,7 +147,9 @@ func linkFixture(t *testing.T, customCookie ...string) (*fiber.App, *fakeLinkAdm
 }
 
 func TestProviderAccountNavigationRequiresNativeActorAndUsesOnlyConfiguredTarget(t *testing.T) {
-	_, fixtureAdmin, _, _, _ := linkFixture(t)
+	fixtureApp, fixtureAdmin, fixtureStore, _, _ := linkFixture(t)
+	_ = fixtureApp
+	_ = fixtureStore
 	admin := &fakeLinkAdmin{actor: fixtureAdmin.actor, native: fixtureAdmin.native}
 	service := &Runtime{Config: testConfig()}
 	h := &linkHandler{service: service, admin: admin}

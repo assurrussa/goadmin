@@ -10,13 +10,13 @@ Source mode requires Git, Python 3 and Docker Compose. Its GoUploads pin is
 explicit candidate consumer resolves GoUploads v0.13.0 without that override
 when only GoAuth and GoNotify paths are selected.
 
-For published GoAdmin v0.12.0, use `GOADMIN_VERSION=v0.12.0 docker compose up --build`
-from this directory. That build removes local overrides and resolves libraries
-anonymously through the public Go proxy. Its embedded UI comes from the selected
+After GoAdmin v0.20.0 is published, use
+`GOADMIN_VERSION=v0.20.0 docker compose up --build` from this directory.
+That build removes local overrides and resolves libraries anonymously through the public Go proxy. Its embedded UI comes from the selected
 published release, not the current checkout. Run
-`make externalconsumer-published VERSION=v0.12.0` from the repository root first.
+`make externalconsumer-published VERSION=v0.20.0` from the repository root first.
 
-For either mode, copy `.env.example` to `.env`. It sets `GOADMIN_VERSION=v0.12.0`
+For either mode, copy `.env.example` to `.env`. It sets `GOADMIN_VERSION=v0.20.0`
 for the published build. Set PostgreSQL credentials, a unique CSRF secret and
 first-admin setup token of at least 32 bytes, and three distinct 32-byte keys
 encoded with standard base64. Generate each key with `openssl rand -base64 32`.

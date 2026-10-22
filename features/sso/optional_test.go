@@ -12,6 +12,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
+const legacyAccountPath = "/sso-account"
+
 func TestDisabledRuntimeHasNoSideEffects(t *testing.T) {
 	runtime, err := NewRuntime(t.Context(), Config{}, nil)
 	if err != nil || runtime != nil {
@@ -48,7 +50,7 @@ func TestSharedAccountNavigationIsOptionalAndDistinctFromStatusRoute(t *testing.
 	links := map[string]string{}
 	for _, item := range menu.Sections[0].Items {
 		links[item.Name] = item.Href
-		if item.Href == "/sso-account" || item.Href == "/sso/account" {
+		if item.Href == legacyAccountPath || item.Href == "/sso/account" {
 			t.Fatalf("status or legacy endpoint exposed as common navigation: %+v", item)
 		}
 	}
@@ -93,7 +95,7 @@ func TestAdapterBoundaryDoesNotCaptureHealthEndpoints(t *testing.T) {
 	app.Use(f.ingress)
 	app.Get("/healthz", func(c fiber.Ctx) error { return c.SendStatus(200) })
 	app.Get("/sso", func(c fiber.Ctx) error { return c.SendStatus(200) })
-	for _, path := range []string{linkPath, "/sso-account", providerAccountPath, "/sso-link/reauth"} {
+	for _, path := range []string{linkPath, legacyAccountPath, providerAccountPath, "/sso-link/reauth"} {
 		app.All(path, func(c fiber.Ctx) error { return c.SendStatus(200) })
 	}
 	for _, tc := range []struct {
@@ -104,7 +106,7 @@ func TestAdapterBoundaryDoesNotCaptureHealthEndpoints(t *testing.T) {
 		{http.MethodGet, "/sso", 404},
 		{http.MethodGet, linkPath, 404},
 		{http.MethodPost, linkPath, 404},
-		{http.MethodGet, "/sso-account", 404},
+		{http.MethodGet, legacyAccountPath, 404},
 		{http.MethodGet, providerAccountPath, 404},
 		{http.MethodPost, "/sso-link/reauth", 404},
 	} {
