@@ -79,6 +79,11 @@ func (a *fakeLinkAdmin) AdminCSRFRequest(_ fiber.Ctx) (host.CSRFRequest, error) 
 	return a.native, a.err
 }
 
+func (a *fakeLinkAdmin) WriteAdminCSRFCookie(c fiber.Ctx, name, token string, ttl time.Duration) error {
+	c.Cookie(&fiber.Cookie{Name: name, Value: token, Path: "/", Secure: true, SameSite: "Lax", MaxAge: int(ttl.Seconds())})
+	return nil
+}
+
 func (a *fakeLinkAdmin) LinkExternalAdminIdentity(_ fiber.Ctx, b host.ExternalBinding) (goauth.IdentityLink, error) {
 	a.linked = append(a.linked, b)
 	if a.linkErr != nil {

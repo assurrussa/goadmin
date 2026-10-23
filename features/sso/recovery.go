@@ -84,10 +84,9 @@ func (f *Feature) recover(c fiber.Ctx) error {
 	if _, valid, err := f.csrf.Check(c, request, token.Token); err != nil || !valid {
 		return recoveryFailure(c, browser.ErrUnavailable)
 	}
-	c.Cookie(&fiber.Cookie{
-		Name: f.rp.csrfCookie, Value: token.Token, Path: "/", Secure: true,
-		HTTPOnly: false, SameSite: "Strict", MaxAge: 24 * 60 * 60,
-	})
+	if err := f.app.WriteAdminCSRFCookie(c, f.rp.csrfCookie, token.Token, f.csrf.TokenTTL()); err != nil {
+		return recoveryFailure(c, browser.ErrUnavailable)
+	}
 	return c.JSON(ssoRecoveryResponse{Status: http.StatusOK, Code: "authentication_recovered", CSRFReady: true})
 }
 

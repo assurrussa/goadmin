@@ -50,7 +50,7 @@ func newTestSessionStore(t *testing.T) *fibersession.Store {
 	return fibersession.NewStore(fibersession.Config{
 		CookiePath:     "/",
 		CookieDomain:   testAdminDomain,
-		CookieSameSite: "Lax",
+		CookieSameSite: fiber.CookieSameSiteLaxMode,
 		CookieSecure:   false,
 	})
 }
