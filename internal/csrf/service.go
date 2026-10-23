@@ -53,6 +53,14 @@ type Service struct {
 	now            func() time.Time
 }
 
+// TokenTTL is the configured lifetime of a freshly issued browser proof.
+func (s *Service) TokenTTL() time.Duration {
+	if s == nil {
+		return 0
+	}
+	return s.tokenTTL
+}
+
 func New(opts Options) (*Service, error) {
 	return newWithClock(opts, time.Now)
 }

@@ -139,6 +139,7 @@ func (f *linkFeature) Build(host.Menu) host.ExtensionBuilder {
 type linkAdmin interface {
 	CurrentActor(ctx context.Context) (host.Actor, bool)
 	AdminCSRFRequest(c fiber.Ctx) (host.CSRFRequest, error)
+	WriteAdminCSRFCookie(c fiber.Ctx, name, token string, ttl time.Duration) error
 	LocalIdentityLinkEligibility(c fiber.Ctx) (host.IdentityLinkEligibility, error)
 	HasExternalAdminIdentity(c fiber.Ctx, issuer, externalSubject string) (bool, error)
 	LinkExternalAdminIdentity(c fiber.Ctx, b host.ExternalBinding) (goauth.IdentityLink, error)
@@ -259,7 +260,9 @@ func (h *linkHandler) page(c fiber.Ctx) error {
 			return c.SendStatus(http.StatusServiceUnavailable)
 		}
 		csrf = token.Token
-		c.Cookie(&fiber.Cookie{Name: h.service.csrfCookie, Value: csrf, Path: "/", Secure: true, SameSite: "Lax"})
+		if err := h.admin.WriteAdminCSRFCookie(c, h.service.csrfCookie, csrf, h.csrf.TokenTTL()); err != nil {
+			return c.SendStatus(http.StatusServiceUnavailable)
+		}
 	}
 	return h.render(c, "auth/SSOLinkPage", map[string]any{
 		titleProp: "Привязка SSO", "issuer": id.Issuer, "subject": id.Subject,
@@ -410,7 +413,10 @@ func (h *linkHandler) staleFailure(c fiber.Ctx, native host.CSRFRequest) error {
 		return h.failure(c, http.StatusServiceUnavailable, "local_auth_unavailable",
 			"Не удалось подготовить повторный вход. Попробуйте позже.")
 	}
-	c.Cookie(&fiber.Cookie{Name: h.service.csrfCookie, Value: token.Token, Path: "/", Secure: true, SameSite: "Lax"})
+	if err := h.admin.WriteAdminCSRFCookie(c, h.service.csrfCookie, token.Token, h.csrf.TokenTTL()); err != nil {
+		return h.failure(c, http.StatusServiceUnavailable, "local_auth_unavailable",
+			"Не удалось подготовить повторный вход. Попробуйте позже.")
+	}
 	return h.render(c, "auth/SSOErrorPage", map[string]any{
 		titleProp: "Повторный локальный вход", errorCodeProp: "local_auth_stale", messageProp: message,
 		"reauthCSRF": token.Token, h.service.csrfCookie: token.Token,

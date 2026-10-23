@@ -2,7 +2,9 @@ package bootstrap //nolint:testpackage // Tests the private cookie policy bounda
 
 import (
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -12,14 +14,66 @@ import (
 	"github.com/stretchr/testify/require"
 
 	adminconfig "github.com/assurrussa/goadmin/config"
+	"github.com/assurrussa/goadmin/internal/auth/browsercookie"
 )
 
+// The mounted recovery path must replace the native domain-scoped proof,
+// rather than creating a second host-only cookie that the auth middleware
+// rejects before session lookup on the next request.
+func TestWriteAdminCSRFCookieAllowsNextRequestWithDomainScope(t *testing.T) {
+	const origin = "https://admin.example.test"
+	const name = "csrf_token"
+	store := &session.Store{Config: session.Config{
+		CookieDomain: hostScopeParentDomain, CookiePath: "/", CookieSecure: true, CookieSameSite: fiber.CookieSameSiteLaxMode,
+	}}
+	jar, err := cookiejar.New(nil)
+	require.NoError(t, err)
+	u, err := url.Parse(origin + "/auth/profile")
+	require.NoError(t, err)
+	jar.SetCookies(u, []*http.Cookie{{ //nolint:gosec // CSRF proofs are deliberately browser-readable in this synthetic fixture.
+		Name: name, Value: "older", Domain: hostScopeParentDomain, Path: "/", Secure: true, SameSite: http.SameSiteLaxMode,
+	}})
+
+	app := fiber.New()
+	app.Get("/auth/session/recover", func(c fiber.Ctx) error {
+		WriteAdminCSRFCookie(c, store, adminconfig.Config{CSRFTokenName: name, CSRFTokenTTL: time.Hour}, "fresh", "")
+		return c.SendStatus(http.StatusOK)
+	})
+	app.Get("/auth/profile", func(c fiber.Ctx) error {
+		if err := browsercookie.Check(c, store, name); err != nil {
+			return c.SendStatus(http.StatusBadRequest)
+		}
+		return c.SendStatus(http.StatusOK)
+	})
+	recoverRequest := httptest.NewRequestWithContext(t.Context(), http.MethodGet, origin+"/auth/session/recover", nil)
+	for _, cookie := range jar.Cookies(u) {
+		recoverRequest.AddCookie(cookie)
+	}
+	recovery, err := app.Test(recoverRequest)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, recovery.StatusCode)
+	jar.SetCookies(u, recovery.Cookies())
+	require.NoError(t, recovery.Body.Close())
+
+	pageRequest := httptest.NewRequestWithContext(t.Context(), http.MethodGet, u.String(), nil)
+	for _, cookie := range jar.Cookies(u) {
+		pageRequest.AddCookie(cookie)
+	}
+	require.Len(t, jar.Cookies(u), 1)
+	require.Equal(t, "fresh", jar.Cookies(u)[0].Value)
+	page, err := app.Test(pageRequest)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, page.StatusCode)
+	require.NoError(t, page.Body.Close())
+}
+
 const (
-	hostScopeProduction  = "production"
-	hostScopeHTTPSOrigin = "https://admin.example.test"
-	hostScopeIPv6        = "::1"
-	hostScopePath        = "/admin"
-	hostScopeDNS         = "admin.example.test"
+	hostScopeParentDomain = "example.test"
+	hostScopeProduction   = "production"
+	hostScopeHTTPSOrigin  = "https://admin.example.test"
+	hostScopeIPv6         = "::1"
+	hostScopePath         = "/admin"
+	hostScopeDNS          = "admin.example.test"
 )
 
 func TestWriteAdminCSRFCookieKeepsStoreScope(t *testing.T) {
@@ -41,7 +95,7 @@ func TestWriteAdminCSRFCookieKeepsStoreScope(t *testing.T) {
 		},
 		{
 			name: "host-only IPv4", origin: "http://127.0.0.1:19443", tokenDomain: "127.0.0.1", environment: hostScopeProduction,
-			store: &session.Store{Config: session.Config{CookiePath: "/", CookieSameSite: "Lax"}},
+			store: &session.Store{Config: session.Config{CookiePath: "/", CookieSameSite: fiber.CookieSameSiteLaxMode}},
 			path:  "/", sameSite: http.SameSiteLaxMode,
 		},
 		{
@@ -53,9 +107,9 @@ func TestWriteAdminCSRFCookieKeepsStoreScope(t *testing.T) {
 			name: "explicit store domain", origin: hostScopeHTTPSOrigin, tokenDomain: hostScopeDNS,
 			environment: hostScopeProduction,
 			store: &session.Store{Config: session.Config{
-				CookieDomain: "example.test", CookiePath: hostScopePath, CookieSameSite: "Strict",
+				CookieDomain: hostScopeParentDomain, CookiePath: hostScopePath, CookieSameSite: "Strict",
 			}},
-			path: hostScopePath, domain: "example.test", sameSite: http.SameSiteStrictMode,
+			path: hostScopePath, domain: hostScopeParentDomain, sameSite: http.SameSiteStrictMode,
 		},
 		{
 			name: "empty store path and SameSite retain defaults", origin: "http://admin.example.test",
@@ -82,7 +136,7 @@ func TestWriteAdminCSRFCookieKeepsStoreScope(t *testing.T) {
 			cfg := adminconfig.Config{CSRFTokenName: cookieName, CSRFTokenTTL: ttl, Env: test.environment}
 			app := fiber.New()
 			app.Get(hostScopePath, func(c fiber.Ctx) error {
-				writeAdminCSRFCookie(c, test.store, cfg, proof, test.tokenDomain)
+				WriteAdminCSRFCookie(c, test.store, cfg, proof, test.tokenDomain)
 				return c.SendStatus(http.StatusOK)
 			})
 			request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, test.origin+hostScopePath, nil)

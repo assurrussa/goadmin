@@ -270,7 +270,7 @@ func newCSRFTokenProvider(
 			return "", goinertia.NewError(419, "failed create CSRF token", err)
 		}
 
-		writeAdminCSRFCookie(c, store, cfg, csrfToken.Token, csrfToken.Domain)
+		WriteAdminCSRFCookie(c, store, cfg, csrfToken.Token, csrfToken.Domain)
 
 		if adminID.IsZero() {
 			sess.Set(string(coresession.GuestAdminKey), int8(1))
@@ -388,7 +388,10 @@ func validAdminOrigin(c fiber.Ctx, cfg adminconfig.Config) bool {
 	return true
 }
 
-func writeAdminCSRFCookie(c fiber.Ctx, store *session.Store, cfg adminconfig.Config, token, domain string) {
+// WriteAdminCSRFCookie applies the native admin session cookie scope to a CSRF
+// proof. Optional features must use this policy instead of issuing a separate
+// cookie with a different domain or path.
+func WriteAdminCSRFCookie(c fiber.Ctx, store *session.Store, cfg adminconfig.Config, token, domain string) {
 	cookiePath := "/"
 	cookieDomain := domain
 	cookieSecure := cfg.IsProduction()
