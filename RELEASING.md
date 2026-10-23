@@ -4,8 +4,8 @@ This module is published as `github.com/assurrussa/goadmin`.
 
 ## Current Baseline
 
-- The latest published baseline is [v0.19.0](https://github.com/assurrussa/goadmin/releases/tag/v0.19.0).
-  The selected next candidate is `v0.20.0`; selection does not claim release
+- The latest published baseline is [v0.20.0](https://github.com/assurrussa/goadmin/releases/tag/v0.20.0).
+  The selected next candidate is `v0.20.1`; selection does not claim release
   readiness, publication, host acceptance or deployment.
 
 - Go 1.27.2 is the minimum. Modular host assembly is a breaking source API:
@@ -47,15 +47,24 @@ This module is published as `github.com/assurrussa/goadmin`.
 - The frontend advisory gate and its current zero-finding result are reviewed
   in [docs/dependency-advisory-review.md](docs/dependency-advisory-review.md).
 
-## v0.20.0 candidate
+## v0.20.1 candidate
+
+- Align optional SSO link and recovery CSRF cookie writes with the native admin
+  session cookie domain, path, Secure and SameSite policy. A recovery must replace
+  the existing browser proof rather than create a differently scoped duplicate;
+  duplicate-cookie rejection and canonical session/RBAC checks remain intact.
+- Run `make publish-readiness VERSION=v0.20.1` on the final source tree. After
+  the separately authorized tag resolves publicly, run
+  `make release-readiness VERSION=v0.20.1` against that exact tag. Library
+  publication does not establish downstream host acceptance or deployment.
+
+## v0.20.0 published baseline
 
 - Align root and starter with published GoAuth v0.15.0; align the root SSO SDK
   with published gossoclient v0.6.1. These pins do not enable mandatory MFA
   or change host SSO policy.
-- Run `make publish-readiness VERSION=v0.20.0` on the final source tree,
-  including the public-dependency clean-consumer probe. Only after a separately
-  authorized tag is published, run `make release-readiness VERSION=v0.20.0`
-  against that exact tag. Do not infer deployment from library publication.
+- The published tag passed its exact-tag `make release-readiness VERSION=v0.20.0`
+  gate. Do not infer deployment from library publication.
 
 ## v0.14.0 historical candidate
 
