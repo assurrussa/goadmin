@@ -1016,3 +1016,147 @@ it('settles local processing when owner changes without remount and allows origi
   expect(useUploadQueueStore(pinia).uploads).toEqual([])
   expect(mocks.reconcile).not.toHaveBeenCalled()
 })
+
+describe('raw JSON model commits', () => {
+  const documentWithText = (text: string) => ({
+    type: 'doc',
+    content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+  })
+  const openRawJSON = async (root: HTMLElement) => {
+    await vi.waitFor(() => expect(root.querySelector('.tiptap')).not.toBeNull())
+    root.querySelector<HTMLButtonElement>('button[title="View Raw JSON"]')!.click()
+    await nextTick()
+    return root.querySelector<HTMLTextAreaElement>('.json-textarea')!
+  }
+  const inputJSON = async (textarea: HTMLTextAreaElement, value: unknown) => {
+    textarea.value = typeof value === 'string' ? value : JSON.stringify(value)
+    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    await nextTick()
+  }
+
+  it('commits through the real form field into the saved host model and survives remount', async () => {
+    const { default: FormRichTextField } = await import('./FormRichTextField.vue')
+    const initial = documentWithText('Before save')
+    const replacement = documentWithText('Raw JSON saved content')
+    const host = reactive({ body: initial as unknown, saved: null as unknown, version: 0 })
+    const updated = vi.fn((value: unknown) => {
+      host.body = value
+    })
+    const changed = vi.fn()
+    const root = document.createElement('div')
+    const app = createApp({
+      render: () =>
+        h(
+          'form',
+          {
+            onSubmit: (event: Event) => {
+              event.preventDefault()
+              host.saved = JSON.parse(JSON.stringify(host.body))
+              host.version++
+            },
+          },
+          [
+            h(FormRichTextField, {
+              key: host.version,
+              modelValue: host.body,
+              allowFileUpload: false,
+              'onUpdate:modelValue': updated,
+              onChange: changed,
+            }),
+            h('button', { type: 'submit', 'data-test': 'save' }, 'Save'),
+          ],
+        ),
+    }).use(createPinia())
+    apps.push(app)
+    app.mount(root)
+    await nextTick()
+    expect(updated).not.toHaveBeenCalled()
+    await inputJSON(await openRawJSON(root), replacement)
+    expect(updated).toHaveBeenCalledExactlyOnceWith(replacement)
+    expect(changed).toHaveBeenCalledExactlyOnceWith(replacement)
+    root
+      .querySelector('form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await nextTick()
+    expect(host.saved).toEqual(replacement)
+    await vi.waitFor(() =>
+      expect(root.querySelector('.tiptap')?.textContent).toBe('Raw JSON saved content'),
+    )
+    expect(updated).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['json', 'html'] as const)(
+    'emits one normalized %s value for a valid empty document',
+    async (outputFormat) => {
+      const updated = vi.fn()
+      const root = document.createElement('div')
+      const app = createApp(RichTextEditor, {
+        modelValue: documentWithText('Remove me'),
+        outputFormat,
+        allowFileUpload: false,
+        'onUpdate:modelValue': updated,
+      }).use(createPinia())
+      apps.push(app)
+      app.mount(root)
+      await inputJSON(await openRawJSON(root), { type: 'doc', content: [{ type: 'paragraph' }] })
+      expect(updated).toHaveBeenCalledExactlyOnceWith(
+        outputFormat === 'json' ? { type: 'doc', content: [{ type: 'paragraph' }] } : '<p></p>',
+      )
+    },
+  )
+
+  it.each(['{', JSON.stringify({ type: 'doc', content: [{ type: 'unknownNode' }] })])(
+    'rejects invalid raw content without changing the document or host model: %s',
+    async (value) => {
+      const updated = vi.fn()
+      const invalid = vi.fn()
+      const root = document.createElement('div')
+      const app = createApp(RichTextEditor, {
+        modelValue: documentWithText('Preserved'),
+        allowFileUpload: false,
+        'onUpdate:modelValue': updated,
+        onInvalidContent: invalid,
+      }).use(createPinia())
+      apps.push(app)
+      app.mount(root)
+      await inputJSON(await openRawJSON(root), value)
+      expect(updated).not.toHaveBeenCalled()
+      expect(root.querySelector('.json-error-message')).not.toBeNull()
+      if (value !== '{')
+        expect(invalid).toHaveBeenCalledWith(expect.objectContaining({ source: 'raw-json' }))
+      root.querySelector<HTMLButtonElement>('button[title="View Visual"]')!.click()
+      await nextTick()
+      await vi.waitFor(() => expect(root.querySelector('.tiptap')?.textContent).toBe('Preserved'))
+    },
+  )
+
+  it.each(['readonly', 'disabled'] as const)(
+    'prevents raw JSON mutation while %s',
+    async (mode) => {
+      const updated = vi.fn()
+      const props = reactive({ readonly: false, disabled: false })
+      const root = document.createElement('div')
+      const app = createApp({
+        render: () =>
+          h(RichTextEditor, {
+            ...props,
+            modelValue: documentWithText('Protected'),
+            allowFileUpload: false,
+            'onUpdate:modelValue': updated,
+          }),
+      }).use(createPinia())
+      apps.push(app)
+      app.mount(root)
+      const textarea = await openRawJSON(root)
+      props[mode] = true
+      await nextTick()
+      expect(mode === 'readonly' ? textarea.readOnly : textarea.disabled).toBe(true)
+      updated.mockClear()
+      await inputJSON(textarea, documentWithText('Must not commit'))
+      expect(updated).not.toHaveBeenCalled()
+      root.querySelector<HTMLButtonElement>('button[title="View Visual"]')!.click()
+      await nextTick()
+      await vi.waitFor(() => expect(root.querySelector('.tiptap')?.textContent).toBe('Protected'))
+    },
+  )
+})
