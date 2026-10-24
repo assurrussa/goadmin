@@ -1611,3 +1611,49 @@ Each concept is one generated image showing light on the left and dark on the
 right. These are built-in Image Gen visual proposals grounded in the browser
 captures, not implemented screens or pixel-exact specifications. Retain source
 content and component behaviour when implementing the selected direction.
+
+## Foreground navigation after browser auth recovery (2026-10-24)
+
+The shared Inertia shell may continue one failed foreground GET after successful
+opt-in recovery. It retains only a same-origin URL and a request cancellation
+signal, not a rejected body, visit options or callbacks. Async/prefetch/partial
+requests and auth endpoints do not qualify. Query strings are preserved; custom
+request parameters/bodies and redirects do not qualify. The continuation is a
+fresh ordinary GET, so authorization is checked again. No mutation is replayed.
+A continued GET cannot earn another recovery attempt until a successful page
+lifecycle. Successful continuation has no "Save again" notice. Noncontinued GET
+recovery gets a neutral navigation notice; mutations still require manual retry.
+
+New navigation, history navigation, pagehide, dismissal, cancelled/interrupted
+visits and teardown abort pending recovery. Late recovery results cannot navigate.
+Failed recovery keeps explicit login, including revoked/expired/denied sessions.
+No server auth deadlines, idle/session policy or provider settings are changed.
+Deadline-aware proactive maintenance is a separate pending contract assessment;
+a blind periodic heartbeat is deliberately not introduced by this change.
+
+### Deferred deadline-aware maintenance design
+
+A fixed heartbeat calling the current recovery endpoint is unsafe: `session.SavePassive`
+refreshes storage idle TTL even without extending cookie/absolute lifetime;
+`CompleteExternalAdminRecovery` uses that write. `GetAdminAuth` also saves the
+projection. PostgreSQL's no-touch session read returns payload but not the stored
+expiry; its normal write resets expiry. Maintenance needs equivalent behavior in
+both PostgreSQL and Redis before enabling a timer.
+
+A bounded follow-on package should add a no-touch deadline snapshot (read via
+store/journal, not `GetAdminAuth`) and an expiry-preserving, ownership/version-fenced
+recovery write. Scheduling metadata can expose server time, the earliest proof/native
+absolute deadline and the SDK renewal window, never tokens/session IDs. SDK renewal
+lead currently derives from freshness / 10 (30 seconds with the SSO five-minute
+freshness), so arbitrary 40–80 second polling can miss the renewal window.
+The browser should clamp scheduling to server hints, stop while idle/hidden, and
+serialize/cancel maintenance with foreground recovery. A visible tab is not itself
+proof of activity; preservation of server idle expiry remains mandatory.
+
+Timing hints are not an authorization grant. Beginning recovery does not alone prove
+canonical token or current permission validity. Renewal must retain all canonical,
+SDK, membership and link fences. `SDK.Check` does not contact the issuer and must
+not be described as immediate central revocation detection. Tests must cover no idle
+extension, hard expiry, revoke, stale CAS, concurrent tabs, clock skew, hidden tabs,
+background throttling and unavailable authorization. This package is a proposal,
+not implemented or enabled by the foreground-navigation patch.
