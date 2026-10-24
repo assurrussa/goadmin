@@ -282,8 +282,8 @@ func TestRunCancellationWaitsForConnectionShutdown(t *testing.T) {
 	cancel()
 	waitReady(t, entered)
 	select {
-	case <-result:
-		t.Fatal("Run returned before connection shutdown")
+	case err := <-result:
+		t.Fatalf("Run returned before connection shutdown: %v", err)
 	default:
 	}
 	close(release)
@@ -334,13 +334,13 @@ func TestDirectAndServerShutdownShareOneDrain(t *testing.T) {
 	serverDone := make(chan error, 1)
 	go func() { serverDone <- srv.Shutdown(t.Context()) }()
 	select {
-	case <-directDone:
-		t.Fatal("direct App shutdown returned before drain")
+	case err := <-directDone:
+		t.Fatalf("direct App shutdown returned before drain: %v", err)
 	default:
 	}
 	select {
-	case <-serverDone:
-		t.Fatal("Server shutdown returned before drain")
+	case err := <-serverDone:
+		t.Fatalf("Server shutdown returned before drain: %v", err)
 	default:
 	}
 	unblock()

@@ -153,6 +153,8 @@ test('validation and navigation synchronize auth from the live Inertia page', as
       document,
       console,
       window: {
+        addEventListener: window.addEventListener.bind(window),
+        removeEventListener: window.removeEventListener.bind(window),
         location: {
           origin: window.location.origin,
           assign() {

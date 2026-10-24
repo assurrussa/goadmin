@@ -16,6 +16,8 @@ export interface AuthFailureEffects {
   // Opt-in recovery changes only authority/CSRF, never repeats the rejected command.
   recoverAuth?(signal: AbortSignal): Promise<boolean>
   showLogin?(): void
+  // Only a validated foreground GET URL is passed; never a command or callback.
+  resumeNavigation?(url: string): void
 }
 
 type AuthFailureCode =
@@ -97,6 +99,43 @@ export function createAuthFailureHandler(effects: AuthFailureEffects) {
   let attemptedRecovery = false
   let settledBeforeNextRequest = false
   let pendingRecovery: AbortController | null = null
+  let visitGeneration = 0
+  const visitIDs = new WeakMap<object, number>()
+  let activeURL: string | null = null
+  const safeURL = (value: unknown): string | null => {
+    if (typeof value !== 'string' && !(value instanceof URL)) return null
+    try {
+      const url = new URL(String(value), effects.origin)
+      if (url.origin !== effects.origin || url.username || url.password) return null
+      // Authentication endpoints can change authority even when reached by GET.
+      if (/^\/auth(?:\/|$)/i.test(url.pathname)) return null
+      url.hash = ''
+      return url.href
+    } catch {
+      return null
+    }
+  }
+  const empty = (value: unknown) =>
+    value == null || (isRecord(value) && Object.keys(value).length === 0)
+  const continuation = (response: unknown): string | null => {
+    if (!activeURL || !isRecord(response) || !isRecord(response.config)) return null
+    const config = response.config
+    // Do not continue a request that actually ended at a redirect/login target.
+    if (
+      isRecord(response.request) &&
+      typeof response.request.responseURL === 'string' &&
+      safeURL(response.request.responseURL) !== activeURL
+    )
+      return null
+    if (
+      config.method !== 'get' ||
+      !empty(config.data) ||
+      !empty(config.params) ||
+      (isRecord(config.signal) && config.signal.aborted === true)
+    )
+      return null
+    return safeURL(config.url) === activeURL ? activeURL : null
+  }
   const requireLogin = () => {
     effects.clearAuth()
     effects.disconnect()
@@ -114,6 +153,14 @@ export function createAuthFailureHandler(effects: AuthFailureEffects) {
       return
     }
     event.preventDefault()
+    const response = event.detail.response
+    if (
+      isRecord(response) &&
+      isRecord(response.config) &&
+      isRecord(response.config.signal) &&
+      response.config.signal.aborted === true
+    )
+      return
     if (leavingForLogin || settledBeforeNextRequest) {
       return
     }
@@ -129,9 +176,25 @@ export function createAuthFailureHandler(effects: AuthFailureEffects) {
         attemptedRecovery = true
         const controller = new AbortController()
         pendingRecovery = controller
+        const resumeURL = effects.resumeNavigation ? continuation(event.detail.response) : null
+        const requestSignal =
+          resumeURL &&
+          isRecord(response) &&
+          isRecord(response.config) &&
+          isRecord(response.config.signal)
+            ? response.config.signal
+            : null
+        const readOnly =
+          isRecord(response) && isRecord(response.config) && response.config.method === 'get'
         effects.disconnect()
-        effects.showNotice('Восстанавливаем доступ. Данные формы остаются на странице.')
-        // Keep no request body, router visit or mutation callback to replay.
+        effects.showNotice(
+          resumeURL
+            ? ''
+            : readOnly
+              ? 'Восстанавливаем доступ.'
+              : 'Восстанавливаем доступ. Данные формы остаются на странице.',
+        )
+        // Keep only a validated GET destination, never a request body or mutation callback.
         void effects
           .recoverAuth(controller.signal)
           .catch(() => false)
@@ -142,9 +205,16 @@ export function createAuthFailureHandler(effects: AuthFailureEffects) {
             pendingRecovery = null
             settledBeforeNextRequest = true
             if (recovered) {
-              effects.showNotice(
-                'Доступ восстановлен. Данные формы сохранены на странице. Нажмите «Сохранить» ещё раз.',
-              )
+              if (resumeURL && resumeURL === activeURL && requestSignal?.aborted !== true) {
+                effects.showNotice('')
+                effects.resumeNavigation?.(resumeURL)
+              } else {
+                effects.showNotice(
+                  readOnly
+                    ? 'Доступ восстановлен. Повторите переход.'
+                    : 'Доступ восстановлен. Данные формы сохранены на странице. Нажмите «Сохранить» ещё раз.',
+                )
+              }
             } else {
               requireLogin()
             }
@@ -176,8 +246,36 @@ export function createAuthFailureHandler(effects: AuthFailureEffects) {
   // Abort any obsolete recovery so a late response cannot replace its notice.
   handler.cancel = () => {
     settledBeforeNextRequest = false
+    visitGeneration++
+    activeURL = null
     pendingRecovery?.abort()
     pendingRecovery = null
+  }
+  handler.start = (visit: unknown) => {
+    handler.cancel()
+    if (isRecord(visit)) {
+      visitIDs.set(visit, visitGeneration)
+      if (
+        visit.method === 'get' &&
+        !visit.async &&
+        !visit.prefetch &&
+        !visit.cancelled &&
+        !visit.interrupted &&
+        ['only', 'except', 'reset'].every(
+          (key) => !Array.isArray(visit[key]) || visit[key].length === 0,
+        )
+      ) {
+        activeURL = safeURL(visit.url)
+      }
+    }
+  }
+  handler.finish = (visit: unknown) => {
+    if (
+      isRecord(visit) &&
+      visitIDs.get(visit) === visitGeneration &&
+      (visit.cancelled || visit.interrupted)
+    )
+      handler.cancel()
   }
   handler.reset = () => {
     handler.cancel()
