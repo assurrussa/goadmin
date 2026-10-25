@@ -2,6 +2,7 @@ package testsmatcher
 
 import (
 	"fmt"
+	"mime/multipart"
 	"reflect"
 
 	uploadhost "github.com/assurrussa/gouploads/host"
@@ -45,19 +46,7 @@ func checkUploadFileMatcher(
 	if !reflect.DeepEqual(expected.Config, got.Config) {
 		unequalFields = append(unequalFields, "Config")
 	}
-	if got.FileHeader != nil && expected.FileHeader != nil {
-		if expected.FileHeader.Size != got.FileHeader.Size {
-			unequalFields = append(unequalFields, "Config size")
-		}
-		if reflect.DeepEqual(expected.FileHeader.Header, got.FileHeader.Header) {
-			unequalFields = append(unequalFields, "Config headers")
-		}
-		if expected.FileHeader.Filename != got.FileHeader.Filename {
-			unequalFields = append(unequalFields, "Config Filename")
-		}
-	} else {
-		unequalFields = append(unequalFields, "FileHeader invalid")
-	}
+	unequalFields = checkUploadFileHeaders(expected.FileHeader, got.FileHeader, unequalFields)
 	if len(expected.AfterJobs) != len(got.AfterJobs) {
 		unequalFields = append(unequalFields, "AfterJobs not equal")
 	} else {
@@ -79,4 +68,22 @@ func checkUploadFileMatcher(
 	}
 
 	return unequalFields, len(unequalFields) == 0
+}
+
+func checkUploadFileHeaders(expected, got *multipart.FileHeader, unequalFields []string) []string {
+	if got != nil && expected != nil {
+		if expected.Size != got.Size {
+			unequalFields = append(unequalFields, "Config size")
+		}
+		if reflect.DeepEqual(expected.Header, got.Header) {
+			unequalFields = append(unequalFields, "Config headers")
+		}
+		if expected.Filename != got.Filename {
+			unequalFields = append(unequalFields, "Config Filename")
+		}
+	} else {
+		unequalFields = append(unequalFields, "FileHeader invalid")
+	}
+
+	return unequalFields
 }

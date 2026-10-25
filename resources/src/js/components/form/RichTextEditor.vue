@@ -1320,6 +1320,17 @@ const updateFromRawJSON = () => {
   if (props.disabled || props.readonly) return
   try {
     const jsonData = JSON.parse(rawJSON.value)
+    if (
+      !jsonData ||
+      typeof jsonData !== 'object' ||
+      Array.isArray(jsonData) ||
+      jsonData.type !== 'doc'
+    ) {
+      const error = new Error('Raw JSON content must be a rich-text document object')
+      reportInvalidContent(error, 'raw-json', jsonData)
+      jsonError.value = error.message
+      return
+    }
     if (setValidatedContent(jsonData, 'raw-json')) {
       jsonError.value = ''
       // Programmatic setContent stays silent; this successful user edit must reach the host.

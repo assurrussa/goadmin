@@ -157,7 +157,7 @@ test('late retryable response does not replace the pending login transition', ()
   assert.deepEqual(f.notices, [])
 })
 
-function recoveryFixture(recover) {
+function recoveryFixture(recover, extra = {}) {
   const calls = []
   const notices = []
   const handler = createAuthFailureHandler({
@@ -168,6 +168,7 @@ function recoveryFixture(recover) {
     showNotice: (value) => notices.push(value),
     recoverAuth: (signal) => { calls.push('recover'); return recover(signal) },
     showLogin: () => calls.push('login-button'),
+    ...extra,
   })
   const value = response(401, 'reauthentication_required')
   value.headers['x-goadmin-auth-recovery'] = '1'
@@ -242,4 +243,109 @@ test('a host must explicitly opt in; unknown recovery versions use legacy handli
   f.value.headers['x-goadmin-auth-recovery'] = '2'
   f.handler(eventFor(f.value))
   assert.deepEqual(f.calls, ['clear', 'disconnect', 'navigate'])
+})
+
+function navigationFixture(recover = () => Promise.resolve(true)) {
+  const resumed = []
+  const f = recoveryFixture(recover, { resumeNavigation: (url) => resumed.push(url) })
+  f.value.config = { url: 'https://admin.test/protected?city=2', method: 'get', signal: new AbortController().signal }
+  const visit = { url: new URL(f.value.config.url), method: 'get', async: false, prefetch: false }
+  f.handler.start(visit)
+  return { ...f, visit, resumed }
+}
+
+test('foreground GET continues once with its exact query and no Save notice', async () => {
+  const f = navigationFixture()
+  f.handler(eventFor(f.value))
+  await flush()
+  assert.deepEqual(f.resumed, ['https://admin.test/protected?city=2'])
+  assert.deepEqual(f.notices, ['', ''])
+  // The continuation gets no extra recovery budget if authority remains invalid.
+  f.handler.start(f.visit)
+  f.handler(eventFor(f.value))
+  await flush()
+  assert.equal(f.resumed.length, 1)
+  assert.equal(f.calls.filter((call) => call === 'recover').length, 1)
+  assert.equal(f.calls.at(-1), 'login-button')
+})
+
+for (const [name, change] of [
+  ['POST payment', (f) => { f.value.config.method = 'post'; f.value.config.data = 'charge=1' }],
+  ['GET body', (f) => { f.value.config.data = { command: 'pay' } }],
+  ['unmerged parameters', (f) => { f.value.config.params = { city: 7 } }],
+  ['background reload', (f) => { f.visit.async = true; f.handler.start(f.visit) }],
+  ['prefetch', (f) => { f.visit.prefetch = true; f.handler.start(f.visit) }],
+  ['partial visit', (f) => { f.visit.only = ['auth']; f.handler.start(f.visit) }],
+  ['another URL response', (f) => { f.value.config.url = '/other' }],
+  ['foreign response', (f) => { f.value.config.url = 'https://evil.test/protected' }],
+  ['redirected response', (f) => { f.value.request = { responseURL: 'https://evil.test/protected' } }],
+  ['login redirect', (f) => { f.value.request = { responseURL: 'https://admin.test/auth/login' } }],
+  ['auth target', (f) => { f.value.config.url = '/auth/logout'; f.handler.start({ ...f.visit, url: '/auth/logout' }) }],
+]) {
+  test(`never automatically continues ${name}`, async () => {
+    const f = navigationFixture()
+    change(f)
+    f.handler(eventFor(f.value))
+    await flush()
+    assert.deepEqual(f.resumed, [])
+  })
+}
+
+for (const [name, invalidate] of [
+  ['new navigation', (f) => f.handler.start({ url: '/new', method: 'get' })],
+  ['dismiss / pagehide / history navigation', (f) => f.handler.cancel()],
+  ['cancelled visit', (f) => { f.visit.cancelled = true; f.handler.finish(f.visit) }],
+  ['interrupted visit', (f) => { f.visit.interrupted = true; f.handler.finish(f.visit) }],
+  ['successful page', (f) => f.handler.reset()],
+]) {
+  test(`late recovery cannot continue after ${name}`, async () => {
+    let finish
+    const f = navigationFixture(() => new Promise((resolve) => { finish = resolve }))
+    f.handler(eventFor(f.value))
+    invalidate(f)
+    finish(true)
+    await flush()
+    assert.deepEqual(f.resumed, [])
+  })
+}
+
+test('normal failed-request finish does not cancel pending recovery', async () => {
+  let finish
+  const f = navigationFixture(() => new Promise((resolve) => { finish = resolve }))
+  f.handler(eventFor(f.value))
+  f.handler.finish(f.visit)
+  finish(true)
+  await flush()
+  assert.equal(f.resumed.length, 1)
+})
+
+test('aborted request is ignored even when its response arrives late', async () => {
+  const f = navigationFixture()
+  const controller = new AbortController()
+  controller.abort()
+  f.value.config.signal = controller.signal
+  f.handler(eventFor(f.value))
+  await flush()
+  assert.deepEqual(f.resumed, [])
+  assert.deepEqual(f.calls, [])
+})
+
+test('revocation or denied recovery never continues GET', async () => {
+  const f = navigationFixture(() => Promise.resolve(false))
+  f.handler(eventFor(f.value))
+  await flush()
+  assert.deepEqual(f.resumed, [])
+  assert.equal(f.calls.at(-1), 'login-button')
+})
+
+test('403 permission denial does not attempt recovery or continuation', async () => {
+  const f = navigationFixture()
+  f.value.status = 403
+  f.value.data = { status: 403, code: 'admission_denied', message: 'Denied' }
+  const event = eventFor(f.value)
+  f.handler(event)
+  await flush()
+  assert.equal(event.defaultPrevented, false)
+  assert.deepEqual(f.calls, [])
+  assert.deepEqual(f.resumed, [])
 })

@@ -1105,7 +1105,18 @@ describe('raw JSON model commits', () => {
     },
   )
 
-  it.each(['{', JSON.stringify({ type: 'doc', content: [{ type: 'unknownNode' }] })])(
+  it.each([
+    '{',
+    'null',
+    'false',
+    '0',
+    '""',
+    '"<p>Must not replace document</p>"',
+    '[]',
+    '{}',
+    JSON.stringify({ type: 'paragraph', content: [{ type: 'text', text: 'Not a document' }] }),
+    JSON.stringify({ type: 'doc', content: [{ type: 'unknownNode' }] }),
+  ])(
     'rejects invalid raw content without changing the document or host model: %s',
     async (value) => {
       const updated = vi.fn()

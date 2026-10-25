@@ -87,6 +87,7 @@ void createInertiaApp({
     const authFailureMessage = ref('')
     const authFailureLogin = ref(false)
     const stopListeners: Array<() => void> = []
+    let cancelAuthRecovery = () => {}
     const app = createApp({
       render: () =>
         h(Fragment, null, [
@@ -94,8 +95,12 @@ void createInertiaApp({
           h(AuthFailureNotice, {
             message: authFailureMessage.value,
             loginRequired: authFailureLogin.value,
-            onLogin: () => window.location.assign('/auth/login'),
+            onLogin: () => {
+              cancelAuthRecovery()
+              window.location.assign('/auth/login')
+            },
             onDismiss: () => {
+              cancelAuthRecovery()
               authFailureMessage.value = ''
             },
           }),
@@ -170,6 +175,7 @@ void createInertiaApp({
           window.location.assign('/auth/login')
         },
         recoverAuth: recoverBrowserAuthentication,
+        resumeNavigation: (url) => router.get(url),
         showLogin: () => {
           authFailureLogin.value = true
         },
@@ -177,10 +183,15 @@ void createInertiaApp({
           authFailureMessage.value = message
         },
       })
+      cancelAuthRecovery = () => authFailureHandler.cancel()
+      window.addEventListener('pagehide', cancelAuthRecovery)
       stopListeners.push(
+        () => window.removeEventListener('pagehide', cancelAuthRecovery),
         () => authFailureHandler.reset(),
         router.on('invalid', authFailureHandler),
-        router.on('start', () => authFailureHandler.cancel()),
+        router.on('start', (event) => authFailureHandler.start(event.detail.visit)),
+        router.on('finish', (event) => authFailureHandler.finish(event.detail.visit)),
+        router.on('navigate', () => authFailureHandler.cancel()),
         router.on('success', (event) => {
           // A late page response must not restore stale auth while the separate
           // login navigation is in progress.
