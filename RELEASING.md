@@ -4,8 +4,8 @@ This module is published as `github.com/assurrussa/goadmin`.
 
 ## Current Baseline
 
-- The latest published baseline is [v0.20.0](https://github.com/assurrussa/goadmin/releases/tag/v0.20.0).
-  The selected next candidate is `v0.20.1`; selection does not claim release
+- The latest published baseline is [v0.20.2](https://github.com/assurrussa/goadmin/releases/tag/v0.20.2).
+  The selected next candidate is `v0.20.3`; selection does not claim release
   readiness, publication, host acceptance or deployment.
 
 - Go 1.27.2 is the minimum. Modular host assembly is a breaking source API:
@@ -47,7 +47,28 @@ This module is published as `github.com/assurrussa/goadmin`.
 - The frontend advisory gate and its current zero-finding result are reviewed
   in [docs/dependency-advisory-review.md](docs/dependency-advisory-review.md).
 
-## v0.20.1 candidate
+## v0.20.3 candidate
+
+- Propagate successfully validated Raw JSON user edits to the host rich-text
+  model while leaving controlled external updates silent. Readonly and disabled
+  editors reject raw-content mutation; invalid syntax and schema preserve the
+  existing document and host model. Raw input must be a document object, not a
+  primitive, HTML string, array, or non-document node.
+- The regression covers the real `FormRichTextField` save/remount path, normalized
+  JSON/HTML empty content, and protected states. Hosts must rebuild their admin
+  extension assets and verify their own save/reload persistence workflow.
+- Run `make publish-readiness VERSION=v0.20.3` on the final candidate tree.
+  After separately authorized publication, run
+  `make release-readiness VERSION=v0.20.3` against that exact immutable tag.
+  Earlier PR checks and published v0.20.2 session-navigation fixes do not prove
+  this candidate's release readiness or downstream host acceptance.
+
+## v0.20.2 published baseline
+
+- Includes safe admin navigation continuation after session recovery (PR #71).
+  Raw JSON model propagation is not included in this tag.
+
+## v0.20.1 published baseline
 
 - Align optional SSO link and recovery CSRF cookie writes with the native admin
   session cookie domain, path, Secure and SameSite policy. A recovery must replace
