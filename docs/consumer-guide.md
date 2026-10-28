@@ -75,7 +75,7 @@ with local replacements is not proof that a published consumer resolves.
 
 ## Know which parts are required
 
-- **Core runtime:** Go 1.27 or newer, Fiber v3, PostgreSQL, GoAuth-backed
+- **Core runtime:** Go 1.27.3 or newer, Fiber v3, PostgreSQL, GoAuth-backed
   authentication/RBAC, and the configured signing/token/journal keys and CSRF
   protection. The host supplies its database and configuration; run
   `migrations.Migrate` before serving traffic. PostgreSQL is the default

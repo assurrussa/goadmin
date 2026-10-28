@@ -8,7 +8,7 @@ This module is published as `github.com/assurrussa/goadmin`.
   The proposed next candidate is `v0.21.0`; selection does not claim release
   readiness, publication, host acceptance or deployment.
 
-- Go 1.27.2 is the minimum. Modular host assembly is a breaking source API:
+- Go 1.27.3 is the minimum. Modular host assembly is a breaking source API:
   migrate hosts to `host.New`, explicit modules and `host.AdminConfig`.
 - The current root module pins published GoAuth `v0.15.0` (schema 14), including the
   companion MFA and assisted-recovery APIs, without a sibling replacement. Verify the resulting
@@ -63,6 +63,10 @@ This module is published as `github.com/assurrussa/goadmin`.
 - Updates only transitive `qs` 6.16.0 to 6.16.1 within Inertia's declared range,
   with rebuilt embedded assets; see the dated
   [advisory reassessment](docs/dependency-advisory-review.md).
+- Requires Go 1.27.3 or newer to address the standard-library `crypto/x509`
+  advisory [GO-2026-6809](https://pkg.go.dev/vuln/GO-2026-6809). Hosts on Go
+  1.27.2 must upgrade their build toolchain before consuming this candidate;
+  rebuild and redeploy existing binaries to receive the standard-library fix.
 - This proposal is not publication, release readiness, downstream acceptance or
   deployment. Run `make publish-readiness VERSION=v0.21.0` on the final candidate
   tree and complete review and agreed acceptance before separately authorized

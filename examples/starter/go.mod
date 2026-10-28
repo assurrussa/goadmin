@@ -1,6 +1,6 @@
 module example.com/goadmin-starter
 
-go 1.27.2
+go 1.27.3
 
 require (
 	github.com/assurrussa/goadmin v0.7.0
