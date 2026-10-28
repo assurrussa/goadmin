@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"time"
 
 	browser "github.com/assurrussa/gossoclient"
 	"github.com/gofiber/fiber/v3"
@@ -51,20 +52,25 @@ func (f *Feature) recover(c fiber.Ctx) error {
 	if !f.recoveryIntent(c) || f.csrf == nil {
 		return recoveryFailure(c, browser.ErrDenied)
 	}
-	snapshot, err := f.app.BeginExternalAdminRecovery(c)
+	snapshot, err := f.app.BeginOwnedExternalAdminRecovery(c)
 	if err != nil {
 		return recoveryFailure(c, err)
 	}
 	old := snapshot.Binding()
 	r, err := adaptor.ConvertRequest(c, true)
 	if err != nil {
+		_ = f.app.CancelExternalAdminRecovery(c, snapshot)
 		return recoveryFailure(c, browser.ErrDenied)
 	}
 	proof, err := f.rp.Client.Verify(r)
 	if err != nil {
+		_ = f.app.CancelExternalAdminRecovery(c, snapshot)
 		return recoveryFailure(c, err)
 	}
 	fresh, err := Build(proof, old.LocalSubject, old.LinkID)
+	if err != nil {
+		_ = f.app.CancelExternalAdminRecovery(c, snapshot)
+	}
 	if err == nil {
 		err = f.app.CompleteExternalAdminRecovery(c, snapshot, fresh)
 	}
@@ -77,6 +83,10 @@ func (f *Feature) recover(c fiber.Ctx) error {
 	}
 	origin, _ := url.Parse(f.rp.Config.Origin)
 	request.Domain = origin.Hostname()
+	if claims, valid, checkErr := f.csrf.Check(c, request, c.Cookies(f.rp.csrfCookie)); checkErr == nil && valid &&
+		time.Until(claims.ExpiresAt.Time) > min(30*time.Second, f.csrf.TokenTTL()/10) {
+		return c.JSON(ssoRecoveryResponse{Status: http.StatusOK, Code: "authentication_recovered", CSRFReady: true})
+	}
 	token, err := f.csrf.Create(c, request)
 	if err != nil {
 		return recoveryFailure(c, browser.ErrUnavailable)
@@ -87,7 +97,9 @@ func (f *Feature) recover(c fiber.Ctx) error {
 	if err := f.app.WriteAdminCSRFCookie(c, f.rp.csrfCookie, token.Token, f.csrf.TokenTTL()); err != nil {
 		return recoveryFailure(c, browser.ErrUnavailable)
 	}
-	return c.JSON(ssoRecoveryResponse{Status: http.StatusOK, Code: "authentication_recovered", CSRFReady: true})
+	return c.Status(http.StatusConflict).JSON(ssoRecoveryResponse{
+		Status: http.StatusConflict, Code: "authentication_recovery_continue",
+	})
 }
 
 func recoveryFailure(c fiber.Ctx, err error) error {

@@ -31,9 +31,11 @@
   let pending = false;
   let leaving = false;
   let activeController;
+  let navigationTimer;
   function abandon() {
     leaving = true;
     activeController?.abort();
+    if (navigationTimer !== undefined) clearTimeout(navigationTimer);
   }
   if (signIn) signIn.addEventListener("click", event => {
     if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button > 0) return;
@@ -42,6 +44,8 @@
   window.addEventListener("pagehide", abandon);
   async function recover() {
     if (pending || leaving) return;
+    if (navigationTimer !== undefined) clearTimeout(navigationTimer);
+    navigationTimer = undefined;
     pending = true;
     retry.hidden = true;
     next.hidden = true;
@@ -74,6 +78,14 @@
           if (reserveReturn()) {
             heading("Возвращаемся на страницу");
             status.textContent = "Вход подтверждён. Открываем страницу автоматически.";
+            navigationTimer = setTimeout(() => {
+              if (leaving) return;
+              heading("Автоматический переход не завершён");
+              status.textContent = "Переход не завершился. Нажмите «Продолжить» или повторите проверку. Сохранение и отправка не повторялись.";
+              next.hidden = false;
+              retry.hidden = false;
+              if (signIn) signIn.hidden = false;
+            }, 10000);
             location.reload();
           }
           return;

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, h, nextTick } from 'vue'
 import SSOLinkPage from './SSOLinkPage.vue'
 import SSOErrorPage from './SSOErrorPage.vue'
+import { configureSessionMaintenance, sessionCoordinator } from '@/http'
 import SSOButton from '@/components/auth/SSOButton.vue'
 import {
   localReauthenticationDestination,
@@ -33,6 +34,9 @@ vi.mock('@/components/form/FormButton.vue', () => ({
 const apps: ReturnType<typeof createApp>[] = []
 afterEach(() => {
   apps.splice(0).forEach((a) => a.unmount())
+  configureSessionMaintenance({ props: {} }, {})
+  sessionCoordinator.dispose()
+  document.cookie = 'csrf_token=; Max-Age=0; path=/'
   vi.unstubAllGlobals()
 })
 function mount(component: Parameters<typeof createApp>[0], props = {}) {
@@ -82,6 +86,108 @@ describe('shared SSO pages', () => {
     form.dispatchEvent(new Event('submit', { cancelable: true }))
     expect(fetch).toHaveBeenCalledTimes(1)
   })
+  it('waits once on double submit and builds the explicit native proof body from the refreshed cookie', async () => {
+    let resolve!: (response: Response) => void
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockImplementationOnce(
+        () =>
+          new Promise((done) => {
+            resolve = done
+          }),
+      )
+      .mockRejectedValueOnce(new Error('response lost'))
+    vi.stubGlobal('fetch', fetch)
+    configureSessionMaintenance({
+      props: { adminSessionMaintenance: { version: 1, sessionEpoch: 'one' } },
+    })
+    const root = mount(SSOLinkPage, {
+      issuer: 'issuer',
+      subject: 'subject',
+      intent: 'explicit-intent',
+      csrf: 'expired-page-proof',
+    })
+    const form = root.querySelector('form')!
+    form.dispatchEvent(new Event('submit', { cancelable: true }))
+    form.dispatchEvent(new Event('submit', { cancelable: true }))
+    expect(fetch).toHaveBeenCalledTimes(1)
+    document.cookie = 'csrf_token=fresh-native-proof; path=/'
+    const now = Date.now()
+    resolve(
+      new Response(
+        JSON.stringify({
+          status: 200,
+          code: 'authentication_recovered',
+          csrfReady: true,
+          maintenance: {
+            version: 1,
+            serverTime: new Date(now).toISOString(),
+            nextCheckAfterMs: 60_000,
+            csrfExpiresAt: new Date(now + 300_000).toISOString(),
+            hardExpiresAt: new Date(now + 3_600_000).toISOString(),
+            sessionEpoch: 'one',
+            revision: 1,
+            renewed: false,
+          },
+        }),
+        { headers: { 'Content-Type': 'application/json', 'X-Goadmin-Auth-Recovery': '1' } },
+      ),
+    )
+    await new Promise((done) => setTimeout(done, 0))
+    await nextTick()
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch.mock.calls[1]?.[1]?.body).toBeInstanceOf(URLSearchParams)
+    const body = fetch.mock.calls[1]?.[1]?.body as URLSearchParams
+    expect(body.get('csrf')).toBe('fresh-native-proof')
+    expect(body.get('intent')).toBe('explicit-intent')
+    expect(new Headers(fetch.mock.calls[1]?.[1]?.headers).get('X-CSRF-Token')).toBe(
+      'fresh-native-proof',
+    )
+    expect(root.textContent).toContain('Результат запроса неизвестен')
+    form.dispatchEvent(new Event('submit', { cancelable: true }))
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('constructs local reauthentication proof from the current cookie while retaining its transition bypass', async () => {
+    const now = Date.now()
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status: 200,
+            code: 'authentication_recovered',
+            csrfReady: true,
+            maintenance: {
+              version: 1,
+              serverTime: new Date(now).toISOString(),
+              nextCheckAfterMs: 60_000,
+              csrfExpiresAt: new Date(now + 300_000).toISOString(),
+              hardExpiresAt: new Date(now + 3_600_000).toISOString(),
+              sessionEpoch: 'one',
+              revision: 1,
+              renewed: false,
+            },
+          }),
+          { headers: { 'Content-Type': 'application/json', 'X-Goadmin-Auth-Recovery': '1' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response('{}', { status: 403, headers: { 'Content-Type': 'application/json' } }),
+      )
+    vi.stubGlobal('fetch', fetch)
+    configureSessionMaintenance({
+      props: { adminSessionMaintenance: { version: 1, sessionEpoch: 'one' } },
+    })
+    document.cookie = 'csrf_token=refreshed-reauth-proof; path=/'
+    expect(await requestLocalReauthentication('expired-page-proof')).toBe(false)
+    const body = fetch.mock.calls[1]?.[1]?.body as URLSearchParams
+    expect(body.get('csrf')).toBe('refreshed-reauth-proof')
+    expect(body.get('confirm')).toBe('reauthenticate-local')
+    expect(fetch.mock.calls[1]?.[0]).toBe('/sso-link/reauth')
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
   it('sends both stale reauthentication buttons through the common CSRF header contract', async () => {
     const fetch = vi.fn().mockResolvedValue({
       status: 403,

@@ -48,7 +48,7 @@ type realtimeLogoutFixture struct {
 	authRelease chan struct{}
 }
 
-func newRealtimeLogoutFixture(t *testing.T) *realtimeLogoutFixture {
+func newRealtimeLogoutFixture(t *testing.T, sessionStores ...*fibersession.Store) *realtimeLogoutFixture {
 	t.Helper()
 	f := &realtimeLogoutFixture{stream: inmem.New(), authEntered: make(chan struct{}, 1), authRelease: make(chan struct{})}
 	f.clock.Store(time.Now().Truncate(time.Second).UnixNano())
@@ -72,7 +72,11 @@ func newRealtimeLogoutFixture(t *testing.T) *realtimeLogoutFixture {
 		return nil, nil
 	}
 	mocks.MockRoleService.EXPECT().GetRolesAdmin(gomock.Any(), f.admin.ID).DoAndReturn(roles).AnyTimes()
-	f.service = adminservice.NewService(fibersession.NewStore(), mocks.MockRoleService,
+	store := fibersession.NewStore()
+	if len(sessionStores) > 0 {
+		store = sessionStores[0]
+	}
+	f.service = adminservice.NewService(store, mocks.MockRoleService,
 		adminservice.WithRuntime(canonical.Runtime, realtimeAdminRepository{admin: f.admin}),
 		adminservice.WithBrowserState(browserstate.NewMemory()))
 	f.app = fiber.New()

@@ -1657,3 +1657,121 @@ not be described as immediate central revocation detection. Tests must cover no 
 extension, hard expiry, revoke, stale CAS, concurrent tabs, clock skew, hidden tabs,
 background throttling and unavailable authorization. This package is a proposal,
 not implemented or enabled by the foreground-navigation patch.
+
+## Session maintenance (2026-10-28)
+
+This accepted implementation supersedes the earlier scheduling proposal above.
+Accepted scope: GoAdmin core and built-in browser transports, local password and
+SSO sessions. No consumer changes, SDK expansion, publication or deployment.
+An executing open tab maintains storage idle leases, never immutable login
+limits. Hard expiry and unknown refresh consumption require explicit login;
+the mounted draft survives until the user chooses navigation.
+
+Implementation: core `/auth/session/maintain`, optional external renewal
+capability, owner before provider renewal, conditional stale-reader cleanup,
+typed browser coordinator and supported `@admin-core/http` facade. Legacy
+recovery remains compatible. Commands already sent are never replayed.
+
+Transition contract: ready -> maintenance owner -> committed ready; followers
+reread or retry without clearing cookies. Transient dependency failure retains
+authority; terminal denial ends the affected lineage. Uncertain native refresh
+retains its fence. Logout supersedes pending renewal; old replies cannot restore
+authority. New cookies require a confirming request before readiness.
+
+Implemented and validated: owner-before-SDK renewal and version/owner cleanup,
+shared local/SSO maintenance, negotiated CSRF repair, typed browser coordinator,
+public request facade, transport/epoch fences and rebuilt embedded assets.
+Fallback document navigation has a ten-second watchdog and explicit controls
+when automatic return stalls; it never repeats a business command. Navigation
+cancels pending shared-client continuations.
+A changed epoch blocks this document until explicit navigation; retained drafts
+cannot silently submit under another login. Old clients retain legacy CSRF errors.
+
+Validation passed:
+- `make check GO_FILES="$(git ls-files -c -o --exclude-standard -- '*.go' | tr '\n' ' ')"`;
+  explicit source inventory excludes ignored historical starter smoke copies.
+- Final `make resources`: 72 Vitest files, 845 tests, manifest/type/lint checks
+  and embedded asset verification. No dependency pins changed.
+- `go test -tags=integration ./... -skip '^TestAdmissionRealBrowser$' -count=1`
+  with disposable PostgreSQL/Redis. Includes real pinned SDK/test OIDC coverage.
+- `go test -race ./bootstrap ./features/sso ./services/adminservice -count=1`
+  with explicit browser configuration. The opt-in maintenance browser test passed
+  real cookies, several native refreshes, more than two accelerated idle TTLs,
+  retained draft, zero document reloads and exactly one command execution.
+- `make externalconsumer-local`, gopls diagnostics and `git diff --check`.
+- Independent final security/concurrency review: no remaining P1/P2 findings.
+
+Not run: the pre-existing full admission browser harness requiring an explicit
+trusted TLS fixture; a full-day SSO/browser soak at ordinary TTLs; production
+acceptance. Consumer adoption, publication and deployment remain out of scope.
+
+### Review fixes and PR (2026-10-28)
+
+Current goal: close all three subsequent review findings, commit the complete
+session-maintenance change on `tasks/admin-session-maintenance` and open a PR.
+The prior no-publication boundary is superseded only for the branch and PR;
+release tags and deployment remain outside this task.
+
+Required fixes: anchor the first check to the login that rendered the page;
+retain background maintenance after navigation cancels pending commands; reject
+old Inertia page responses before they can replace the mounted document.
+An advertised v1 capability without a page epoch fails closed. An absent
+capability keeps legacy behavior. Mutations are never automatically replayed.
+
+The branch was fast-forwarded to current master (`6336783`) before final checks;
+the unrelated Raw JSON editor fixes are inherited from master. Backend page and
+maintenance epochs now share one derivation, and the page uses its authenticated
+projection as the anchor. Targeted native session/CSRF tests pass, including
+same-admin independent-login epoch separation. The three findings are fixed and
+`make check` passes on the integrated branch (872 UI tests plus Go race/coverage,
+lint and embedded assets). A follow-up review confirmed that terminal 401/403
+and hard expiry must also refuse late successful Inertia pages. The final guard
+retains stale-response fencing for sign-in/logout and exempts only current
+explicit transitions from terminal-state refusal.
+
+Final validation: `make resources` passed all 879 tests in 73 files, types, lint,
+manifest checks and rebuilt embedded assets. The opt-in Chromium maintenance test
+passed under Go race detection with real cookies, multiple native refreshes,
+preserved draft and exactly one command. The clean local consumer probe passed.
+Independent review of the final fixes found no remaining actionable findings.
+The full SSO/browser soak, production acceptance and release publication remain
+outside this validation. Changes are ready for the authorized commit and PR.
+
+### PR 72 document-command identity fence (2026-10-28)
+
+Cached readiness is not a request identity proof: another
+window can replace both native and CSRF cookies during the thirty-second fresh
+window. Negotiated protected requests now send `X-Goadmin-Session-Epoch`, pinned
+to the login that rendered this document, independently of the cookie jar and
+maintenance metadata. Core authenticated middleware compares that value with
+the validated canonical login before continuing to CSRF, RBAC or business code.
+A v1 request with a missing, malformed, duplicate or mismatched epoch (or an
+invalid/duplicate negotiation marker) receives no-store HTTP 409 JSON with
+`X-Goadmin-Auth-Error: 1` and `code: session_changed`; there is no redirect or
+business-command replay. Both reads and mutations are fenced. The mounted draft
+remains intact and this document becomes terminal until explicit navigation.
+
+Clients without the maintenance request marker intentionally retain their legacy
+auth/CSRF behavior; this fence does not replace either check. Public auth routes
+and explicit login/logout/recovery transitions remain outside the old document's
+command fence. Same-session renewal preserves the canonical login epoch.
+`AdminFetchNotSentError` identifies only readiness/fence rejection before the
+original fetch invocation; a transport failure is not evidence of non-execution.
+
+### Negotiated read refusal and effective Axios URLs (2026-10-28)
+
+A protected GET/HEAD can lose native authority during cached readiness. Its
+version-1 request now receives the tagged non-page authentication refusal,
+including anonymous/missing-cookie and opted-in external-recovery cases, rather
+than a login redirect or recovery document that could replace an unsaved editor.
+Membership denial is `403 access_denied`; native expiry/revocation or missing
+credentials are `401 reauthentication_required`. Normal legacy document requests,
+public authentication routes and explicit identity transitions retain their
+existing navigation behavior. No business request or mutation is replayed.
+
+Axios transition, logout and response-fence classification now use its effective
+`getUri` URL, including Axios's baseURL combination semantics. A custom
+`/api/auth/login` reached by `baseURL: /api` plus `url: /auth/login` is a protected
+request, not the root login transition; terminal readiness cannot bypass the
+fence through that spelling. Absolute root identity URLs retain their explicit
+transition behavior. No publication or deployment is part of these fixes.

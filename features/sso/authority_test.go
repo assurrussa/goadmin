@@ -86,11 +86,46 @@ func TestSnapshotRejectsInconsistentProof(t *testing.T) {
 type fakeLifecycle struct {
 	checks, revokes int
 	revoked         browser.Binding
+	checkErr        error
 }
 
 func (f *fakeLifecycle) Check(context.Context, browser.Binding) (browser.Proof, error) {
 	f.checks++
+	if f.checkErr != nil {
+		return browser.Proof{}, f.checkErr
+	}
 	return browser.Proof{}, errors.New("unavailable")
+}
+
+func TestAuthorityDistinguishesProviderDenialFromOutage(t *testing.T) {
+	for _, providerErr := range []error{browser.ErrDenied, browser.ErrRequiredAMR, browser.ErrUnavailable} {
+		t.Run(providerErr.Error(), func(t *testing.T) {
+			b, id, local, _ := snapshotFixture()
+			now := time.Now()
+			b.AuthTime = now.Add(-time.Minute).Unix()
+			b.AbsoluteUntil = now.Add(time.Hour)
+			b.Deadline = now.Add(5 * time.Minute)
+			id.AuthTime, id.AbsoluteUntil = b.AuthTime, b.AbsoluteUntil
+			id.IssuedAt, id.SessionExpiresAt = now.Add(-time.Second), now.Add(time.Hour)
+			binding, err := buildSnapshot(b, id, local, "link", now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			client := &fakeLifecycle{checkErr: providerErr}
+			a := &Authority{Client: client, Allows: func(string, string) bool { return true }}
+			_, err = a.Validate(t.Context(), binding)
+			if client.checks != 1 {
+				t.Fatal("provider classification was not exercised")
+			}
+			if errors.Is(providerErr, browser.ErrUnavailable) {
+				if !errors.Is(err, browser.ErrUnavailable) || errors.Is(err, goauth.ErrSessionRevoked) {
+					t.Fatal(err)
+				}
+			} else if !errors.Is(err, goauth.ErrSessionRevoked) {
+				t.Fatal(err)
+			}
+		})
+	}
 }
 
 func (f *fakeLifecycle) RevokeBinding(_ context.Context, b browser.Binding) error {

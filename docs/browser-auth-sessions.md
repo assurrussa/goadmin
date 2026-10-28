@@ -1,5 +1,65 @@
 # Opaque admin browser sessions
 
+## Continuous maintenance
+
+Authenticated pages advertise `adminSessionMaintenance: { version: 1, sessionEpoch }` only
+when their login supports the protocol. Core password sessions are supported;
+external sessions require the optional `host.ExternalSessionMaintainer`
+capability. The built-in SSO runtime implements it. Custom authorities retain
+their existing read-only `Validate` contract and must opt into renewal explicitly.
+The epoch comes from the login used to render the page and anchors the first
+maintenance response. An advertised version 1 without an epoch fails closed;
+absence of the capability retains legacy behavior. A different login blocks the
+mounted document, even when it belongs to the same admin.
+
+Core owns `GET /auth/session/maintain`. Requests require exactly one
+`X-Goadmin-Auth-Recovery: 1` header, unambiguous cookies, no bearer header/query,
+and same-origin Origin or Fetch-Site/Referer evidence. Responses are no-store
+JSON. The endpoint authenticates an existing login; it cannot create a native
+admission or resurrect an expired/missing journal. The old SSO recovery route
+and Begin/Complete facade remain available. New custom recovery adapters should
+use BeginOwned/Cancel/Complete to acquire the native owner before SDK Verify.
+
+HTTP 200 retains `status`, `code: authentication_recovered`, `csrfReady: true`
+and adds `maintenance` version 1: server time, relative next-check interval,
+CSRF/external/hard deadlines, nonbearer session epoch, revision and renewal flag.
+The fixed hard deadline includes journal and canonical expiry, external absolute
+expiry and known browser absolute expiry. New anonymous bootstraps retain their
+browser absolute deadline across login. Legacy browser snapshots without that
+metadata retain their existing Fiber expiry enforcement; their reported deadline
+is the minimum of the remaining known limits, not a new lifetime promise.
+
+Healthy maintenance reuses CSRF and keeps auth revision/cookies unchanged.
+A missing, expired or unsuitable CSRF cookie is issued once with HTTP 409
+`authentication_recovery_continue`; the following request must confirm the
+incoming proof before a 200. A normal attempt contains at most two GETs. Busy
+owners and dependency failures return retryable 503, with Retry-After. Confirmed
+revocation/hard expiry/unknown native refresh consumption requires explicit
+login; lost membership is access denied. Recognized authenticated CSRF failures
+return tagged 419 `csrf_needs_sync` before the business handler when the client
+negotiates `X-Goadmin-Session-Maintenance: 1`; older clients retain their legacy
+CSRF error behavior. Invalid origins
+and ambiguous credentials are not repair signals.
+
+The native journal owner is acquired before provider renewal, with no SQL lock
+held across network calls. Readers wait/re-read or fail temporarily. Error cleanup
+is conditional on the captured version/owner; explicit logout still terminates
+its lineage and fences late refresh. An uncertain consumed refresh secret cannot
+be retried. This version does not add cross-store crash reconciliation to the SDK.
+
+Executing visible and hidden tabs maintain the existing storage idle lease with
+throttled passive saves, without renewing browser cookies, immutable limits or
+user-activity timestamps. Defaults are a 60-second visible watchdog and
+120-second hidden watchdog, bounded earlier by the server schedule and idle
+touch interval. Sleeping/frozen tabs are checked on resume, not promised timer
+execution. After hard expiry the draft stays mounted until explicit navigation.
+
+Frontend scheduling requires the explicit versioned capability. A new client on
+an old host preserves legacy recovery. A new server retains old recovery response
+fields for old clients. Maintenance uses one in-flight request per tab; correctness
+across tabs/instances remains the server's responsibility. Tokens, authority
+references, opaque cookie identifiers and form bodies are never maintenance data.
+
 The browser continues to carry one random opaque session identifier. The
 supported host and DI assemblies keep credentials in a separate encrypted state
 journal, using the Runtime Outbox AEAD key ring. Fiber session snapshots contain
@@ -190,3 +250,21 @@ RBAC and CSRF still gate every later mutation. Recovery is not a save
 acknowledgement and must never automatically repeat a mutation, including
 uploads or requests with unknown outcomes. Without explicit host opt-in the
 existing authentication error behavior is unchanged.
+
+## Negotiated document identity fence
+
+Protected requests from the version-1 session-maintenance client carry
+`X-Goadmin-Session-Maintenance: 1` and exactly one
+`X-Goadmin-Session-Epoch` header. The latter is the public, non-credential epoch
+from the document's initial `adminSessionMaintenance` page prop, not a value
+read from shared cookies or learned from a later login. The authenticated core
+middleware validates it against the current canonical login before dispatching
+protected handlers, even when client readiness is cached and the new login's
+CSRF cookie is valid. Missing, malformed, duplicate or unequal epochs for
+negotiated requests fail closed with HTTP 409, `X-Goadmin-Auth-Error: 1`, and
+`{ "status": 409, "code": "session_changed", "message": "..." }`.
+The shared client stops this document's submissions and keeps its draft mounted;
+there is no automatic mutation retry or navigation. Explicit identity
+transitions are exempt. Clients which omit the maintenance negotiation header
+intentionally keep their existing auth/CSRF contract. Refreshing the same login
+must not change its epoch.

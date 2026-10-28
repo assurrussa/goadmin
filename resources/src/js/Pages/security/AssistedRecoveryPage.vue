@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { adminFetch, AdminFetchNotSentError } from '@/http'
 import { ref, onBeforeUnmount } from 'vue'
 import { router } from '@inertiajs/vue3'
 import { useI18n, registerTranslations } from '@/i18n'
@@ -25,6 +26,8 @@ registerTranslations({
       'Invitation queued. Credentials change only after recovery is completed.',
     'Результат неизвестен. Не отправляйте новое приглашение до проверки владельцем сервиса.':
       'Outcome unknown. Do not send another invitation until the service owner reconciles this request.',
+    'Приглашение не отправлено: сеанс не готов. Введите пароль и MFA заново и повторите попытку.':
+      'Invitation not sent: the session is not ready. Re-enter your password and MFA and try again.',
     'Запрос отклонён. Проверьте разрешение, независимую проверку личности и свежие пароль и MFA.':
       'Request rejected. Check permission, independent identity verification, and fresh password and MFA.',
     'Учётная запись с таким email не найдена.': 'No account found with this email.',
@@ -62,7 +65,7 @@ async function submit(event: Event) {
   locked.value = true
   const form = event.target as HTMLFormElement
   try {
-    const response = await fetch('/account-recovery', {
+    const response = await adminFetch('/account-recovery', {
       method: 'POST',
       credentials: 'same-origin',
       mode: 'same-origin',
@@ -87,8 +90,14 @@ async function submit(event: Event) {
           : t(
               'Запрос отклонён. Проверьте разрешение, независимую проверку личности и свежие пароль и MFA.',
             )
-  } catch {
-    if (lifecycle.isActive())
+  } catch (error) {
+    if (lifecycle.isActive() && error instanceof AdminFetchNotSentError) {
+      locked.value = false
+      message.value = () =>
+        t(
+          'Приглашение не отправлено: сеанс не готов. Введите пароль и MFA заново и повторите попытку.',
+        )
+    } else if (lifecycle.isActive())
       message.value = () =>
         t('Результат неизвестен. Не отправляйте новое приглашение до проверки владельцем сервиса.')
   } finally {

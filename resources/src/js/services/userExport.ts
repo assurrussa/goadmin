@@ -1,3 +1,4 @@
+import { adminFetch } from '@/http'
 // Export is a file transfer, not an Inertia page visit. Use the grid's URL state
 // and leave page size/selection out of the matching-row export contract.
 export async function downloadUserExport(
@@ -14,7 +15,7 @@ export async function downloadUserExport(
   target.searchParams.delete('page')
   target.searchParams.delete('limit')
   target.hash = ''
-  const response = await fetch(target.href, {
+  const response = await adminFetch(target.href, {
     credentials: 'same-origin',
     headers: { Accept: 'text/csv' },
     signal,

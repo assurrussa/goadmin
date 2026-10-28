@@ -18,6 +18,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/static"
 
 	"github.com/assurrussa/goadmin/adminapp"
+	adminconfig "github.com/assurrussa/goadmin/config"
 	adminadmins "github.com/assurrussa/goadmin/http/handlers/administrations"
 	adminauthhandler "github.com/assurrussa/goadmin/http/handlers/auth"
 	adminmain "github.com/assurrussa/goadmin/http/handlers/dashboard"
@@ -177,7 +178,8 @@ func initServer(ctx context.Context, deps Dependencies, cfg Config, app *adminap
 		httpWS,
 		uploadContextBuild,
 		staticFilesConfig{
-			routes: staticRoutes, uploadsRoot: filepath.Clean(uploadsRoot),
+			adminConfig: cfg.AdminConfig,
+			routes:      staticRoutes, uploadsRoot: filepath.Clean(uploadsRoot),
 			csrfCookieName:  getCookieTokenName(cfg.AdminConfig),
 			publicAuthPaths: authrecovery.Paths(cfg.PasswordRecovery),
 		},
@@ -194,7 +196,7 @@ func initServer(ctx context.Context, deps Dependencies, cfg Config, app *adminap
 		server.WithRegistered(fnRegistered),
 		server.WithHandlers(httpHandlers),
 
-		server.WithErrHandler(app.HTTPManager().MiddlewareErrorListener()),
+		server.WithErrHandler(sessionMaintenanceErrorHandler(app.HTTPManager().MiddlewareErrorListener())),
 		server.WithTlsCert(cfg.ServerConfig.TLSCert),
 		server.WithTlsKey(cfg.ServerConfig.TLSKey),
 		server.WithMaxRequest(cfg.ServerConfig.MaxRequest),
@@ -268,6 +270,7 @@ func validateUploadTransports(transports []UploadTransport) error {
 }
 
 type staticFilesConfig struct {
+	adminConfig     adminconfig.Config
 	publicAuthPaths []string
 	routes          []StaticRoute
 	uploadsRoot     string
@@ -285,6 +288,7 @@ func buildRegisteredHandler(
 	registered []func(*fiber.App),
 ) func(*fiber.App) {
 	return func(fiberApp *fiber.App) {
+		registerSessionMaintenance(fiberApp, deps, staticFiles.adminConfig)
 		if httpWS != nil {
 			registerRealtimeRoute(fiberApp, deps.System.AdminAuthService, httpWS, staticFiles.csrfCookieName)
 		}

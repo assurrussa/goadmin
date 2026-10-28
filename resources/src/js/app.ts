@@ -20,6 +20,13 @@ import InertiaFallbackPage from '@/components/system/InertiaFallbackPage.vue'
 import AuthFailureNotice from '@/components/system/AuthFailureNotice.vue'
 import { createAuthFailureHandler } from '@/auth/browserAuthFailures'
 import { recoverBrowserAuthentication } from '@/auth/browserAuthRecovery'
+import {
+  configureSessionMaintenance,
+  sessionCoordinator,
+  installSessionAxiosInterceptor,
+  reportSessionAuthFailure,
+  SessionReadinessError,
+} from '@/http'
 import axios from 'axios'
 import type { AdminAuthUser } from '@/types/models'
 import { extensions } from '@/extensions'
@@ -150,7 +157,11 @@ void createInertiaApp({
         authUserStore.setAuthUser(auth)
         profileStore.setAvatarUrl(auth?.avatarUrl ?? null)
 
-        if (nextId && hasAdminCapability('realtime')) {
+        if (
+          nextId &&
+          hasAdminCapability('realtime') &&
+          (!sessionCoordinator.isEnabled() || sessionCoordinator.getState() === 'ready')
+        ) {
           ensureConnected()
         } else if (currentAuthId) {
           disconnect()
@@ -158,6 +169,44 @@ void createInertiaApp({
 
         currentAuthId = nextId
       }
+
+      stopListeners.push(installSessionAxiosInterceptor())
+      let manualRetryAfterRepair = false
+      configureSessionMaintenance((props as { initialPage?: unknown }).initialPage, {
+        onState: (state) => {
+          if (
+            state === 'reauthentication_required' ||
+            state === 'access_denied' ||
+            state === 'session_changed'
+          ) {
+            authUserStore.setAuthUser(null)
+            profileStore.setAvatarUrl(null)
+            currentAuthId = null
+            disconnect()
+            authFailureLogin.value = true
+            authFailureMessage.value =
+              state === 'session_changed'
+                ? 'Сеанс изменился. Данные формы сохранены. Войдите снова перед отправкой.'
+                : 'Сеанс завершён или доступ закрыт. Данные формы сохранены. Войдите снова.'
+          } else if (state === 'csrf_needs_sync') {
+            manualRetryAfterRepair = true
+            authFailureMessage.value = 'Восстанавливаем доступ. Данные формы остаются на странице.'
+          } else if (state === 'authentication_unavailable') {
+            authFailureMessage.value =
+              'Сервис авторизации временно недоступен. Данные формы сохранены. Повторите попытку.'
+          } else if (state === 'ready') {
+            authFailureMessage.value = manualRetryAfterRepair
+              ? 'Доступ восстановлен. Данные формы сохранены на странице. Нажмите «Сохранить» ещё раз.'
+              : ''
+            manualRetryAfterRepair = false
+            authFailureLogin.value = false
+          }
+        },
+        onReady: () => {
+          if (currentAuthId && hasAdminCapability('realtime')) ensureConnected()
+        },
+      })
+      stopListeners.push(() => sessionCoordinator.dispose())
 
       const initialAuth = extractAuth((props as { initialPage?: unknown }).initialPage)
       syncAuthState(initialAuth)
@@ -183,28 +232,79 @@ void createInertiaApp({
           authFailureMessage.value = message
         },
       })
-      cancelAuthRecovery = () => authFailureHandler.cancel()
+      cancelAuthRecovery = () => {
+        authFailureHandler.cancel()
+        // Discard command continuations while the shared watchdog keeps running.
+        sessionCoordinator.cancel()
+      }
       window.addEventListener('pagehide', cancelAuthRecovery)
       stopListeners.push(
         () => window.removeEventListener('pagehide', cancelAuthRecovery),
         () => authFailureHandler.reset(),
-        router.on('invalid', authFailureHandler),
+        router.on('invalid', (event) => {
+          if (!sessionCoordinator.isEnabled()) {
+            authFailureHandler(event)
+            return
+          }
+          const response = event.detail.response
+          if (
+            reportSessionAuthFailure(
+              response.status,
+              {
+                get: (name) =>
+                  typeof response.headers.get === 'function'
+                    ? response.headers.get(name)
+                    : response.headers[name],
+              },
+              response.data,
+              false,
+            )
+          )
+            event.preventDefault()
+        }),
+        router.on('exception', (event) => {
+          if (
+            sessionCoordinator.isEnabled() &&
+            axios.isAxiosError(event.detail.exception) &&
+            !event.detail.exception.response
+          ) {
+            event.preventDefault()
+          }
+          if (event.detail.exception instanceof SessionReadinessError) {
+            event.preventDefault()
+            if (event.detail.exception.code === 'session_changed') {
+              authFailureMessage.value = event.detail.exception.message
+            }
+          }
+        }),
         router.on('start', (event) => authFailureHandler.start(event.detail.visit)),
         router.on('finish', (event) => authFailureHandler.finish(event.detail.visit)),
-        router.on('navigate', () => authFailureHandler.cancel()),
+        router.on('navigate', cancelAuthRecovery),
         router.on('success', (event) => {
           // A late page response must not restore stale auth while the separate
           // login navigation is in progress.
-          if (!leavingForLogin) {
+          if (
+            !leavingForLogin &&
+            (!['reauthentication_required', 'access_denied', 'session_changed'].includes(
+              sessionCoordinator.getState(),
+            ) ||
+              extractAuth(event.detail?.page) === null)
+          ) {
             authFailureHandler.reset()
             authFailureMessage.value = ''
             authFailureLogin.value = false
             setAdminCapabilities(event.detail?.page)
+            configureSessionMaintenance(event.detail?.page)
             syncAuthState(extractAuth(event.detail?.page))
           }
         }),
         router.on('error', () => {
-          if (!leavingForLogin) {
+          if (
+            !leavingForLogin &&
+            !['reauthentication_required', 'access_denied', 'session_changed'].includes(
+              sessionCoordinator.getState(),
+            )
+          ) {
             syncAuthState(extractAuth(currentPage))
           }
         }),

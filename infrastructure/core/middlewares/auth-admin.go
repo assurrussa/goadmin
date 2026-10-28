@@ -12,6 +12,7 @@ import (
 	"github.com/assurrussa/goadmin/infrastructure/core/session"
 	goinertia "github.com/assurrussa/goadmin/infrastructure/inertia"
 	"github.com/assurrussa/goadmin/internal/auth/browsercookie"
+	"github.com/assurrussa/goadmin/internal/auth/browserstate"
 	identity "github.com/assurrussa/goadmin/internal/identity"
 	"github.com/assurrussa/goadmin/models"
 	"github.com/assurrussa/goadmin/services/adminservice"
@@ -55,23 +56,68 @@ func AuthAdminMiddlewareWithPublicPaths(
 				serviceSession.RecoverAmbiguousBrowserCookies(c, extraCookieNames...)
 				return c.Next()
 			}
-			return browserAuthFailure(c, err)
+			return browserAuthFailure(c, err, publicAuth)
 		}
 		c.Locals(session.AuthAdminKey.String(), admin)
+		// A document's identity fence is independent of the shared cookie jar.
+		// Check before CSRF/RBAC/business handlers: another tab may have replaced
+		// both the login cookie and its readable CSRF proof since readiness.
+		_, publicAuth := publicPaths[c.Path()]
+		if admin != nil && !publicAuth && !sessionEpochTransition(c.Path()) && !validDocumentSessionEpoch(c, admin) {
+			return sendBrowserAuthFailure(c, fiber.StatusConflict, "session_changed", "Session changed; your draft has not been submitted")
+		}
 		return c.Next()
 	}
 }
 
-func browserAuthFailure(c fiber.Ctx, err error) error {
+// Explicit identity transitions are not commands belonging to the old document.
+// Maintenance is registered ahead of this middleware and uses its own protocol.
+func sessionEpochTransition(path string) bool {
+	switch path {
+	case "/login", "/logout", "/auth/logout", "/auth/session/maintain", "/auth/session/recover",
+		"/sso", "/sso/", "/sso/open", "/sso/login", "/sso/logout", "/sso/callback", "/callback", "/sso-link/reauth":
+		return true
+	default:
+		return false
+	}
+}
+
+func validDocumentSessionEpoch(c fiber.Ctx, admin *models.SessionAdmin) bool {
+	const versionHeader = "X-Goadmin-Session-Maintenance"
+	const epochHeader = "X-Goadmin-Session-Epoch"
+	versions := c.Request().Header.PeekAll(versionHeader)
+	if len(versions) == 0 {
+		// Intentionally preserve existing clients which did not negotiate v1.
+		return true
+	}
+	expected := browserstate.SessionEpoch(admin.AuthSessionID)
+	return len(versions) == 1 && c.Get(versionHeader) == "1" &&
+		len(c.Request().Header.PeekAll(epochHeader)) == 1 && expected != "" && c.Get(epochHeader) == expected
+}
+
+// Negotiation selects a non-page refusal, never a sign-in/recovery document.
+// Keep legacy document navigation and explicit identity transitions unchanged.
+func negotiatedProtectedRequest(c fiber.Ctx, publicAuth bool) bool {
+	const marker = "X-Goadmin-Session-Maintenance"
+	return !publicAuth && !sessionEpochTransition(c.Path()) &&
+		len(c.Request().Header.PeekAll(marker)) == 1 && c.Get(marker) == "1"
+}
+
+func browserAuthFailure(c fiber.Ctx, err error, publicAuth ...bool) error {
+	_, public := excludePath[c.Path()]
+	if len(publicAuth) > 0 {
+		public = publicAuth[0]
+	}
+	negotiated := negotiatedProtectedRequest(c, public)
 	c.Set(fiber.HeaderCacheControl, "no-store")
 	switch {
 	case errors.Is(err, adminservice.ErrExternalRecoveryRequired):
 		if adminservice.ExternalAdminRecoveryEnabled(c) {
 			c.Set("X-Goadmin-Auth-Recovery", "1")
-			if isBrowserRecoveryNavigation(c) {
+			if !negotiated && isBrowserRecoveryNavigation(c) {
 				return sendBrowserRecoveryDocument(c)
 			}
-		} else if c.Method() == fiber.MethodGet || c.Method() == fiber.MethodHead {
+		} else if !negotiated && (c.Method() == fiber.MethodGet || c.Method() == fiber.MethodHead) {
 			return goinertia.Redirect(c, "/auth/login")
 		}
 		return sendBrowserAuthFailure(c, fiber.StatusUnauthorized, "reauthentication_required", "Refresh your sign-in")
@@ -80,7 +126,10 @@ func browserAuthFailure(c fiber.Ctx, err error) error {
 		errors.Is(err, goauth.ErrSecurityVersionMismatch), errors.Is(err, goauth.ErrMFARequired),
 		errors.Is(err, goauth.ErrAccountUnavailable),
 		errors.Is(err, goauth.ErrAccountNotFound):
-		if c.Method() == fiber.MethodGet || c.Method() == fiber.MethodHead {
+		if negotiated && errors.Is(err, goauth.ErrMembershipDenied) {
+			return sendBrowserAuthFailure(c, fiber.StatusForbidden, "access_denied", "Access denied")
+		}
+		if !negotiated && (c.Method() == fiber.MethodGet || c.Method() == fiber.MethodHead) {
 			return goinertia.Redirect(c, "/auth/login")
 		}
 		return sendBrowserAuthFailure(c, fiber.StatusUnauthorized, "reauthentication_required", "Sign in again")
@@ -143,7 +192,7 @@ func IsNotAuthAdminMiddleware(paths ...string) fiber.Handler {
 				return nil
 			}
 			if _, ok := publicPaths[path]; !ok {
-				if c.Method() != fiber.MethodGet && c.Method() != fiber.MethodHead {
+				if negotiatedProtectedRequest(c, false) || (c.Method() != fiber.MethodGet && c.Method() != fiber.MethodHead) {
 					return sendBrowserAuthFailure(c, fiber.StatusUnauthorized, "reauthentication_required", "Sign in again")
 				}
 				return goinertia.Redirect(c, "/auth/login?redirectback="+url.QueryEscape(c.OriginalURL()))

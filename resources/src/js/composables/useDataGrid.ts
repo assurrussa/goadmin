@@ -1,3 +1,4 @@
+import { adminFetch } from '@/http'
 import {
   computed,
   onMounted,
@@ -318,7 +319,7 @@ export function useDataGrid({
         }
       })
 
-      const response = await fetch(`${toValue(apiUrl)}/data?${searchParams}`, {
+      const response = await adminFetch(`${toValue(apiUrl)}/data?${searchParams}`, {
         signal: controller.signal,
       })
       // Avoid status handling and JSON decoding even when the transport ignores cancellation.

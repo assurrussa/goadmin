@@ -21,6 +21,8 @@ type LocalLoginPending struct {
 	Persistent bool                `json:"persistent"`
 }
 type Record struct {
+	// ExpiresAt is the fixed journal deadline, never renewed by a read or CAS.
+	ExpiresAt          time.Time          `json:"expiresAt,omitempty"`
 	External           *ExternalBinding   `json:"external,omitempty"`
 	LocalLoginPending  *LocalLoginPending `json:"localLoginPending,omitempty"`
 	LocalLoginTerminal bool               `json:"localLoginTerminal,omitempty"`
@@ -43,6 +45,8 @@ type Store interface {
 	// not change tokens, version or expiry, and cannot release another owner.
 	ReleaseClaim(ctx context.Context, id string, version int64, owner string) (bool, error)
 	Complete(ctx context.Context, id string, version int64, owner string, record Record) (bool, error)
+	// DeleteIfCurrent is passive cleanup; explicit logout deliberately uses Delete.
+	DeleteIfCurrent(ctx context.Context, id string, version int64, owner string) (bool, error)
 	Delete(ctx context.Context, id string) error
 }
 
@@ -61,12 +65,13 @@ func (s *Memory) Load(_ context.Context, id string) (Record, bool, error) {
 	return r, ok, nil
 }
 
-func (s *Memory) Create(_ context.Context, id string, r Record, _ time.Duration) error {
+func (s *Memory) Create(_ context.Context, id string, r Record, ttl time.Duration) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, exists := s.records[id]; exists {
 		return errors.New("admin auth state already exists")
 	}
+	r.ExpiresAt = fixedExpiry(r.ExpiresAt, ttl)
 	r.Version = 1
 	r.Owner = ""
 	s.records[id] = r
@@ -92,6 +97,7 @@ func (s *Memory) Complete(_ context.Context, id string, v int64, owner string, r
 	if !ok || old.Version != v || old.Owner != owner || owner == "" {
 		return false, nil
 	}
+	r.ExpiresAt = old.ExpiresAt
 	r.Version = v + 1
 	r.Owner = ""
 	s.records[id] = r
@@ -103,4 +109,23 @@ func (s *Memory) Delete(_ context.Context, id string) error {
 	defer s.mu.Unlock()
 	delete(s.records, id)
 	return nil
+}
+
+func fixedExpiry(previous time.Time, ttl time.Duration) time.Time {
+	end := time.Now().UTC().Add(ttl)
+	if !previous.IsZero() && previous.Before(end) {
+		return previous
+	}
+	return end
+}
+
+func (s *Memory) DeleteIfCurrent(_ context.Context, id string, version int64, owner string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	record, found := s.records[id]
+	if !found || record.Version != version || record.Owner != owner {
+		return false, nil
+	}
+	delete(s.records, id)
+	return true, nil
 }

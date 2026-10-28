@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"net/url"
+	"time"
 
 	logger "github.com/assurrussa/gologger"
 	"github.com/gofiber/fiber/v3"
@@ -42,6 +43,18 @@ func initInertia(
 		deps.Repos.FileLoader, deps.System.AdminNotificationRepo, deps.Repos.RolesService,
 		menuExtra, log, cfg.BaseDomainURL,
 	)
+	if deps.System.AdminAuthService != nil && deps.System.CSRF != nil {
+		props["adminSessionMaintenance"] = goinertia.LazyProp{
+			Key: "adminSessionMaintenance", Fn: func(ctx context.Context) (any, error) {
+				c, ok := ctx.(fiber.Ctx)
+				if !ok {
+					return map[string]int{}, nil
+				}
+				//nolint:contextcheck // Resolver forwards its verified Fiber request context.
+				return sessionMaintenancePageProp(c, deps.System.AdminAuthService), nil
+			},
+		}
+	}
 	if deps.Capabilities != nil {
 		props["adminCapabilities"] = deps.Capabilities
 	}
@@ -241,6 +254,9 @@ func newCSRFTokenProvider(
 			return "", goinertia.NewError(fiber.StatusBadRequest, "failed admin session", err)
 		}
 		defer sess.Release()
+		if sess.Fresh() && store.AbsoluteTimeout > 0 {
+			sess.Set("goadmin.browserHardExpiresAt", time.Now().Add(store.AbsoluteTimeout))
+		}
 
 		sessionID, err := adminAuthService.RegenerateSessionID(c, sess)
 		if err != nil {
@@ -329,10 +345,12 @@ func newCheckCSRFTokenProvider(
 		csrfTokenHeader := c.Get(csrfservice.HeaderName)
 		csrfTokenCookie := c.Cookies(csrfTokenName)
 		if csrfTokenHeader == "" || csrfTokenCookie == "" {
+			markCSRFRepair(c, !adminID.IsZero())
 			return goinertia.NewError(419, "CSRF token is missing")
 		}
 
 		if csrfTokenHeader != csrfTokenCookie {
+			markCSRFRepair(c, !adminID.IsZero())
 			return goinertia.NewError(419, "Invalid CSRF token")
 		}
 
@@ -343,6 +361,7 @@ func newCheckCSRFTokenProvider(
 			return nil
 		}
 
+		markCSRFRepair(c, !adminID.IsZero())
 		return goinertia.NewError(419, "Invalid CSRF token")
 	}
 }

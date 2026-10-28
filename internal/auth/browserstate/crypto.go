@@ -7,16 +7,18 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"time"
 
 	"github.com/assurrussa/goauth"
 )
 
 type sealedRecord struct {
-	Version    int64  `json:"version"`
-	Owner      string `json:"owner"`
-	KeyID      string `json:"keyId"`
-	Nonce      []byte `json:"nonce"`
-	Ciphertext []byte `json:"ciphertext"`
+	ExpiresAt  time.Time `json:"expiresAt,omitempty"`
+	Version    int64     `json:"version"`
+	Owner      string    `json:"owner"`
+	KeyID      string    `json:"keyId"`
+	Nonce      []byte    `json:"nonce"`
+	Ciphertext []byte    `json:"ciphertext"`
 }
 type codec struct{ keys goauth.KeyRing }
 
@@ -54,7 +56,7 @@ func (c codec) encode(id string, r Record) ([]byte, error) {
 		return nil, err
 	}
 	sealed := sealedRecord{
-		Version: r.Version, Owner: r.Owner, KeyID: c.keys.ActiveKeyID(), Nonce: nonce,
+		ExpiresAt: r.ExpiresAt, Version: r.Version, Owner: r.Owner, KeyID: c.keys.ActiveKeyID(), Nonce: nonce,
 		Ciphertext: aead.Seal(nil, nonce, raw, associatedData(id, r.Version)),
 	}
 	return json.Marshal(sealed)
@@ -87,5 +89,8 @@ func (c codec) decode(id string, raw []byte) (Record, error) {
 		return Record{}, errors.New("invalid admin auth version")
 	}
 	r.Owner = sealed.Owner
+	if !sealed.ExpiresAt.IsZero() {
+		r.ExpiresAt = sealed.ExpiresAt
+	}
 	return r, nil
 }

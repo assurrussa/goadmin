@@ -74,14 +74,17 @@ type adminRepository interface {
 }
 
 type browserSession struct {
-	LocalLoginFlowKey string
-	External          *ExternalBinding
-	Version           int64
-	AccessToken       string
-	RefreshToken      string
-	AuthSessionID     string
-	SubjectID         goauth.SubjectID
-	Payload           models.SessionAdmin
+	LocalLoginFlowKey    string
+	External             *ExternalBinding
+	Version              int64
+	Owner                string
+	HardExpiresAt        time.Time
+	MaintenanceTouchedAt time.Time
+	AccessToken          string
+	RefreshToken         string
+	AuthSessionID        string
+	SubjectID            goauth.SubjectID
+	Payload              models.SessionAdmin
 }
 
 type Option func(*Service) error
@@ -376,10 +379,23 @@ func (s *Service) refreshAdminToken(
 	return &authContext, nil
 }
 
-func (s *Service) clearAdminBrowserSession(c fiber.Ctx, sess *session.Session) error {
+func (s *Service) clearAdminBrowserSession(c fiber.Ctx, sess *session.Session, captured ...*browserSession) error {
 	if s.states != nil {
-		if err := s.states.Delete(c, sess.ID()); err != nil {
+		state, ok := sess.Get(sessioncore.AuthAdminKey.String()).(*browserSession)
+		if len(captured) > 0 && captured[0] != nil {
+			state, ok = captured[0], true
+		}
+		if !ok || state == nil {
+			s.discardStaleSessionCookies(c)
+			return ErrRefreshRetryRequired
+		}
+		deleted, err := s.states.DeleteIfCurrent(c, sess.ID(), state.Version, state.Owner)
+		if err != nil {
 			return fmt.Errorf("delete admin auth state: %w", err)
+		}
+		if !deleted {
+			s.discardStaleSessionCookies(c)
+			return ErrRefreshRetryRequired
 		}
 	}
 	sess.Delete(localMFAKey)
@@ -429,9 +445,14 @@ func (s *Service) saveAuthenticatedSessionWithLocalFlow(
 		return sess.ID(), err
 	}
 	payload.Email = account.PrimaryEmail.DisplayValue
+	hardExpiresAt := time.Now().Add(min(s.sessionTTL, time.Until(tokens.Session.ExpiresAt)))
+	if browserHard, ok := sess.Get("goadmin.browserHardExpiresAt").(time.Time); ok {
+		hardExpiresAt = earliestMaintenanceExpiry(hardExpiresAt, browserHard)
+	}
 	state := &browserSession{
 		LocalLoginFlowKey: flowKey,
 		Version:           1,
+		HardExpiresAt:     hardExpiresAt,
 		AccessToken:       tokens.AccessToken, RefreshToken: tokens.RefreshToken,
 		AuthSessionID: tokens.Session.ID, SubjectID: account.Subject.ID, Payload: payload,
 	}
@@ -796,6 +817,15 @@ func (s *Service) loadBrowserAuthority(c fiber.Ctx, sess *session.Session, state
 	if !found {
 		s.discardStaleSessionCookies(c)
 		return false, nil
+	}
+	if record.Owner != "" && record.External != nil {
+		if auth, err := s.waitAdminRefresh(c, sess, state); err != nil {
+			return false, err
+		} else if auth == nil {
+			return false, nil
+		}
+		// waitAdminRefresh verifies the committed token; the caller still checks external proof.
+		return true, nil
 	}
 	applyBrowserRecord(state, record)
 	return true, nil

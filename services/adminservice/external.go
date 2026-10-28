@@ -229,13 +229,12 @@ func (s *Service) externalProof(ctx context.Context, b ExternalBinding) (Externa
 }
 
 func (s *Service) checkExternal(c fiber.Ctx, sess *session.Session, state *browserSession) error {
+	return s.checkExternalAttempt(c, sess, state, true)
+}
+
+func (s *Service) checkExternalAttempt(c fiber.Ctx, sess *session.Session, state *browserSession, reread bool) error {
 	if state.External == nil {
-		if s.localAdmission != nil {
-			if err := s.localAdmission(c, state.SubjectID); err != nil {
-				return errors.Join(err, s.clearAdminBrowserSession(c, sess))
-			}
-		}
-		return nil
+		return s.checkLocalAdmission(c, sess, state)
 	}
 	binding := *state.External
 	link, err := s.canonicalExternalLink(c, binding)
@@ -255,13 +254,68 @@ func (s *Service) checkExternal(c fiber.Ctx, sess *session.Session, state *brows
 			return nil
 		}
 	}
-	// Clearing native authority never clears only the external marker. Disable,
-	// unlink/relink, missing binding and dependency failure remain fail-closed.
+	// A provider renewal may have committed after this request read N. Re-read
+	// once, wait for a live owner within the existing budget, then validate N+1.
+	if reread && s.states != nil {
+		changed, readErr := s.rereadExternalAuthority(c, sess, state)
+		if readErr != nil {
+			return readErr
+		}
+		if changed {
+			return s.checkExternalAttempt(c, sess, state, false)
+		}
+	}
+	// A provider/storage outage denies this request while retaining its authority.
+	// Only an explicit terminal classification may destroy the captured version.
 	if errors.Is(err, goauth.ErrIdentityLinkNotFound) || errors.Is(err, goauth.ErrExplicitIdentityLink) {
 		err = goauth.ErrSessionRevoked
 	}
+	if !isTerminalSessionError(err) && !errors.Is(err, goauth.ErrInvalidToken) && !errors.Is(err, goauth.ErrExpiredToken) {
+		return errors.Join(ErrRefreshRetryRequired, err)
+	}
 	clearErr := s.clearAdminBrowserSession(c, sess)
-	return errors.Join(err, clearErr)
+	if clearErr != nil {
+		return clearErr
+	}
+	return err
+}
+
+func (s *Service) checkLocalAdmission(c fiber.Ctx, sess *session.Session, state *browserSession) error {
+	if s.localAdmission == nil {
+		return nil
+	}
+	err := s.localAdmission(c, state.SubjectID)
+	if err == nil {
+		return nil
+	}
+	if !isTerminalSessionError(err) {
+		return errors.Join(ErrRefreshRetryRequired, err)
+	}
+	if clearErr := s.clearAdminBrowserSession(c, sess); clearErr != nil {
+		return clearErr
+	}
+	return err
+}
+
+func (s *Service) rereadExternalAuthority(c fiber.Ctx, sess *session.Session, state *browserSession) (bool, error) {
+	latest, found, err := s.states.Load(c, sess.ID())
+	if err != nil {
+		return false, errors.Join(ErrRefreshRetryRequired, err)
+	}
+	if !found {
+		return false, goauth.ErrSessionRevoked
+	}
+	if latest.Version == state.Version && latest.Owner == state.Owner {
+		return false, nil
+	}
+	active, err := s.loadBrowserAuthority(c, sess, state)
+	if err != nil {
+		return false, err
+	}
+	if !active {
+		return false, goauth.ErrSessionRevoked
+	}
+	return true, nil
 }
 
 func externalDeadline(p ExternalProof, absolute time.Time) time.Time {
@@ -311,6 +365,10 @@ func (s *Service) saveAuthenticatedProjection(c fiber.Ctx, sess *session.Session
 			return errors.Join(goauth.ErrSessionRevoked, s.clearAdminBrowserSession(c, sess))
 		}
 		state.Payload.ExternalValidUntil = state.External.Deadline
+	}
+	if maintenance, _ := c.Locals("goadmin.sessionMaintenance").(bool); maintenance {
+		c.Locals(maintenanceProjectionKey{}, state)
+		return nil
 	}
 	return sessioncore.SavePassive(c, s.store, sess)
 }
