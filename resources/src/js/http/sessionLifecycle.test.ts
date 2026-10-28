@@ -55,6 +55,132 @@ afterEach(() => {
 })
 
 describe('document epoch and the pinned Inertia transport', () => {
+  it.each([
+    { status: 401, code: 'reauthentication_required' },
+    { status: 403, code: 'access_denied' },
+  ])(
+    'keeps the mounted editor when a cached-readiness reload receives $status',
+    async ({ status, code }) => {
+      const request = vi.fn<typeof globalThis.fetch>().mockImplementation(async () => reply('A'))
+      vi.stubGlobal('fetch', request)
+      disposers.push(installSessionAxiosInterceptor())
+      configureSessionMaintenance(capability)
+      await ensureSessionReady()
+      const root = document.createElement('main')
+      document.body.append(root)
+      const swap = vi.fn(async () => {
+        root.textContent = 'Login replacement'
+      })
+      const initial = {
+        component: 'Editor',
+        url: '/editor',
+        version: null,
+        props: { errors: {}, ...capability.props },
+        clearHistory: false,
+        encryptHistory: false,
+        flash: {},
+        rememberedState: {},
+      }
+      router.init({ initialPage: initial, resolveComponent: async () => ({}), swapComponent: swap })
+      await flush()
+      swap.mockClear()
+      const draft = document.createElement('input')
+      draft.value = 'unsaved editor draft'
+      root.replaceChildren(draft)
+      const sends = vi.fn<AxiosAdapter>().mockImplementation(async (config) => {
+        expect(config.method).toBe('get')
+        expect(config.headers.get('X-Goadmin-Session-Maintenance')).toBe('1')
+        return {
+          status,
+          statusText: 'Refused',
+          config,
+          headers: { 'content-type': 'application/json', 'x-goadmin-auth-error': '1' },
+          data: JSON.stringify({ status, code }),
+        }
+      })
+      axios.defaults.adapter = sends
+      disposers.push(router.on('invalid', (event) => event.preventDefault()))
+      const success = vi.fn()
+      await new Promise<void>((resolve) =>
+        router.reload({ onFinish: () => resolve(), onSuccess: success }),
+      )
+      expect(root.firstChild).toBe(draft)
+      expect(draft.value).toBe('unsaved editor draft')
+      expect(swap).not.toHaveBeenCalled()
+      expect(success).not.toHaveBeenCalled()
+      expect(sessionCoordinator.getState()).toBe(code)
+      expect(request).toHaveBeenCalledTimes(1)
+      expect(sends).toHaveBeenCalledTimes(1)
+      await expect(
+        adminFetch('/save', { method: 'POST', body: draft.value }),
+      ).rejects.toMatchObject({ code })
+      expect(sends).toHaveBeenCalledTimes(1)
+      expect(request).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('keeps the mounted Inertia draft after the server refuses a cached-readiness epoch mismatch', async () => {
+    const request = vi.fn<typeof globalThis.fetch>().mockImplementation(async () => reply('A'))
+    vi.stubGlobal('fetch', request)
+    disposers.push(installSessionAxiosInterceptor())
+    configureSessionMaintenance(capability)
+    await ensureSessionReady()
+    const root = document.createElement('main')
+    document.body.append(root)
+    const swap = vi.fn(async () => {
+      root.textContent = 'replacement'
+    })
+    const initial = {
+      component: 'Editor',
+      url: '/editor',
+      version: null,
+      props: { errors: {}, ...capability.props },
+      clearHistory: false,
+      encryptHistory: false,
+      flash: {},
+      rememberedState: {},
+    }
+    router.init({ initialPage: initial, resolveComponent: async () => ({}), swapComponent: swap })
+    await flush()
+    swap.mockClear()
+    const draft = document.createElement('input')
+    draft.value = 'A draft while cookies belong to B'
+    root.replaceChildren(draft)
+    document.cookie = 'csrf_token=B-proof; path=/'
+    const sends = vi.fn<AxiosAdapter>().mockImplementation(async (config) => {
+      expect(config.headers.get('X-Goadmin-Session-Epoch')).toBe('A')
+      expect(config.headers.get('X-CSRF-Token')).toBe('B-proof')
+      return {
+        status: 409,
+        statusText: 'Conflict',
+        config,
+        headers: { 'content-type': 'application/json', 'x-goadmin-auth-error': '1' },
+        data: JSON.stringify({ status: 409, code: 'session_changed' }),
+      }
+    })
+    axios.defaults.adapter = sends
+    disposers.push(router.on('invalid', (event) => event.preventDefault()))
+    const success = vi.fn()
+    await new Promise<void>((resolve) =>
+      router.post(
+        '/save',
+        { text: draft.value },
+        {
+          onFinish: () => resolve(),
+          onSuccess: success,
+        },
+      ),
+    )
+    expect(root.firstChild).toBe(draft)
+    expect(draft.value).toBe('A draft while cookies belong to B')
+    expect(swap).not.toHaveBeenCalled()
+    expect(success).not.toHaveBeenCalled()
+    expect(sessionCoordinator.getState()).toBe('session_changed')
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(sends).toHaveBeenCalledTimes(1)
+    document.cookie = 'csrf_token=; Max-Age=0; path=/'
+  })
+
   it('never dispatches an A draft when the very first maintenance response belongs to B', async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async () => reply('B'))
     vi.stubGlobal('fetch', fetch)

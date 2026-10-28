@@ -1736,3 +1736,42 @@ preserved draft and exactly one command. The clean local consumer probe passed.
 Independent review of the final fixes found no remaining actionable findings.
 The full SSO/browser soak, production acceptance and release publication remain
 outside this validation. Changes are ready for the authorized commit and PR.
+
+### PR 72 document-command identity fence (2026-10-28)
+
+Cached readiness is not a request identity proof: another
+window can replace both native and CSRF cookies during the thirty-second fresh
+window. Negotiated protected requests now send `X-Goadmin-Session-Epoch`, pinned
+to the login that rendered this document, independently of the cookie jar and
+maintenance metadata. Core authenticated middleware compares that value with
+the validated canonical login before continuing to CSRF, RBAC or business code.
+A v1 request with a missing, malformed, duplicate or mismatched epoch (or an
+invalid/duplicate negotiation marker) receives no-store HTTP 409 JSON with
+`X-Goadmin-Auth-Error: 1` and `code: session_changed`; there is no redirect or
+business-command replay. Both reads and mutations are fenced. The mounted draft
+remains intact and this document becomes terminal until explicit navigation.
+
+Clients without the maintenance request marker intentionally retain their legacy
+auth/CSRF behavior; this fence does not replace either check. Public auth routes
+and explicit login/logout/recovery transitions remain outside the old document's
+command fence. Same-session renewal preserves the canonical login epoch.
+`AdminFetchNotSentError` identifies only readiness/fence rejection before the
+original fetch invocation; a transport failure is not evidence of non-execution.
+
+### Negotiated read refusal and effective Axios URLs (2026-10-28)
+
+A protected GET/HEAD can lose native authority during cached readiness. Its
+version-1 request now receives the tagged non-page authentication refusal,
+including anonymous/missing-cookie and opted-in external-recovery cases, rather
+than a login redirect or recovery document that could replace an unsaved editor.
+Membership denial is `403 access_denied`; native expiry/revocation or missing
+credentials are `401 reauthentication_required`. Normal legacy document requests,
+public authentication routes and explicit identity transitions retain their
+existing navigation behavior. No business request or mutation is replayed.
+
+Axios transition, logout and response-fence classification now use its effective
+`getUri` URL, including Axios's baseURL combination semantics. A custom
+`/api/auth/login` reached by `baseURL: /api` plus `url: /auth/login` is a protected
+request, not the root login transition; terminal readiness cannot bypass the
+fence through that spelling. Absolute root identity URLs retain their explicit
+transition behavior. No publication or deployment is part of these fixes.

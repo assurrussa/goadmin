@@ -39,6 +39,28 @@ afterEach(() => {
 })
 
 describe('versioned session maintenance coordinator', () => {
+  it('pins the original document across same-window page updates and same-session renewal', async () => {
+    const { instance, request } = coordinator()
+    instance.configure(capability)
+    await instance.ensure()
+    request.mockResolvedValue(
+      reply(200, 'authentication_recovered', metadata({ revision: 2, renewed: true })),
+    )
+    await instance.ensure({ force: true })
+    expect(instance.expectedEpoch()).toBe('epoch-a')
+    instance.configure({
+      props: { adminSessionMaintenance: { version: 1, sessionEpoch: 'epoch-b' } },
+    })
+    expect(instance.expectedEpoch()).toBe('epoch-a')
+    request.mockResolvedValue(
+      reply(200, 'authentication_recovered', metadata({ sessionEpoch: 'epoch-b' })),
+    )
+    await expect(instance.ensure({ force: true })).rejects.toMatchObject({
+      code: 'session_changed',
+    })
+    expect(instance.expectedEpoch()).toBe('epoch-a')
+  })
+
   it('does nothing without the exact initial capability and never falls back', async () => {
     const { instance, request } = coordinator()
     instance.start()

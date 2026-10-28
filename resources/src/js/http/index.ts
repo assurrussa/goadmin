@@ -48,10 +48,10 @@ function currentResponse(fence: ResponseFence | undefined): boolean {
   return fence.generation === current.generation && fence.epoch === current.epoch
 }
 
-function sameOrigin(value: string, base?: string): boolean {
+function sameOrigin(value: string): boolean {
   if (typeof window === 'undefined') return false
   try {
-    const target = new URL(value, base ? new URL(base, window.location.href) : window.location.href)
+    const target = new URL(value, window.location.href)
     return target.origin === window.location.origin && !target.username && !target.password
   } catch {
     return false
@@ -124,6 +124,8 @@ export function reportSessionAuthFailure(
     return false
   if (status === 419 && data.code === 'csrf_needs_sync') {
     if (applyEffects) void sessionCoordinator.repair().catch(() => {})
+  } else if (status === 409 && data.code === 'session_changed') {
+    if (applyEffects) sessionCoordinator.reportFailure('session_changed')
   } else if (status === 401 && data.code === 'reauthentication_required') {
     if (applyEffects) sessionCoordinator.reportFailure('reauthentication_required')
   } else if (status === 403 && data.code === 'access_denied') {
@@ -136,6 +138,14 @@ export function reportSessionAuthFailure(
       sessionCoordinator.reportFailure('authentication_unavailable', headers.get('retry-after'))
   } else return false
   return true
+}
+
+/** Provenance: readiness refused this command before its fetch was invoked. */
+export class AdminFetchNotSentError extends SessionReadinessError {
+  constructor(error: SessionReadinessError) {
+    super(error.code)
+    this.name = 'AdminFetchNotSentError'
+  }
 }
 
 export interface AdminFetchOptions extends RequestInit {
@@ -164,13 +174,26 @@ async function sendAdminFetch(
   const gate = !transition(target)
   const send = async () => {
     const fence = sessionCoordinator.commandFence()
-    if (gate) {
-      await ensureSessionReady({ signal: init.signal ?? undefined })
-      sessionCoordinator.assertCommandFence(fence)
+    try {
+      if (gate) {
+        await ensureSessionReady({ signal: init.signal ?? undefined })
+        sessionCoordinator.assertCommandFence(fence)
+      }
+      init.signal?.throwIfAborted()
+    } catch (error) {
+      if (error instanceof SessionReadinessError) throw new AdminFetchNotSentError(error)
+      throw error
     }
-    init.signal?.throwIfAborted()
     const headers = new Headers(init.headers)
-    headers.set('X-Goadmin-Session-Maintenance', '1')
+    if (gate) {
+      headers.set('X-Goadmin-Session-Maintenance', '1')
+      headers.set('X-Goadmin-Session-Epoch', sessionCoordinator.expectedEpoch()!)
+    } else {
+      // Fetch/XHR redirects retain custom headers. An explicit sign-in may
+      // land on a protected page belonging to the newly chosen identity.
+      headers.delete('X-Goadmin-Session-Maintenance')
+      headers.delete('X-Goadmin-Session-Epoch')
+    }
     if (unsafe(init.method)) {
       const csrf = getCurrentCSRFToken()
       if (csrf) headers.set('X-CSRF-Token', csrf)
@@ -233,7 +256,7 @@ function observeAxios(response: AxiosResponse, fence: ResponseFence | undefined)
     response.status >= 200 &&
     response.status < 300 &&
     response.config.headers.get('X-Inertia') === 'true' &&
-    response.config.headers.get('X-Goadmin-Session-Maintenance') === '1' &&
+    fence !== undefined &&
     (typeof response.headers.get === 'function'
       ? response.headers.get('x-inertia')
       : response.headers['x-inertia']) === 'true'
@@ -242,7 +265,7 @@ function observeAxios(response: AxiosResponse, fence: ResponseFence | undefined)
   )
   if (
     inertiaPage &&
-    (!currentResponse(fence) || (!transition(response.config.url ?? '') && terminal))
+    (!currentResponse(fence) || (!transition(axios.getUri(response.config)) && terminal))
   ) {
     throw new SessionReadinessError(
       sessionCoordinator.getState() === 'session_changed' ? 'session_changed' : 'cancelled',
@@ -251,7 +274,7 @@ function observeAxios(response: AxiosResponse, fence: ResponseFence | undefined)
   if (
     currentResponse(fence) &&
     !response.config.signal?.aborted &&
-    sameOrigin(response.config.url ?? '', response.config.baseURL)
+    sameOrigin(axios.getUri(response.config))
   ) {
     reportSessionAuthFailure(
       response.status,
@@ -271,8 +294,11 @@ function observeAxios(response: AxiosResponse, fence: ResponseFence | undefined)
 export function installSessionAxiosInterceptor(client: AxiosInstance = axios): () => void {
   const responseFences = new WeakMap<object, ResponseFence>()
   const requestID = client.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-    const target = config.url ?? ''
-    if (!sessionCoordinator.isEnabled() || !sameOrigin(target, config.baseURL)) return config
+    if (!sessionCoordinator.isEnabled()) return config
+    // Axios combines baseURL even with a leading slash; WHATWG URL resolution
+    // would misclassify /api/auth/login as the root identity transition.
+    const target = client.getUri(config)
+    if (!sameOrigin(target)) return config
     if (logout(target)) sessionCoordinator.reportFailure('reauthentication_required')
     if (!transition(target)) {
       const fence = sessionCoordinator.commandFence()
@@ -281,7 +307,13 @@ export function installSessionAxiosInterceptor(client: AxiosInstance = axios): (
     }
     if (config.signal?.aborted) throw new SessionReadinessError('cancelled')
     config.cancelToken?.throwIfRequested()
-    config.headers.set('X-Goadmin-Session-Maintenance', '1', true)
+    if (!transition(target)) {
+      config.headers.set('X-Goadmin-Session-Maintenance', '1', true)
+      config.headers.set('X-Goadmin-Session-Epoch', sessionCoordinator.expectedEpoch()!, true)
+    } else {
+      config.headers.delete('X-Goadmin-Session-Maintenance')
+      config.headers.delete('X-Goadmin-Session-Epoch')
+    }
     if (unsafe(config.method)) {
       const csrf = getCurrentCSRFToken()
       if (csrf) config.headers.set('X-CSRF-Token', csrf)
@@ -301,7 +333,7 @@ export function installSessionAxiosInterceptor(client: AxiosInstance = axios): (
         !error.config.signal?.aborted &&
         sessionCoordinator.isEnabled() &&
         currentResponse(responseFences.get(error.config)) &&
-        sameOrigin(error.config.url ?? '', error.config.baseURL)
+        sameOrigin(axios.getUri(error.config))
       ) {
         sessionCoordinator.reportFailure('authentication_unavailable')
       }

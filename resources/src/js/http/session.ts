@@ -373,6 +373,8 @@ export function createSessionCoordinator(options: SessionCoordinatorOptions = {}
     isEnabled: () => enabled,
     getState: () => state,
     getMaintenance: () => metadata,
+    // Never learn a new document identity from maintenance or a shared cookie.
+    expectedEpoch: () => documentEpoch,
     commandFence: () => ({ generation, epoch: metadata?.sessionEpoch ?? documentEpoch }),
     assertCommandFence: (fence: { generation: number; epoch?: string }) => {
       if (generation !== fence.generation) throw new SessionReadinessError('cancelled')
@@ -385,7 +387,11 @@ export function createSessionCoordinator(options: SessionCoordinatorOptions = {}
       }
     },
     reportFailure: (
-      code: 'authentication_unavailable' | 'reauthentication_required' | 'access_denied',
+      code:
+        | 'authentication_unavailable'
+        | 'reauthentication_required'
+        | 'access_denied'
+        | 'session_changed',
       retryAfter?: unknown,
     ) => {
       if (!enabled || terminal()) return

@@ -8,6 +8,7 @@ import { router } from '@inertiajs/vue3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   adminFetch,
+  createAdminAxios,
   configureSessionMaintenance,
   ensureSessionReady,
   installSessionAxiosInterceptor,
@@ -72,6 +73,139 @@ afterEach(() => {
 })
 
 describe('public admin transport', () => {
+  it.each(['/api', window.location.origin + '/api'])(
+    'uses Axios combined URL for readiness, transitions and logout with base %s',
+    async (baseURL) => {
+      vi.stubGlobal('fetch', vi.fn<typeof globalThis.fetch>().mockResolvedValue(ready()))
+      configureSessionMaintenance(capability)
+      await ensureSessionReady()
+      const sends = vi.fn<AxiosAdapter>().mockImplementation(async (config) => response(config))
+      const client = createAdminAxios({ baseURL, adapter: sends })
+      for (const path of ['/auth/login', '/auth/logout']) {
+        await client.post(path, {})
+        expect(sends.mock.lastCall?.[0].headers.get('X-Goadmin-Session-Maintenance')).toBe('1')
+        expect(sends.mock.lastCall?.[0].headers.get('X-Goadmin-Session-Epoch')).toBe('one')
+        expect(sessionCoordinator.getState()).toBe('ready')
+      }
+      sessionCoordinator.reportFailure('session_changed')
+      for (const path of ['/auth/login', '/auth/logout']) {
+        await expect(client.post(path, {})).rejects.toMatchObject({ code: 'session_changed' })
+      }
+      expect(sends).toHaveBeenCalledTimes(2)
+      // An absolute root login overrides baseURL under Axios's default policy.
+      await client.post(window.location.origin + '/auth/login', {})
+      expect(sends).toHaveBeenCalledTimes(3)
+      expect(sends.mock.lastCall?.[0].headers.has('X-Goadmin-Session-Maintenance')).toBe(false)
+      expect(sends.mock.lastCall?.[0].headers.has('X-Goadmin-Session-Epoch')).toBe(false)
+    },
+  )
+
+  it.each(['fetch', 'axios'] as const)(
+    'sends the document epoch after another tab changes cookies inside cached readiness via %s',
+    async (transport) => {
+      const request = vi.fn<typeof globalThis.fetch>().mockResolvedValue(ready())
+      vi.stubGlobal('fetch', request)
+      configureSessionMaintenance(capability)
+      await ensureSessionReady()
+      document.cookie = 'csrf_token=new-login-proof; path=/'
+      const refusal = { status: 409, code: 'session_changed' }
+      const headers = { 'content-type': 'application/json', 'x-goadmin-auth-error': '1' }
+      const draft = { text: 'unsaved A draft' }
+      if (transport === 'fetch') {
+        request.mockImplementation(async (_input, init) => {
+          expect(new Headers(init?.headers).get('X-Goadmin-Session-Epoch')).toBe('one')
+          expect(new Headers(init?.headers).get('X-CSRF-Token')).toBe('new-login-proof')
+          return new Response(JSON.stringify(refusal), { status: 409, headers })
+        })
+        const result = await adminFetch('/save', { method: 'POST', body: JSON.stringify(draft) })
+        expect(result.status).toBe(409)
+        expect(request).toHaveBeenCalledTimes(2)
+      } else {
+        stopAxios = installSessionAxiosInterceptor()
+        const sends = vi.fn<AxiosAdapter>().mockImplementation(async (config) => {
+          expect(config.headers.get('X-Goadmin-Session-Epoch')).toBe('one')
+          expect(config.headers.get('X-CSRF-Token')).toBe('new-login-proof')
+          return { ...response(config, 409, refusal), headers }
+        })
+        axios.defaults.adapter = sends
+        expect((await axios.post('/save', draft)).status).toBe(409)
+        expect(sends).toHaveBeenCalledTimes(1)
+        expect(request).toHaveBeenCalledTimes(1)
+      }
+      expect(sessionCoordinator.getState()).toBe('session_changed')
+      expect(draft).toEqual({ text: 'unsaved A draft' })
+      await expect(adminFetch('/save', { method: 'POST' })).rejects.toMatchObject({
+        name: 'AdminFetchNotSentError',
+        code: 'session_changed',
+      })
+    },
+  )
+
+  it('does not negotiate a document epoch for explicit identity transitions and their redirects', async () => {
+    const request = vi.fn<typeof globalThis.fetch>().mockResolvedValue(ready())
+    vi.stubGlobal('fetch', request)
+    configureSessionMaintenance(capability)
+    await ensureSessionReady()
+    for (const target of ['/auth/login', '/auth/logout']) {
+      request.mockResolvedValueOnce(new Response(null, { status: 204 }))
+      await adminFetch(target, { method: 'POST', headers: { 'X-Goadmin-Session-Epoch': 'wrong' } })
+      expect(new Headers(request.mock.lastCall?.[1]?.headers).has('X-Goadmin-Session-Epoch')).toBe(
+        false,
+      )
+      expect(
+        new Headers(request.mock.lastCall?.[1]?.headers).has('X-Goadmin-Session-Maintenance'),
+      ).toBe(false)
+    }
+  })
+
+  it('strips stale negotiation headers for Axios transitions too', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof globalThis.fetch>().mockResolvedValue(ready()))
+    configureSessionMaintenance(capability)
+    await ensureSessionReady()
+    stopAxios = installSessionAxiosInterceptor()
+    const sends = vi.fn<AxiosAdapter>().mockImplementation(async (config) => {
+      expect(config.headers.has('X-Goadmin-Session-Epoch')).toBe(false)
+      expect(config.headers.has('X-Goadmin-Session-Maintenance')).toBe(false)
+      return response(config)
+    })
+    axios.defaults.adapter = sends
+    for (const target of ['/auth/login', '/auth/logout']) {
+      await axios.post(
+        target,
+        {},
+        {
+          headers: {
+            'X-Goadmin-Session-Epoch': 'stale',
+            'X-Goadmin-Session-Maintenance': '1',
+          },
+        },
+      )
+    }
+    expect(sends).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([
+    { marker: false, code: 'session_changed' },
+    { marker: true, code: 'business_conflict' },
+  ])('keeps unrelated 409 caller-owned: %s', async ({ marker, code }) => {
+    const request = vi.fn<typeof globalThis.fetch>().mockResolvedValue(ready())
+    vi.stubGlobal('fetch', request)
+    configureSessionMaintenance(capability)
+    await ensureSessionReady()
+    request.mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: 409, code }), {
+        status: 409,
+        headers: {
+          'content-type': 'application/json',
+          ...(marker ? { 'x-goadmin-auth-error': '1' } : {}),
+        },
+      }),
+    )
+    expect((await adminFetch('/save', { method: 'POST' })).status).toBe(409)
+    expect(sessionCoordinator.getState()).toBe('ready')
+    expect(request).toHaveBeenCalledTimes(2)
+  })
+
   it('preserves the legacy transport without capability opt-in', async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response('ok'))
     vi.stubGlobal('fetch', fetch)

@@ -250,3 +250,21 @@ RBAC and CSRF still gate every later mutation. Recovery is not a save
 acknowledgement and must never automatically repeat a mutation, including
 uploads or requests with unknown outcomes. Without explicit host opt-in the
 existing authentication error behavior is unchanged.
+
+## Negotiated document identity fence
+
+Protected requests from the version-1 session-maintenance client carry
+`X-Goadmin-Session-Maintenance: 1` and exactly one
+`X-Goadmin-Session-Epoch` header. The latter is the public, non-credential epoch
+from the document's initial `adminSessionMaintenance` page prop, not a value
+read from shared cookies or learned from a later login. The authenticated core
+middleware validates it against the current canonical login before dispatching
+protected handlers, even when client readiness is cached and the new login's
+CSRF cookie is valid. Missing, malformed, duplicate or unequal epochs for
+negotiated requests fail closed with HTTP 409, `X-Goadmin-Auth-Error: 1`, and
+`{ "status": 409, "code": "session_changed", "message": "..." }`.
+The shared client stops this document's submissions and keeps its draft mounted;
+there is no automatic mutation retry or navigation. Explicit identity
+transitions are exempt. Clients which omit the maintenance negotiation header
+intentionally keep their existing auth/CSRF contract. Refreshing the same login
+must not change its epoch.
