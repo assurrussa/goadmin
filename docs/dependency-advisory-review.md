@@ -113,3 +113,44 @@ migration results above do not substitute for the current candidate gates.
 The conclusions apply to the reviewed first-party source and lockfile. They do
 not constitute an independent security audit or extend to a host's custom
 frontend plugins, schemas, or exposed development services.
+
+## 2026-10-28 reassessment — qs 6.16.1
+
+The earlier zero-finding statements above record their dated audits, not a
+permanent claim about the dependency graph. A fresh audit of the merged
+session-maintenance tree reported **one moderate finding**, with no
+low/high/critical findings:
+[GHSA-6pq8-jhm2-2vcw](https://github.com/advisories/GHSA-6pq8-jhm2-2vcw).
+It affects `qs` 6.7.0 through 6.16.0: comma-array serialization can throw an
+uncaught TypeError for an element with a non-callable own `toString` property.
+The first-party client does not select this comma-array mode; this limits the
+identified path, but is not a reason to suppress the advisory or postpone an
+available compatible patch.
+
+Only the locked transitive `qs` moves from 6.16.0 to **6.16.1**, within
+`@inertiajs/core`'s existing `^6.15.0` range. Its version, official registry
+tarball URL and SHA-512 integrity are the only lockfile fields changed.
+Direct dependencies and Inertia remain unchanged. No override, forced/broad
+upgrade, exclusion or audit suppression is used. The official registry already
+also offered 6.17.0; that broader update was not selected.
+
+A clean isolated `npm ci` installed the patched lockfile with Node.js 24.19.0
+and npm 11.9.0. Fresh full `npm audit --json` and production
+`npm audit --omit=dev --json` both report **zero vulnerabilities at every
+severity**. A focused check of the advisory's comma-array shape completes
+without throwing and ordinary comma-array serialization remains intact.
+The embedded production build changes only `public/dist/js/app.js`; asset
+names, manifests and CSS remain unchanged. Current candidate frontend gate
+results are recorded below. These checks do not establish full release
+readiness, host acceptance or deployment, and do not replace final candidate
+publish-readiness and exact-tag release-readiness gates.
+
+Final frontend verification on the patched tree passed: 74 unit files / 894
+unit tests; 131 source-manifest tests (including default/topbar production
+builds); read-only ESLint and Prettier checks; `vue-tsc` plus the complete typed
+host positive/negative page and theme checks; production build and embedded
+asset verification. Initial isolation attempts lacked parent Go source files
+and later overlapping heavy fixture processes exited without a numeric status;
+those diagnostics were retained, the isolated checkout context was completed,
+and manifest/type checks passed when rerun sequentially. No failed or incomplete
+attempt is counted as a pass.
