@@ -94,7 +94,7 @@ independently override a saved selection with the OS preference.
 
 ## Runtime profiles
 
-Go 1.27.2 is the minimum. The default core needs PostgreSQL and security keys;
+Go 1.27.3 is the minimum. The default core needs PostgreSQL and security keys;
 Redis, uploads, queues, notification delivery and WebSockets are optional.
 `host.New(ctx, Config, Dependencies, modules...)` validates the requested module
 graph and bundle, then constructs an inert runtime. `Run` supervises the HTTP

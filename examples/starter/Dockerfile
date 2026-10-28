@@ -12,7 +12,7 @@ ARG VITE_ADMIN_EXTENSION_MANIFESTS=""
 ENV VITE_ADMIN_EXTENSION_MANIFESTS=$VITE_ADMIN_EXTENSION_MANIFESTS
 RUN npm run test:manifest && npm run test:unit && npm run type-check && npm run build-only
 
-FROM golang:1.27.2-alpine AS build
+FROM golang:1.27.3-alpine AS build
 RUN apk add --no-cache git
 WORKDIR /src/goadmin
 COPY . .

@@ -4,11 +4,11 @@ This module is published as `github.com/assurrussa/goadmin`.
 
 ## Current Baseline
 
-- The latest published baseline is [v0.20.2](https://github.com/assurrussa/goadmin/releases/tag/v0.20.2).
-  The selected next candidate is `v0.20.3`; selection does not claim release
+- The latest published baseline is [v0.20.3](https://github.com/assurrussa/goadmin/releases/tag/v0.20.3).
+  The proposed next candidate is `v0.21.0`; selection does not claim release
   readiness, publication, host acceptance or deployment.
 
-- Go 1.27.2 is the minimum. Modular host assembly is a breaking source API:
+- Go 1.27.3 is the minimum. Modular host assembly is a breaking source API:
   migrate hosts to `host.New`, explicit modules and `host.AdminConfig`.
 - The current root module pins published GoAuth `v0.15.0` (schema 14), including the
   companion MFA and assisted-recovery APIs, without a sibling replacement. Verify the resulting
@@ -47,7 +47,33 @@ This module is published as `github.com/assurrussa/goadmin`.
 - The frontend advisory gate and its current zero-finding result are reviewed
   in [docs/dependency-advisory-review.md](docs/dependency-advisory-review.md).
 
-## v0.20.3 candidate
+## v0.21.0 proposed candidate — not published or release-ready
+
+- Includes the merged session-maintenance APIs and browser coordinator for local
+  and optional SSO sessions: versioned capability negotiation, rendered-login
+  epoch fencing, owner-before-provider renewal, CSRF repair and passive idle
+  leases within immutable login limits. Navigation cancels queued commands but
+  keeps maintenance running; stale negotiated pages cannot replace the document.
+- Host extensions can adopt `adminFetch`, `createAdminAxios` and
+  `ensureSessionReady` from `@admin-core/http`. Mutations are not automatically
+  replayed after authentication repair. Rebuild extensions from the same source
+  version and verify host-specific flows; see
+  [client embedding](docs/embedding-client.md) and
+  [browser sessions](docs/browser-auth-sessions.md).
+- Updates only transitive `qs` 6.16.0 to 6.16.1 within Inertia's declared range,
+  with rebuilt embedded assets; see the dated
+  [advisory reassessment](docs/dependency-advisory-review.md).
+- Requires Go 1.27.3 or newer to address the standard-library `crypto/x509`
+  advisory [GO-2026-6809](https://pkg.go.dev/vuln/GO-2026-6809). Hosts on Go
+  1.27.2 must upgrade their build toolchain before consuming this candidate;
+  rebuild and redeploy existing binaries to receive the standard-library fix.
+- This proposal is not publication, release readiness, downstream acceptance or
+  deployment. Run `make publish-readiness VERSION=v0.21.0` on the final candidate
+  tree and complete review and agreed acceptance before separately authorized
+  publication. Then run `make release-readiness VERSION=v0.21.0` against the exact
+  immutable published tag. Earlier merged PR checks do not replace these gates.
+
+## v0.20.3 published baseline
 
 - Propagate successfully validated Raw JSON user edits to the host rich-text
   model while leaving controlled external updates silent. Readonly and disabled
@@ -57,11 +83,9 @@ This module is published as `github.com/assurrussa/goadmin`.
 - The regression covers the real `FormRichTextField` save/remount path, normalized
   JSON/HTML empty content, and protected states. Hosts must rebuild their admin
   extension assets and verify their own save/reload persistence workflow.
-- Run `make publish-readiness VERSION=v0.20.3` on the final candidate tree.
-  After separately authorized publication, run
-  `make release-readiness VERSION=v0.20.3` against that exact immutable tag.
-  Earlier PR checks and published v0.20.2 session-navigation fixes do not prove
-  this candidate's release readiness or downstream host acceptance.
+- This baseline includes Raw JSON model propagation; it does not include the
+  proposed v0.21.0 session-maintenance APIs or qs advisory patch. Publication
+  does not establish downstream host acceptance or deployment.
 
 ## v0.20.2 published baseline
 
