@@ -36,6 +36,13 @@
   </AuthLayout>
 </template>
 <script setup lang="ts">
+import {
+  adminFetch,
+  ensureSessionReady,
+  getCurrentCSRFToken,
+  sessionCoordinator,
+  SessionReadinessError,
+} from '@/http'
 import { ref } from 'vue'
 import AuthLayout from '@/components/layout/AuthLayout.vue'
 import AppHead from '@/components/layout/AppHead.vue'
@@ -59,7 +66,12 @@ async function reauthenticate() {
       return
     }
     reauthError.value = 'Не удалось начать локальный вход. Обновите страницу и попробуйте снова.'
-  } catch {
+  } catch (cause) {
+    if (cause instanceof SessionReadinessError) {
+      reauthSubmitting.value = false
+      reauthError.value = cause.message
+      return
+    }
     reauthError.value = 'Результат запроса неизвестен. Обновите страницу перед новой попыткой.'
   }
 }
@@ -69,17 +81,22 @@ async function confirmLink() {
   error.value = ''
   errorCode.value = ''
   try {
-    const response = await fetch('/sso-link', {
+    let csrf = props.csrf
+    if (sessionCoordinator.isEnabled()) {
+      await ensureSessionReady()
+      csrf = getCurrentCSRFToken() ?? csrf
+    }
+    const response = await adminFetch('/sso-link', {
       method: 'POST',
       credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'X-CSRF-Token': props.csrf,
+        'X-CSRF-Token': csrf,
         Accept: 'application/json',
       },
       body: new URLSearchParams({
         intent: props.intent,
-        csrf: props.csrf,
+        csrf,
         confirm: 'link-this-identity',
       }),
     })
@@ -99,7 +116,12 @@ async function confirmLink() {
         ? body.message
         : 'Привязка не подтверждена. Откройте новую форму или войдите локально заново.'
     errorCode.value = typeof body?.code === 'string' ? body.code : ''
-  } catch {
+  } catch (cause) {
+    if (cause instanceof SessionReadinessError) {
+      submitting.value = false
+      error.value = cause.message
+      return
+    }
     error.value =
       'Результат запроса неизвестен. Не повторяйте отправку: откройте новую форму для проверки.'
   }

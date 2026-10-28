@@ -43,10 +43,11 @@ func (a *App) HasExternalAdminIdentity(c fiber.Ctx, issuer, externalSubject stri
 }
 
 type (
-	ExternalBinding          = adminservice.ExternalBinding
-	ExternalProof            = adminservice.ExternalProof
-	LocalAdminAdmission      = adminservice.LocalAdminAdmission
-	ExternalSessionAuthority = adminservice.ExternalSessionAuthority
+	ExternalBinding           = adminservice.ExternalBinding
+	ExternalProof             = adminservice.ExternalProof
+	LocalAdminAdmission       = adminservice.LocalAdminAdmission
+	ExternalSessionAuthority  = adminservice.ExternalSessionAuthority
+	ExternalSessionMaintainer = adminservice.ExternalSessionMaintainer
 )
 
 // LinkExternalAdminIdentity explicitly enrolls a verified external identity

@@ -1,8 +1,14 @@
+import { adminFetch, ensureSessionReady, getCurrentCSRFToken, sessionCoordinator } from '@/http'
 export const localReauthenticationDestination = '/auth/login?local=1&redirectback=%2Fsso-link'
 
 // A redirect followed by fetch must not be mistaken for successful logout.
 export async function requestLocalReauthentication(csrf: string): Promise<boolean> {
-  const response = await fetch('/sso-link/reauth', {
+  if (sessionCoordinator.isEnabled()) {
+    if (!['reauthentication_required', 'access_denied'].includes(sessionCoordinator.getState()))
+      await ensureSessionReady()
+    csrf = getCurrentCSRFToken() ?? csrf
+  }
+  const response = await adminFetch('/sso-link/reauth', {
     method: 'POST',
     credentials: 'same-origin',
     redirect: 'manual',

@@ -11,6 +11,24 @@ type ExternalAdminRecovery = adminservice.ExternalAdminRecovery
 
 var ErrExternalRecoveryRequired = adminservice.ErrExternalRecoveryRequired
 
+// BeginOwnedExternalAdminRecovery fences native readers before provider Verify.
+// Call CancelExternalAdminRecovery if provider verification fails.
+func (a *App) BeginOwnedExternalAdminRecovery(c fiber.Ctx) (*ExternalAdminRecovery, error) {
+	if a == nil || a.inner == nil {
+		return nil, goauth.ErrSessionRevoked
+	}
+	return a.inner.AdminAuth().BeginOwnedExternalAdminRecovery(c)
+}
+
+// CancelExternalAdminRecovery releases only this owner's definitely unconsumed
+// native refresh. The RP adapter remains responsible for its own SDK fence.
+func (a *App) CancelExternalAdminRecovery(c fiber.Ctx, recovery *ExternalAdminRecovery) error {
+	if a == nil || a.inner == nil {
+		return goauth.ErrSessionRevoked
+	}
+	return a.inner.AdminAuth().CancelExternalAdminRecovery(c, recovery)
+}
+
 // BeginExternalAdminRecovery captures an opaque native fence before SDK Verify.
 // It is never an authentication result. Hosts must guard the dedicated endpoint
 // against cross-origin requests and must not expose the snapshot to the browser.

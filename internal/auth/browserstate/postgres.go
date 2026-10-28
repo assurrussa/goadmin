@@ -20,7 +20,9 @@ func NewPostgres(db *sql.DB, keys goauth.KeyRing) *Postgres {
 
 func (s *Postgres) Load(ctx context.Context, id string) (Record, bool, error) {
 	var raw []byte
-	err := s.db.QueryRowContext(ctx, `SELECT record FROM goadmin_browser_auth_state WHERE id=$1 AND expires_at>now()`, id).Scan(&raw)
+	var expiresAt time.Time
+	err := s.db.QueryRowContext(ctx, `SELECT record,expires_at FROM goadmin_browser_auth_state
+        WHERE id=$1 AND expires_at>now()`, id).Scan(&raw, &expiresAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Record{}, false, nil
 	}
@@ -28,6 +30,7 @@ func (s *Postgres) Load(ctx context.Context, id string) (Record, bool, error) {
 		return Record{}, false, err
 	}
 	r, err := s.codec.decode(id, raw)
+	r.ExpiresAt = expiresAt
 	return r, err == nil, err
 }
 
@@ -35,6 +38,7 @@ func (s *Postgres) Create(ctx context.Context, id string, r Record, ttl time.Dur
 	if ttl <= 0 {
 		return errors.New("admin auth state lifetime must be positive")
 	}
+	r.ExpiresAt = fixedExpiry(r.ExpiresAt, ttl)
 	r.Version = 1
 	r.Owner = ""
 	raw, err := s.codec.encode(id, r)
@@ -47,7 +51,7 @@ func (s *Postgres) Create(ctx context.Context, id string, r Record, ttl time.Dur
 		return err
 	}
 	_, err = s.db.ExecContext(ctx, `INSERT INTO goadmin_browser_auth_state(id,version,owner,record,expires_at)
- VALUES($1,1,'',$2,$3)`, id, raw, time.Now().UTC().Add(ttl))
+ VALUES($1,1,'',$2,$3)`, id, raw, r.ExpiresAt)
 	return err
 }
 
@@ -81,4 +85,14 @@ func (s *Postgres) Complete(ctx context.Context, id string, v int64, owner strin
 func (s *Postgres) Delete(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM goadmin_browser_auth_state WHERE id=$1`, id)
 	return err
+}
+
+func (s *Postgres) DeleteIfCurrent(ctx context.Context, id string, version int64, owner string) (bool, error) {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM goadmin_browser_auth_state
+        WHERE id=$1 AND version=$2 AND owner=$3`, id, version, owner)
+	if err != nil {
+		return false, err
+	}
+	n, err := result.RowsAffected()
+	return n == 1, err
 }

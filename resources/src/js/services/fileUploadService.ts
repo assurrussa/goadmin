@@ -1,3 +1,4 @@
+import { ensureSessionReady } from '@/http'
 import axios, { type AxiosRequestConfig, type AxiosResponse } from 'axios'
 import { resolveTusEndpoint } from './tusEndpoint'
 
@@ -488,7 +489,8 @@ const tusRequest = <T>(
     options.signal?.addEventListener('abort', cancel, { once: true })
     progress()
     Promise.resolve()
-      .then(() => {
+      .then(async () => {
+        await ensureSessionReady({ signal: controller.signal })
         if (settled) throw new Error('Upload cancelled')
         return send({
           signal: controller.signal,

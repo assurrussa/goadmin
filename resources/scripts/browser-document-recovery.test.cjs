@@ -14,20 +14,44 @@ async function run(responses, storage = new Map()) {
   const requests = [];
   let reloads = 0;
   let timer;
+  let navigationTimer;
+  const windowListeners = {};
   let cleared = false;
   vm.runInNewContext(script, {
     document: {getElementById: id => elements[id.replace('auth-recovery-', '')]},
     location: {reload: () => reloads++}, AbortController,
-    window: {addEventListener() {}},
+    window: {addEventListener(name, callback) {windowListeners[name] = callback;}},
     sessionStorage: {getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value)},
-    setTimeout: (callback, ms) => {assert.equal(ms, 30000); timer = callback; return 7;},
-    clearTimeout: id => {assert.equal(id, 7); cleared = true;},
+    setTimeout: (callback, ms) => {
+      if (ms === 10000) {navigationTimer = callback; return 8;}
+      assert.equal(ms, 30000); timer = callback; return 7;
+    },
+    clearTimeout: id => {assert.ok(id === 7 || id === 8); cleared = true;},
     fetch: async (url, init) => {requests.push({url, init}); const next = responses.shift(); if (next instanceof Error) throw next; return typeof next === 'function' ? next(init) : next;}
   });
   const settle = async () => {for (let i = 0; i < 20; i++) await Promise.resolve();};
   await settle();
-  return {elements, requests, settle, timeout: () => timer(), reloads: () => reloads, cleared: () => cleared};
+  return {elements, requests, settle, timeout: () => timer(), navigationTimeout: () => navigationTimer(),
+    pagehide: () => windowListeners.pagehide(), reloads: () => reloads, cleared: () => cleared};
 }
+
+test('stalled automatic return changes promise to explicit fallback without another request', async () => {
+  const result = await run([response(200, 'authentication_recovered', {csrfReady: true})]);
+  result.navigationTimeout();
+  assert.equal(result.elements.title.textContent, 'Автоматический переход не завершён');
+  assert.equal(result.elements.retry.hidden, false);
+  assert.equal(result.elements.continue.hidden, false);
+  assert.equal(result.requests.length, 1);
+  assert.equal(result.reloads(), 1);
+});
+
+test('leaving the document cancels the navigation watchdog effects', async () => {
+  const result = await run([response(200, 'authentication_recovered', {csrfReady: true})]);
+  result.pagehide();
+  result.navigationTimeout();
+  assert.equal(result.elements.title.textContent, 'Возвращаемся на страницу');
+  assert.equal(result.elements.retry.hidden, true);
+});
 
 test('confirmed recovery automatically returns with a safe GET, never mutation replay', async () => {
   const result = await run([response(200, 'authentication_recovered', {csrfReady: true})]);

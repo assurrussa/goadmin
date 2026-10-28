@@ -66,7 +66,7 @@ func NewRuntime(ctx context.Context, cfg Config, db *sql.DB) (*Runtime, error) {
 	if err != nil {
 		return nil, errors.New("admin SSO provider initialization failed")
 	}
-	authority := &Authority{Client: client, Allows: func(issuer, subject string) bool {
+	authority := &Authority{Client: client, AllowsRequest: cfg.AllowsRequest, Allows: func(issuer, subject string) bool {
 		return issuer == cfg.Issuer && subject != ""
 	}}
 	return &Runtime{

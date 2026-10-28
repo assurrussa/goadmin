@@ -1,5 +1,45 @@
 # Embedding and extending the admin client
 
+## Shared authenticated requests
+
+Extensions built with this GoAdmin version can import `adminFetch`,
+`createAdminAxios` and `ensureSessionReady` from `@admin-core/http`. The core
+bootstrap configures their shared coordinator from the explicit
+`adminSessionMaintenance.version` page prop. Built-in Inertia (shared Axios),
+tables, export and upload transports use this coordinator. There is no global
+replacement of browser fetch; custom forms must adopt the facade for pre-send
+guarantees. Rebuild host extensions and embedded assets from the same version.
+The page prop also carries `sessionEpoch`, the nonbearer fence of the rendered
+login. Clients require that anchor before accepting their first maintenance
+response. Custom page bootstraps must preserve it along with the version.
+
+For example, use `adminFetch('/api/example', { method: 'POST', body, signal })`
+in the host form's existing single-submit lifecycle. The helper waits before
+the original send when readiness is older than 30 seconds or repair is running,
+and reads the current configured CSRF cookie at dispatch. It sends a mutation
+once. A tagged refusal can repair session state, but does not replay the failed
+command. Preserve a normal submit guard, AbortSignal and component cancellation;
+the coordinator does not infer that two distinct user commands are duplicates.
+
+`createAdminAxios(config)` provides an isolated Axios client with the same
+contract. `ensureSessionReady({ signal })` is for custom transports: call it
+before constructing any native-CSRF form body or sending a command. A changed
+session epoch cancels old continuations even if the user ID is unchanged.
+Negotiated Inertia page responses with an obsolete dispatch fence are rejected
+before Inertia can replace the page. Confirmed session expiry or access denial
+also blocks late page responses, while explicit sign-in/logout transitions remain
+available. Cancelling pending commands on navigation
+keeps the shared maintenance check and its background schedule alive.
+The foreground wait budget is ten seconds; a timeout cancels the unsent
+continuation, while the server may still complete and commit its refresh.
+
+Forms remain mounted on temporary or terminal authentication failures. Backend
+auth, membership, permission and CSRF checks still authorize every operation.
+After a network failure with an unknown business outcome, retain that uncertainty
+and use the domain's result check before retrying. Upload adapters retain their
+own offset/completion rules. Explicitly safe reads may opt into one retry with
+`retrySafeRead`; GET alone does not establish safety.
+
 This guide is the host contract for serving the GoAdmin UI and adding or removing
 pages. It applies to the version of `goadmin` pinned by the host's `go.mod`;
 rebuild the client from that same version whenever its Vue source or an extension

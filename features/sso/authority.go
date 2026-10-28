@@ -2,7 +2,9 @@ package sso
 
 import (
 	"context"
+	"errors"
 	"math"
+	"net/http"
 	"time"
 
 	"github.com/assurrussa/goauth"
@@ -21,9 +23,46 @@ type Client interface {
 type Authority struct {
 	Client Client
 	Allows func(issuer, subject string) bool
+	// AllowsRequest opts into core maintenance and enforces the same ingress
+	// restrictions as the optional browser adapter.
+	AllowsRequest func(*http.Request) bool
 }
 
 var _ host.ExternalSessionAuthority = (*Authority)(nil)
+
+var _ host.ExternalSessionMaintainer = (*Authority)(nil)
+
+func (a *Authority) MaintenanceEnabled() bool {
+	if a == nil || a.Allows == nil || a.AllowsRequest == nil {
+		return false
+	}
+	_, ok := a.Client.(interface {
+		Verify(request *http.Request) (browser.Proof, error)
+	})
+	return ok
+}
+
+// Renew uses the existing SDK owner protocol under GoAdmin's outer native
+// owner. It does not weaken Validate or create a new admission.
+func (a *Authority) Renew(r *http.Request, old host.ExternalBinding) (host.ExternalBinding, error) {
+	if !a.MaintenanceEnabled() || r == nil || !a.AllowsRequest(r) || !a.Allows(old.Issuer, old.Subject) {
+		return host.ExternalBinding{}, goauth.ErrSessionRevoked
+	}
+	client, ok := a.Client.(interface {
+		Verify(request *http.Request) (browser.Proof, error)
+	})
+	if !ok {
+		return host.ExternalBinding{}, goauth.ErrSessionRevoked
+	}
+	proof, err := client.Verify(r)
+	if err != nil {
+		if errors.Is(err, browser.ErrDenied) || errors.Is(err, browser.ErrRequiredAMR) {
+			return host.ExternalBinding{}, goauth.ErrSessionRevoked
+		}
+		return host.ExternalBinding{}, err
+	}
+	return Build(proof, old.LocalSubject, old.LinkID)
+}
 
 // Build accepts only an opaque SDK proof. The result is protected server
 // metadata; callers must never decode it from browser forms, headers or JSON.
@@ -73,6 +112,9 @@ func (a *Authority) Validate(ctx context.Context, binding host.ExternalBinding) 
 	}
 	proof, err := a.Client.Check(ctx, b)
 	if err != nil {
+		if errors.Is(err, browser.ErrDenied) || errors.Is(err, browser.ErrRequiredAMR) {
+			return host.ExternalProof{}, goauth.ErrSessionRevoked
+		}
 		return host.ExternalProof{}, err
 	}
 	expected, err := Build(proof, binding.LocalSubject, binding.LinkID)

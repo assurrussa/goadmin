@@ -20,11 +20,13 @@ import (
 // not authentication, cannot authorize commands, and must never enter page
 // props, cookies, request bodies or host persistence.
 type ExternalAdminRecovery struct {
-	service *Service
-	id      string
-	record  browserstate.Record
-	binding ExternalBinding
-	until   time.Time
+	service  *Service
+	id       string
+	record   browserstate.Record
+	binding  ExternalBinding
+	until    time.Time
+	owner    string
+	consumed bool
 }
 
 // Binding returns a copy of identity/lineage pins for the host's SDK verifier.
@@ -68,7 +70,10 @@ func (s *Service) BeginExternalAdminRecovery(c fiber.Ctx) (*ExternalAdminRecover
 	if err != nil {
 		return nil, err
 	}
-	if !found || record.Owner != "" || record.External == nil || record.SubjectID != record.External.LocalSubject ||
+	if found && record.Owner != "" {
+		return nil, ErrRefreshInProgress
+	}
+	if !found || record.External == nil || record.SubjectID != record.External.LocalSubject ||
 		record.Tokens.Session.ID == "" || !time.Now().Before(record.Tokens.Session.ExpiresAt) ||
 		!time.Now().Before(record.External.AbsoluteUntil) {
 		return nil, goauth.ErrSessionRevoked
@@ -93,6 +98,41 @@ func (s *Service) BeginExternalAdminRecovery(c fiber.Ctx) (*ExternalAdminRecover
 	}, nil
 }
 
+// BeginOwnedExternalAdminRecovery fences native readers before the host calls
+// its provider SDK. The owner can be canceled only before canonical consumption.
+func (s *Service) BeginOwnedExternalAdminRecovery(c fiber.Ctx) (*ExternalAdminRecovery, error) {
+	recovery, err := s.BeginExternalAdminRecovery(c)
+	if err != nil {
+		return nil, err
+	}
+	owner := refreshpolicy.Owner("refresh", uuid.NewString(), time.Now())
+	claimed, err := s.states.Claim(c, recovery.id, recovery.record.Version, owner)
+	if err != nil {
+		// An ambiguous claim is safe to release: no credential has been consumed.
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(c.Context()), time.Second)
+		defer cancel()
+		_, releaseErr := s.states.ReleaseClaim(ctx, recovery.id, recovery.record.Version, owner)
+		return nil, errors.Join(ErrRefreshRetryRequired, err, releaseErr)
+	}
+	if !claimed {
+		return nil, ErrRefreshInProgress
+	}
+	recovery.owner = owner
+	return recovery, nil
+}
+
+// CancelExternalAdminRecovery releases only this pre-consumption owner. An
+// unknown canonical refresh keeps its fence; a provider SDK owns its own fence.
+func (s *Service) CancelExternalAdminRecovery(c fiber.Ctx, recovery *ExternalAdminRecovery) error {
+	if recovery == nil || recovery.service != s || recovery.owner == "" || recovery.consumed {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(c.Context()), time.Second)
+	defer cancel()
+	_, err := s.states.ReleaseClaim(ctx, recovery.id, recovery.record.Version, recovery.owner)
+	return err
+}
+
 func sameExternalLogin(old, fresh ExternalBinding) bool {
 	if fresh.Generation == old.Generation &&
 		(!fresh.Deadline.Equal(old.Deadline) || !fresh.AbsoluteUntil.Equal(old.AbsoluteUntil) ||
@@ -114,6 +154,9 @@ func sameExternalLogin(old, fresh ExternalBinding) bool {
 // rotation and refresh. A canonical revocation cannot be resurrected because
 // the canonical session ID never changes. No remote call occurs under a DB lock.
 func (s *Service) CompleteExternalAdminRecovery(c fiber.Ctx, recovery *ExternalAdminRecovery, fresh ExternalBinding) error {
+	if recovery != nil && recovery.service == s {
+		defer func() { _ = s.CancelExternalAdminRecovery(c, recovery) }()
+	}
 	if c.Method() != fiber.MethodGet || recovery == nil || recovery.service != s || !time.Now().Before(recovery.until) ||
 		!time.Now().Before(recovery.binding.AbsoluteUntil) || !sameExternalLogin(recovery.binding, fresh) {
 		return goauth.ErrSessionRevoked
@@ -129,34 +172,30 @@ func (s *Service) CompleteExternalAdminRecovery(c fiber.Ctx, recovery *ExternalA
 	if sess.ID() != recovery.id {
 		return goauth.ErrSessionRevoked
 	}
+	owner, err := s.claimExternalRecovery(c, recovery)
+	if err != nil {
+		return err
+	}
 	if err := s.checkExternalRecoveryAdmission(c, fresh, recovery.binding.LinkID); err != nil {
 		return err
 	}
-	owner := refreshpolicy.Owner("refresh", uuid.NewString(), time.Now())
-	claimed, err := s.states.Claim(c, recovery.id, recovery.record.Version, owner)
-	if err != nil || !claimed {
-		return errors.Join(goauth.ErrSessionRevoked, err)
-	}
-	// Before canonical refresh consumes anything this claim can be released.
-	consumed := false
-	defer func() {
-		if !consumed {
-			ctx, cancel := context.WithTimeout(context.WithoutCancel(c.Context()), time.Second)
-			defer cancel()
-			_, _ = s.states.ReleaseClaim(ctx, recovery.id, recovery.record.Version, owner)
-		}
-	}()
 	record, found, err := s.states.Load(c, recovery.id)
-	if err != nil || !found || record.External == nil || record.Version != recovery.record.Version || record.Owner != owner ||
+	if err != nil {
+		return errors.Join(ErrRefreshRetryRequired, err)
+	}
+	if !found || record.External == nil || record.Version != recovery.record.Version || record.Owner != owner ||
 		record.SubjectID != recovery.record.SubjectID || record.Tokens.Session.ID != recovery.record.Tokens.Session.ID {
 		return errors.Join(goauth.ErrSessionRevoked, err)
 	}
-	auth, err := s.verifyExternalRecoveryToken(c, sess, &record, owner, &consumed)
+	auth, err := s.verifyExternalRecoveryToken(c, sess, &record, owner, &recovery.consumed)
 	if err != nil {
 		return err
 	}
 	if err := s.checkExternalRecoveryCommit(c, recovery, fresh, record, auth); err != nil {
 		return err
+	}
+	if !recovery.consumed && fresh == recovery.binding {
+		return s.CancelExternalAdminRecovery(c, recovery)
 	}
 	binding := fresh
 	record.External = &binding
@@ -193,12 +232,18 @@ func (s *Service) checkExternalRecoveryCommit(
 		return err
 	}
 	link, err := s.canonicalExternalLink(c, fresh)
-	if err != nil || link.ID != fresh.LinkID {
-		return errors.Join(goauth.ErrExplicitIdentityLink, err)
+	if err != nil {
+		return err
+	}
+	if link.ID != fresh.LinkID {
+		return goauth.ErrExplicitIdentityLink
 	}
 	admin, err := s.admins.GetBySubjectID(c, fresh.LocalSubject)
-	if err != nil || admin.ID <= 0 {
-		return errors.Join(goauth.ErrMembershipDenied, err)
+	if err != nil {
+		return err
+	}
+	if admin.ID <= 0 {
+		return goauth.ErrMembershipDenied
 	}
 	if !time.Now().Before(recovery.until) || !time.Now().Before(fresh.Deadline) || !time.Now().Before(fresh.AbsoluteUntil) {
 		return goauth.ErrSessionRevoked
@@ -240,7 +285,10 @@ func (s *Service) verifyExternalRecoveryToken(
 		tokens, refreshErr := s.runtime.Refresh(c, record.Tokens.RefreshToken)
 		if refreshErr != nil {
 			_, handledErr := s.failOwnedAdminRefresh(c, sess, *record, owner, refreshErr)
-			return goauth.AuthContext{}, errors.Join(goauth.ErrSessionRevoked, handledErr)
+			if isTerminalSessionError(refreshErr) || isInvalidRefreshToken(refreshErr) {
+				return goauth.AuthContext{}, errors.Join(goauth.ErrSessionRevoked, handledErr)
+			}
+			return goauth.AuthContext{}, handledErr
 		}
 		// Never transform recovery into a new canonical login.
 		if tokens.Session.ID != record.Tokens.Session.ID || tokens.Session.ExpiresAt.After(record.Tokens.Session.ExpiresAt) {
@@ -277,4 +325,20 @@ func SetExternalAdminRecoverySignIn(c fiber.Ctx, target string) {
 func ExternalAdminRecoverySignIn(c fiber.Ctx) string {
 	target, _ := c.Locals(externalRecoverySignInKey{}).(string)
 	return target
+}
+
+func (s *Service) claimExternalRecovery(c fiber.Ctx, recovery *ExternalAdminRecovery) (string, error) {
+	if recovery.owner != "" {
+		return recovery.owner, nil
+	}
+	owner := refreshpolicy.Owner("refresh", uuid.NewString(), time.Now())
+	recovery.owner = owner
+	claimed, err := s.states.Claim(c, recovery.id, recovery.record.Version, owner)
+	if err != nil {
+		return "", errors.Join(ErrRefreshRetryRequired, err)
+	}
+	if !claimed {
+		return "", ErrRefreshInProgress
+	}
+	return owner, nil
 }

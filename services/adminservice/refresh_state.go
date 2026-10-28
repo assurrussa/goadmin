@@ -12,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/session"
 	"github.com/google/uuid"
 
+	sessioncore "github.com/assurrussa/goadmin/infrastructure/core/session"
 	"github.com/assurrussa/goadmin/internal/auth/browserstate"
 	"github.com/assurrussa/goadmin/internal/refreshpolicy"
 )
@@ -42,6 +43,7 @@ func applyBrowserRecord(state *browserSession, r browserstate.Record) {
 		state.External = &binding
 	}
 	state.Version = r.Version
+	state.Owner = r.Owner
 	state.SubjectID = r.SubjectID
 	state.AccessToken = r.Tokens.AccessToken
 	state.RefreshToken = r.Tokens.RefreshToken
@@ -107,7 +109,7 @@ func (s *Service) verifyCommittedRefresh(c fiber.Ctx, sess *session.Session, sta
 		return &auth, nil
 	}
 	if isTerminalSessionError(err) {
-		if clearErr := s.clearAdminBrowserSession(c, sess); clearErr != nil {
+		if clearErr := s.clearAdminBrowserSession(c, sess, state); clearErr != nil {
 			return nil, clearErr
 		}
 		return nil, nil //nolint:nilnil // terminal canonical failure is anonymous
@@ -210,6 +212,9 @@ func (s *Service) failOwnedAdminRefresh(
 		return nil, refreshErr
 	}
 	if isTerminalSessionError(refreshErr) || isInvalidRefreshToken(refreshErr) {
+		if state, ok := sess.Get(sessioncore.AuthAdminKey.String()).(*browserSession); ok && state != nil {
+			state.Version, state.Owner = old.Version, owner
+		}
 		if err := s.clearAdminBrowserSession(c, sess); err != nil {
 			return nil, err
 		}

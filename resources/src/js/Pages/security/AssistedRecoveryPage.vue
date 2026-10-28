@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { adminFetch } from '@/http'
 import { ref, onBeforeUnmount } from 'vue'
 import { router } from '@inertiajs/vue3'
 import { useI18n, registerTranslations } from '@/i18n'
@@ -62,7 +63,7 @@ async function submit(event: Event) {
   locked.value = true
   const form = event.target as HTMLFormElement
   try {
-    const response = await fetch('/account-recovery', {
+    const response = await adminFetch('/account-recovery', {
       method: 'POST',
       credentials: 'same-origin',
       mode: 'same-origin',

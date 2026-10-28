@@ -1,3 +1,4 @@
+import { ensureSessionReady, sessionCoordinator } from '@/http'
 import { ref, shallowRef, getCurrentInstance, onUnmounted, watch } from 'vue'
 import { hasAdminCapability, useAdminCapabilities } from './useAdminCapabilities'
 
@@ -139,7 +140,7 @@ const dispatchEvent = (message: WebSocketEvent) => {
   })
 }
 
-const connect = () => {
+const openSocket = () => {
   if (typeof window === 'undefined' || !hasAdminCapability('realtime')) {
     return
   }
@@ -225,6 +226,29 @@ const connect = () => {
   }
 }
 
+let connectionGeneration = 0
+let pendingConnection = false
+const connect = () => {
+  if (!sessionCoordinator.isEnabled()) {
+    openSocket()
+    return
+  }
+  if (pendingConnection || isConnected.value || isConnecting.value) return
+  const generation = connectionGeneration
+  const fence = sessionCoordinator.commandFence()
+  pendingConnection = true
+  void ensureSessionReady()
+    .then(() => {
+      if (generation !== connectionGeneration) return
+      sessionCoordinator.assertCommandFence(fence)
+      openSocket()
+    })
+    .catch(() => {})
+    .finally(() => {
+      if (generation === connectionGeneration) pendingConnection = false
+    })
+}
+
 const off = <E extends WebSocketEventName>(eventName: E, handler: MessageHandler<E>) => {
   if (!handlers.value.has(eventName)) {
     return
@@ -247,6 +271,8 @@ const on = <E extends WebSocketEventName>(eventName: E, handler: MessageHandler<
 }
 
 const disconnect = () => {
+  connectionGeneration++
+  pendingConnection = false
   manualDisconnect = true
   stopHeartbeat()
   clearReconnect()

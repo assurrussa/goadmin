@@ -581,6 +581,18 @@ Existing scalar/TLS handling and borrowed *sql.DB ownership remain unchanged.
 PG environment/service defaults remain parser inputs; this is not process
 environment isolation.
 
+## Session maintenance
+
+Core session maintenance is documented in [browser sessions](browser-auth-sessions.md)
+and the supported `@admin-core/http` facade in [client embedding](embedding-client.md).
+It covers local and optional SSO logins, versioned capability negotiation,
+owner-before-provider renewal, conditional cleanup, CSRF repair and passive idle
+leases within immutable login limits. Pages pin their rendered login epoch before
+the first maintenance check. Navigation cancels queued commands while preserving
+the maintenance watchdog; stale negotiated Inertia pages cannot replace the
+mounted document. Legacy recovery remains supported; full
+SDK/native crash reconciliation and consumer adoption are outside this change.
+
 ## Browser history after logout
 
 Authenticated admin responses opt into encrypted Inertia history. Anonymous

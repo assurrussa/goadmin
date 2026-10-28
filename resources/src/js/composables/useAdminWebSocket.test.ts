@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { setAdminCapabilities } from './useAdminCapabilities'
+import { configureSessionMaintenance, sessionCoordinator, ensureSessionReady } from '@/http'
 import { FILE_AFTER_PROCESS_EVENT, useAdminWebSocket } from './useAdminWebSocket'
 
 const sockets: FakeSocket[] = []
@@ -23,6 +24,8 @@ beforeEach(() => {
 })
 afterEach(async () => {
   useAdminWebSocket().disconnect()
+  configureSessionMaintenance({ props: {} }, {})
+  sessionCoordinator.dispose()
   setAdminCapabilities({ props: {} })
   await nextTick()
   vi.useRealTimers()
@@ -47,6 +50,54 @@ describe('realtime capability', () => {
     sockets[0].onmessage?.({ data: JSON.stringify(event) })
     expect(handler).toHaveBeenCalledExactlyOnceWith(event)
     dispose()
+  })
+
+  it('waits for session readiness before reconnecting and fences disconnect during that check', async () => {
+    let resolve!: (response: Response) => void
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(
+        () =>
+          new Promise((done) => {
+            resolve = done
+          }),
+      ),
+    )
+    setAdminCapabilities({ props: { adminCapabilities: { realtime: true } } })
+    configureSessionMaintenance({
+      props: { adminSessionMaintenance: { version: 1, sessionEpoch: 'one' } },
+    })
+    const websocket = useAdminWebSocket()
+    websocket.ensureConnected()
+    expect(sockets).toHaveLength(0)
+    websocket.disconnect()
+    const now = Date.now()
+    resolve(
+      new Response(
+        JSON.stringify({
+          status: 200,
+          code: 'authentication_recovered',
+          csrfReady: true,
+          maintenance: {
+            version: 1,
+            serverTime: new Date(now).toISOString(),
+            nextCheckAfterMs: 60_000,
+            csrfExpiresAt: new Date(now + 300_000).toISOString(),
+            hardExpiresAt: new Date(now + 3_600_000).toISOString(),
+            sessionEpoch: 'one',
+            revision: 1,
+            renewed: false,
+          },
+        }),
+        { headers: { 'Content-Type': 'application/json', 'X-Goadmin-Auth-Recovery': '1' } },
+      ),
+    )
+    await ensureSessionReady()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(sockets).toHaveLength(0)
+    websocket.ensureConnected()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(sockets).toHaveLength(1)
   })
 
   it('never opens a socket when realtime is disabled', () => {

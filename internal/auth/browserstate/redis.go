@@ -30,10 +30,21 @@ func (s *Redis) Load(ctx context.Context, id string) (Record, bool, error) {
 	if err != nil {
 		return Record{}, false, err
 	}
+	if r.ExpiresAt.IsZero() {
+		ttl, ttlErr := s.conn.PTTL(ctx, redisKey(id)).Result()
+		if ttlErr != nil {
+			return Record{}, false, ttlErr
+		}
+		if ttl <= 0 {
+			return Record{}, false, nil
+		}
+		r.ExpiresAt = time.Now().Add(ttl)
+	}
 	return r, true, nil
 }
 
 func (s *Redis) Create(ctx context.Context, id string, r Record, ttl time.Duration) error {
+	r.ExpiresAt = fixedExpiry(r.ExpiresAt, ttl)
 	r.Version = 1
 	r.Owner = ""
 	raw, err := s.codec.encode(id, r)
@@ -43,7 +54,7 @@ func (s *Redis) Create(ctx context.Context, id string, r Record, ttl time.Durati
 	if ttl <= 0 {
 		return errors.New("admin auth state lifetime must be positive")
 	}
-	ok, err := s.conn.SetNX(ctx, redisKey(id), raw, ttl).Result()
+	ok, err := s.conn.SetNX(ctx, redisKey(id), raw, time.Until(r.ExpiresAt)).Result()
 	if err != nil {
 		return err
 	}
@@ -67,7 +78,9 @@ local raw=redis.call('GET',KEYS[1])
 if not raw then return 0 end
 local old=cjson.decode(raw)
 if old.version~=tonumber(ARGV[1]) or old.owner~=ARGV[2] then return 0 end
-redis.call('SET',KEYS[1],ARGV[3],'KEEPTTL')
+local fresh=cjson.decode(ARGV[3])
+fresh.expiresAt=old.expiresAt
+redis.call('SET',KEYS[1],cjson.encode(fresh),'KEEPTTL')
 return 1`
 
 func (s *Redis) Claim(ctx context.Context, id string, v int64, owner string) (bool, error) {
@@ -88,4 +101,16 @@ func (s *Redis) Complete(ctx context.Context, id string, v int64, owner string, 
 
 func (s *Redis) Delete(ctx context.Context, id string) error {
 	return s.conn.Del(ctx, redisKey(id)).Err()
+}
+
+const deleteIfCurrentScript = `
+local raw=redis.call('GET',KEYS[1])
+if not raw then return 0 end
+local r=cjson.decode(raw)
+if r.version~=tonumber(ARGV[1]) or r.owner~=ARGV[2] then return 0 end
+return redis.call('DEL',KEYS[1])`
+
+func (s *Redis) DeleteIfCurrent(ctx context.Context, id string, version int64, owner string) (bool, error) {
+	n, err := s.conn.Eval(ctx, deleteIfCurrentScript, []string{redisKey(id)}, version, owner).Int()
+	return n == 1, err
 }

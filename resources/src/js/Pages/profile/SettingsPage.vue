@@ -219,6 +219,7 @@
 </template>
 
 <script setup lang="ts">
+import { adminFetch } from '@/http'
 import { t, locale } from '@/i18n'
 
 import LocalMFASettings from '@/components/profile/LocalMFASettings.vue'
@@ -265,7 +266,7 @@ onMounted(async () => {
   if (!ssoEnabled.value) return
   ssoLoading.value = true
   try {
-    const response = await fetch('/sso-account', {
+    const response = await adminFetch('/sso-account', {
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
     })

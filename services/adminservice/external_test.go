@@ -22,6 +22,10 @@ import (
 	"github.com/assurrussa/goadmin/models"
 )
 
+const resolverOutageCase = "resolver-outage"
+
+const authorityOutageCase = "authority-outage"
+
 type externalAuthorityFake struct {
 	proof                     ExternalProof
 	err                       error
@@ -184,7 +188,7 @@ func admittedExternal(t *testing.T, f externalFixture) *http.Cookie {
 }
 
 func TestExternalEveryRequestFailsClosedWithoutDowngrade(t *testing.T) {
-	for _, name := range []string{"missing-link", "regrant", "resolver-outage", "authority-outage", "authority-disabled", "expired", "receipt-slide", "absolute-end"} {
+	for _, name := range []string{"missing-link", "regrant", resolverOutageCase, authorityOutageCase, "authority-disabled", "expired", "receipt-slide", "absolute-end"} {
 		t.Run(name, func(t *testing.T) {
 			f := newExternalFixture(t)
 			cookie := admittedExternal(t, f)
@@ -193,9 +197,9 @@ func TestExternalEveryRequestFailsClosedWithoutDowngrade(t *testing.T) {
 				f.resolver.missing = true
 			case "regrant":
 				f.resolver.replacement = true
-			case "resolver-outage":
+			case resolverOutageCase:
 				f.resolver.err = errors.New("synthetic link store failure")
-			case "authority-outage":
+			case authorityOutageCase:
 				f.authority.err = errors.New("synthetic provider store failure")
 			case "authority-disabled":
 				f.service.externalAuthority = nil
@@ -216,7 +220,11 @@ func TestExternalEveryRequestFailsClosedWithoutDowngrade(t *testing.T) {
 			f.authority.err = nil
 			retry, err := f.app.Test(requestWithCookie(http.MethodGet, "/auth", cookie))
 			require.NoError(t, err)
-			require.Equal(t, http.StatusUnauthorized, retry.StatusCode)
+			if name == resolverOutageCase || name == authorityOutageCase {
+				require.Equal(t, http.StatusNoContent, retry.StatusCode, "transient failures must preserve the admitted session")
+			} else {
+				require.Equal(t, http.StatusUnauthorized, retry.StatusCode)
+			}
 			_ = retry.Body.Close()
 		})
 	}

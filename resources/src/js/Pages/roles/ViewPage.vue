@@ -232,6 +232,7 @@
 </template>
 
 <script setup lang="ts">
+import { adminFetch } from '@/http'
 import { t } from '@/i18n'
 import { useRolePreviewAction } from '@/composables/useRolePreviewAction'
 const canAssignInPreview = useRolePreviewAction('roles', 'assign')
@@ -332,7 +333,7 @@ const loadAssignedAdmins = async () => {
   }
   assignedLoading.value = true
   try {
-    const resp = await fetch(`/roles/${roleId.value}/admins`)
+    const resp = await adminFetch(`/roles/${roleId.value}/admins`)
     if (!resp.ok) {
       throw new Error('failed to fetch assigned admins')
     }
@@ -365,7 +366,7 @@ const searchAdmins = async () => {
     if (searchQuery.value.trim()) {
       params.set('search', searchQuery.value.trim())
     }
-    const resp = await fetch(`/roles/${roleId.value}/admins/search?${params.toString()}`)
+    const resp = await adminFetch(`/roles/${roleId.value}/admins/search?${params.toString()}`)
     if (!resp.ok) {
       throw new Error('failed to fetch admins')
     }

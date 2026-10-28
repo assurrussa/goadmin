@@ -235,6 +235,7 @@ func validateModules(modules []Module) (map[string]bool, []Module, error) {
 	claims, err := moduleRouteClaims(ModuleDescriptor{
 		Key: coreModuleKey,
 		Routes: []string{
+			"GET /auth/session/maintain",
 			"GET /auth/mfa", "POST /auth/mfa",
 			"POST /auth/mfa/enrollment/begin", "POST /auth/mfa/enrollment/confirm", "GET /", "GET /auth/login", "POST /auth/login",
 			"GET /auth/register", "POST /auth/register", "GET /auth/profile",
