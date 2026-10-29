@@ -47,6 +47,7 @@ func TestBuiltInNamespacesRejectFeatureRoutesBeforeConstruction(t *testing.T) {
 func TestCoreStaticNamespacesRejectFeatureRoutesBeforeConstruction(t *testing.T) {
 	for _, route := range []string{
 		"GET /public/custom.js", "HEAD /public/dist/js/app.js", "GET /test/theme", "POST /test/buttons",
+		"GET /dashboard/data", "HEAD /dashboard/data",
 	} {
 		t.Run(route, func(t *testing.T) {
 			called := false

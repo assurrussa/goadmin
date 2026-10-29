@@ -27,7 +27,7 @@ The default core uses PostgreSQL for browser and canonical auth sessions; it
 needs no Redis or SMTP. The login page offers first-admin registration until an
 administrator exists. Enter the setup token from `.env` in that form.
 
-`ADMIN_MODULES` selects comma-separated modules: `access,jobs,uploads,queues,
+`ADMIN_MODULES` selects comma-separated modules: `users,access,jobs,uploads,queues,
 notifications,realtime,authmail`. Uploads, queues and notifications require jobs.
 For notifications or authmail, set `NOTIFYHUB_URL` and `NOTIFYHUB_PROJECT_KEY`
 for an existing NotifyHub gateway. Both modules reuse one client and project key;
@@ -94,10 +94,23 @@ make starter-smoke KEEP=1
 It builds the current source twice: the standard presentation at
 `http://localhost:18768` and the topbar reference at `http://127.0.0.1:18769`.
 The different hostnames isolate browser cookies when both are open together.
-Both instances enable core plus `access,jobs,uploads,queues,realtime`; each has
+Both instances enable core plus `users,access,jobs,uploads,queues,notifications,realtime`; each has
 its own fresh PostgreSQL and upload volumes. The command generates private test
-credentials and keys, without reading this starter's `.env`. Mail and NotifyHub
-are outside this acceptance profile.
+credentials and keys, without reading this starter's `.env`. The source smoke
+build alone selects the `starter_smoke` Go tag: it adds an example host dashboard
+card and a notification transport that rejects external delivery. In-app
+notification records are seeded only in each run's isolated database. Auth mail
+and external NotifyHub delivery remain outside this acceptance profile. Normal
+starter builds exclude these fixtures. See [dashboard cards](../../docs/dashboard.md)
+for the host extension contract.
+
+Use `SMOKE_RECORDS_ONLY=1 make starter-smoke` to run the narrower record-editing
+acceptance: setup, profile/uploads, presentation preferences and users/admins
+editing on both packs. Its report is explicitly marked `record-editing`; the
+normal profile remains `full` and additionally checks role assignment/restricted
+sessions and dashboard summaries, private unread counts, host cards, refresh,
+locale and mobile presentation. Both profiles require zero browser console/page errors.
+
 
 The browser checks first-admin registration, login/logout, profile validation
 and persistence, an actual restricted account, avatar processing across Inertia

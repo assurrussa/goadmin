@@ -12,6 +12,8 @@
 </template>
 
 <script setup lang="ts">
+import { useRecordNavigation } from '@/composables/useRecordNavigation'
+const { recordHref } = useRecordNavigation('/users')
 import { t } from '@/i18n'
 
 import { computed, onUnmounted, ref } from 'vue'
@@ -106,10 +108,10 @@ function handleDataCreate() {
 function handleDataAction(actionKey: string, item: Record<string, unknown>) {
   switch (actionKey) {
     case 'view':
-      router.get(`${apiUrl.value}/${item.id}`)
+      router.get(recordHref(item.id))
       break
     case 'edit':
-      router.get(`${apiUrl.value}/${item.id}/edit`)
+      router.get(recordHref(item.id, true))
       break
     case 'delete':
       if (

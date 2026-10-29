@@ -1,17 +1,19 @@
 import assert from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { chromium } from 'playwright'
 import { expect as baseExpect } from 'playwright/test'
 import { terminalUpload, taskStatus, deferred, deadline } from './helpers.mjs'
 import { waitForPaint } from './paint.mjs'
+import { dashboardAcceptance } from './dashboard.mjs'
 
 const expect = baseExpect.configure({ timeout: 20000 })
 
 const folder = path.resolve(process.argv[2] ?? '')
 const manifest = JSON.parse(await readFile(path.join(folder, 'run.json'), 'utf8'))
 assert.equal(manifest.owner, 'goadmin-starter-smoke-v1')
-const report = { runId: manifest.runId, revision: manifest.revision, dirty: manifest.dirty,
+const report = { profile: process.argv.includes('--records-only') ? 'record-editing' : 'full', runId: manifest.runId, revision: manifest.revision, dirty: manifest.dirty,
   playwright: JSON.parse(await readFile(new URL('./package.json', import.meta.url))).devDependencies.playwright,
   startedAt: new Date().toISOString(), cases: {} }
 const browser = await chromium.launch({ headless: true,
@@ -20,6 +22,11 @@ report.browser = browser.version()
 
 async function fill(page, values) {
   for (const [name, value] of Object.entries(values)) await page.locator(`input[name="${name}"]`).fill(value)
+}
+function ownedSQL(config, statement) {
+  execFileSync('docker', ['compose', '--project-directory', folder, '--env-file', config.env,
+    '-p', config.project, '-f', config.compose, 'exec', '-T', 'postgres',
+    'psql', '-U', 'smoke', '-d', 'smoke', '-v', 'ON_ERROR_STOP=1', '-c', statement], { stdio: 'pipe' })
 }
 async function submit(page, pathname) {
   const [result] = await Promise.all([
@@ -295,17 +302,94 @@ async function runCase(name, config) {
       username: `queues-${name}`, password: credentials.password, passwordConfirm: credentials.password })
     await submit(page, '/admins/create')
     await expect(page).toHaveURL(/\/admins\/\d+$/)
+    // Only this run's isolated PostgreSQL receives projections for the two
+    // UI-created canonical accounts. No production seed endpoint is added.
+    ownedSQL(config, 'INSERT INTO users(subject_id,uuid,created_at,updated_at) SELECT subject_id,gen_random_uuid(),now(),now() FROM administrations ON CONFLICT (subject_id) DO NOTHING')
+    for (const resource of ['admins', 'users']) {
+      await page.goto(`/${resource}?page=2&limit=1&sortBy=name&sortOrder=asc&search=smoke&status=active`)
+      await expect(page.getByRole('row').filter({ has: page.getByRole('button', { name: /^(Просмотр|View)$/ }) })).toHaveCount(1)
+      const listURL = page.url()
+      await page.getByRole('button', { name: /^(Просмотр|View)$/ }).click()
+      await expect(page).toHaveURL(new RegExp(`/${resource}/\\d+\\?returnTo=`))
+      await page.getByRole('link', { name: /^(Редактировать|Edit)$/ }).first().click()
+      await expect(page).toHaveURL(new RegExp(`/${resource}/\\d+/edit\\?returnTo=`))
+      const editURL = page.url()
+      await page.reload()
+      await page.screenshot({ path: path.join(folder, `${name}-${resource}-edit-light-en.png`), fullPage: true })
+      await page.getByRole('button', { name: /Switch to dark theme|Переключить на темную тему/i }).click()
+      await language(page, 'Русский', 'ru')
+      await expect(page.getByRole('link', { name: 'К списку', exact: true })).toBeVisible()
+      await page.setViewportSize({ width: 390, height: 844 })
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'edit form mobile fit')
+      await page.screenshot({ path: path.join(folder, `${name}-${resource}-edit-dark-mobile-ru.png`), fullPage: true })
+      await page.setViewportSize({ width: 1440, height: 1000 })
+      await language(page, 'English', 'en')
+      await page.getByRole('button', { name: /Switch to light theme|Переключить на светлую тему/i }).click()
+      await page.locator('input[name="name"]').fill(`Workflow ${resource} ${name}`)
+      page.once('dialog', (dialog) => dialog.dismiss())
+      await page.getByRole('link', { name: /^(Отмена|Cancel)$/ }).click()
+      await expect(page).toHaveURL(editURL)
+      await expect(page.locator('input[name="name"]')).toHaveValue(`Workflow ${resource} ${name}`)
+      const mutation = page.waitForResponse((response) => response.request().method() === 'PUT' && new URL(response.url()).pathname === new URL(editURL).pathname.replace(/\/edit$/, ''))
+      await page.getByRole('button', { name: /^(Сохранить|Save)$/ }).click()
+      assert.ok((await mutation).status() < 400)
+      await expect(page.locator('form[aria-busy="true"]')).toHaveCount(0)
+      await expect(page).toHaveURL(editURL)
+      await expect(page.getByText(resource === 'users' ? 'User updated successfully!' : 'Record updated successfully!', { exact: true })).toHaveCount(1)
+      await page.reload()
+      await expect(page.locator('input[name="name"]')).toHaveValue(`Workflow ${resource} ${name}`)
+      await page.getByRole('link', { name: /^(К списку|Back to list)$/ }).click()
+      await expect(page).toHaveURL(listURL)
+      await expect(page.getByRole('row').filter({ hasText: `Workflow ${resource} ${name}` })).toBeVisible()
+      await page.getByRole('button', { name: /^(Редактировать|Edit)$/ }).click()
+      await page.locator('input[name="name"]').fill('Discard this change')
+      page.once('dialog', (dialog) => dialog.accept())
+      await page.getByRole('link', { name: /^(Отмена|Cancel)$/ }).click()
+      await expect(page).toHaveURL(listURL)
+      await page.screenshot({ path: path.join(folder, `${name}-${resource}-workflow.png`), fullPage: true })
+    }
+    check('users/admins filtered second-page view/edit/save/reload/return and dirty leave confirmation')
+    if (process.argv.includes('--records-only')) {
+      assert.deepEqual(result.pageErrors, [], 'uncaught browser errors')
+      assert.deepEqual(result.consoleErrors, [], 'browser console errors')
+      result.result = 'passed'
+      return
+    }
+    ownedSQL(config, `UPDATE admin_notifications SET is_read=TRUE;
+      INSERT INTO admin_notifications(admin_id,title,message)
+      SELECT a.id,'Dashboard fixture','Isolated dashboard fixture'
+      FROM administrations a CROSS JOIN LATERAL generate_series(1, CASE WHEN a.id=(SELECT MIN(id) FROM administrations) THEN 2 ELSE 1 END) AS copies;`)
+    await dashboardAcceptance({ page, folder, name, expect, language, result })
+    check('dashboard real queues/private notifications/host card, manual refresh, persisted opt-in, simulated stale rendering, mobile and live locale')
     await page.goto('/roles/create')
     const slug = `smoke-queues-${name}`
     await fill(page, { slug, name: `Smoke Queue Reader ${name}`, description: 'Automated real restricted session' })
     const queueCard = page.getByText('queues', { exact: true }).locator('xpath=ancestor::div[.//label][1]')
     await queueCard.locator('label').filter({ has: page.getByText('read', { exact: true }) }).getByRole('checkbox').click()
+    const dashboardPermission = page.getByText('dashboard', { exact: true }).locator('xpath=ancestor::div[.//label][1]')
+    await dashboardPermission.locator('label').filter({ has: page.getByText('read', { exact: true }) }).getByRole('checkbox').click()
     await submit(page, '/roles')
     await page.goto('/roles')
     const roleRow = page.getByRole('row').filter({ hasText: slug })
     await expect(roleRow).toBeVisible()
-    await roleRow.getByRole('button', { name: /^(Просмотр|View)$/ }).click()
+    const [assignedRead, searchRead] = await Promise.all([
+      page.waitForResponse((response) => response.request().method() === 'GET' && /\/roles\/\d+\/admins$/.test(new URL(response.url()).pathname)),
+      page.waitForResponse((response) => response.request().method() === 'GET' && /\/roles\/\d+\/admins\/search$/.test(new URL(response.url()).pathname)),
+      roleRow.getByRole('button', { name: /^(Просмотр|View)$/ }).click(),
+    ])
+    assert.ok(assignedRead.ok(), 'mounted role page must load assigned admins')
+    assert.ok(searchRead.ok(), 'mounted role page must load admin search')
     await expect(page).toHaveURL(/\/roles\/\d+$/)
+    await page.goBack()
+    await expect(page).toHaveURL(/\/roles(?:\?.*)?$/)
+    await expect(roleRow).toBeVisible()
+    const [restoredAssignedRead, restoredSearchRead] = await Promise.all([
+      page.waitForResponse((response) => response.request().method() === 'GET' && /\/roles\/\d+\/admins$/.test(new URL(response.url()).pathname)),
+      page.waitForResponse((response) => response.request().method() === 'GET' && /\/roles\/\d+\/admins\/search$/.test(new URL(response.url()).pathname)),
+      page.goForward(),
+    ])
+    assert.ok(restoredAssignedRead.ok(), 'history-restored role page must load assigned admins')
+    assert.ok(restoredSearchRead.ok(), 'history-restored role page must load admin search')
     const filter = page.getByPlaceholder(/Имя, фамилия или email|Name or email/i)
     await filter.fill(credentials.restrictedEmail)
     const [searchResponse] = await Promise.all([
@@ -334,6 +418,14 @@ async function runCase(name, config) {
     assert.equal(denied.status(), 403, 'real restricted session must be denied by server guard')
     result.restrictedAccess = { granted: '/queues', denied: '/admins', status: denied.status(), role: slug }
     await page.screenshot({ path: path.join(folder, `${name}-restricted-queues.png`), fullPage: true })
+    const restrictedSnapshot = page.waitForResponse((r) => new URL(r.url()).pathname === '/dashboard/data')
+    await page.goto('/')
+    const privateData = await (await restrictedSnapshot).json()
+    const unread = privateData.cards.find((card) => card.key === 'goadmin.notifications')
+    assert.equal(unread.metrics.find((metric) => metric.key === 'unread-notifications').value, '1', 'notifications must be scoped to the restricted actor')
+    const restrictedHost = page.locator('[data-dashboard-card="starter.summary"]')
+    await expect(restrictedHost.getByRole('link', { name: 'Administrators', exact: true })).toHaveCount(0)
+    result.dashboard.restrictedUnread = 1
     await logout(page)
     await login(page, credentials.email, credentials.password)
     check('UI-created admin and queues:read role assignment; real restricted login, menu filtering, server 403 and logout protection')

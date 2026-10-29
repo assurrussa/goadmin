@@ -12,7 +12,10 @@ vi.mock('@/services/userExport', () => ({ downloadUserExport: mocks.download }))
 vi.mock('@/composables/useNotifications', () => ({
   useNotifications: () => ({ warning: mocks.warning, error: mocks.error }),
 }))
-vi.mock('@inertiajs/vue3', () => ({ router: { get: mocks.get } }))
+vi.mock('@inertiajs/vue3', () => ({
+  router: { get: mocks.get },
+  usePage: () => ({ url: '/users' }),
+}))
 vi.mock('@/components/layout/AppHead.vue', () => ({
   default: defineComponent({ render: () => null }),
 }))

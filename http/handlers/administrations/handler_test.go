@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/assurrussa/goauth"
+	"github.com/assurrussa/goinertia"
 	uploadhost "github.com/assurrussa/gouploads/host"
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5"
@@ -24,8 +25,10 @@ import (
 	datagrid "github.com/assurrussa/goadmin/infrastructure/core/datagrid"
 	"github.com/assurrussa/goadmin/infrastructure/core/session"
 	"github.com/assurrussa/goadmin/infrastructure/pgsql/repositories/adminactionauditrepo"
+	"github.com/assurrussa/goadmin/infrastructure/pgsql/repositories/adminrepo"
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 	identity "github.com/assurrussa/goadmin/internal/identity"
+	"github.com/assurrussa/goadmin/internal/uploadintegration"
 	"github.com/assurrussa/goadmin/models"
 )
 
@@ -672,6 +675,106 @@ func TestUpdateAdminRejectsRecoveryEmailChanges(t *testing.T) {
 			require.Equal(t, "Owner", repo.current.Name)
 			require.Equal(t, "owner@example.com", repo.current.Email)
 			require.Empty(t, audit.records)
+		})
+	}
+}
+
+func TestUpdateAdminSaveOutcome(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name           string
+		transactionErr error
+		invalidName    bool
+		wantStatus     int
+		wantError      string
+	}{
+		{name: "success", wantStatus: http.StatusFound},
+		{
+			name: "version-conflict", transactionErr: adminrepo.ErrAdminVersionConflict, wantStatus: http.StatusFound,
+			wantError: "Данные администратора изменились. Обновите страницу и повторите действие.",
+		},
+		{
+			name: "preview-conflict", transactionErr: uploadintegration.ErrPreviewBindingConflict, wantStatus: http.StatusFound,
+			wantError: "Данные администратора изменились. Обновите страницу и повторите действие.",
+		},
+		{
+			name: "unknown-outcome", transactionErr: goauth.ErrOperationOutcomeUnknown, wantStatus: http.StatusFound,
+			wantError: "Результат операции неизвестен. Обновите страницу перед повтором.",
+		},
+		{
+			name: "handled-failure", transactionErr: errors.New("write failed"), wantStatus: http.StatusFound,
+			wantError: "Не удалось обновить администратора.",
+		},
+		{name: "not-found", transactionErr: fiber.ErrNotFound, wantStatus: http.StatusNotFound},
+		{name: "bad-request", transactionErr: fiber.ErrBadRequest, wantStatus: http.StatusBadRequest},
+		{name: "field-validation", invalidName: true, wantStatus: http.StatusFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			harness := adminappt.NewAppTest(t)
+			for _, action := range []integrationroles.PermissionAction{
+				integrationroles.PermissionActionRead, integrationroles.PermissionActionCreate,
+				integrationroles.PermissionActionUpdate, integrationroles.PermissionActionDelete,
+			} {
+				harness.ExpertGuard(integrationroles.PermissionDomainAdmins, action).AnyTimes()
+			}
+			attempts := 0
+			harness.App.SetCommandTransaction(func(ctx context.Context, fn func(context.Context) error) error {
+				attempts++
+				if tc.transactionErr != nil {
+					return tc.transactionErr
+				}
+				return fn(ctx)
+			})
+			repo := &adminRepoStub{current: models.Admin{
+				ID: 42, Email: "admin@example.test", Name: "Original",
+				SubjectID: integrationroles.MustParseSubjectIDString("123e4567-e89b-12d3-a456-426614174130"),
+			}}
+			runtime := &adminAuthRuntimeStub{}
+			app := fiber.New()
+			var props map[string]any
+			app.Use(func(c fiber.Ctx) error {
+				c.Locals(session.AuthAdminKey.String(), &models.SessionAdmin{ID: 1})
+				err := c.Next()
+				props, _ = c.Locals(goinertia.ContextKeyProps).(map[string]any)
+				return err
+			})
+			NewHandler(harness.App, repo, runtime, noopFileRepo{}, noopPreviewService{}, &adminActionAuditStub{}).
+				RegisterGroupRoutes(app)
+			name := "Changed"
+			if tc.invalidName {
+				name = ""
+			}
+			request := httptest.NewRequestWithContext(t.Context(), http.MethodPut, "/admins/42",
+				strings.NewReader(`{"name":"`+name+`","email":"admin@example.test"}`))
+			request.Header.Set("Content-Type", "application/json")
+			request.Header.Set("Referer", "/admins/42/edit")
+			response, err := app.Test(request)
+			require.NoError(t, err)
+			defer func() { require.NoError(t, response.Body.Close()) }()
+			require.Equal(t, tc.wantStatus, response.StatusCode)
+			if tc.wantStatus == http.StatusFound {
+				require.Equal(t, "/admins/42/edit", response.Header.Get("Location"))
+			}
+			switch {
+			case tc.invalidName:
+				require.Zero(t, attempts)
+				require.Equal(t, map[string]string{"name": "Name не задан"}, props[goinertia.ContextPropsErrors])
+				require.Empty(t, props[goinertia.ContextPropsFlash])
+			case tc.transactionErr != nil:
+				require.Equal(t, 1, attempts, "failed saves must not automatically retry")
+				require.Zero(t, repo.updateCalls)
+				require.Zero(t, runtime.profileCalls)
+				require.Empty(t, props[goinertia.ContextPropsFlash], "failures must not notify success or duplicate the error")
+				if tc.wantError != "" {
+					require.Equal(t, map[string]string{"form": tc.wantError}, props[goinertia.ContextPropsErrors])
+				}
+			default:
+				require.Equal(t, 1, attempts)
+				require.Equal(t, 1, repo.updateCalls)
+				require.Empty(t, props[goinertia.ContextPropsErrors])
+				require.Equal(t, map[string]string{"success": "Запись успешна обновлена!"}, props[goinertia.ContextPropsFlash])
+			}
 		})
 	}
 }

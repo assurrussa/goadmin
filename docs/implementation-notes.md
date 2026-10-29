@@ -1,5 +1,164 @@
 # Implementation Notes
 
+## Dashboard review follow-up (2026-10-29)
+
+Goal: retain the complete last successful card content, including a status-only
+result, and preserve each administrator's saved refresh preference across owner
+changes and teardown. Reset active timers on owner change; restore the saved
+preference on dashboard mount. An explicit user toggle persists immediately for
+its current owner; programmatic hydration/reset never writes a preference.
+
+Status and metrics retain their original timestamp through provider/network
+failures. The old status remains visible in a neutral tone alongside the stale
+warning. A successful response without a status removes the previous status.
+
+Regression tests reproduced both findings before the fix. Nine new regression
+cases cover repeated provider/network failures, status-only rendering and live
+locale, recovery without status, queued/flushed owner changes, terminal cleanup
+and remount. Existing revocation checks also prove the old status is discarded.
+The focused source review found no remaining issues. `make check` passed Go
+race/coverage, 132 resource-manifest checks, all 950 UI tests, lint, formatting,
+types, frontend build and embedded-asset verification. Generated assets are
+updated. The full Docker starter smoke was not repeated for this frontend fix.
+
+## Dashboard summaries and host cards (2026-10-29)
+
+Accepted: immediate dashboard shell; asynchronous permission-scoped queues and
+personal unread-notification summaries; additive host cards through the existing
+host facade; navigation-only links; existing section catalog below the cards.
+Use shared rendering, RU/EN, both presentation packs and light/dark. No graphs,
+custom Vue widgets, mutations, new public packages, dependencies or migrations.
+
+State contract: provider errors never become zero; retain successful same-owner
+values/timestamps as stale, but discard omitted/revoked cards and all data on
+owner change. Abort/ignore old responses. Refresh is manual with an opt-in,
+per-admin browser preference for visible-only 60-second updates, no overlapping
+requests and one refresh on visibility resume. Terminal auth and unmount stop
+all refresh work.
+
+The wire contract uses a descriptor-only `dashboard` page prop and protected
+GET /dashboard/data snapshots: owner (decimal admin ID string), ordered cards,
+optional snapshot updatedAt. Each card has key/title/links/metrics, optional
+status/updatedAt and loading/ready/unavailable state. Text has literal text and
+optional ru/en translations. Providers receive copied canonical identity and a
+standard context with a two-second deadline; at most four run concurrently.
+Authorization happens before provider execution. Host callbacks are borrowed,
+concurrency-safe and cancellation-aware. Registration is validated at assembly.
+
+Implemented with focused backend/frontend lifecycle and permission regressions.
+Independent security/data-lifecycle review has no remaining findings. Targeted
+Go race tests and lint passed; make check passed its full Go race/coverage and
+resource gates (132 manifest/integration checks and 941 UI tests). The generated
+clean-consumer probe now exercises dashboard facade types; make
+externalconsumer-local passed. Tagged source-starter tests passed as well.
+
+Full run `20261029t160424z-a1506edd` passed nine scenario groups per presentation
+pack, with zero console/page errors. Real queue counts, per-admin unread counts
+(two versus one), host registration, narrower link permissions, manual refresh,
+persisted opt-in, live locale and mobile rendering are verified. A single explicit
+HTTP snapshot override verifies stale-card rendering; backend errors/timeouts are
+covered separately by Go regressions. Screenshots were visually reviewed. Both
+owned stacks and volumes were removed.
+
+Initial Docker attempts exposed a pre-existing expiry-test race: the test's
+100ms deadline could be renewed by the watchdog during its 150ms sleep. The
+fixture now injects a controllable clock into the real coordinator and advances
+past the deadline after requests are sent, preserving all rejection/draft
+assertions. Its 16 targeted tests, type/lint/format checks and independent review
+passed; final Docker builds repeated the complete resource tests with this fix.
+The unchanged Go pass was reused. No external delivery, publication or
+production deployment was performed.
+
+## Navigation cancellation follow-up (2026-10-29)
+
+Goal: close the record-editing acceptance by fixing destination reads cancelled
+on Inertia navigation, while retaining departing-page command fences, same-page
+save/validation behavior, document-owned maintenance and native history safety.
+Runtime palettes, dashboard changes and further theme work remain deferred.
+
+The regression reproduces cancelled destination reads with the real pinned
+Inertia router and a delayed session-maintenance response. Cancellation now
+runs synchronously when the Vue adapter swaps to a different page, after lazy
+resolution/history decryption and before destination setup/mount. Same-page
+updates and hash changes keep their commands. The late navigate event only
+cancels obsolete legacy recovery.
+Python bytecode is removed from source control and ignored.
+
+Regression checks reject both late navigate cancellation and early cancellation
+before lazy resolution. The real Vue/Inertia entrypoint test also proves the
+fence precedes destination mount, including client-side visits. Independent
+session-safety review has no remaining findings.
+
+Go tidy/format/vet/lint and race/coverage from make check passed. Its resource
+phase first exposed the entrypoint harness's new import requirement; after fixing
+that fixture and test types, final make resources passed 132 manifest/integration
+checks, 913 unit tests, types/lint/build and embedded-asset verification. Smoke
+infrastructure passed eight Python and five JavaScript checks.
+
+Full browser run `20261029t143440z-b843bba3` passed all eight scenario groups on
+both freshly built packs, with zero console/page errors. Both mounted role-page
+reads succeed on normal navigation and native Back/Forward restoration; role
+assignment, restricted login and server-side 403 remain verified. Both owned
+stacks and volumes were removed. The preceding run found an overly strict test
+URL expectation after Back (the grid restores its query); the corrected harness
+accepts the list query and waits for the actual list row before Forward.
+The record-editing iteration's full acceptance is now complete. Changes remain
+local; no publication or production deployment was performed.
+
+## Record editing workflow (2026-10-29)
+
+Accepted: users/admins list -> view/edit -> save in place -> explicit return to
+list with search, filters, sort and pagination. Shared form composition retains
+page-owned fields, permissions and email-confirmation behavior. No draft storage;
+internal GET navigation confirms dirty forms; browser Back/Forward cannot be
+cancelled. Return targets are restricted to the same resource list.
+
+State contract: success clears dirty state and emits one success notification;
+field/form errors retain input and dirty state; conflict/unknown outcomes never
+become success and are never replayed automatically. Direct edit links fall back
+to their resource list. Submission disables form actions.
+
+Implemented shared RecordEditForm composition, validated same-resource returnTo
+navigation, non-field handler error bags and opt-in users in the isolated starter.
+Production MiddlewareErrorListener regressions prove generic user failures retain
+input and roll back canonical changes. Independent review additionally corrected
+missing EN feedback and reactive page-action text during live locale changes.
+
+Validation: targeted handler tests and nested starter readonly tests passed.
+make check passed Go tidy/format/vet/lint and race/coverage, 131 manifest tests,
+907 unit tests, types/lint/build. After the final locale fix, make resources
+passed again with 908 unit tests; unchanged Go checks were reused. The smoke
+infrastructure passed eight Python and five JavaScript checks. The Go file scan
+now excludes ignored output artifacts so candidate snapshots are not formatted
+as GoAdmin source.
+
+Real record-editing acceptance passed seven scenario groups per pack with zero
+console/page errors. Run `20261029t135623z-4f013760` used unchanged source images
+from its initial build, fresh isolated PostgreSQL/upload volumes and the corrected
+browser harness. The report explicitly records profile `record-editing`. It
+proves real filtered second-page list/view/edit/save/reload/return, dirty leave
+confirmation, English success feedback and live RU/mobile dark layout. Screenshots
+were visually reviewed and the owned stacks were removed. Reproduce this scope
+with `SMOKE_RECORDS_ONLY=1 make starter-smoke`.
+
+The initial full starter gate failed. Its separate role-assignment phase
+exposed a global auth lifecycle problem: app.ts cancelled the session
+coordinator on Inertia navigate after the target role page starts its mounted
+reads, so those reads are refused before fetch and logged as console errors.
+Evidence: full run `20261029t135330z-5d847517`. A later attempted wait for these
+responses timed out and was removed. The full profile remains strict and this
+problem was not hidden by the record-editing profile. The authorized navigation
+cancellation follow-up above fixes this defect and closes the full gate.
+No publication or production deployment was performed.
+
+Browser iteration exposed an unrelated transient HTTP parser failure in an
+existing Vite asset test and incorrect smoke search assumptions. Admin search is
+an email prefix; both synthetic accounts now share the smoke prefix. No search
+behavior was changed.
+Deferred ideas: runtime palette selection, useful dashboard, polished second
+presentation pack. These have no approved implementation contract yet.
+
+
 ## Real-host presentation acceptance (2026-10-22)
 
 The accepted follow-up uses two isolated source-candidate starter instances:

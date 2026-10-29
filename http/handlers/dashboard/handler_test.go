@@ -62,7 +62,7 @@ func TestDashboard_PageBounds(t *testing.T) {
 
 func TestDashboard_RegisterGroupRoutes(t *testing.T) {
 	adminAppTest := adminappt.NewAppTest(t)
-	adminAppTest.ExpertGuard("dashboard", "read").Times(1)
+	adminAppTest.ExpertGuard("dashboard", "read").Times(2)
 	h := dashboard.NewHandler(adminAppTest.App)
 	app := fiber.New()
 	h.RegisterGroupRoutes(app)

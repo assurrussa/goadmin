@@ -4,10 +4,12 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	server "github.com/assurrussa/goadmin/infrastructure/fiber/server"
+	"github.com/assurrussa/goadmin/internal/dashboard"
 )
 
 // Extension is a small reusable bootstrap extension implementation for host features.
 type Extension struct {
+	dashboardCards []dashboard.Card
 	handlers       []server.Handler
 	middlewares    []fiber.Handler
 	publicRegister []func(*fiber.App)

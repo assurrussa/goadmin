@@ -16,6 +16,7 @@ import (
 
 	"github.com/assurrussa/goauth"
 
+	"github.com/assurrussa/goadmin/features/users"
 	"github.com/assurrussa/goadmin/host"
 	"github.com/assurrussa/goadmin/migrations"
 )
@@ -41,7 +42,7 @@ func run() error {
 			continue
 		}
 		switch key {
-		case "access", "jobs", "uploads", "queues", "notifications", "realtime", "authmail":
+		case "users", "access", "jobs", "uploads", "queues", "notifications", "realtime", "authmail":
 			selected[key] = true
 		default:
 			return fmt.Errorf("unknown admin module %q", key)
@@ -141,6 +142,9 @@ func run() error {
 		})},
 	}
 	modules := make([]host.Module, 0, len(selected)+1)
+	if selected["users"] {
+		modules = append(modules, host.FeatureModule(users.NewFeature()))
+	}
 	if selected["access"] {
 		modules = append(modules, host.AccessModule())
 	}
@@ -170,7 +174,7 @@ func run() error {
 	if selected["queues"] {
 		modules = append(modules, host.QueuesModule())
 	}
-	mail, configErr := newMailIntegrations(selected)
+	mail, configErr := starterMailIntegrations(selected)
 	if configErr != nil {
 		return configErr
 	}
@@ -180,6 +184,7 @@ func run() error {
 	if selected["authmail"] {
 		modules = append(modules, host.AuthMailModule(host.AuthMailConfig{Sender: mail.auth}))
 	}
+	modules = append(modules, starterDashboardModules()...)
 	var runtime *host.Runtime
 	modules = append(modules, host.DefinedFeatureModule(host.ModuleDescriptor{Key: "starter.health", Routes: []string{"GET /healthz"}}, healthFeature{ready: func(ctx context.Context) error {
 		if runtime == nil {

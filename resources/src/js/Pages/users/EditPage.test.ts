@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createApp, defineComponent, nextTick, reactive } from 'vue'
+import { createApp, defineComponent, nextTick, reactive, h } from 'vue'
 import EditPage from './EditPage.vue'
 import { setAdminCapabilities } from '@/composables/useAdminCapabilities'
 
@@ -7,6 +7,13 @@ const submissions = vi.hoisted(() => ({ put: vi.fn() }))
 const page = vi.hoisted(() => ({ props: {} as Record<string, unknown> }))
 vi.mock('@inertiajs/vue3', () => ({
   usePage: () => page,
+  Link: defineComponent({
+    props: ['href'],
+    setup:
+      (props, { slots }) =>
+      () =>
+        h('a', { href: props.href }, slots.default?.()),
+  }),
   useForm: (data: object) =>
     reactive({ ...data, errors: {}, put: submissions.put, processing: false }),
   router: { on: () => () => {} },

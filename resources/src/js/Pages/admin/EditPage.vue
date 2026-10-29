@@ -1,97 +1,69 @@
 <template>
   <AppHead :title="props.title" />
-  <PageActionBar
-    :back-href="basePath"
-    :label="t('Редактирование администратора')"
-    :use-history="false"
-  />
-
-  <AdminForm
+  <RecordEditForm
     :form="form"
     :fields="['username', 'name', 'lastName', 'email']"
-    warn-unsaved
+    :return-href="listHref"
+    :label="t('Редактирование администратора')"
     @submit="handleForm"
   >
-    <div class="bg-card shadow-sm border border-border-primary overflow-hidden sm:rounded-lg">
-      <div class="px-4 py-5 sm:p-6">
-        <div class="space-y-6">
-          <!-- Name -->
-          <FormInput
-            v-model="form.name"
-            name="name"
-            type="text"
-            :label="t('Имя')"
-            autocomplete="given-name"
-            required
-            :error="form.errors.name"
-          />
+    <!-- Name -->
+    <FormInput
+      v-model="form.name"
+      name="name"
+      type="text"
+      :label="t('Имя')"
+      autocomplete="given-name"
+      required
+      :error="form.errors.name"
+    />
 
-          <!-- Last Name -->
-          <FormInput
-            v-model="form.lastName"
-            name="lastName"
-            type="text"
-            :label="t('Фамилия (необязательно)')"
-            autocomplete="family-name"
-            :error="form.errors.lastName"
-          />
+    <!-- Last Name -->
+    <FormInput
+      v-model="form.lastName"
+      name="lastName"
+      type="text"
+      :label="t('Фамилия (необязательно)')"
+      autocomplete="family-name"
+      :error="form.errors.lastName"
+    />
 
-          <!-- Email -->
-          <FormInput
-            v-model="form.email"
-            name="email"
-            type="email"
-            :label="t('Электронная почта')"
-            required
-            :error="form.errors.email"
-            readonly
-            help-text="Адрес связан с учётной записью. Администратор меняет свой email в настройках профиля с подтверждением пароля."
-          />
+    <!-- Email -->
+    <FormInput
+      v-model="form.email"
+      name="email"
+      type="email"
+      :label="t('Электронная почта')"
+      required
+      :error="form.errors.email"
+      readonly
+      help-text="Адрес связан с учётной записью. Администратор меняет свой email в настройках профиля с подтверждением пароля."
+    />
 
-          <!-- Username -->
-          <FormInput
-            v-model="form.username"
-            name="username"
-            type="text"
-            :label="t('Имя пользователя (необязательно)')"
-            autocomplete="username"
-            help-text="Можно оставить пустым."
-            :error="form.errors.username"
-          />
-        </div>
-      </div>
-
-      <div
-        class="px-4 py-3 bg-surface border-t border-border-primary sm:px-6 flex flex-wrap justify-end gap-3"
-      >
-        <AppButton as-child variant="secondary">
-          <Link :href="basePath">{{ t('Отмена') }}</Link>
-        </AppButton>
-        <FormButton
-          type="submit"
-          :loading="form.processing"
-          :loading-text="t('Сохранение...')"
-          variant="primary"
-        >
-          {{ t('Сохранить') }}
-        </FormButton>
-      </div>
-    </div>
-  </AdminForm>
+    <!-- Username -->
+    <FormInput
+      v-model="form.username"
+      name="username"
+      type="text"
+      :label="t('Имя пользователя (необязательно)')"
+      autocomplete="username"
+      help-text="Можно оставить пустым."
+      :error="form.errors.username"
+    />
+  </RecordEditForm>
 </template>
 
 <script setup lang="ts">
 import { t } from '@/i18n'
 
-import { Link, useForm, usePage } from '@inertiajs/vue3'
+import { useForm, usePage } from '@inertiajs/vue3'
 import AppHead from '@/components/layout/AppHead.vue'
-import PageActionBar from '@/components/layout/PageActionBar.vue'
 import FormInput from '@/components/form/FormInput.vue'
-import FormButton from '@/components/form/FormButton.vue'
-import AdminForm from '@/components/form/AdminForm.vue'
-import AppButton from '@/components/ui/AppButton.vue'
+import RecordEditForm from '@/components/form/RecordEditForm.vue'
+import { useRecordNavigation } from '@/composables/useRecordNavigation'
 
 const basePath = '/admins'
+const { listHref } = useRecordNavigation(basePath)
 const props = defineProps({
   title: {
     type: [String],

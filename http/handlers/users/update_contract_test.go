@@ -57,10 +57,10 @@ func TestUserUpdateCapabilityAndTransactionContract(t *testing.T) {
 		{name: "disabled-email-change", changeEmail: true, wantStatus: http.StatusFound},
 		{name: "disabled-mail-profile-only", wantStatus: http.StatusFound, wantUpdated: true},
 		{name: "enabled-email-change", mail: true, changeEmail: true, wantStatus: http.StatusFound, wantUpdated: true},
-		{name: "projection-failure", mail: true, changeEmail: true, projectionErr: failure, wantStatus: http.StatusInternalServerError},
+		{name: "projection-failure", mail: true, changeEmail: true, projectionErr: failure, wantStatus: http.StatusFound},
 		{
 			name: "email-enqueue-then-failure", mail: true, changeEmail: true, emailErr: failure,
-			wantStatus: http.StatusInternalServerError,
+			wantStatus: http.StatusFound,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -103,8 +103,11 @@ func TestUserUpdateCapabilityAndTransactionContract(t *testing.T) {
 				}
 				return err
 			})
-			app := fiber.New()
-			var flashedOld map[string]any
+			// Use the production error listener: a plain Fiber 500 would hide a
+			// redirect with empty errors that Inertia incorrectly treats as success.
+			app := fiber.New(fiber.Config{ErrorHandler: harness.App.HTTPManager().MiddlewareErrorListener()})
+			var flashedOld, props map[string]any
+			app.Use(captureUpdateProps(&props))
 			app.Use(captureFlashedOld(&flashedOld))
 			NewHandler(harness.App, repo, subjects).RegisterGroupRoutes(app)
 			email := "original@example.test"
@@ -114,11 +117,13 @@ func TestUserUpdateCapabilityAndTransactionContract(t *testing.T) {
 			req := httptest.NewRequestWithContext(t.Context(), http.MethodPut, "/users/42",
 				strings.NewReader(`{"name":"Changed","email":"`+email+`"}`))
 			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-Inertia", "true")
 			req.Header.Set("Referer", "/users/42/edit")
 			response, err := app.Test(req)
 			require.NoError(t, err)
 			defer func() { require.NoError(t, response.Body.Close()) }()
 			require.Equal(t, tc.wantStatus, response.StatusCode)
+			assertUserUpdateFeedback(t, props, tc.wantUpdated, !tc.mail && tc.changeEmail)
 			require.Equal(t, 1, transactions)
 			current, err := fixture.Runtime.GetAccount(t.Context(), account.Subject.ID)
 			require.NoError(t, err)
@@ -181,6 +186,8 @@ func TestUserUpdateUnknownCommitIsNotRetried(t *testing.T) {
 	repo := &userRepoStub{}
 	subjects := &userSubjectStoreStub{}
 	app := fiber.New()
+	var props map[string]any
+	app.Use(captureUpdateProps(&props))
 	NewHandler(harness.App, repo, subjects).RegisterGroupRoutes(app)
 	request := httptest.NewRequestWithContext(t.Context(), http.MethodPut, "/users/42", strings.NewReader(`{"name":"Changed"}`))
 	request.Header.Set("Content-Type", "application/json")
@@ -190,6 +197,10 @@ func TestUserUpdateUnknownCommitIsNotRetried(t *testing.T) {
 	defer func() { require.NoError(t, response.Body.Close()) }()
 	require.Equal(t, http.StatusFound, response.StatusCode)
 	require.Equal(t, "/users/42/edit", response.Header.Get("Location"))
+	require.Equal(t, map[string]string{
+		"form": "Результат операции неизвестен. Обновите страницу перед повтором.",
+	}, props[goinertia.ContextPropsErrors])
+	require.Empty(t, props[goinertia.ContextPropsFlash], "unknown outcome must not notify success or duplicate the error")
 	require.Equal(t, 1, attempts)
 	require.Zero(t, repo.updateCalls)
 	require.Zero(t, subjects.profileCalls)
@@ -203,4 +214,33 @@ func captureFlashedOld(old *map[string]any) fiber.Handler {
 		}
 		return err
 	}
+}
+
+func captureUpdateProps(props *map[string]any) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		err := c.Next()
+		*props, _ = c.Locals(goinertia.ContextKeyProps).(map[string]any)
+		return err
+	}
+}
+
+func assertUserUpdateFeedback(t *testing.T, props map[string]any, success, emailDisabled bool) {
+	t.Helper()
+	if success {
+		require.Equal(t, map[string]string{"success": "Пользователь успешно обновлён!"}, props[goinertia.ContextPropsFlash])
+		require.Empty(t, props[goinertia.ContextPropsErrors])
+		return
+	}
+	require.Empty(t, props[goinertia.ContextPropsFlash], "failed updates must not notify success")
+	old, ok := props[goinertia.ContextPropsOld].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "Changed", old["name"])
+	if emailDisabled {
+		require.Equal(t, map[string]string{
+			"email": "Изменение электронной почты отключено",
+		}, props[goinertia.ContextPropsErrors])
+		return
+	}
+	require.Equal(t, "changed@example.test", old["email"], "failed updates preserve the attempted email")
+	require.Equal(t, map[string]string{"form": "Не удалось обновить пользователя."}, props[goinertia.ContextPropsErrors])
 }

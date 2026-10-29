@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,6 +34,7 @@ import (
 	server "github.com/assurrussa/goadmin/infrastructure/fiber/server"
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 	"github.com/assurrussa/goadmin/internal/authrecovery"
+	"github.com/assurrussa/goadmin/internal/dashboard"
 	"github.com/assurrussa/goadmin/internal/uploadintegration"
 	adminshared "github.com/assurrussa/goadmin/shared"
 )
@@ -107,6 +109,11 @@ func initServer(ctx context.Context, deps Dependencies, cfg Config, app *adminap
 		return nil, err
 	}
 
+	dashboardRegistry, err := dashboard.New(builtInDashboardCards(cfg, deps), extensions.dashboardCards)
+	if err != nil {
+		return nil, fmt.Errorf("build dashboard: %w", err)
+	}
+
 	// Define Middlewares
 	defaultMiddlewares := make([]fiber.Handler, 0, 3+len(extensions.middlewares))
 	defaultMiddlewares = append(defaultMiddlewares, extensions.middlewares...)
@@ -117,21 +124,24 @@ func initServer(ctx context.Context, deps Dependencies, cfg Config, app *adminap
 	)
 
 	// Core routes are always mounted; module routes use the same capability snapshot.
-	httpHandlers := []server.Handler{adminmain.NewHandler(app), adminauthhandler.NewHandler(adminauthhandler.HandlerOptions{
-		AdminApp:            app,
-		PasswordRecovery:    cfg.PasswordRecovery,
-		Sleep:               opts.authSleep,
-		AdminRepo:           deps.System.AdminRepo,
-		RolesManager:        deps.Repos.RolesManager,
-		PreviewService:      deps.Repos.FileLoader,
-		AdminAccountService: deps.System.AdminAuthService,
-		SessionStoreActions: deps.System.AdminAuthService,
-		AdminLoginAudit:     deps.Repos.AdminLoginAudit,
-		FirstAdminSetup:     deps.System.FirstAdminSetup,
-		ActionAudit:         deps.System.AdminActionAudit,
-		AdminDomainURL:      cfg.AdminConfig.DomainURL,
-		AdminMenu:           opts.menu,
-	})}
+	httpHandlers := []server.Handler{
+		adminmain.NewHandler(app, dashboardRegistry),
+		adminauthhandler.NewHandler(adminauthhandler.HandlerOptions{
+			AdminApp:            app,
+			PasswordRecovery:    cfg.PasswordRecovery,
+			Sleep:               opts.authSleep,
+			AdminRepo:           deps.System.AdminRepo,
+			RolesManager:        deps.Repos.RolesManager,
+			PreviewService:      deps.Repos.FileLoader,
+			AdminAccountService: deps.System.AdminAuthService,
+			SessionStoreActions: deps.System.AdminAuthService,
+			AdminLoginAudit:     deps.Repos.AdminLoginAudit,
+			FirstAdminSetup:     deps.System.FirstAdminSetup,
+			ActionAudit:         deps.System.AdminActionAudit,
+			AdminDomainURL:      cfg.AdminConfig.DomainURL,
+			AdminMenu:           opts.menu,
+		}),
+	}
 	if cfg.Enabled("uploads") {
 		httpHandlers = append(httpHandlers,
 			adminprofileavatar.NewHandler(deps.Uploads.Service, deps.System.Logger),
@@ -220,6 +230,7 @@ func initServer(ctx context.Context, deps Dependencies, cfg Config, app *adminap
 }
 
 type serverExtensions struct {
+	dashboardCards   []dashboard.Card
 	staticRoutes     []StaticRoute
 	middlewares      []fiber.Handler
 	handlers         []server.Handler
@@ -236,6 +247,10 @@ func buildServerExtensions(app *adminapp.App, builders []ExtensionBuilder) (serv
 		}
 		if ext == nil {
 			continue
+		}
+
+		if cards, ok := ext.(interface{ DashboardCards() []dashboard.Card }); ok {
+			result.dashboardCards = append(result.dashboardCards, cards.DashboardCards()...)
 		}
 
 		if routes, ok := ext.(StaticRoutesExtension); ok {
@@ -489,4 +504,75 @@ func isNil(val any) bool {
 	default:
 		return false
 	}
+}
+
+// Built-in card ordering is stable and follows explicit module selection.
+func builtInDashboardCards(cfg Config, deps Dependencies) []dashboard.Card {
+	cards := make([]dashboard.Card, 0, 2)
+	if cfg.Enabled("queues") {
+		cards = append(cards, dashboard.Card{
+			Key: "goadmin.queues", Title: dashboard.Text{Text: "Очереди", RU: "Очереди", EN: "Queues"},
+			PermissionKey: integrationroles.NewPermissionKey(
+				integrationroles.PermissionDomainQueues, integrationroles.PermissionActionRead,
+			),
+			Links: []dashboard.Link{
+				{Label: dashboard.Text{Text: "Задачи", RU: "Задачи", EN: "Jobs"}, Href: "/queues/jobs"},
+				{Label: dashboard.Text{Text: "Неудачные задачи", RU: "Неудачные задачи", EN: "Failed jobs"}, Href: "/queues/jobs-failed"},
+			},
+			Load: func(ctx context.Context, _ dashboard.Actor) (dashboard.Content, error) {
+				if deps.Repos.JobsRepo == nil || deps.Repos.JobsFailedRepo == nil {
+					return dashboard.Content{}, errors.New("queue repositories unavailable")
+				}
+				queued, err := deps.Repos.JobsRepo.CountExact(ctx)
+				if err != nil {
+					return dashboard.Content{}, err
+				}
+				failed, err := deps.Repos.JobsFailedRepo.CountExact(ctx)
+				if err != nil {
+					return dashboard.Content{}, err
+				}
+				content := dashboard.Content{Metrics: []dashboard.Metric{
+					{
+						Key: "queued", Label: dashboard.Text{Text: "Задач в очереди", RU: "Задач в очереди", EN: "Queued jobs"},
+						Value: strconv.FormatInt(queued, 10),
+					},
+					{
+						Key: "failed", Label: dashboard.Text{Text: "Неудачных задач", RU: "Неудачных задач", EN: "Failed jobs"},
+						Value: strconv.FormatInt(failed, 10),
+					},
+				}}
+				if failed > 0 {
+					content.Status = &dashboard.Status{
+						Text: dashboard.Text{Text: "Есть неудачные задачи", RU: "Есть неудачные задачи", EN: "Failed jobs need attention"},
+						Tone: "warning",
+					}
+				}
+				return content, nil
+			},
+		})
+	}
+	if cfg.Enabled("notifications") {
+		cards = append(cards, dashboard.Card{
+			Key: "goadmin.notifications", Title: dashboard.Text{Text: "Уведомления", RU: "Уведомления", EN: "Notifications"},
+			Links: []dashboard.Link{{
+				Label: dashboard.Text{Text: "Непрочитанные", RU: "Непрочитанные", EN: "Unread"},
+				Href:  "/notifications?status=unread",
+			}},
+			Load: func(ctx context.Context, actor dashboard.Actor) (dashboard.Content, error) {
+				if deps.System.AdminNotificationRepo == nil {
+					return dashboard.Content{}, errors.New("notification repository unavailable")
+				}
+				unread, err := deps.System.AdminNotificationRepo.CountUnread(ctx, actor.AdminID)
+				if err != nil {
+					return dashboard.Content{}, err
+				}
+				return dashboard.Content{Metrics: []dashboard.Metric{{
+					Key:   "unread-notifications",
+					Label: dashboard.Text{Text: "Непрочитанных уведомлений", RU: "Непрочитанных уведомлений", EN: "Unread notifications"},
+					Value: strconv.Itoa(unread),
+				}}}, nil
+			},
+		})
+	}
+	return cards
 }

@@ -19,7 +19,7 @@ import urllib.request
 REPO = Path(__file__).resolve().parent.parent
 ARTIFACTS = REPO / 'output/playwright/starter-smoke'
 RUN_ID = re.compile(r'^\d{8}t\d{6}z-[a-f0-9]{8}$')
-MODULES = 'access,jobs,uploads,queues,realtime'
+MODULES = 'users,access,jobs,uploads,queues,notifications,realtime'
 MARKER = 'goadmin-starter-smoke-v1'
 
 
@@ -105,7 +105,8 @@ def spec(project, port, manifest, candidates):
                                      'interval': '2s', 'timeout': '5s', 'retries': 40}},
         'admin': {'image': f'{project}:source',
                   'build': {'context': str(REPO), 'dockerfile': 'examples/starter/Dockerfile',
-                            'args': {'VITE_ADMIN_EXTENSION_MANIFESTS': manifest},
+                            'args': {'VITE_ADMIN_EXTENSION_MANIFESTS': manifest,
+                                     'STARTER_BUILD_TAGS': 'starter_smoke'},
                             'additional_contexts': {dep: str(candidates / dep) for dep in
                                                     ('goauth', 'gonotify', 'gouploads', 'gowebsocket')}},
                   'depends_on': {'postgres': {'condition': 'service_healthy'}},
@@ -225,7 +226,7 @@ def write_report(data, folder, collection_errors=None):
         errors.append({'artifact': 'browser-report.json', 'error': 'RunIdMismatch'})
         browser = {}
     report = {key: data[key] for key in ('runId', 'revision', 'dirty', 'modules', 'result')}
-    report.update({'schemaVersion': 1, 'cases': {}, 'diagnosticErrors': errors,
+    report.update({'schemaVersion': 1, 'profile': browser.get('profile', data.get('profile', 'full')), 'cases': {}, 'diagnosticErrors': errors,
                    'browser': {key: browser[key] for key in (
                        'browser', 'playwright', 'startedAt', 'finishedAt', 'diagnosticOnly') if key in browser},
                    'artifacts': {'browserReport': 'browser-report.json', 'browserLog': 'browser.log'}})
@@ -270,6 +271,7 @@ def run():
     data = {'owner': MARKER, 'runId': run_id, 'revision': subprocess.check_output(
         ['git', 'rev-parse', 'HEAD'], cwd=REPO, text=True).strip(),
         'dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=REPO)),
+        'profile': 'record-editing' if os.environ.get('SMOKE_RECORDS_ONLY') == '1' else 'full',
         'modules': MODULES.split(','), 'cases': {}, 'result': 'running'}
     candidates = folder / 'candidates'
     for dep in ('goauth', 'gonotify', 'gouploads', 'gowebsocket'):
@@ -294,7 +296,7 @@ def run():
         data['cases'][name] = {'project': project, 'env': str(env_path), 'compose': str(compose_path), 'url': url}
         protected_write(folder / f'{name}.credentials.json', json.dumps(
             {'url': url, 'setupToken': setup, 'email': f'smoke-{name}@example.test', 'password': password,
-             'restrictedEmail': f'queues-{name}@example.test'}, indent=2))
+             'restrictedEmail': f'smoke-queues-{name}@example.test'}, indent=2))
     protected_write(folder / 'run.json', json.dumps(data, indent=2) + '\n')
     print(f'Starter smoke RUN_ID={run_id}\nArtifacts: {folder}', flush=True)
     keep = os.environ.get('KEEP') == '1'
@@ -308,7 +310,8 @@ def run():
                 output=folder / 'browser-install.log')
         command(['npm', 'exec', '--', 'playwright', 'install', 'chromium'], cwd=harness,
                 output=folder / 'chromium-install.log')
-        command(['node', 'run.mjs', str(folder)], cwd=harness, output=folder / 'browser.log')
+        command(['node', 'run.mjs', str(folder), *(['--records-only'] if os.environ.get('SMOKE_RECORDS_ONLY') == '1' else [])],
+                cwd=harness, output=folder / 'browser.log')
         data['result'] = 'passed'
     except BaseException as error:
         data['result'] = 'failed'
