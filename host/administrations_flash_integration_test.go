@@ -130,11 +130,22 @@ func TestAssemblyAdministrationFlashRoundTrip(t *testing.T) {
 			if tc.changedEmail {
 				require.Equal(t, "Bad request", page.Props.Flash["error"])
 			} else {
-				require.NotEmpty(t, page.Props.Flash["warning"])
-				require.Contains(t, page.Props.Errors, "name")
+				require.Equal(t, map[string]string{"name": "Name не задан"}, page.Props.Errors)
+				if tc.method == http.MethodPut {
+					require.Empty(t, page.Props.Flash)
+				} else {
+					require.NotEmpty(t, page.Props.Flash["warning"])
+				}
 			}
 			require.NotContains(t, string(body), "gob:")
 			require.NotContains(t, page.Props.Old, "password")
+			for field, want := range map[string]string{
+				"username": "submitted", "name": tc.nameValue, "lastName": "Submitted", "email": tc.email,
+			} {
+				var submitted string
+				require.NoError(t, json.Unmarshal(page.Props.Old[field], &submitted), field)
+				require.Equal(t, want, submitted, field)
+			}
 			if tc.previewValue == 0 {
 				require.NotContains(t, page.Props.Old, "previewId")
 			} else {
