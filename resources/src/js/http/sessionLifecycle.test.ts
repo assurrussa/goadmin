@@ -9,6 +9,17 @@ import {
   sessionCoordinator,
 } from './index'
 
+// Keep the document singleton on the coordinator's injectable clock so the
+// hard-expiry case can advance authority time without waiting for real timers.
+vi.mock('./session', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./session')>()
+  return {
+    ...actual,
+    createSessionCoordinator: (options: import('./session').SessionCoordinatorOptions = {}) =>
+      actual.createSessionCoordinator({ ...options, now: options.now ?? (() => Date.now()) }),
+  }
+})
+
 const capability = { props: { adminSessionMaintenance: { version: 1, sessionEpoch: 'A' } } }
 function reply(epoch: string, hardLifetime = 3600000) {
   const now = Date.now()
@@ -306,9 +317,9 @@ describe('document epoch and the pinned Inertia transport', () => {
   it.each(['maintenance401', 'maintenance403', 'hard-expiry'] as const)(
     'rejects a late negotiated Inertia page after %s while preserving a non-Inertia success',
     async (failure) => {
-      const request = vi
-        .fn<typeof globalThis.fetch>()
-        .mockImplementation(async () => reply('A', failure === 'hard-expiry' ? 100 : 3600000))
+      let now = Date.now()
+      if (failure === 'hard-expiry') vi.spyOn(Date, 'now').mockImplementation(() => now)
+      const request = vi.fn<typeof globalThis.fetch>().mockImplementation(async () => reply('A'))
       vi.stubGlobal('fetch', request)
       disposers.push(installSessionAxiosInterceptor())
       configureSessionMaintenance(capability)
@@ -362,7 +373,9 @@ describe('document epoch and the pinned Inertia transport', () => {
       expect(sends).toHaveBeenCalledTimes(2)
       const code = failure === 'maintenance403' ? 'access_denied' : 'reauthentication_required'
       if (failure === 'hard-expiry') {
-        await new Promise((resolve) => setTimeout(resolve, 150))
+        // Advance the authority clock beyond the fixed deadline without racing
+        // the real watchdog timer, whose maintenance could renew a 100ms fixture.
+        now += 3_600_001
       } else {
         const status = failure === 'maintenance403' ? 403 : 401
         request.mockImplementation(

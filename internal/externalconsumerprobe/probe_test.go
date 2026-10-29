@@ -53,6 +53,8 @@ func TestBuildProbeTestImportsSupportedPackages(t *testing.T) {
 	require.Contains(t, got, "adminhosttest.WithActor")
 	require.Contains(t, got, "adminhost.Command")
 	require.Contains(t, got, "wrapper.CurrentActor")
+	require.Contains(t, got, "func TestDashboardPublicContract")
+	require.Contains(t, got, "adminhost.NewExtension().WithDashboardCards")
 	require.Contains(t, got, "func TestCustomUploadStrategyContract")
 	require.Contains(t, got, "map[string]adminhost.UploadStrategy")
 }

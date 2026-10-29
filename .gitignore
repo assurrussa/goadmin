@@ -13,4 +13,6 @@ resources/backend/internal/adminext/public/hot
 .go-cache/
 cover.html
 *.test
+__pycache__/
+*.py[cod]
 output/playwright/starter-smoke/

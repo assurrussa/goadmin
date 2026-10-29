@@ -495,7 +495,6 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		&validators.EmailIsPresent{Name: "Email", Field: form.Email, Message: "Email не задан или неверный"},
 	)
 	if validationErrs.HasAny() {
-		h.adminApp.HTTPManager().WithFlashWarning(c, "Форма заполнена не верно!")
 		return h.adminApp.HTTPManager().RedirectBackWithValidationErrors(c, validationErrs.Errors)
 	}
 
@@ -504,7 +503,6 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		return fmt.Errorf("admin handler update preview validation: %w", err)
 	}
 	if len(previewValidationErrors) > 0 {
-		h.adminApp.HTTPManager().WithFlashWarning(c, "Форма заполнена не верно!")
 		return h.adminApp.HTTPManager().RedirectBackWithValidationErrors(c, previewValidationErrors)
 	}
 
@@ -520,15 +518,17 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		}
 		h.adminApp.Logger().ErrorContext(c, "admin repo update in http handler", logger.Error(err))
 		if errors.Is(err, adminrepo.ErrAdminVersionConflict) || errors.Is(err, uploadintegration.ErrPreviewBindingConflict) {
-			h.adminApp.HTTPManager().WithFlashWarning(c, "Данные администратора изменились. Обновите страницу и повторите действие.")
-			return h.adminApp.HTTPManager().RedirectBack(c)
+			return h.adminApp.HTTPManager().RedirectBackWithValidationErrors(c, goinertia.ValidationErrors{
+				"form": {"Данные администратора изменились. Обновите страницу и повторите действие."},
+			})
 		}
 		message := "Не удалось обновить администратора."
 		if errors.Is(err, goauth.ErrOperationOutcomeUnknown) {
 			message = "Результат операции неизвестен. Обновите страницу перед повтором."
 		}
-		h.adminApp.HTTPManager().WithFlashError(c, message)
-		return h.adminApp.HTTPManager().RedirectBack(c)
+		return h.adminApp.HTTPManager().RedirectBackWithValidationErrors(c, goinertia.ValidationErrors{
+			"form": {message},
+		})
 	}
 
 	h.adminApp.HTTPManager().WithFlashSuccess(c, "Запись успешна обновлена!")

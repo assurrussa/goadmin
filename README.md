@@ -48,6 +48,9 @@ Record the agreed scope and dependencies; do not enable everything by default.
 
 ## Try the admin locally
 
+The [dashboard card API](docs/dashboard.md) adds permission-scoped host summaries
+through the existing `host` facade, without a custom frontend build.
+
 New to embedding? Start with [the consumer guide](docs/consumer-guide.md) for
 the visible result, required stack, and path to your own entity page.
 

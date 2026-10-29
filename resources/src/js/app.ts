@@ -28,6 +28,7 @@ import {
   SessionReadinessError,
 } from '@/http'
 import axios from 'axios'
+import { installSessionNavigationCancellation } from '@/http/sessionNavigation'
 import type { AdminAuthUser } from '@/types/models'
 import { extensions } from '@/extensions'
 import { extensionPages } from '@admin-extensions-generated'
@@ -171,6 +172,7 @@ void createInertiaApp({
       }
 
       stopListeners.push(installSessionAxiosInterceptor())
+      stopListeners.push(installSessionNavigationCancellation(currentPage))
       let manualRetryAfterRepair = false
       configureSessionMaintenance((props as { initialPage?: unknown }).initialPage, {
         onState: (state) => {
@@ -279,7 +281,7 @@ void createInertiaApp({
         }),
         router.on('start', (event) => authFailureHandler.start(event.detail.visit)),
         router.on('finish', (event) => authFailureHandler.finish(event.detail.visit)),
-        router.on('navigate', cancelAuthRecovery),
+        router.on('navigate', () => authFailureHandler.cancel()),
         router.on('success', (event) => {
           // A late page response must not restore stale auth while the separate
           // login navigation is in progress.

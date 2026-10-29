@@ -1,6 +1,6 @@
 # goadmin Project Context
 
-Last updated: 2026-10-22.
+Last updated: 2026-10-29.
 
 ## Current Role
 
@@ -151,6 +151,36 @@ The typed SDK exposes canonical Actor, guards, rendering, logger and extensions;
 `Command[T]` binds typed commands after current authorization. Business services
 belong to feature constructors. Declarative CRUD remains a TODO in the current
 implementation notes.
+
+## Dashboard summaries
+
+The core dashboard renders authorized descriptors immediately and reads values
+through guarded `GET /dashboard/data`. Queues contribute stored/failed job counts
+only with the queues module and read permission; notifications contribute the
+current administrator's unread count only with that module. Neither is a worker
+health assertion. Host extensions add plain-text, shared-renderer cards through
+`WithDashboardCards`, without changing the mandatory Feature/Registry contracts
+or requiring a host frontend build. Providers receive copied `host.Actor` and a
+two-second standard context, with at most four concurrent loads. Card/link
+authorization precedes loading. Registration errors fail assembly.
+
+The UI retains successful same-owner values as stale after provider failure,
+removes omitted cards and clears all data on owner change. Manual refresh has a
+per-admin browser opt-in for visible-only minute refresh. See
+[dashboard cards](dashboard.md) for the public callback, permission and lifecycle
+contract. The supported package list and database schema are unchanged.
+
+## Record editing navigation
+
+Users and administrators share an internal edit-form layout. Save stays on the
+form; explicit list/cancel links restore the originating grid query through the
+optional client-only `returnTo` query parameter. Targets must be root-relative
+and match the same resource list exactly; direct links fall back to that list.
+The server never uses this parameter as a redirect target. Internal GET visits
+confirm dirty forms; browser Back/Forward cannot be cancelled and no draft is
+stored. Handled update failures use the non-field `errors.form` bag, retaining
+input/dirty state instead of triggering Inertia success. Unknown outcomes never
+trigger automatic replay. Confirmed success emits one notification.
 
 ## Optional users feature
 

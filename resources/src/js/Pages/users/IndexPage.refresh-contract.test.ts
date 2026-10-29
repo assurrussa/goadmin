@@ -6,7 +6,10 @@ import RolesPage from '../roles/IndexPage.vue'
 import PermissionsPage from '../permissions/IndexPage.vue'
 import type { ApiResponse } from '@/composables/useDataGrid'
 const router = vi.hoisted(() => ({ visit: vi.fn(), get: vi.fn(), delete: vi.fn(), post: vi.fn() }))
-vi.mock('@inertiajs/vue3', () => ({ router }))
+vi.mock('@inertiajs/vue3', () => ({
+  router,
+  usePage: () => ({ url: window.location.pathname + window.location.search }),
+}))
 vi.mock('@/components/layout/AppHead.vue', () => ({
   default: defineComponent({ render: () => null }),
 }))

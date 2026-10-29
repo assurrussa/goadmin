@@ -72,11 +72,12 @@ class IsolationTests(unittest.TestCase):
                 'ContainerConfig': {'Env': ['PASSWORD=never-copy-this-secret']}}]))
             scenarios = {'result': 'passed', 'checks': ['real WebSocket completion'], 'paint': {'light': {}}}
             (folder / 'browser-report.json').write_text(json.dumps({
-                'runId': data['runId'], 'browser': '144.0', 'playwright': 'pinned',
+                'runId': data['runId'], 'profile': 'record-editing', 'browser': '144.0', 'playwright': 'pinned',
                 'cases': {'default': scenarios}}))
             (folder / 'default.credentials.json').write_text('never-copy-this-secret')
             report = smoke.write_report(data, folder)
             self.assertEqual(report['result'], 'passed')
+            self.assertEqual(report['profile'], 'record-editing')
             self.assertEqual(report['revision'], 'abc123')
             case = report['cases']['default']
             self.assertEqual(case['dependencies'], [
@@ -99,13 +100,14 @@ class IsolationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             folder = Path(directory)
             data = {'runId': 'test-run', 'revision': 'abc123', 'dirty': True,
-                    'modules': ['access'], 'result': 'failed', 'error': 'build failed',
+                    'modules': ['access'], 'profile': 'record-editing', 'result': 'failed', 'error': 'build failed',
                     'cases': {'default': {'project': 'owned-project', 'url': 'http://localhost:18768'}}}
             (folder / 'default.modules.json').write_text('service admin is not running')
             (folder / 'browser-report.json').write_text('[]')
             report = smoke.write_report(data, folder, [{'stage': 'collection', 'error': 'OSError'}])
             self.assertEqual(report['result'], 'failed')
             self.assertEqual(report['error'], 'build failed')
+            self.assertEqual(report['profile'], 'record-editing')
             self.assertEqual(data['error'], 'build failed')
             self.assertEqual(report['cases']['default']['dependencies'], [])
             self.assertEqual(report['cases']['default']['images'], [])
@@ -134,7 +136,8 @@ class IsolationTests(unittest.TestCase):
         config = smoke.spec('goadmin-smoke-test', '18768', '', Path('/candidate-snapshot'))
         self.assertEqual(set(config['services']), {'admin', 'postgres'})
         admin = config['services']['admin']
-        self.assertEqual(admin['environment']['ADMIN_MODULES'], 'access,jobs,uploads,queues,realtime')
+        self.assertEqual(admin['environment']['ADMIN_MODULES'], 'users,access,jobs,uploads,queues,notifications,realtime')
+        self.assertEqual(admin['build']['args']['STARTER_BUILD_TAGS'], 'starter_smoke')
         self.assertEqual(admin['ports'], ['127.0.0.1:18768:8080'])
         self.assertEqual(config['volumes'], {'postgres_data': {}, 'uploads': {}})
         self.assertEqual(admin['build']['args']['VITE_ADMIN_EXTENSION_MANIFESTS'], '')

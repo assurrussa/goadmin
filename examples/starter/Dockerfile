@@ -22,8 +22,9 @@ COPY --from=gouploads . /src/gouploads/
 COPY --from=gowebsocket . /src/gowebsocket/
 COPY --from=assets /src/public/dist /src/goadmin/public/dist
 WORKDIR /src/goadmin/examples/starter
+ARG STARTER_BUILD_TAGS=""
 RUN GOWORK=off go list -mod=readonly -m -json all > /tmp/starter-modules.json && \
-    GOWORK=off go build -mod=readonly -o /tmp/goadmin-starter .
+    GOWORK=off go build -mod=readonly -tags="$STARTER_BUILD_TAGS" -o /tmp/goadmin-starter .
 
 FROM alpine:3.22
 RUN addgroup -S app && adduser -S -G app app && mkdir -p /data/uploads && chown -R app:app /data

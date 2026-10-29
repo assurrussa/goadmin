@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/assurrussa/goauth"
+	logger "github.com/assurrussa/gologger"
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/assurrussa/goadmin/adminapp"
@@ -362,11 +363,16 @@ func (h *Handler) Update(c fiber.Ctx) error {
 			return httpErr
 		}
 		if errors.Is(err, goauth.ErrOperationOutcomeUnknown) {
-			h.adminApp.HTTPManager().WithFlashError(c, "Результат операции неизвестен. Обновите страницу перед повтором.")
-			return h.adminApp.HTTPManager().RedirectBack(c)
+			return h.adminApp.HTTPManager().RedirectBackWithValidationErrors(c, goinertia.ValidationErrors{
+				"form": {"Результат операции неизвестен. Обновите страницу перед повтором."},
+			})
 		}
-		return fmt.Errorf("user handler update: %w", err)
+		h.adminApp.Logger().ErrorContext(c, "user update command", logger.Error(err))
+		return h.adminApp.HTTPManager().RedirectBackWithValidationErrors(c, goinertia.ValidationErrors{
+			"form": {"Не удалось обновить пользователя."},
+		})
 	}
+	h.adminApp.HTTPManager().WithFlashSuccess(c, "Пользователь успешно обновлён!")
 	return h.adminApp.HTTPManager().RedirectBack(c)
 }
 

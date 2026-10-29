@@ -1,61 +1,44 @@
 <template>
   <AppHead :title="props.title" />
-  <PageActionBar :back-href="basePath" :label="t('Редактирование')" />
-
-  <AdminForm
+  <RecordEditForm
     :form="form"
     :fields="['username', 'name', 'lastName', 'email']"
-    warn-unsaved
+    :return-href="listHref"
+    :label="t('Редактирование')"
     @submit="handleForm"
   >
-    <Card class="overflow-hidden">
-      <CardContent class="pt-6">
-        <div class="space-y-6">
-          <FormInput
-            v-model="form.name"
-            name="name"
-            type="text"
-            :label="t('Имя')"
-            required
-            :error="form.errors.name"
-          />
-          <FormInput
-            v-model="form.lastName"
-            name="lastName"
-            type="text"
-            :label="t('Фамилия')"
-            :error="form.errors.lastName"
-          />
-          <FormInput
-            v-model="form.email"
-            name="email"
-            type="email"
-            :label="t('core.ui.E-mail', 'E-mail')"
-            required
-            :error="form.errors.email"
-            :readonly="!authmail"
-          />
-          <FormInput
-            v-model="form.username"
-            name="username"
-            type="text"
-            :label="t('core.ui.Nickname', 'Nickname')"
-            :error="form.errors.username"
-          />
-        </div>
-      </CardContent>
-
-      <CardFooter class="bg-surface border-t border-border-primary flex justify-end py-3 px-6">
-        <FormButton
-          type="submit"
-          :loading="form.processing"
-          :loading-text="t('Сохранение...')"
-          variant="primary"
-          >{{ t('Сохранить') }}</FormButton
-        >
-      </CardFooter>
-    </Card>
-  </AdminForm>
+    <FormInput
+      v-model="form.name"
+      name="name"
+      type="text"
+      :label="t('Имя')"
+      required
+      :error="form.errors.name"
+    />
+    <FormInput
+      v-model="form.lastName"
+      name="lastName"
+      type="text"
+      :label="t('Фамилия')"
+      :error="form.errors.lastName"
+    />
+    <FormInput
+      v-model="form.email"
+      name="email"
+      type="email"
+      :label="t('core.ui.E-mail', 'E-mail')"
+      required
+      :error="form.errors.email"
+      :readonly="!authmail"
+    />
+    <FormInput
+      v-model="form.username"
+      name="username"
+      type="text"
+      :label="t('core.ui.Nickname', 'Nickname')"
+      :error="form.errors.username"
+    />
+  </RecordEditForm>
 </template>
 
 <script setup lang="ts">
@@ -65,14 +48,13 @@ import { useForm, usePage } from '@inertiajs/vue3'
 import { watch } from 'vue'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 import AppHead from '@/components/layout/AppHead.vue'
-import PageActionBar from '@/components/layout/PageActionBar.vue'
 import FormInput from '@/components/form/FormInput.vue'
-import FormButton from '@/components/form/FormButton.vue'
-import AdminForm from '@/components/form/AdminForm.vue'
-import { Card, CardContent, CardFooter } from '@/components/ui/card'
+import RecordEditForm from '@/components/form/RecordEditForm.vue'
+import { useRecordNavigation } from '@/composables/useRecordNavigation'
 
 const { authmail } = useAdminCapabilities()
 const basePath = '/users'
+const { listHref } = useRecordNavigation(basePath)
 const props = defineProps({
   title: { type: [String], default: undefined },
   old: { type: Object, default: () => ({}) },

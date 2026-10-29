@@ -53,7 +53,7 @@ test('validation and navigation synchronize auth from the live Inertia page', as
   )
   const inertiaPageModule = { exports: {} }
   vm.runInNewContext(compile(path.join(__dirname, '../src/js/inertiaPage.ts')), inertiaPageModule)
-  const calls = { connected: 0, disconnected: 0, login: 0, presentation: 0 }
+  const calls = { connected: 0, disconnected: 0, login: 0, presentation: 0, cancellations: 0 }
   const authStore = {
     authUser: null,
     setAuthUser(user) {
@@ -79,7 +79,13 @@ test('validation and navigation synchronize auth from the live Inertia page', as
   document.getElementById('app').dataset.page = JSON.stringify(initialPage)
   let mountedApp
   let bootstrap
-  const component = { render: () => vue.h('input', { name: 'draft' }) }
+  const mountedGenerations = []
+  const component = {
+    setup() {
+      vue.onMounted(() => mountedGenerations.push(calls.cancellations))
+      return () => vue.h('input', { name: 'draft' })
+    },
+  }
   // Keep the actual Inertia App mounted beneath the new runtime frame. A leaf
   // UI stub here would erase the page and invalidate the draft-preservation test.
   const runtimeFrame = {
@@ -141,7 +147,12 @@ test('validation and navigation synchronize auth from the live Inertia page', as
       installSessionAxiosInterceptor: () => () => {},
       reportSessionAuthFailure: () => false,
       SessionReadinessError: class extends Error {},
-      sessionCoordinator: { isEnabled: () => false, getState: () => 'disabled', cancel() {}, dispose() {} },
+      sessionCoordinator: {
+        isEnabled: () => false,
+        getState: () => 'disabled',
+        cancel() { calls.cancellations++ },
+        dispose() {},
+      },
     },
     '@/auth/browserAuthFailures': authModule.exports,
     '@/auth/browserAuthRecovery': {
@@ -151,9 +162,19 @@ test('validation and navigation synchronize auth from the live Inertia page', as
     },
     axios: { default: { defaults: {} } },
     '@/extensions': { extensions: { install() {}, webSocketHandlers: {}, theme: selectedTheme } },
-    '@admin-extensions-generated': { extensionPages: {} },
+    '@admin-extensions-generated': { extensionPages: { 'auth/next': async () => ({ default: { ...component } }) } },
     '../css/app.css': {},
   }
+  const navigationModule = {
+    exports: {}, URL, window,
+    require(name) {
+      if (name === 'vue') return vue
+      assert.equal(name, './index')
+      return modules['@/http']
+    },
+  }
+  vm.runInNewContext(compile(path.join(__dirname, '../src/js/http/sessionNavigation.ts')), navigationModule)
+  modules['@/http/sessionNavigation'] = navigationModule.exports
   const bootstrapClient = () =>
     vm.runInNewContext(compile(path.join(__dirname, '../src/js/app.ts')), {
       exports: {},
@@ -218,14 +239,28 @@ test('validation and navigation synchronize auth from the live Inertia page', as
     async () => {
       const input = document.querySelector('input[name=draft]')
       input.value = 'unsaved content'
+      const generation = calls.cancellations
       await setPage({ authuser: initialUser, errors: { title: 'Required' } })
       for (let i = 0; i < 2; i++) dispatch('error', { errors: { title: 'Required' } })
       assertUser(initialUser)
       assert.equal(calls.disconnected, 0)
       assert.equal(document.querySelector('input[name=draft]'), input)
       assert.equal(input.value, 'unsaved content')
+      assert.equal(calls.cancellations, generation)
     },
   )
+
+  await t.test('real Vue page swap cancels old commands before destination mount, including client-side visits', async () => {
+    const generation = calls.cancellations
+    const mounts = mountedGenerations.length
+    await new Promise((resolve) => inertia.router.push({
+      component: 'auth/next', url: '/next-page', preserveState: false, onFinish: resolve,
+    }))
+    await vue.nextTick()
+    assert.ok(calls.cancellations > generation)
+    assert.ok(mountedGenerations.length > mounts)
+    assert.equal(mountedGenerations.at(-1), calls.cancellations)
+  })
 
   await t.test(
     'validation uses newly accepted page auth rather than the initial identity',

@@ -27,6 +27,7 @@ import { t } from '@/i18n'
 import { ArrowLeft, ArrowUpRight } from 'lucide-vue-next'
 import BackPage from '@/components/layout/BackPage.vue'
 import AppButton from '@/components/ui/AppButton.vue'
+import { toRefs } from 'vue'
 
 const props = defineProps({
   backHref: {
@@ -60,10 +61,5 @@ const props = defineProps({
   },
 })
 
-const backHref = props.backHref
-const backText = props.backText
-const siteHref = props.siteHref
-const siteText = props.siteText
-const label = props.label
-const useHistory = props.useHistory
+const { backHref, backText, siteHref, siteText, label, useHistory } = toRefs(props)
 </script>

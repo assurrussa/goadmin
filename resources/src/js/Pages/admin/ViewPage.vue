@@ -1,6 +1,11 @@
 <template>
   <AppHead :title="props.title" />
-  <PageActionBar :back-href="basePath" :label="t('Просмотр')" />
+  <PageActionBar
+    :back-href="listHref"
+    :back-text="t('К списку')"
+    :label="t('Просмотр')"
+    :use-history="false"
+  />
 
   <div class="max-w-4xl mx-auto space-y-8">
     <!-- Заголовок с основной информацией -->
@@ -47,7 +52,7 @@
           <!-- Кнопка редактирования -->
           <div class="flex-shrink-0">
             <AppButton v-if="canEditInPreview" asChild>
-              <Link :href="`${basePath}/${props.data.id}/edit`">
+              <Link :href="recordHref(props.data.id, true)">
                 <Pencil class="h-4 w-4 mr-2" />
                 {{ t('Редактировать') }}
               </Link>
@@ -241,13 +246,13 @@
     <!-- Действия -->
     <div class="flex justify-end space-x-4">
       <AppButton asChild variant="secondary">
-        <Link :href="basePath">
+        <Link :href="listHref">
           <ArrowLeft class="h-4 w-4 mr-2" />
           {{ t('Назад к списку') }}
         </Link>
       </AppButton>
       <AppButton v-if="canEditInPreview" asChild>
-        <Link :href="`${basePath}/${props.data.id}/edit`">
+        <Link :href="recordHref(props.data.id, true)">
           <Pencil class="h-4 w-4 mr-2" />
           {{ t('Редактировать') }}
         </Link>
@@ -257,6 +262,8 @@
 </template>
 
 <script setup lang="ts">
+import { useRecordNavigation } from '@/composables/useRecordNavigation'
+const { listHref, recordHref } = useRecordNavigation('/admins')
 import { t, locale } from '@/i18n'
 
 import { computed } from 'vue'
@@ -283,7 +290,6 @@ import {
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 
 const canEditInPreview = useRolePreviewAction('admins', 'update')
-const basePath = '/admins'
 const props = defineProps({
   title: {
     type: [String],

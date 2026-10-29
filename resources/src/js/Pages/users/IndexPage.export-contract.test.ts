@@ -6,7 +6,10 @@ import type { ApiResponse } from '@/composables/useDataGrid'
 const visits = vi.hoisted(() => ({ get: vi.fn(), visit: vi.fn(), delete: vi.fn(), post: vi.fn() }))
 const notices = vi.hoisted(() => ({ warning: vi.fn(), error: vi.fn() }))
 vi.mock('@/composables/useNotifications', () => ({ useNotifications: () => notices }))
-vi.mock('@inertiajs/vue3', () => ({ router: visits }))
+vi.mock('@inertiajs/vue3', () => ({
+  router: visits,
+  usePage: () => ({ url: window.location.pathname + window.location.search }),
+}))
 vi.mock('@/components/layout/AppHead.vue', () => ({
   default: defineComponent({ render: () => null }),
 }))

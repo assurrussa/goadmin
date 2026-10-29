@@ -4,6 +4,8 @@
 
     <div
       v-if="showSummary && summaryErrors.length"
+      ref="summaryElement"
+      tabindex="-1"
       role="alert"
       class="rounded-md bg-error/10 border border-error/30 p-3 my-2 mx-4"
     >
@@ -11,8 +13,10 @@
         <p class="mb-1 font-medium text-error">{{ t('Исправьте ошибки формы:') }}</p>
         <ul class="list-disc list-inside text-error text-sm">
           <li v-for="(e, i) in summaryErrors" :key="`${e.field}-${i}`">
-            <strong>{{ e.field }}</strong
-            >: {{ t(e.message) }}
+            <template v-if="e.field !== 'form'"
+              ><strong>{{ e.field }}</strong
+              >: </template
+            >{{ t(e.message) }}
           </li>
         </ul>
       </slot>
@@ -74,6 +78,7 @@ const toCamel = (key: string) => {
 }
 
 const formLayout = ref<InstanceType<typeof FormLayout> | null>(null)
+const summaryElement = ref<HTMLElement | null>(null)
 let unmounted = false
 const focusErrors = computed(() =>
   props.form.errors && Object.keys(props.form.errors).length > 0
@@ -89,6 +94,10 @@ const focusFirstError = async () => {
   const rawKey = Object.keys(focusErrors.value)[0]
   const formElement = formLayout.value?.$el as HTMLFormElement | undefined
   if (!rawKey || !formElement?.isConnected) return
+  if (rawKey === 'form' && props.showSummary) {
+    summaryElement.value?.focus()
+    return
+  }
   const controls = Array.from(
     formElement.querySelectorAll<HTMLElement>(
       'input:not([type="hidden"]), select, textarea, button, a[href], [tabindex], [contenteditable="true"]',

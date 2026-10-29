@@ -1,4 +1,7 @@
 {
+  "Не удалось обновить пользователя.": "Could not update the user.",
+  "Пользователь успешно обновлён!": "User updated successfully!",
+  "К списку": "Back to list",
   "SSO access": "SSO access",
   ". Действует до": ". Valid until",
   "1:1 (квадрат)": "1:1 (square)",
@@ -711,5 +714,11 @@
   "Сервис авторизации временно недоступен. Данные формы сохранены. Повторите попытку.": "The authorization service is temporarily unavailable. Your form data is preserved. Try again.",
   "Сеанс завершён или доступ закрыт. Данные формы сохранены. Войдите снова.": "Your session has ended or access is denied. Your form data is preserved. Sign in again.",
   "Сеанс изменился. Данные формы сохранены. Войдите снова перед отправкой.": "Your session has changed. Your form data is preserved. Sign in again before submitting.",
-  "Отправка отменена.": "Submission cancelled."
+  "Отправка отменена.": "Submission cancelled.",
+  "Загрузка показателей…": "Loading metrics…",
+  "Не удалось обновить. Показаны последние полученные данные.": "Refresh failed. Showing the last received data.",
+  "Показатели временно недоступны.": "Metrics are temporarily unavailable.",
+  "Обновлено": "Updated",
+  "Автообновление каждую минуту": "Auto-refresh every minute",
+  "Не удалось обновить панель. Данные могут быть устаревшими.": "Dashboard refresh failed. Data may be out of date."
 }

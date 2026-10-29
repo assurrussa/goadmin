@@ -197,6 +197,27 @@ func TestHostActorCommandContract(t *testing.T) {
 	}
 }
 
+func TestDashboardPublicContract(t *testing.T) {
+	loader := func(_ context.Context, actor adminhost.Actor) (adminhost.DashboardContent, error) {
+		return adminhost.DashboardContent{
+			Metrics: []adminhost.DashboardMetric{{Key: "owner", Label: adminhost.DashboardText{Text: "Owner"}, Value: actor.SubjectID}},
+			Status: &adminhost.DashboardStatus{
+				Text: adminhost.DashboardText{Text: "Current", RU: "Актуально", EN: "Current"}, Tone: "info",
+			},
+		}, nil
+	}
+	extension := adminhost.NewExtension().WithDashboardCards(adminhost.DashboardCard{
+		Key: "consumer.summary", Title: adminhost.DashboardText{Text: "Summary"},
+		PermissionKey: adminhost.NewPermissionKey("dashboard", "read"),
+		Links: []adminhost.DashboardLink{{Label: adminhost.DashboardText{Text: "Profile"}, Href: "/auth/profile"}},
+		Load: loader,
+	})
+	content, err := loader(t.Context(), adminhost.Actor{AdminID: 42, SubjectID: "123e4567-e89b-12d3-a456-426614174201"})
+	if extension == nil || err != nil || len(content.Metrics) != 1 || content.Status.Tone != "info" {
+		t.Fatal("dashboard registration must use supported facade types only")
+	}
+}
+
 func TestMenuAnyPermissionKeysContract(t *testing.T) {
 	key := adminhost.NewPermissionKey("users", adminhost.PermissionActionUpdate)
 	item := adminhost.Item{Href: "/students", AnyPermissionKeys: []adminhost.PermissionKey{key}}
