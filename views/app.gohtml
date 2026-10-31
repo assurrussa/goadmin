@@ -19,9 +19,23 @@
     <script>
         (function() {
             try {
-                const savedTheme = localStorage.getItem('theme-mode');
+                const page = {{ marshal .page }};
+                const props = page && page.props || {};
+                const authenticated = props.authuser && (props.authuser.idExact || props.authuser.id);
+                let choice = { theme: 'system', locale: 'ru', density: 'default' };
+                if (authenticated) {
+                    const personal = props.appearance;
+                    if (personal && String(personal.owner) === String(authenticated) && personal.payload) choice = personal.payload;
+                } else {
+                    try { choice = JSON.parse(localStorage.getItem('goadmin.appearance.device.v1')) || choice; } catch (_) {}
+                }
+                const savedTheme = ['system', 'light', 'dark'].includes(choice.theme) ? choice.theme : 'system';
+                document.documentElement.setAttribute('data-theme-preference', savedTheme);
+                document.documentElement.setAttribute('data-appearance-owner', authenticated ? String(authenticated) : '');
                 const systemDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-                const shouldBeDark = savedTheme === 'dark' || (savedTheme === null && systemDarkMode);
+                const shouldBeDark = savedTheme === 'dark' || (savedTheme === 'system' && systemDarkMode);
+                document.documentElement.lang = choice.locale === 'en' ? 'en' : 'ru';
+                document.documentElement.setAttribute('data-density', ['default', 'compact', 'comfortable'].includes(choice.density) ? choice.density : 'default');
                 
                 if (shouldBeDark) {
                     document.documentElement.classList.add('dark');

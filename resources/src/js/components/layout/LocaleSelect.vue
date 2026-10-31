@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { appearance } from '@/appearance/state'
 import { Languages } from 'lucide-vue-next'
 import { useI18n } from '@/i18n'
 import {
@@ -16,7 +17,8 @@ function selectLocale(value: unknown) {
 <template>
   <DropdownMenu>
     <DropdownMenuTrigger
-      class="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-border-primary bg-card px-3 text-sm text-text-primary hover:bg-surface-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      :disabled="appearance.readOnly || appearance.resolving"
+      class="appearance-select inline-flex shrink-0 items-center gap-2 rounded-xl border border-border-primary bg-card px-3 text-sm text-text-primary hover:bg-surface-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       :aria-label="t('Язык')"
       :title="locale === 'ru' ? 'Русский' : 'English'"
     >

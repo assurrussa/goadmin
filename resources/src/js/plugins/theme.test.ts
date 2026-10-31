@@ -1,55 +1,52 @@
 import { afterEach, expect, it, vi } from 'vitest'
-
+let dispose: (() => void) | undefined
 afterEach(() => {
-  localStorage.removeItem('theme-mode')
-  document.documentElement.classList.remove('dark')
-  document.documentElement.removeAttribute('data-theme-mode')
+  dispose?.()
+  localStorage.clear()
   vi.unstubAllGlobals()
 })
-
 async function loadTheme(systemDark: boolean, saved: 'light' | 'dark' | null = null) {
   vi.resetModules()
-  if (saved === null) localStorage.removeItem('theme-mode')
-  else localStorage.setItem('theme-mode', saved)
-  let onChange: ((event: { matches: boolean }) => void) | undefined
+  if (saved) localStorage.setItem('goadmin.appearance.device.v1', JSON.stringify({ theme: saved }))
+  const media = { matches: systemDark, addEventListener: vi.fn(), removeEventListener: vi.fn() }
   vi.stubGlobal(
     'matchMedia',
-    vi.fn(() => ({
-      matches: systemDark,
-      addEventListener: (_name: string, listener: typeof onChange) => (onChange = listener),
-    })),
+    vi.fn(() => media),
   )
   const { themeManager } = await import('./theme')
-  return { themeManager, changeSystem: (dark: boolean) => onChange!({ matches: dark }) }
+  const { disposeAppearance } = await import('@/appearance/state')
+  dispose = disposeAppearance
+  themeManager.init()
+  return {
+    themeManager,
+    changeSystem: (dark: boolean) => {
+      media.matches = dark
+      media.addEventListener.mock.calls[0]![1]()
+    },
+  }
 }
-
-it.each([false, true])(
-  'follows system dark=%s without creating a saved preference',
-  async (dark) => {
-    const { themeManager, changeSystem } = await loadTheme(dark)
-    expect(themeManager.getCurrent()).toBe(dark ? 'dark' : 'light')
-    expect(document.documentElement.getAttribute('data-theme-mode')).toBe(dark ? 'dark' : 'light')
-    expect(localStorage.getItem('theme-mode')).toBeNull()
-    changeSystem(!dark)
-    expect(themeManager.getCurrent()).toBe(dark ? 'light' : 'dark')
-    expect(document.documentElement.getAttribute('data-theme-mode')).toBe(dark ? 'light' : 'dark')
-    expect(localStorage.getItem('theme-mode')).toBeNull()
-  },
-)
-
+it.each([false, true])('follows system dark=%s without saving device preferences', async (dark) => {
+  const { themeManager, changeSystem } = await loadTheme(dark)
+  expect(themeManager.getCurrent()).toBe(dark ? 'dark' : 'light')
+  changeSystem(!dark)
+  expect(themeManager.getCurrent()).toBe(dark ? 'light' : 'dark')
+  expect(localStorage.getItem('goadmin.appearance.device.v1')).toBeNull()
+})
 it.each(['light', 'dark'] as const)(
-  'preserves explicit %s against system changes',
+  'preserves explicit device %s against system changes',
   async (saved) => {
     const { themeManager, changeSystem } = await loadTheme(saved === 'light', saved)
     expect(themeManager.getCurrent()).toBe(saved)
     changeSystem(saved === 'light')
     expect(themeManager.getCurrent()).toBe(saved)
-    expect(localStorage.getItem('theme-mode')).toBe(saved)
     themeManager.toggle()
     const next = saved === 'light' ? 'dark' : 'light'
     expect(themeManager.getCurrent()).toBe(next)
-    expect(localStorage.getItem('theme-mode')).toBe(next)
-    changeSystem(saved === 'dark')
-    expect(themeManager.getCurrent()).toBe(next)
+    expect(JSON.parse(localStorage.getItem('goadmin.appearance.device.v1')!).theme).toBe(next)
   },
 )
+it('does not import legacy shared browser theme into an account or device', async () => {
+  localStorage.setItem('theme-mode', 'dark')
+  const { themeManager } = await loadTheme(false)
+  expect(themeManager.getCurrent()).toBe('light')
+})

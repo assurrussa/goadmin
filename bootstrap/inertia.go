@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"net/url"
+	"strconv"
 	"time"
 
 	logger "github.com/assurrussa/gologger"
@@ -43,6 +44,9 @@ func initInertia(
 		deps.Repos.FileLoader, deps.System.AdminNotificationRepo, deps.Repos.RolesService,
 		menuExtra, log, cfg.BaseDomainURL,
 	)
+	for key, value := range appearanceSharedProps(deps) {
+		props[key] = value
+	}
 	if deps.System.AdminAuthService != nil && deps.System.CSRF != nil {
 		props["adminSessionMaintenance"] = goinertia.LazyProp{
 			Key: "adminSessionMaintenance", Fn: func(ctx context.Context) (any, error) {
@@ -166,6 +170,7 @@ func loadAuthUser(servicePreviewLoader FileLoader, log logger.Logger) func(ctx c
 		return map[string]any{
 			"profilePresentation": profile,
 			"id":                  admin.ID,
+			"idExact":             strconv.FormatInt(admin.ID, 10),
 			"name":                name,
 			"lastName":            lastName,
 			"email":               admin.Email,

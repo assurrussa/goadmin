@@ -94,6 +94,13 @@ func Run(
 	deps Dependencies,
 	opts ...Option,
 ) (*server.Server, error) {
+	appearanceService, ownedAppearance := initAppearance(ctx, &deps)
+	assembled := false
+	defer func() {
+		if ownedAppearance && !assembled {
+			_ = closeAppearance(ctx, appearanceService)
+		}
+	}()
 	// 1. Default Options
 	options := bootOptions{
 		authSleep: 300 * time.Millisecond,
@@ -168,6 +175,13 @@ func Run(
 	if err != nil {
 		return nil, fmt.Errorf("bootstrap: init server: %w", err)
 	}
+	if ownedAppearance {
+		// Fiber skips post-shutdown hooks when its server was never initialized.
+		// Ensure Close-before-Run owns the same cache cleanup as a normal stop.
+		_ = srv.App.Server()
+		srv.App.Hooks().OnPostShutdown(func(error) error { return closeAppearance(ctx, appearanceService) })
+	}
+	assembled = true
 
 	return srv, nil
 }

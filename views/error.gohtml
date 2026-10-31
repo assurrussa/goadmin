@@ -8,8 +8,10 @@
     <script>
         (function() {
             try {
-                const saved = localStorage.getItem('theme-mode');
-                const dark = saved === 'dark' || (saved === null && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                let choice = {};
+                try { choice = JSON.parse(localStorage.getItem('goadmin.appearance.device.v1')) || {}; } catch (_) {}
+                const saved = choice.theme;
+                const dark = saved === 'dark' || ((!saved || saved === 'system') && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
                 document.documentElement.setAttribute('data-theme-mode', dark ? 'dark' : 'light');
             } catch (_) {}
         })();

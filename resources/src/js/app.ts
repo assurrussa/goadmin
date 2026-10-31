@@ -3,7 +3,7 @@ import '../css/app.css'
 // Install history provenance before Inertia can restore a lazily loaded grid page.
 import '@/components/datagrid/historyRestoration'
 import { initLocale } from '@/i18n'
-import { createApp, h, defineComponent, Fragment, ref } from 'vue'
+import { createApp, h, defineComponent, Fragment, ref, watch } from 'vue'
 import { createInertiaApp, router, usePage } from '@inertiajs/vue3'
 import { createPinia } from 'pinia'
 import { toInertiaPage } from '@/inertiaPage'
@@ -17,7 +17,7 @@ import { useAuthUserStore } from '@/stores/authUser'
 import { useAdminWebSocket } from '@/composables/useAdminWebSocket'
 import { createAdminWebSocketPlugin } from '@/plugins/adminWebSocket'
 import { hasAdminCapability, setAdminCapabilities } from '@/composables/useAdminCapabilities'
-import '@/plugins/theme'
+import { syncAppearance, discardAppearance, disposeAppearance } from '@/appearance/state'
 import InertiaFallbackPage from '@/components/system/InertiaFallbackPage.vue'
 import AuthFailureNotice from '@/components/system/AuthFailureNotice.vue'
 import { createAuthFailureHandler } from '@/auth/browserAuthFailures'
@@ -134,6 +134,8 @@ void createInertiaApp({
 
     // Инициализируем store после создания Pinia, но до монтирования
     if (typeof window !== 'undefined') {
+      syncAppearance((props as { initialPage?: unknown }).initialPage)
+      stopListeners.push(disposeAppearance)
       const themeStore = useThemeStore()
       themeStore.init()
 
@@ -183,6 +185,7 @@ void createInertiaApp({
             state === 'access_denied' ||
             state === 'session_changed'
           ) {
+            discardAppearance()
             authUserStore.setAuthUser(null)
             profileStore.setAvatarUrl(null)
             currentAuthId = null
@@ -212,12 +215,31 @@ void createInertiaApp({
       })
       stopListeners.push(() => sessionCoordinator.dispose())
 
+      // Inertia updates usePage before destination setup, including back/forward.
+      // Fence private drafts synchronously before the next page can use them.
+      stopListeners.push(
+        watch(
+          () => currentPage.props,
+          (nextProps) => {
+            if (
+              !leavingForLogin &&
+              !['reauthentication_required', 'access_denied', 'session_changed'].includes(
+                sessionCoordinator.getState(),
+              )
+            )
+              syncAppearance({ props: nextProps })
+          },
+          { flush: 'sync' },
+        ),
+      )
+
       const initialAuth = extractAuth((props as { initialPage?: unknown }).initialPage)
       syncAuthState(initialAuth)
 
       const authFailureHandler = createAuthFailureHandler({
         origin: window.location.origin,
         clearAuth: () => {
+          discardAppearance()
           currentAuthId = null
           authUserStore.setAuthUser(null)
           profileStore.setAvatarUrl(null)
@@ -299,6 +321,7 @@ void createInertiaApp({
             authFailureLogin.value = false
             setAdminCapabilities(event.detail?.page)
             configureSessionMaintenance(event.detail?.page)
+            syncAppearance(event.detail?.page)
             syncAuthState(extractAuth(event.detail?.page))
           }
         }),

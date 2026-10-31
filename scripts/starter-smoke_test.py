@@ -122,6 +122,12 @@ class IsolationTests(unittest.TestCase):
         sources = set()
         for test in (repo / 'resources/scripts').glob('*.test.cjs'):
             sources.update(re.findall(r"['\"]\.\./\.\./([^'\"]+\.(?:go|js))['\"]", test.read_text()))
+        # The DOM contract composes these paths from a middleware directory;
+        # the literal relative-path scan above cannot discover that form.
+        sources.update({
+            'infrastructure/core/middlewares/browser-recovery.go',
+            'infrastructure/core/middlewares/browser-recovery.css',
+        })
         self.assertGreaterEqual(len(sources), 3, 'resource recovery contract inputs disappeared')
         for source in sources:
             with self.subTest(source=source):

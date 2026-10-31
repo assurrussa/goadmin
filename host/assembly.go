@@ -268,9 +268,10 @@ func (r *Runtime) Close() error {
 			<-r.done
 		}
 		if r.Server != nil {
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-			r.closeErr = r.Server.Shutdown(ctx)
-			cancel()
+			// Server shutdown has bounded HTTP/connection phases. Join its owned
+			// finalizers before closing the auth database, including when another
+			// caller previously stopped waiting for shutdown.
+			r.closeErr = r.Server.Shutdown(context.Background())
 		}
 		if r.ownedAuth {
 			r.closeErr = errors.Join(r.closeErr, r.Auth.Close())

@@ -99,6 +99,7 @@ linters:
             - github.com/assurrussa/outbox
             - github.com/assurrussa/gouploads
             - github.com/assurrussa/gologger
+            - github.com/assurrussa/gocache/rcu
             - github.com/assurrussa/goinertia
             - github.com/assurrussa/gonotify
             - github.com/assurrussa/godi

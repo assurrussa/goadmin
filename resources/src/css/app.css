@@ -594,3 +594,67 @@
     cursor: progress;
   }
 }
+
+/* Personal density overrides only explicit choices; default preserves the host pack. */
+:root[data-density='compact'] {
+  --goadmin-control-height-xs: 32px;
+  --goadmin-control-height-sm: 32px;
+  --goadmin-control-height: 32px;
+  --goadmin-control-height-lg: 36px;
+  --goadmin-control-height-xl: 40px;
+  --goadmin-card-padding: 16px;
+  --goadmin-textarea-min-height: 64px;
+}
+:root[data-density='comfortable'] {
+  --goadmin-control-height-xs: 44px;
+  --goadmin-control-height-sm: 44px;
+  --goadmin-control-height: 44px;
+  --goadmin-control-height-lg: 48px;
+  --goadmin-control-height-xl: 52px;
+  --goadmin-card-padding: 28px;
+  --goadmin-textarea-min-height: 96px;
+}
+.appearance-select {
+  min-height: var(--goadmin-control-height, 36px);
+}
+.appearance-select:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+@media (max-width: 767px), (pointer: coarse) {
+  :root[data-density] {
+    --goadmin-control-height-xs: 44px;
+    --goadmin-control-height-sm: 44px;
+    --goadmin-control-height: 44px;
+    --goadmin-control-height-lg: 48px;
+    --goadmin-control-height-xl: 52px;
+  }
+  [data-ui='button'],
+  [data-ui='input'],
+  [data-ui='select'],
+  .appearance-select {
+    min-height: 44px;
+  }
+  [data-ui='button'] {
+    min-width: 44px;
+  }
+}
+:root[data-density='compact'] [data-ui='table'][data-part='cell'] {
+  padding-block: 6px;
+}
+:root[data-density='comfortable'] [data-ui='table'][data-part='cell'] {
+  padding-block: 20px;
+}
+:root[data-density='compact'] [data-ui='navigation'] a {
+  min-height: 32px;
+  padding-block: 4px;
+}
+:root[data-density='comfortable'] [data-ui='navigation'] a {
+  min-height: 44px;
+  padding-block: 10px;
+}
+@media (max-width: 767px), (pointer: coarse) {
+  :root[data-density] [data-ui='navigation'] a {
+    min-height: 44px;
+  }
+}

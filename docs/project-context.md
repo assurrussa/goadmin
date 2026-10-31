@@ -282,6 +282,31 @@ pipeline. No media editor/player contract changes are included.
 
 ## Admin client bundle
 
+Core appearance settings follow the administrator account: theme
+system/light/dark, RU/EN locale and default/compact/comfortable density. Personal
+documents use `goadmin_admin_preferences` under `ui.appearance`, with the same
+owner-scoped CAS boundary as table preferences but an independent typed schema.
+Anonymous theme and locale use a separate device document. Login hydrates the
+verified account before paint; logout discards private drafts and pending work.
+The legacy shared browser choices are not imported into an account automatically.
+
+Core branding adds installation-wide name, accent and light/dark PNG logos.
+The editor requires `branding:read`/`branding:update`, uses explicit Apply and
+isolated preview, and commits configuration, images and audit atomically under
+CAS. Logos accept bounded PNG/JPEG input, normalized to PNG in PostgreSQL; no
+uploads/jobs module is required. Only published variants are served anonymously
+from `/public/branding/light` and `/public/branding/dark`, with ETag revalidation.
+This does not expose arbitrary file IDs or draft/history assets.
+
+Each runtime owns a pinned GoCache RCU whole-brand snapshot. It checks versions
+every two seconds and loads images only on change; healthy instances target
+convergence within five seconds. Failed refreshes retain the previous snapshot.
+A committed save returns its saved values even when local application is delayed.
+Open pages receive a new brand on navigation/reload. Shutdown joins admitted
+operations and the cache before the runtime closes its auth dependencies.
+The host continues selecting the build-time presentation pack. See
+[theme customization](theme-customization.md#account-settings-and-installation-branding).
+
 The default UI uses neutral white/gray light surfaces, graphite dark surfaces,
 a restrained blue accent and system fonts. Shared controls have an 8px radius;
 cards have a 12px radius. Shell shadows default to none. Existing `--goadmin-*`

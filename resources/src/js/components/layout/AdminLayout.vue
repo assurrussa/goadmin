@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { t } from '@/i18n'
+import { ref, watch } from 'vue'
+import { appearance } from '@/appearance/state'
+import AdminBrand from './AdminBrand.vue'
 import { usePresentation } from '@/presentation/context'
 import AdminHeader from './AdminHeader.vue'
 import AdminSidebar from './AdminSidebar.vue'
@@ -16,16 +17,22 @@ const { adminShell } = usePresentation()
 provideAdminHeaderState()
 const sidebarOpen = ref(false)
 const collapsed = ref(false)
-const collapseKey = 'goadmin.sidebar.collapsed'
-try {
-  collapsed.value = localStorage.getItem(collapseKey) === 'true'
-} catch {
-  /* Session-only. */
-}
+const collapseKey = () => `goadmin.sidebar.collapsed.${appearance.owner || 'device'}`
+watch(
+  () => appearance.owner,
+  () => {
+    try {
+      collapsed.value = localStorage.getItem(collapseKey()) === 'true'
+    } catch {
+      collapsed.value = false
+    }
+  },
+  { immediate: true, flush: 'sync' },
+)
 const toggleCollapse = () => {
   collapsed.value = !collapsed.value
   try {
-    localStorage.setItem(collapseKey, String(collapsed.value))
+    localStorage.setItem(collapseKey(), String(collapsed.value))
   } catch {
     /* Session-only. */
   }
@@ -48,9 +55,7 @@ const toggleCollapse = () => {
     /></template>
     <template #utilities><AdminHeaderUtilities /></template>
     <template #account><AdminAccountMenu /></template>
-    <template #brand
-      ><span class="text-sm font-semibold text-text-primary">{{ t('Админка') }}</span></template
-    >
+    <template #brand><AdminBrand /></template>
     <template #breadcrumbs><AdminBreadcrumbs /></template>
     <slot />
   </component>

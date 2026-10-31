@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"regexp"
 	"slices"
 	"strconv"
@@ -13,14 +12,12 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/jackc/pgx/v5"
-
 	"github.com/assurrussa/goadmin/infrastructure/outbox"
-	"github.com/assurrussa/goadmin/internal/admintx"
+	"github.com/assurrussa/goadmin/internal/adminpreferences"
 	"github.com/assurrussa/goadmin/toolkit/datagrid"
 )
 
-const MaxPayloadBytes = 64 * 1024
+const MaxPayloadBytes = adminpreferences.MaxPayloadBytes
 
 var (
 	ErrConflict      = errors.New("table preferences changed; reload before saving")
@@ -61,61 +58,37 @@ type Store interface {
 	Save(ctx context.Context, owner int64, namespace string, version int64, payload Payload) (int64, error)
 }
 
-type PostgresStore struct{ db outbox.StoragePgsqlDBEngine }
+type PostgresStore struct{ store *adminpreferences.Store }
 
-func NewPostgresStore(db outbox.StoragePgsqlDBEngine) *PostgresStore { return &PostgresStore{db: db} }
+func NewPostgresStore(db outbox.StoragePgsqlDBEngine) *PostgresStore {
+	return &PostgresStore{store: adminpreferences.NewStore(db)}
+}
 
 func (s *PostgresStore) Load(ctx context.Context, owner int64, namespace string) (Payload, int64, error) {
-	if s == nil || s.db == nil {
+	if s == nil {
 		return Payload{}, 0, errors.New("table preferences database unavailable")
 	}
-	var row struct {
-		Payload []byte `db:"payload"`
-		Version int64  `db:"version"`
-	}
-	err := admintx.Wrap(s.db).ScanOne(ctx, "table_preferences.load", &row,
-		`SELECT payload, version FROM goadmin_admin_preferences WHERE admin_id=$1 AND namespace=$2`, owner, namespace)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return Payload{}, 0, nil
-	}
-	if err != nil {
-		return Payload{}, 0, fmt.Errorf("load table preferences: %w", err)
-	}
+	raw, version, err := s.store.Load(ctx, owner, namespace)
 	var payload Payload
-	if err = json.Unmarshal(row.Payload, &payload); err != nil {
-		return Payload{}, 0, fmt.Errorf("decode table preferences: %w", err)
+	if err == nil && len(raw) > 0 {
+		err = json.Unmarshal(raw, &payload)
 	}
-	return payload, row.Version, nil
+	return payload, version, err
 }
 
 func (s *PostgresStore) Save(ctx context.Context, owner int64, namespace string, version int64, payload Payload) (int64, error) {
-	if s == nil || s.db == nil {
+	if s == nil {
 		return 0, errors.New("table preferences database unavailable")
 	}
-	encoded, err := json.Marshal(payload)
+	raw, err := json.Marshal(payload)
 	if err != nil {
 		return 0, err
 	}
-	if len(encoded) > MaxPayloadBytes {
-		return 0, errors.New("table preferences exceed 64 KiB")
-	}
-	var next int64
-	if version == 0 {
-		err = admintx.Wrap(s.db).ScanOne(ctx, "table_preferences.create", &next,
-			`INSERT INTO goadmin_admin_preferences(admin_id,namespace,payload) VALUES ($1,$2,$3::jsonb)
-    ON CONFLICT (admin_id,namespace) DO NOTHING RETURNING version`, owner, namespace, string(encoded))
-	} else {
-		err = admintx.Wrap(s.db).ScanOne(ctx, "table_preferences.update", &next,
-			`UPDATE goadmin_admin_preferences SET payload=$3::jsonb,version=version+1,updated_at=NOW()
-    WHERE admin_id=$1 AND namespace=$2 AND version=$4 RETURNING version`, owner, namespace, string(encoded), version)
-	}
-	if errors.Is(err, pgx.ErrNoRows) {
+	next, err := s.store.Save(ctx, owner, namespace, version, raw)
+	if errors.Is(err, adminpreferences.ErrConflict) {
 		return 0, ErrConflict
 	}
-	if err != nil {
-		return 0, fmt.Errorf("save table preferences: %w", err)
-	}
-	return next, nil
+	return next, err
 }
 
 type schema struct {

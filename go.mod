@@ -7,6 +7,7 @@ tool github.com/assurrussa/goadmin/tools/toolsmocks
 require (
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/assurrussa/goauth v0.15.0
+	github.com/assurrussa/gocache v0.2.2
 	github.com/assurrussa/godi v0.11.0
 	github.com/assurrussa/goinertia v0.11.1
 	github.com/assurrussa/gologger v0.1.0
@@ -39,7 +40,6 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.6.0 // indirect
-	github.com/assurrussa/gocache v0.2.2 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.41.11 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.12 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.21 // indirect

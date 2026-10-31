@@ -7,8 +7,34 @@
     :label="t('Настройки')"
   />
 
+  <h1 class="mb-6 text-2xl font-semibold text-text-primary">{{ t('Настройки') }}</h1>
+  <nav
+    :aria-label="t('Разделы настроек')"
+    class="mb-6 flex flex-wrap gap-2 border-b border-border-primary pb-3"
+  >
+    <a
+      v-for="item in settingsSections"
+      :key="item.key"
+      :href="'#' + item.key"
+      :aria-current="section === item.key ? 'page' : undefined"
+      class="inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-medium hover:bg-surface-variant"
+      :class="section === item.key ? 'bg-primary/10 text-primary' : 'text-text-secondary'"
+      @click="section = item.key"
+      >{{ t(item.label) }}</a
+    >
+  </nav>
   <div class="space-y-8">
-    <section v-if="ssoEnabled" aria-labelledby="sso-settings-title" class="space-y-4">
+    <AppearanceSettings v-if="section === 'interface'" />
+    <BrandingSettings v-if="section === 'branding' && appearance.brandingRead" />
+    <p v-if="section === 'account' && !authmail && !ssoEnabled" class="text-text-secondary">
+      {{ t('Дополнительные настройки учётной записи недоступны.') }}
+    </p>
+    <section
+      v-if="ssoEnabled"
+      v-show="section === 'account'"
+      aria-labelledby="sso-settings-title"
+      class="space-y-4"
+    >
       <h2 id="sso-settings-title" class="text-xl font-semibold">AuthHub SSO</h2>
       <Card>
         <CardHeader class="border-b border-border-secondary bg-surface-variant/40">
@@ -53,7 +79,12 @@
         </CardContent>
       </Card>
     </section>
-    <section v-if="authmail" aria-labelledby="profile-settings-title" class="space-y-4">
+    <section
+      v-if="authmail"
+      v-show="section === 'account'"
+      aria-labelledby="profile-settings-title"
+      class="space-y-4"
+    >
       <h2 id="profile-settings-title" class="text-xl font-semibold">{{ t('Профиль') }}</h2>
       <Card>
         <CardHeader class="border-b border-border-secondary bg-surface-variant/40">
@@ -150,7 +181,11 @@
       </Card>
     </section>
 
-    <section aria-labelledby="security-settings-title" class="space-y-4">
+    <section
+      v-show="section === 'security'"
+      aria-labelledby="security-settings-title"
+      class="space-y-4"
+    >
       <h2 id="security-settings-title" class="text-xl font-semibold">{{ t('Безопасность') }}</h2>
       <LocalMFASettings
         :state="
@@ -219,6 +254,9 @@
 </template>
 
 <script setup lang="ts">
+import AppearanceSettings from '@/components/profile/AppearanceSettings.vue'
+import BrandingSettings from '@/components/profile/BrandingSettings.vue'
+import { appearance } from '@/appearance/state'
 import { adminFetch } from '@/http'
 import { t, locale } from '@/i18n'
 
@@ -251,6 +289,27 @@ interface SettingsProps {
 }
 
 const props = defineProps<SettingsProps>()
+const settingsSections = computed(() => [
+  { key: 'interface', label: 'Интерфейс' },
+  { key: 'account', label: 'Учётная запись' },
+  { key: 'security', label: 'Безопасность' },
+  ...(appearance.brandingRead ? [{ key: 'branding', label: 'Бренд админки' }] : []),
+])
+const section = ref('interface')
+const syncSection = () => {
+  const hash = window.location.hash.slice(1)
+  section.value = settingsSections.value.some((item) => item.key === hash) ? hash : 'interface'
+}
+onMounted(() => {
+  syncSection()
+  window.addEventListener('hashchange', syncSection)
+})
+onUnmounted(() => window.removeEventListener('hashchange', syncSection))
+watch(settingsSections, () => {
+  if (!settingsSections.value.some((item) => item.key === section.value))
+    section.value = 'interface'
+})
+
 const { authmail } = useAdminCapabilities()
 const page = usePage()
 const ssoEnabled = computed(() => page.props.adminSSOEnabled === true)
