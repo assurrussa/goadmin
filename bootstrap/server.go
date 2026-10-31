@@ -21,6 +21,7 @@ import (
 	"github.com/assurrussa/goadmin/adminapp"
 	adminconfig "github.com/assurrussa/goadmin/config"
 	adminadmins "github.com/assurrussa/goadmin/http/handlers/administrations"
+	adminappearance "github.com/assurrussa/goadmin/http/handlers/appearance"
 	adminauthhandler "github.com/assurrussa/goadmin/http/handlers/auth"
 	adminmain "github.com/assurrussa/goadmin/http/handlers/dashboard"
 	adminfiles "github.com/assurrussa/goadmin/http/handlers/files"
@@ -125,6 +126,7 @@ func initServer(ctx context.Context, deps Dependencies, cfg Config, app *adminap
 
 	// Core routes are always mounted; module routes use the same capability snapshot.
 	httpHandlers := []server.Handler{
+		adminappearance.NewHandler(app, deps.System.Appearance),
 		adminmain.NewHandler(app, dashboardRegistry),
 		adminauthhandler.NewHandler(adminauthhandler.HandlerOptions{
 			AdminApp:            app,
@@ -304,6 +306,9 @@ func buildRegisteredHandler(
 ) func(*fiber.App) {
 	return func(fiberApp *fiber.App) {
 		registerSessionMaintenance(fiberApp, deps, staticFiles.adminConfig)
+		// Published branding assets are public core routes, before static-file
+		// fallbacks and all session-owned middleware.
+		adminappearance.NewHandler(app, deps.System.Appearance).RegisterRoutes(fiberApp)
 		if httpWS != nil {
 			registerRealtimeRoute(fiberApp, deps.System.AdminAuthService, httpWS, staticFiles.csrfCookieName)
 		}

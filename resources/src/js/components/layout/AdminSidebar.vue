@@ -6,19 +6,7 @@
       :class="collapsed ? 'justify-center' : 'justify-between'"
     >
       <div :class="collapsed ? 'hidden' : 'flex min-w-0 items-center space-x-3 whitespace-nowrap'">
-        <div
-          class="h-9 w-9 shrink-0 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center"
-        >
-          <span class="text-primary-dark dark:text-primary-light font-bold text-sm tracking-wide"
-            >A</span
-          >
-        </div>
-        <div :class="collapsed ? 'sr-only' : ''">
-          <p class="text-sm font-semibold text-text-primary uppercase tracking-wider">
-            {{ t('Админка') }}
-          </p>
-          <p class="text-xs text-text-tertiary">{{ t('Панель управления') }}</p>
-        </div>
+        <AdminBrand />
       </div>
 
       <AppButton
@@ -86,6 +74,7 @@
 </template>
 
 <script setup lang="ts">
+import AdminBrand from './AdminBrand.vue'
 import { t } from '@/i18n'
 import { computed } from 'vue'
 import { usePage } from '@inertiajs/vue3'

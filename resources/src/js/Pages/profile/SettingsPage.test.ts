@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, h, nextTick, reactive } from 'vue'
 import SettingsPage from './SettingsPage.vue'
 import { setAdminCapabilities } from '@/composables/useAdminCapabilities'
+import { appearance } from '@/appearance/state'
 
 interface MockForm {
   [key: string]: unknown
@@ -76,7 +77,74 @@ afterEach(() => {
   vi.useRealTimers()
   setAdminCapabilities({ props: {} })
   pageState.props = {}
+  appearance.brandingRead = false
+  window.history.replaceState(null, '', '/auth/profile/settings')
   vi.unstubAllGlobals()
+})
+
+describe('settings section navigation', () => {
+  function enableSections() {
+    pageState.props = { adminSSOEnabled: true }
+    appearance.brandingRead = true
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ version: 0, payload: {}, linked: false }),
+      }),
+    )
+  }
+
+  it.each([
+    ['sso-settings-title', 'account', 'sso-settings-title'],
+    ['profile-settings-title', 'account', 'profile-settings-title'],
+    ['security-settings-title', 'security', 'security-settings-title'],
+    ['interface', 'interface', 'appearance-title'],
+    ['account', 'account', 'profile-settings-title'],
+    ['security', 'security', 'security-settings-title'],
+    ['branding', 'branding', 'branding-title'],
+    ['unknown', 'interface', 'appearance-title'],
+  ])('opens #%s in the visible %s section', async (hash, section, heading) => {
+    enableSections()
+    window.history.replaceState(null, '', '/auth/profile/settings#' + hash)
+    const { root } = mountSettings()
+    await nextTick()
+    expect(root.querySelector('nav a[aria-current="page"]')?.getAttribute('href')).toBe(
+      '#' + section,
+    )
+    const content = root.querySelector<HTMLElement>('section[aria-labelledby="' + heading + '"]')!
+    expect(content).not.toBeNull()
+    expect(content.style.display).not.toBe('none')
+  })
+
+  it('restores legacy and new sections through real Back/Forward hash navigation', async () => {
+    enableSections()
+    window.history.replaceState(null, '', '/auth/profile/settings#sso-settings-title')
+    const { root } = mountSettings()
+    await nextTick()
+    async function navigate(action: () => void) {
+      const changed = new Promise<void>((resolve) =>
+        window.addEventListener('hashchange', () => resolve(), { once: true }),
+      )
+      action()
+      await changed
+      await nextTick()
+    }
+    const selected = () => root.querySelector('nav a[aria-current="page"]')?.getAttribute('href')
+    expect(selected()).toBe('#account')
+    await navigate(() => {
+      window.location.hash = '#security'
+    })
+    expect(selected()).toBe('#security')
+    await navigate(() => window.history.back())
+    expect(selected()).toBe('#account')
+    expect(
+      root.querySelector<HTMLElement>('section[aria-labelledby="sso-settings-title"]')!.style
+        .display,
+    ).not.toBe('none')
+    await navigate(() => window.history.forward())
+    expect(selected()).toBe('#security')
+  })
 })
 
 describe('optional SSO settings', () => {

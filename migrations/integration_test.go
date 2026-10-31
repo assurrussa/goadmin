@@ -34,6 +34,7 @@ INSERT INTO files (original_filename, filename, slug) VALUES ('sentinel.png', 's
 		postgres.ConfirmResetAuthState,
 	))
 	requireTableMissing(t, ctx, db, "goadmin_admin_preferences")
+	requireTableMissing(t, ctx, db, "goadmin_branding")
 	requireTableMissing(t, ctx, db, "admin_profile_presentations")
 	requireTableMissing(t, ctx, db, "admin_admission_events")
 	requireTableMissing(t, ctx, db, "admin_admission_invitations")
@@ -54,7 +55,7 @@ INSERT INTO files (original_filename, filename, slug) VALUES ('sentinel.png', 's
 		"goauth_schema_version", "auth_subjects", "auth_identifiers", "auth_sessions",
 		"auth_roles", "administrations", "users", "goadmin_first_admin_setup_tokens",
 		"goadmin_browser_auth_state", "goadmin_browser_sessions",
-		"admin_admissions", "admin_admission_invitations", "admin_admission_events", "admin_profile_presentations", "goadmin_admin_preferences",
+		"admin_admissions", "admin_admission_invitations", "admin_admission_events", "admin_profile_presentations", "goadmin_admin_preferences", "goadmin_branding",
 	} {
 		requireTable(t, ctx, db, table)
 	}

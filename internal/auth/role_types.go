@@ -35,6 +35,7 @@ func (p PermissionDomain) String() string { return string(p) }
 func (p PermissionAction) String() string { return string(p) }
 
 const (
+	PermissionDomainBranding    PermissionDomain = "branding"
 	PermissionDomainRoles       PermissionDomain = "roles"
 	PermissionDomainPermissions PermissionDomain = "permissions"
 	PermissionDomainAdmins      PermissionDomain = "admins"
@@ -295,6 +296,8 @@ func permissionFromRBAC(value rbac.Permission) (Permission, error) {
 }
 
 var defaultPermissionDefinitions = []PermissionDefinition{
+	{Key: NewPermissionKey(PermissionDomainBranding, PermissionActionRead), Description: "Просмотр оформления админки"},
+	{Key: NewPermissionKey(PermissionDomainBranding, PermissionActionUpdate), Description: "Изменение оформления админки"},
 	{Key: NewPermissionKey(PermissionDomainRoles, PermissionActionRead), Description: "Просмотр списка ролей и деталей"},
 	{Key: NewPermissionKey(PermissionDomainRoles, PermissionActionCreate), Description: "Создание новой роли"},
 	{Key: NewPermissionKey(PermissionDomainRoles, PermissionActionUpdate), Description: "Редактирование существующей роли"},

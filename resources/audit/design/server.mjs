@@ -27,8 +27,9 @@ process.once('exit', scaffold.cleanup)
 const appTemplate = readFileSync(path.resolve(sourceRoot, '../views/app.gohtml'), 'utf8')
 const themeScript = [...appTemplate.matchAll(/<script>([\s\S]*?)<\/script>/g)]
   .map((match) => match[1])
-  .find((script) => script.includes("localStorage.getItem('theme-mode')"))
+  .find((script) => script.includes('goadmin.appearance.device.v1') || script.includes("localStorage.getItem('theme-mode')"))
 if (!themeScript) throw new Error('Canonical inline theme initializer not found')
+const themeFor = page => themeScript.replace('{{ marshal .page }}', JSON.stringify(page).replaceAll('<', '\\u003c'))
 
 // Go's html/template owns all conditional error copy and escaping. The helper is
 // copied into the owned temporary scaffold so no Go package enters the SDK tree.
@@ -90,12 +91,13 @@ ${
   !baseline
     ? `import {extensions} from '/src/js/extensions/index.ts';
 import {installPresentation} from '/src/js/presentation/context.ts';
+import {syncAppearance} from '/src/js/appearance/state.ts';
 import AdminRuntimeFrame from '/src/js/components/layout/AdminRuntimeFrame.vue';`
     : ''
 }
-const page=window.__DESIGN_PAGE__;initLocale();setAdminCapabilities(page);const pages={${components}};
+const page=window.__DESIGN_PAGE__;initLocale();${!baseline ? 'syncAppearance(page);' : ''}setAdminCapabilities(page);const pages={${components}};
 for(const [name,component] of Object.entries(pages)){if(!name.startsWith('auth/'))component.layout=(render,page)=>render(AdminLayout,null,{default:()=>page})}
-await createInertiaApp({page,resolve:(name)=>toInertiaPage(pages[name]),setup({el,App,props,plugin}){const pinia=createPinia();const app=createApp({render:()=>${!baseline ? 'h(AdminRuntimeFrame,null,{default:()=>h(App,props)})' : 'h(App,props)'}}).use(plugin).use(pinia);${!baseline ? 'extensions.install(app);installPresentation(app,extensions.theme);' : ''}useAuthUserStore(pinia).setAuthUser(page.props.authuser);router.on('success',event=>{setAdminCapabilities(event.detail.page);useAuthUserStore(pinia).setAuthUser(event.detail.page.props.authuser)});useThemeStore(pinia).init();app.mount(el)}});`
+await createInertiaApp({page,resolve:(name)=>toInertiaPage(pages[name]),setup({el,App,props,plugin}){const pinia=createPinia();const app=createApp({render:()=>${!baseline ? 'h(AdminRuntimeFrame,null,{default:()=>h(App,props)})' : 'h(App,props)'}}).use(plugin).use(pinia);${!baseline ? 'extensions.install(app);installPresentation(app,extensions.theme);' : ''}useAuthUserStore(pinia).setAuthUser(page.props.authuser);router.on('success',event=>{setAdminCapabilities(event.detail.page);${!baseline ? 'syncAppearance(event.detail.page);' : ''}useAuthUserStore(pinia).setAuthUser(event.detail.page.props.authuser)});useThemeStore(pinia).init();app.mount(el)}});`
 const requests = new Map()
 const json = (res, data, status = 200) => {
   res.statusCode = status
@@ -203,6 +205,8 @@ const server = await createServer({
             )
           }
           res.setHeader('Cache-Control', 'no-store')
+          if (pathname === '/auth/profile/appearance') return json(res, makePage('/auth/profile/settings').props.appearance)
+          if (pathname === '/auth/branding') return json(res, { version: 0, payload: makePage('/auth/profile/settings').props.branding })
           if (pathname === '/public/favicon.ico' || pathname === '/favicon.ico') {
             res.statusCode = 204
             res.end()
@@ -211,7 +215,7 @@ const server = await createServer({
           if (pathname === '/__design/theme') {
             res.setHeader('Content-Type', 'text/html; charset=utf-8')
             res.end(
-              `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fixture theme preference</title><script>${themeScript}</script></head><body><h1>Fixture theme preference</h1><p>Synthetic visual audit only. These buttons set the existing local theme preference.</p><button id="light">Manual light</button> <button id="dark">Manual dark</button> <button id="system">System preference (unset)</button><p id="state"></p><a href="/">Dashboard</a> · <a href="/users">Users</a> · <a href="/__design/error/404">Standalone error</a><script type="module">import {themeManager} from '/src/js/plugins/theme.ts';const show=()=>document.querySelector('#state').textContent='Saved: '+(localStorage.getItem('theme-mode')??'unset')+'; applied: '+themeManager.getCurrent();document.querySelector('#light').onclick=()=>{themeManager.setLight();show()};document.querySelector('#dark').onclick=()=>{themeManager.setDark();show()};document.querySelector('#system').onclick=()=>{localStorage.removeItem('theme-mode');location.reload()};show();</script></body></html>`,
+              `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fixture theme preference</title><script>${themeFor({ props: {} })}</script></head><body><h1>Fixture theme preference</h1><p>Synthetic visual audit only. These buttons set the existing local theme preference.</p><button id="light">Manual light</button> <button id="dark">Manual dark</button> <button id="system">System preference (unset)</button><p id="state"></p><a href="/">Dashboard</a> · <a href="/users">Users</a> · <a href="/__design/error/404">Standalone error</a><script type="module">import {themeManager} from '/src/js/plugins/theme.ts';const show=()=>document.querySelector('#state').textContent='Saved: '+(localStorage.getItem('goadmin.appearance.device.v1')??'unset')+'; applied: '+themeManager.getCurrent();document.querySelector('#light').onclick=()=>{themeManager.setLight();show()};document.querySelector('#dark').onclick=()=>{themeManager.setDark();show()};document.querySelector('#system').onclick=()=>{localStorage.removeItem('goadmin.appearance.device.v1');location.reload()};show();</script></body></html>`,
             )
             return
           }
@@ -270,7 +274,7 @@ const server = await createServer({
           }
           res.setHeader('Content-Type', 'text/html; charset=utf-8')
           res.end(
-            `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>GoAdmin · synthetic visual audit</title><script>${themeScript}</script></head><body><div id="app"></div><script>window.__DESIGN_PAGE__=${JSON.stringify(page).replaceAll('<', '\\u003c')}</script><script type="module" src="/__design-entry.js"></script></body></html>`,
+            `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>GoAdmin · synthetic visual audit</title><script>${themeFor(page)}</script></head><body><div id="app"></div><script>window.__DESIGN_PAGE__=${JSON.stringify(page).replaceAll('<', '\\u003c')}</script><script type="module" src="/__design-entry.js"></script></body></html>`,
           )
         })
       },

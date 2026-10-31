@@ -1,5 +1,140 @@
 # Implementation Notes
 
+## Appearance and personalization (2026-10-31)
+
+PR review follow-up: preserve the existing `sso-settings-title`,
+`profile-settings-title` and `security-settings-title` deep links by mapping them
+to the new Account/Security sections. The AuthHub account-menu URL remains
+compatible. Mounted regressions cover those legacy links, all new section keys,
+unknown-hash fallback and real hash-history Back/Forward. Four regressions fail
+against the original PR source; all 28 settings tests pass with the aliases.
+Verification passed: 142 manifest checks, 1051 UI tests, ESLint, Prettier, core
+Vue type-checking, the complete typed-host positive/negative checks and the
+rebuilt embedded assets. The first typed-host compiler exited without a status
+or diagnostics during memory pressure; the unchanged gate passed on a serial
+1536 MiB heap rerun. Matching-lock installed dependencies were reused with
+private writable caches; no dependency installation or Go checks were repeated.
+
+Completion audit follow-up: complete. Saved personal versions survive cached
+Inertia history; public brand versions also remain monotonic across owner/logout
+boundaries and delayed successful PUT bodies. A retained branding editor reloads
+after identity/permission changes while fencing old requests. Empty-accent
+previews resolve the actual host pack separately for light/dark without changing
+the live root. An 80-character unbroken name wraps within the mobile preview.
+Shared mobile/coarse buttons now keep both dimensions at least 44px; the missing
+English Apply label is translated.
+
+New PostgreSQL race integration proves one winner/conflict/audit for concurrent
+complete branding writes, atomic configuration and both JPEG-to-PNG logos,
+rollback on a real audit SQL failure, immutable assets/ETags and replica
+convergence within five seconds. The assembled `host.New` integration proves
+that both admitted reads and an in-flight RCU loader join before owned auth DB
+closure, including Close-before-Run. Both integration tests passed with `-race`.
+The targeted command was `go test -tags=integration -race ./internal/appearance
+./host -run 'TestPostgresAppearanceCASAuditRollbackAndReplicaConvergence|TestAssembledAppearanceDrainsBeforeAuthCloseAndStopsPolling' -count=1`.
+Integration-tagged files have no gopls package metadata; the tagged compiler and
+race tests validate them. No production Go contracts or dependency versions were
+changed by this follow-up.
+
+`make check` passed, followed by the final `make resources` after browser/review
+fixes: 1042 UI tests, manifest checks, types, formatting, lint, build and embedded
+asset checks. `make externalconsumer-local` and `make starter-smoke-test` passed.
+Fresh full starter run `20261031t175828z-fd554ede` passed all eleven scenario groups
+for each pack, with no page/console errors. Each pack measured 168 screen/theme/
+locale/density/viewport combinations, four system-theme cases, desktop coarse
+targets and fourteen actual Chromium zoom-200% cases. Zoom halved the layout
+viewport to 720px and doubled DPR to 2 while root font size stayed 16px. Mobile
+shared targets measured at least 44x44px; the same record measured 45/73px for
+compact/comfortable, with visible, connected, stable row and padding checks.
+Preview AA checks include empty, white, black and saturated custom accents;
+the measured minimum contrast was 5.025:1. Draft palette isolation and applied
+light/dark palette agreement are checked. RU/EN branding labels and keyboard
+focus are asserted; screenshots of both packs were reviewed. Standalone errors
+retain the documented neutral/device-theme fallback.
+
+Independent review of fixes and acceptance assertions has no remaining findings.
+Focused reruns use `scripts/starter-smoke/appearance-check.mjs` against an already
+initialized owned smoke folder and reset its test brand through the native API.
+Earlier failed runs remain diagnostic artifacts; the final run above is the
+acceptance result. No commit, publication or production deployment was performed.
+
+Accepted: refine the current neutral style in both build-time presentation packs.
+The host keeps choosing sidebar/topbar. Personal theme (system/light/dark),
+locale (ru/en), and density (default/compact/comfortable) follow the administrator
+account across devices and autosave with visible failure/conflict states.
+Temporary navigation state stays local; desktop collapse is owner-scoped.
+Settings get Interface, Account, Security and permission-gated Admin Branding
+sections. Preserve existing identity/security operations and explicit section URLs.
+
+Branding: installation-wide name, light/dark logo, custom HEX accent; isolated
+preview and explicit Apply/reset. Core PostgreSQL stores logos without optional
+uploads/jobs. Accept PNG/JPEG up to 512 KiB and 1024x1024 each, normalize to PNG,
+and expose only published variants. Brand writes use CAS plus transactional audit.
+Use pinned gocache/rcu for immutable whole-brand snapshots, version polling at
+2s with bounded SQL/refresh, and immediate refresh after save. Healthy server
+replicas converge within 5s; open pages update on navigation/reload. Failed refresh
+retains last good data; a committed write remains successful with pending-apply
+feedback. Runtime drains saves, cancels and joins cache before closing database.
+
+Integration contract (internal DTO/routes, no new supported Go packages):
+- GET/PATCH /auth/profile/appearance: authenticated personal preference document
+  {owner:string,version:number,payload:{schemaVersion:1,theme,locale,density}}.
+  PATCH accepts {version,payload}; strict input and current session owner only.
+- GET/PUT /auth/branding: guarded by branding:read/update. GET and successful PUT
+  return {version,payload:{name,accentColor,logoLightUrl,logoDarkUrl},pending?:bool}.
+  PUT accepts JSON {version,name,accentColor,logoLight?,logoDark?,reset?}; logo
+  strings are base64 bytes, omitted means unchanged, empty string means remove.
+- GET /public/branding/:variant (light|dark): published PNG, ETag/revalidation;
+  never arbitrary IDs, paths, draft or historic files.
+- Shared Inertia props: appearance (document or null), branding (flat public
+  snapshot with version/name/accentColor/logoLightUrl/logoDarkUrl), and
+  appearanceAccess:{brandingRead:boolean,brandingUpdate:boolean,readOnly:boolean}.
+  readOnly reflects role preview. No account preferences enter shared brand RCU.
+
+Transitions: anonymous uses separate device preferences; login applies the
+server-owned profile before paint; logout/owner change discards private drafts,
+requests and late replies. No automatic import of shared legacy localStorage
+into accounts. Autosave serializes/coalesces edits; 409 pauses without losing
+draft, and explicit resolution updates only changed fields against fresh version.
+Brand preview never changes global root tokens until Apply. Default density and
+unset brand tokens preserve the chosen pack; mobile/coarse controls stay >=44px.
+
+Implemented and independently reviewed. PostgreSQL integration/race tests passed
+for personal CAS/isolation, branding audit rollback, two RCU instances, immutable
+assets and shutdown admission/drain. Go tidy/format/vet/lint and full race/coverage
+passed through `make check`. Its resource phase initially rejected the newly
+imported appearance module in the isolated app-bootstrap test; updating that
+test's unrelated-service fixture closed the failure. `make resources` then passed
+142 manifest checks, all 1029 UI tests, lint/format/types/build and asset checks.
+The final density-only CSS adjustment was rebuilt and verified in the browser.
+`make externalconsumer-local`, the starter's readonly source build and
+`make starter-smoke-test` also passed. No root dependency versions were upgraded;
+the existing GoCache version is now direct. Starter metadata was synchronized
+with the GoDI version already adopted by the root module.
+
+Fresh full starter run `20261031t163059z-09acafa4` passed eleven scenario groups
+for each presentation pack. The new acceptance proves autosave, real logout/login
+and separate-browser restoration, owner isolation, native CSRF/origin/RBAC and
+role-preview guards, public PNG/ETag delivery, confirmed/cancelled keyboard reset,
+mobile reflow and 200% text scaling. Compact/comfortable table rows measured
+45/73px in both packs. Both page-error and console-error lists are empty.
+Desktop RU/dark branding and mobile EN/light interface captures were reviewed.
+
+Acceptance exposed and corrected implicit select labels that included their
+option text; a mounted regression reproduced the selector failure and now proves
+the explicit label and real autosave together. Earlier review caught late logo
+decoding restoring cleared selections; generation fences and decoding-aware Apply
+controls close it. Core/runtime cleanup now joins post-shutdown finalizers before
+dependency closure, including Close-before-Run. A stuck accepted operation can
+therefore delay Close without an overall deadline; bounded cache polling remains
+independent of that deliberate ownership policy.
+
+Starter Docker assets-stage contract tests also exposed missing recovery Go/CSS
+inputs; the matching sources are copied explicitly and the isolation check covers
+them. Initial failed runs remain separate evidence under the existing ignored
+starter-smoke output directory. No commit, publication or production deployment
+was performed for this implementation.
+
 ## Personal table workflows (2026-10-31)
 
 PR review repairs: saved-view page sizes now follow the listing parser's 1–100

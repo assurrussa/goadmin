@@ -12,7 +12,7 @@ require (
 require (
 	github.com/Masterminds/squirrel v1.5.4 // indirect
 	github.com/assurrussa/gocache v0.2.2 // indirect
-	github.com/assurrussa/godi v0.9.3 // indirect
+	github.com/assurrussa/godi v0.11.0 // indirect
 	github.com/assurrussa/goinertia v0.11.1 // indirect
 	github.com/assurrussa/gologger v0.1.0 // indirect
 	github.com/assurrussa/gouploads v0.13.0 // indirect

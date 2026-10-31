@@ -123,6 +123,7 @@ test('validation and navigation synchronize auth from the live Inertia page', as
     '@/components/system/InertiaFallbackPage.vue': { default: component },
     '@/components/system/AuthFailureNotice.vue': { default: component },
     '@/stores/theme': { useThemeStore: () => ({ init() {} }) },
+    '@/appearance/state': { syncAppearance() {}, discardAppearance() {}, disposeAppearance() {} },
     '@/stores/adminProfile': { useAdminProfileStore: () => profileStore },
     '@/stores/authUser': { useAuthUserStore: () => authStore },
     '@/composables/useAdminWebSocket': {

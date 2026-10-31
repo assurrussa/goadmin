@@ -8,6 +8,42 @@ surfaces, a system font stack, restrained blue accents and semantic status color
 The shell, shared controls and static cards have no shadows; floating menus retain
 subtle elevation. Auth, permissions, CSRF and navigation semantics are unchanged.
 
+## Account settings and installation branding
+
+Core profile settings now include Interface, Account, Security and a
+permission-gated Admin Branding section. Interface changes apply immediately and
+autosave per administrator; conflicts retain the local draft for explicit
+resolution. The header's theme and locale controls use the same account state.
+The system theme choice follows the current device's operating-system setting.
+Anonymous device preferences remain separate from authenticated accounts.
+
+Default density leaves the chosen pack's geometry intact. Compact/comfortable
+choices set the documented shared size tokens at runtime; small or coarse-pointer
+devices retain 44px shared interaction targets. Existing explicit component
+classes remain authoritative. A user's density choice does not switch sidebar
+and topbar: presentation packs are still selected at build time.
+
+Admin Branding supports a name, a custom six-digit HEX accent and two optional
+logos for light/dark backgrounds. An accent is converted to readable theme
+variants; status/error colors and fonts retain their existing semantics.
+Preview is local until Apply. Reset restores the original presentation. Input
+logos must be PNG/JPEG, at most 512 KiB and 1024x1024 each; published images are
+normalized PNG. The brand appears in the existing admin/auth brand slots.
+Custom packs should render that slot to receive the configured content.
+
+The new JSON companions are `GET/PATCH /auth/profile/appearance` and
+`GET/PUT /auth/branding`. Current session identity owns personal documents; the
+branding editor uses `branding:read` and `branding:update`. Native CSRF and role
+preview restrictions remain in effect. These routes require no optional module
+and introduce no supported Go package. Their storage is installed by the normal
+`migrations.Migrate` call.
+
+Compiled CSS extensions continue supplying the fallback when an account uses
+default density or the installation has no accent override. Host CSS can still
+override explicit component classes; arbitrary host overrides need their own
+contrast and responsive checks. Standalone error documents retain their
+independent neutral fallback and anonymous device theme.
+
 ## Project-owned CSS
 
 Add a local stylesheet to your existing admin extension source root and import it

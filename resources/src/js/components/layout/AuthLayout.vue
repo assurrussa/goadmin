@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { appearance } from '@/appearance/state'
+import AdminBrand from './AdminBrand.vue'
 import { t } from '@/i18n'
 import { usePresentation } from '@/presentation/context'
 import LocaleSelect from './LocaleSelect.vue'
@@ -15,6 +17,7 @@ const themeStore = useThemeStore()
       <AppButton
         variant="ghost"
         size="icon-sm"
+        :disabled="appearance.readOnly || appearance.resolving"
         :aria-label="
           themeStore.isDark ? t('Переключить на светлую тему') : t('Переключить на темную тему')
         "
@@ -26,9 +29,7 @@ const themeStore = useThemeStore()
         <Sun v-if="themeStore.isDark" class="h-5 w-5" /><Moon v-else class="h-5 w-5" />
       </AppButton>
     </template>
-    <template #brand
-      ><span class="text-sm font-semibold text-text-secondary">{{ t('Админка') }}</span></template
-    >
+    <template #brand><AdminBrand /></template>
     <template #title><slot name="title" /></template>
     <template v-if="$slots.subtitle" #subtitle><slot name="subtitle" /></template>
     <template v-if="$slots.footer" #footer><slot name="footer" /></template>

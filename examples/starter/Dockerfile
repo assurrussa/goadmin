@@ -8,6 +8,8 @@ COPY views/ /src/views/
 COPY host/assisted_recovery.go /src/host/
 COPY bootstrap/server.go /src/bootstrap/
 COPY infrastructure/core/middlewares/browser-recovery.js /src/infrastructure/core/middlewares/
+COPY infrastructure/core/middlewares/browser-recovery.go /src/infrastructure/core/middlewares/
+COPY infrastructure/core/middlewares/browser-recovery.css /src/infrastructure/core/middlewares/
 ARG VITE_ADMIN_EXTENSION_MANIFESTS=""
 ENV VITE_ADMIN_EXTENSION_MANIFESTS=$VITE_ADMIN_EXTENSION_MANIFESTS
 RUN npm run test:manifest && npm run test:unit && npm run type-check && npm run build-only

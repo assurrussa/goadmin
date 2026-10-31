@@ -9,12 +9,13 @@ afterEach(() => {
 })
 
 describe('admin locale', () => {
-  it('persists only supported locales and falls back safely after corrupt storage', () => {
+  it('initializes from validated document language without importing legacy storage', () => {
     setLocale('en')
-    expect(localStorage.getItem('goadmin.locale')).toBe('en')
+    expect(localStorage.getItem('goadmin.locale')).toBeNull()
     expect(document.documentElement.lang).toBe('en')
     expect(t('Пароль')).toBe('Password')
     localStorage.setItem('goadmin.locale', 'javascript:invalid')
+    document.documentElement.lang = 'ru'
     initLocale()
     expect(useI18n().locale.value).toBe('ru')
     expect(t('Пароль')).toBe('Пароль')

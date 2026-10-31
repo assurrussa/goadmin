@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { appearance } from '@/appearance/state'
 import { t } from '@/i18n'
 import { Link } from '@inertiajs/vue3'
 import RolePreviewBanner from './RolePreviewBanner.vue'
@@ -20,6 +21,7 @@ const handleThemeToggle = () => themeStore.toggle()
   <AppButton
     variant="ghost"
     size="icon-sm"
+    :disabled="appearance.readOnly || appearance.resolving"
     :aria-label="
       themeStore.isDark ? t('Переключить на светлую тему') : t('Переключить на темную тему')
     "

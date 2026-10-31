@@ -4,7 +4,10 @@ import ru from './ru.json'
 
 export type AdminLocale = 'ru' | 'en'
 export type AdminTranslations = Partial<Record<AdminLocale, Record<string, string>>>
-const storageKey = 'goadmin.locale'
+let preferenceHandler: ((value: AdminLocale) => void) | undefined
+export function installLocalePreferenceHandler(handler: (value: AdminLocale) => void) {
+  preferenceHandler = handler
+}
 const currentLocale = ref<AdminLocale>('ru')
 export const locale = readonly(currentLocale)
 type ValidityField = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
@@ -27,6 +30,14 @@ export function registerTranslations(messages: AdminTranslations): void {
 }
 
 export function setLocale(value: string): void {
+  if (preferenceHandler) {
+    preferenceHandler(value === 'en' ? 'en' : 'ru')
+    return
+  }
+  applyLocale(value)
+}
+
+export function applyLocale(value: string): void {
   currentLocale.value = value === 'en' ? 'en' : 'ru'
   if (typeof document !== 'undefined') {
     document.documentElement.lang = currentLocale.value
@@ -35,21 +46,10 @@ export function setLocale(value: string): void {
       else invalidFields.delete(field)
     }
   }
-  try {
-    localStorage.setItem(storageKey, currentLocale.value)
-  } catch {
-    /* Storage may be disabled. */
-  }
 }
 
 export function initLocale(): void {
-  let stored: string | null = null
-  try {
-    stored = localStorage.getItem(storageKey)
-  } catch {
-    /* Use the safe default. */
-  }
-  setLocale(stored ?? 'ru')
+  applyLocale(typeof document !== 'undefined' ? document.documentElement.lang : 'ru')
   initValidationMessages()
 }
 

@@ -21,6 +21,7 @@ import (
 	outbox "github.com/assurrussa/goadmin/infrastructure/outbox"
 	adminactionauditrepo "github.com/assurrussa/goadmin/infrastructure/pgsql/repositories/adminactionauditrepo"
 	adminnotificationrepo "github.com/assurrussa/goadmin/infrastructure/pgsql/repositories/adminnotificationrepo"
+	"github.com/assurrussa/goadmin/internal/appearance"
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 	"github.com/assurrussa/goadmin/internal/authrecovery"
 	csrfservice "github.com/assurrussa/goadmin/internal/csrf"
@@ -132,6 +133,7 @@ type FirstAdminSetupTokens interface {
 
 // SystemDependencies - это инфраструктурные сервисы, которые часто уже есть в Module.
 type SystemDependencies struct {
+	Appearance         *appearance.Service
 	GridDB             outbox.StoragePgsqlDBEngine
 	CommandTransaction func(context.Context, func(context.Context) error) error
 	Logger             logger.Logger

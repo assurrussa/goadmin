@@ -89,6 +89,11 @@ actions. Filtered exports include up to 10,000 rows and report truncation.
 See [personal table workflows](docs/project-context.md#personal-table-workflows)
 for ownership, permissions and compatibility.
 
+Profile settings also provide account-owned theme, language and density with
+automatic saving. Authorized administrators can preview and apply a shared name,
+accent and light/dark logos without enabling the uploads module. See
+[appearance and branding](docs/theme-customization.md#account-settings-and-installation-branding).
+
 Custom application sections with an omitted/zero `Section.Order` appear after Home and
 before the built-in Access/System sections. Their effective order is 15;
 Home, Access and System use 10, 20 and 40. Set a nonzero order to place a

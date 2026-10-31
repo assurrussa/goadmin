@@ -339,6 +339,9 @@ export function makePage(url) {
       title: 'Пользователи',
       adminCapabilities: { notifications: true, authmail: true },
       adminInfo: { version: '0.13.0 · демо' },
+      appearance: { owner: String(profile.id), version: 0, payload: { schemaVersion: 1, theme: 'system', locale: 'ru', density: 'default' } },
+      branding: { version: 0, name: '', accentColor: '', logoLightUrl: '', logoDarkUrl: '' },
+      appearanceAccess: { brandingRead: true, brandingUpdate: true, readOnly: false },
       flash: {},
       errors: {},
       old: {},
@@ -475,5 +478,9 @@ export function makePage(url) {
       { name: 'Главная', href: '/' },
       ...(pathname === '/' ? [] : [{ name: page.props.title }]),
     ]
+  if (!page.props.authuser) {
+    page.props.appearance = null
+    page.props.appearanceAccess = { brandingRead: false, brandingUpdate: false, readOnly: false }
+  }
   return page
 }

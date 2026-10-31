@@ -6,8 +6,8 @@ github.com/assurrussa/goauth v0.15.0 h1:9nelbyuGMgF53H4WGABCwlr1cWsmkuFCTIkhSC9w
 github.com/assurrussa/goauth v0.15.0/go.mod h1:zj4wF4g/9yUO+2IOPYkfPgovz5PyylwQVl/p0hn5tsg=
 github.com/assurrussa/gocache v0.2.2 h1:Ca2Q+rjoxpEMjKtxpBNvo7U7y0beW3JjUgXCO38DjGE=
 github.com/assurrussa/gocache v0.2.2/go.mod h1:2phNxsjBMsJ8l9pu04tuhAKEOOVR2ZmU799DLgQZEo8=
-github.com/assurrussa/godi v0.9.3 h1:41DOaW+kAV4387ZERN5GjUzGFjGIaHcCBqUpxuPnVIM=
-github.com/assurrussa/godi v0.9.3/go.mod h1:gV3ls8GtxLLDO5NPD2RqSyVbMqZO0/snRMtIOYgnGVk=
+github.com/assurrussa/godi v0.11.0 h1:i4lLldHOMzwo6RVYev/oT7FXfSQfYkMyrd7rQbtTGXU=
+github.com/assurrussa/godi v0.11.0/go.mod h1:vwvJ7dQXzc9cyeRNMV1htWPReUkgbm7Na8HjjS4JB6Y=
 github.com/assurrussa/goinertia v0.11.1 h1:ajUI8RhaJe1Bu8Hds1r2c1LsMTbfJPDftW/R3rorvyM=
 github.com/assurrussa/goinertia v0.11.1/go.mod h1:2QjSrkVDtdoFkiUvd8ZdrvdY6JjyhrygVpawfzeHDWw=
 github.com/assurrussa/gologger v0.1.0 h1:jo5VXaznPUReNXEruMrNOEfIbRLUctjfeRdElocU4F8=
