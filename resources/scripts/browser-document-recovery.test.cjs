@@ -9,8 +9,8 @@ function response(status, code, extras = {}, headers = {}) {
   return {status, redirected: false, headers: {get: name => ({'x-goadmin-auth-recovery': '1', 'content-type': 'application/json', ...headers})[name]},
     json: async () => ({status, code, ...extras})};
 }
-async function run(responses, storage = new Map()) {
-  const elements = Object.fromEntries(['status', 'retry', 'continue', 'title', 'sign-in'].map(name => [name, {hidden: true, textContent: '', listeners: {}, addEventListener(type, callback) {this.listeners[type] = callback;}}]));
+async function run(responses, storage = new Map(), signInAvailable = true) {
+  const elements = Object.fromEntries(['status', 'retry', 'continue', 'title', 'sign-in'].map(name => [name, {hidden: true, textContent: '', classList: {values: new Set(), add(value) {this.values.add(value);}, contains(value) {return this.values.has(value);}}, listeners: {}, addEventListener(type, callback) {this.listeners[type] = callback;}}]));
   const requests = [];
   let reloads = 0;
   let timer;
@@ -18,7 +18,7 @@ async function run(responses, storage = new Map()) {
   const windowListeners = {};
   let cleared = false;
   vm.runInNewContext(script, {
-    document: {getElementById: id => elements[id.replace('auth-recovery-', '')]},
+    document: {getElementById: id => !signInAvailable && id === 'auth-recovery-sign-in' ? null : elements[id.replace('auth-recovery-', '')]},
     location: {reload: () => reloads++}, AbortController,
     window: {addEventListener(name, callback) {windowListeners[name] = callback;}},
     sessionStorage: {getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value)},
@@ -186,4 +186,61 @@ test('modified sign-in click does not abandon the current tab recovery', async (
     assert.equal(result.requests[0].init.signal.aborted, false);
     assert.equal(result.reloads(), 1);
   }
+});
+
+
+test('terminal reauthentication requires fresh sign-in, never retries or replays', async () => {
+  const result = await run([response(403, 'reauthentication_required')]);
+  assert.equal(result.elements.title.textContent, 'Нужно войти заново');
+  assert.equal(result.elements['sign-in'].hidden, false);
+  assert.equal(result.elements['sign-in'].classList.contains('primary-action'), true);
+  assert.equal(result.elements.retry.hidden, true);
+  assert.equal(result.elements.continue.hidden, true);
+  assert.equal(result.requests.length, 1);
+  assert.equal(result.requests[0].init.method, 'GET');
+  assert.equal(result.requests[0].init.body, undefined);
+  assert.equal(result.reloads(), 0);
+  result.elements['sign-in'].listeners.click({button: 0});
+  await result.settle();
+  assert.equal(result.requests.length, 1);
+  assert.equal(result.reloads(), 0);
+});
+
+test('temporary unavailability and network failures retain explicit bounded retry', async () => {
+  for (const failure of [response(503, 'authentication_unavailable'), new Error('network')]) {
+    const result = await run([failure, response(200, 'authentication_recovered', {csrfReady: true})]);
+    assert.equal(result.elements.retry.hidden, false);
+    assert.equal(result.elements['sign-in'].classList.contains('primary-action'), false);
+    assert.equal(result.elements.continue.hidden, true);
+    assert.equal(result.requests.length, 1);
+    assert.equal(result.reloads(), 0);
+    await result.elements.retry.listeners.click();
+    await result.settle();
+    assert.equal(result.requests.length, 2);
+    assert.equal(result.reloads(), 1);
+  }
+});
+
+test('untrusted terminal responses do not select the fresh-sign-in state', async () => {
+  for (const failure of [
+    response(403, 'reauthentication_required', {}, {'x-goadmin-auth-recovery': '0'}),
+    response(403, 'reauthentication_required', {status: 200}),
+    response(503, 'reauthentication_required'),
+    response(403, 'unrecognized_code'),
+  ]) {
+    const result = await run([failure]);
+    assert.equal(result.elements.retry.hidden, false);
+    assert.equal(result.elements['sign-in'].classList.contains('primary-action'), false);
+    assert.equal(result.reloads(), 0);
+  }
+});
+
+
+test('terminal refusal without a host sign-in link gives guidance without inventing a destination', async () => {
+  const result = await run([response(403, 'reauthentication_required')], new Map(), false);
+  assert.match(result.elements.status.textContent, /Откройте страницу входа приложения/);
+  assert.equal(result.elements.retry.hidden, true);
+  assert.equal(result.elements.continue.hidden, true);
+  assert.equal(result.requests.length, 1);
+  assert.equal(result.reloads(), 0);
 });

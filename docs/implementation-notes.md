@@ -1934,3 +1934,39 @@ Axios transition, logout and response-fence classification now use its effective
 request, not the root login transition; terminal readiness cannot bypass the
 fence through that spelling. Absolute root identity URLs retain their explicit
 transition behavior. No publication or deployment is part of these fixes.
+
+### Terminal external-recovery refusal (2026-10-31)
+
+The independent recovery document now distinguishes the versioned same-origin
+`403 reauthentication_required` response from a temporary recovery failure.
+Terminal refusal explains that the current session cannot be recovered and
+promotes the existing trusted sign-in link; it does not offer another recovery
+attempt or automatically start a new login. HTTP 503, network failures and
+unrecognized response contracts retain an explicit bounded retry. Successful
+recovery and its two-safe-GET CSRF continuation are unchanged. No business
+request is retained or replayed, and no authentication check is relaxed.
+
+SSO recovery failures emit one structured warning with a source-owned stage,
+HTTP status and public response code. Request context attributes, raw errors,
+URLs, headers, cookies, proofs, session references and user identifiers are not
+copied into this event. Stages distinguish intent, native snapshot, provider
+verification, proof construction, native completion and CSRF operations without
+exposing the underlying credentials. The failure response remains unchanged;
+stage diagnostics do not prove the cause of a previously observed refusal.
+
+Validation: focused document/coordinator and real-DOM Node suites pass (37
+tests). Server diagnostic tests assert response classification and exact log
+fields, including exclusion of synthetic request credentials and context
+identity. Read-only review found no blocking issues; the optional missing
+sign-in-link case now has explicit guidance and coverage.
+
+All `make check` component gates pass: module tidiness, formatting, Go vet,
+Go lint (v2.15.0), full Go race/coverage, clean npm installation, 137 manifest
+tests, 950 unit tests, ESLint, Prettier, the core and positive/negative typed-host
+resource graphs, and production assets/CSS-layer verification. These were not
+one uninterrupted passing invocation: resource-limited child-process failures
+were retained as failed evidence, then the affected resource stages passed
+after reclaiming unused disposable fixtures/cache and increasing the Node heap.
+The final redaction test additionally preserves the log buffer while decoding
+it so the raw-output privacy assertion remains effective. No publication,
+release, deployment or production-session reproduction is included.
