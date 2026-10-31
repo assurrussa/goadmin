@@ -14,6 +14,7 @@
             >
               <Checkbox
                 :model-value="allSelected"
+                :disabled="selectionDisabled"
                 :aria-label="t('Выбрать все строки')"
                 class="absolute left-4 top-1/2 -mt-2 sm:left-6"
                 @update:model-value="$emit('toggle-select-all')"
@@ -77,8 +78,15 @@
               class="relative w-12 px-6 sm:w-16 sm:px-8 sticky left-0 bg-card z-10"
             >
               <Checkbox
+                :disabled="
+                  selectionDisabled ||
+                  (config.workflow &&
+                    (!item.selectionId ||
+                      (selectedItems.length >= 100 &&
+                        !selectedItems.includes(getItemId(item, config)))))
+                "
                 :model-value="selectedItems.includes(getItemId(item, config))"
-                :aria-label="`Выбрать строку ${getItemId(item, config)}`"
+                :aria-label="t('Выбрать строку {id}', undefined, { id: getItemId(item, config) })"
                 class="absolute left-4 top-1/2 -mt-2 sm:left-6"
                 @update:model-value="$emit('toggle-select-item', getItemId(item, config))"
               />
@@ -191,6 +199,7 @@
 <script setup lang="ts">
 import { t, locale } from '@/i18n'
 
+import { dataGridRowId } from '~/composables/useDataGrid.ts'
 import type { Config, Column, DataItem, DataItemValue } from '~/composables/useDataGrid.ts'
 import { computed } from 'vue'
 import {
@@ -232,6 +241,7 @@ interface Props {
   sortOrder: 'asc' | 'desc'
   selectedItems: (string | number)[]
   allSelected: boolean
+  selectionDisabled?: boolean
 }
 
 // Define props with defaults
@@ -242,6 +252,7 @@ const props = withDefaults(defineProps<Props>(), {
   sortOrder: 'desc',
   selectedItems: () => [],
   allSelected: false,
+  selectionDisabled: false,
 })
 
 // Define emits
@@ -270,7 +281,7 @@ const getActionClass = (action: { key: string; variant?: string }) => {
 
 // Helper function to safely get item ID
 const getItemId = (item: DataItem, config: Config): string | number => {
-  const id = item.item[config.ui?.idKey || 'id']
+  const id = dataGridRowId(item, config)
   return typeof id === 'string' || typeof id === 'number' ? id : String(id)
 }
 

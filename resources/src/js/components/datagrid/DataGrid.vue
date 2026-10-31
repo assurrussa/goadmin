@@ -2,13 +2,21 @@
   <div data-ui="datagrid" data-part="root" class="data-grid space-y-6">
     <DataGridHeader
       :meta="metaInfo"
-      :config="config"
+      :config="headerConfig"
       :search-query="searchQuery"
       :export-disabled="loading || !!loadError"
       @search="handleSearch"
       @create="handleCreate"
       @refresh="handleRefresh"
       @export="handleExport"
+    />
+
+    <DataGridWorkflow
+      v-if="config.workflow"
+      :model="workflowModel"
+      :selected-count="selectedItems.length"
+      :loading="loading || !!loadError"
+      @clear-selection="selectedItems = []"
     />
 
     <DataGridFilters
@@ -31,12 +39,13 @@
 
     <DataGridTable
       v-if="items.length > 0"
-      :config="config"
+      :config="workflowModel.tableConfig.value"
       :items="items"
       :sort-by="sortBy"
       :sort-order="sortOrder"
       :selected-items="selectedItems"
       :all-selected="allSelected"
+      :selection-disabled="selectionDisabled"
       :show-inline-create="config.behaviour?.inlineCreatable && items.length > 0"
       @sort="handleSort"
       @toggle-select-all="toggleSelectAll"
@@ -92,7 +101,11 @@
 <script setup lang="ts">
 import { t } from '@/i18n'
 
-import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { useAuthUserStore } from '@/stores/authUser'
+import { useDataGridWorkflow, type BulkResult } from '@/composables/useDataGridWorkflow'
+import DataGridWorkflow from './DataGridWorkflow.vue'
+import { isGridHistoryRestoration } from './historyRestoration'
+import { computed, getCurrentInstance, onMounted, onUnmounted, watch } from 'vue'
 import {
   type ApiResponse,
   type DataItemValue,
@@ -130,8 +143,41 @@ const emit = defineEmits<{
   'action-table': [actionKey: string, val: string | number | null]
   'action-row': [actionKey: string, item: DataItemValue]
   'page-change': [urlOrPage: string | number | null]
+  'bulk-complete': [results: BulkResult[]]
 }>()
 
+const grid = useDataGrid({
+  apiUrl: () => props.apiUrl,
+  initialData: () => props.initialData,
+  initialQuery: () =>
+    props.syncWithUrl && typeof window !== 'undefined' ? window.location.search : undefined,
+  initialParams:
+    props.syncWithUrl && typeof window !== 'undefined' && window.location.search
+      ? parseDataGridQuery(new URLSearchParams(window.location.search), undefined, true)
+      : undefined,
+})
+const workflowModel = useDataGridWorkflow(
+  grid,
+  props.syncWithUrl &&
+    typeof window !== 'undefined' &&
+    !window.location.search &&
+    !isGridHistoryRestoration(),
+  (results) => emit('bulk-complete', results),
+)
+const headerConfig = computed(() =>
+  config.value.workflow
+    ? { ...config.value, behaviour: { ...config.value.behaviour, exportable: false } }
+    : config.value,
+)
+const pinia = getCurrentInstance()?.appContext.config.globalProperties.$pinia
+if (pinia) {
+  const auth = useAuthUserStore(pinia)
+  watch(
+    () => auth.id,
+    () => workflowModel.invalidate(),
+    { flush: 'sync' },
+  )
+}
 const {
   // State
   metaInfo,
@@ -151,6 +197,7 @@ const {
   // Computed
   filterableColumns,
   allSelected,
+  selectionDisabled,
 
   // Actions
   handleSearch,
@@ -164,16 +211,7 @@ const {
   loadDataFromUrl,
   retryLoad,
   suspendForNavigation,
-} = useDataGrid({
-  apiUrl: () => props.apiUrl,
-  initialData: () => props.initialData,
-  initialQuery: () =>
-    props.syncWithUrl && typeof window !== 'undefined' ? window.location.search : undefined,
-  initialParams:
-    props.syncWithUrl && typeof window !== 'undefined' && window.location.search
-      ? parseDataGridQuery(new URLSearchParams(window.location.search), undefined, true)
-      : undefined,
-})
+} = grid
 
 const hasActiveFilters = computed(() =>
   Object.values(filters.value).some(
@@ -247,7 +285,8 @@ const handleRefresh = (): void => {
 const handleExport = (): void => {
   // URL state belongs to the last successful response until query synchronization finishes.
   if (loading.value || loadError.value) return
-  emit('action-table', 'export', null)
+  if (config.value.workflow) void workflowModel.exportCSV('filtered')
+  else emit('action-table', 'export', null)
 }
 
 const handlePageChange = (urlOrPage: string | number | null): void => {

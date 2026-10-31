@@ -48,10 +48,26 @@ type Action[T any] struct {
 	Variant string                        `json:"variant,omitempty"`
 	CanView func(context.Context, T) bool `json:"-"`
 }
+type WorkflowAction struct {
+	CanView func(context.Context) bool `json:"-"`
+	Key     string                     `json:"key"`
+	Label   string                     `json:"label"`
+}
+
+// WorkflowConfig opts a grid into persisted views and server-side exports.
+type WorkflowConfig struct {
+	Key            string           `json:"key"`
+	PreferencesURL string           `json:"preferencesUrl"`
+	ExportURL      string           `json:"exportUrl"`
+	BulkURL        string           `json:"bulkUrl,omitempty"`
+	BulkActions    []WorkflowAction `json:"bulkActions,omitempty"`
+}
+
 type Item[T any] struct {
-	Item    T              `json:"item"`
-	Actions []Action[T]    `json:"actions"`
-	Values  map[string]any `json:"values,omitempty"`
+	SelectionID string         `json:"selectionId,omitempty"`
+	Item        T              `json:"item"`
+	Actions     []Action[T]    `json:"actions"`
+	Values      map[string]any `json:"values,omitempty"`
 }
 
 // PaginationLink структура ссылки пагинации (как в Laravel).
@@ -95,6 +111,8 @@ type ErrorTemplateComponent func(c fiber.Ctx, data ErrorData, err error) error
 
 // FilterConfig конфигурация для конкретной сущности - МАКСИМАЛЬНО ПРОСТАЯ.
 type FilterConfig[T any] struct {
+	Workflow    *WorkflowConfig
+	SelectionID func(T) string
 	// Основные настройки
 	RoutePath  string
 	Entity     string        // "users", "posts", "orders"
@@ -205,6 +223,7 @@ func (f Filters) GetFields() map[string]any {
 
 // Response ответ для Vue DataGrid - совместимый с Vue компонентом.
 type Response[T any] struct {
+	Workflow *WorkflowConfig `json:"workflow,omitempty"`
 	// RequestQuery identifies the GET query whose effective state and rows this response applies.
 	// nil means provenance is unknown; an empty string means a known query without parameters.
 	RequestQuery *string `json:"-"`
@@ -326,6 +345,7 @@ type FrontendColumn struct {
 
 // APIConfig конфигурация для фронтенда.
 type APIConfig[T any] struct {
+	Workflow  *WorkflowConfig    `json:"workflow,omitempty"`
 	RoutePath string             `json:"routePath"`
 	Columns   []FrontendColumn   `json:"columns"`
 	UI        APIUIConfig        `json:"ui"`
@@ -382,6 +402,7 @@ func NewAPIResponse[T any](response Response[T], sortBy, sortOrder string) APIRe
 			Filters: response.FilterValues,
 		},
 		Config: APIConfig[T]{
+			Workflow:  response.Workflow,
 			RoutePath: response.RoutePath,
 			Columns:   convertColumns(response.Columns),
 			UI: APIUIConfig{

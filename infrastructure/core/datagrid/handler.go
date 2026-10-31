@@ -214,6 +214,7 @@ func (h *Handler[T]) loadDataInternal(c fiber.Ctx, filters Filters) (Response[T]
 	}
 
 	internalResp := Response[T]{
+		Workflow:   h.workflowForRequest(c),
 		Items:      items,
 		Pagination: pagi,
 
@@ -347,10 +348,15 @@ func (h *Handler[T]) buildItems(ctx context.Context, data []T) ([]Item[T], error
 			return nil, err
 		}
 
+		selectionID := ""
+		if h.config.SelectionID != nil {
+			selectionID = h.config.SelectionID(item)
+		}
 		itemData = append(itemData, Item[T]{
-			Item:    item,
-			Actions: actions,
-			Values:  values,
+			SelectionID: selectionID,
+			Item:        item,
+			Actions:     actions,
+			Values:      values,
 		})
 	}
 
@@ -461,4 +467,41 @@ func (h *Handler[T]) previewActionAllowed(ctx context.Context, action string) bo
 		integrationroles.PermissionDomain(domain), integrationroles.PermissionAction(action),
 	)
 	return integrationroles.RolePreviewAllows(ctx, key)
+}
+
+// ConfigureWorkflow sets optional workflow metadata during route construction.
+// Call before serving requests; registration must not race with request handling.
+func (h *Handler[T]) ConfigureWorkflow(workflow *WorkflowConfig, selectionID func(T) string) {
+	h.config.Workflow = workflow
+	h.config.SelectionID = selectionID
+}
+
+// ParseRequestFilters reuses the listing query parser for companion endpoints.
+func (h *Handler[T]) ParseRequestFilters(c fiber.Ctx) Filters { return h.parseFilters(c) }
+
+// DecorateItems applies the same preparation, field masking and row values as the list.
+func (h *Handler[T]) DecorateItems(ctx context.Context, rows []T) ([]Item[T], error) {
+	if err := h.prepareRowDecorators(ctx, rows); err != nil {
+		return nil, err
+	}
+	return h.buildItems(ctx, rows)
+}
+
+func (h *Handler[T]) workflowForRequest(ctx context.Context) *WorkflowConfig {
+	if h.config.Workflow == nil {
+		return nil
+	}
+	workflow := *h.config.Workflow
+	workflow.BulkActions = nil
+	if !integrationroles.RolePreviewActive(ctx) {
+		for _, action := range h.config.Workflow.BulkActions {
+			if action.CanView == nil || action.CanView(ctx) {
+				workflow.BulkActions = append(workflow.BulkActions, action)
+			}
+		}
+	}
+	if len(workflow.BulkActions) == 0 {
+		workflow.BulkURL = ""
+	}
+	return &workflow
 }

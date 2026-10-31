@@ -195,6 +195,7 @@ func buildDependencies(input assemblyInput) (bootstrap.Dependencies, error) {
 	return bootstrap.Dependencies{
 		Capabilities: input.Config.Capabilities,
 		System: bootstrap.SystemDependencies{
+			GridDB: input.Services.DB.DB(),
 			CommandTransaction: func(ctx context.Context, fn func(context.Context) error) error {
 				return input.Auth.Runtime().InAuthTransaction(ctx, func(txCtx context.Context) error {
 					executor, err := input.Auth.Runtime().SQLExecutor(txCtx)

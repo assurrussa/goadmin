@@ -102,6 +102,35 @@ string-valued and search is represented by `_search`. `Response.ToJSON()`
 serializes that same API envelope. There is no `ToJSONRaw()` or
 `success/message/errors` wrapper.
 
+## Optional personal workflow metadata
+
+`FilterConfig.Workflow` and `SelectionID` opt a grid into the shared client
+workflow. `WorkflowConfig` describes the stable key, personal preference/export
+URLs and optional bulk actions. `WorkflowAction.CanView` filters mutation
+metadata per request; role preview suppresses bulk actions independently.
+`SelectionID` must return an exact string identity, including for numeric IDs.
+The original row `item` schema is unchanged.
+
+`Handler.ConfigureWorkflow` may be called during route construction, before any
+requests are served. `ParseRequestFilters` and `DecorateItems` let companion
+handlers reuse the list parser and its prepared/masked values. Metadata does
+not register or authorize companion endpoints; host-owned handlers retain that
+responsibility. Existing grids without metadata retain legacy behavior.
+
+Built-in tables register companion `GET/PUT /table-preferences` and
+`GET /table-export` routes below each resource's guarded route. Preference writes
+use expected versions and return 409 on conflict. Export accepts `scope` as
+`filtered` or `selected`, ordered comma-separated `columns`, and comma-separated
+exact `ids` for selected exports. The response is uncached CSV and reports
+`X-Goadmin-Export-Truncated`. Limits are 10,000 filtered or 100 selected rows.
+
+Preference payloads and individual saved-view states include `knownColumns`,
+the configured keys known when saved. The built-in server drops removed keys,
+appends newly configured keys and preserves deliberately hidden known columns.
+Missing legacy snapshots establish the current baseline without exposing hidden
+columns. This read-time adaptation does not change the stored revision; an
+explicit save persists it under the normal version check.
+
 ## Verification
 
 The executable example runs with normal Go tests. Public behavior and security

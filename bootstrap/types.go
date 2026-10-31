@@ -132,6 +132,7 @@ type FirstAdminSetupTokens interface {
 
 // SystemDependencies - это инфраструктурные сервисы, которые часто уже есть в Module.
 type SystemDependencies struct {
+	GridDB             outbox.StoragePgsqlDBEngine
 	CommandTransaction func(context.Context, func(context.Context) error) error
 	Logger             logger.Logger
 	PermissionGuard    adminapp.PermissionGuard

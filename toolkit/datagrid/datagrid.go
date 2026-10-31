@@ -8,6 +8,8 @@ import (
 )
 
 type (
+	WorkflowConfig             = core.WorkflowConfig
+	WorkflowAction             = core.WorkflowAction
 	Filtered                   = core.Filtered
 	Repository[T any]          = core.Repository[T]
 	Column                     = core.Column

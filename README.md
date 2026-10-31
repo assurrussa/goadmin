@@ -81,6 +81,14 @@ The shared interface supports Russian and English. Navigation and the home
 screen use the signed-in administrator's permissions; optional host features
 appear only when registered and permitted.
 
+Built-in users, administrators, roles, permissions and queue tables support
+personal saved views, ordered visible columns and CSV export. Settings follow
+the administrator across browsers through versioned PostgreSQL JSONB storage.
+Select up to 100 rows across pages for export and supported bulk user/queue
+actions. Filtered exports include up to 10,000 rows and report truncation.
+See [personal table workflows](docs/project-context.md#personal-table-workflows)
+for ownership, permissions and compatibility.
+
 Custom application sections with an omitted/zero `Section.Order` appear after Home and
 before the built-in Access/System sections. Their effective order is 15;
 Home, Access and System use 10, 20 and 40. Set a nonzero order to place a

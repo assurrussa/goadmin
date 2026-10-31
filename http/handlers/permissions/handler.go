@@ -82,6 +82,7 @@ func NewHandler(
 
 func (h *Handler) RegisterGroupRoutes(route fiber.Router, _ ...fiber.Handler) {
 	group := route.Group(h.routePath, h.adminApp.Guard(integrationroles.PermissionDomainPermissions, integrationroles.PermissionActionRead)) //nolint:lll // required
+	h.registerWorkflow(group)
 	h.dataGridHandler.RegisterRoutes(group, "")
 	group.Post("refresh", h.Refresh)
 	group.Post("sync", h.adminApp.Guard(integrationroles.PermissionDomainPermissions, integrationroles.PermissionActionSync), h.Sync)

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -19,6 +21,31 @@ import (
 )
 
 const testHTTPOrigin = "http://admin"
+
+func TestSelectedExportAcceptsHundredUUIDsWithSessionCookie(t *testing.T) {
+	srv := newServer(t)
+	srv.App.Get("/table-export", func(c fiber.Ctx) error { return c.SendStatus(http.StatusNoContent) })
+	listener := fasthttputil.NewInmemoryListener()
+	ctx, cancel := context.WithCancel(t.Context())
+	result := make(chan error, 1)
+	go func() { result <- srv.Run(ctx, listener) }()
+	t.Cleanup(func() { cancel(); waitRun(t, result, nil) })
+	client := &http.Client{Transport: &http.Transport{
+		DialContext: func(context.Context, string, string) (net.Conn, error) { return listener.Dial() },
+	}, Timeout: 2 * time.Second}
+	t.Cleanup(client.CloseIdleConnections)
+	ids := strings.TrimSuffix(strings.Repeat("123e4567-e89b-12d3-a456-426614174000,", 100), ",")
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet,
+		"http://admin/table-export?scope=selected&ids="+url.QueryEscape(ids), nil)
+	require.NoError(t, err)
+	req.AddCookie(&http.Cookie{
+		Name: "session", Value: strings.Repeat("s", 1024), Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode,
+	})
+	response, err := client.Do(req)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, response.Body.Close()) }()
+	require.Equal(t, http.StatusNoContent, response.StatusCode)
+}
 
 func TestShutdownConcurrentClose(t *testing.T) {
 	signal := server.NewShutdown()

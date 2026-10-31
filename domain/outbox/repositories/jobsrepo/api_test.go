@@ -55,6 +55,27 @@ func TestIntegration_Init(t *testing.T) {
 	})
 }
 
+func TestIntegration_DeleteJobSkipsLiveLease(t *testing.T) {
+	ctx, _, ts := NewTestRepoSuite(t)
+	defer ts.cleanUp(ctx)
+	jobs := createModels(t, ts, ctx, 1)
+	id := jobs[0].ID
+	_, err := ts.db.DB().Exec(ctx, "test.jobs.reserve",
+		`UPDATE jobs SET reserved_at = NOW() + INTERVAL '1 minute' WHERE id=$1`, id)
+	ts.Require().NoError(err)
+	affected, err := ts.repo.DeleteJob(ctx, id)
+	ts.Require().NoError(err)
+	ts.EqualValues(0, affected)
+	_, err = ts.repo.GetByID(ctx, id)
+	ts.Require().NoError(err)
+	_, err = ts.db.DB().Exec(ctx, "test.jobs.expire",
+		`UPDATE jobs SET reserved_at = NOW() - INTERVAL '1 minute' WHERE id=$1`, id)
+	ts.Require().NoError(err)
+	affected, err = ts.repo.DeleteJob(ctx, id)
+	ts.Require().NoError(err)
+	ts.EqualValues(1, affected)
+}
+
 func TestIntegration_GetList(t *testing.T) {
 	ctx, _, ts := NewTestRepoSuite(t)
 	defer ts.cleanUp(ctx)

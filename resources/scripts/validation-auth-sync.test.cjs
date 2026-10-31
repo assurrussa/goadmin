@@ -175,6 +175,12 @@ test('validation and navigation synchronize auth from the live Inertia page', as
   }
   vm.runInNewContext(compile(path.join(__dirname, '../src/js/http/sessionNavigation.ts')), navigationModule)
   modules['@/http/sessionNavigation'] = navigationModule.exports
+  const historyModule = { exports: {}, window, document }
+  vm.runInNewContext(
+    compile(path.join(__dirname, '../src/js/components/datagrid/historyRestoration.ts')),
+    historyModule,
+  )
+  modules['@/components/datagrid/historyRestoration'] = historyModule.exports
   const bootstrapClient = () =>
     vm.runInNewContext(compile(path.join(__dirname, '../src/js/app.ts')), {
       exports: {},
