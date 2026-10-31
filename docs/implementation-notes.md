@@ -2,6 +2,24 @@
 
 ## Personal table workflows (2026-10-31)
 
+PR review repairs: saved-view page sizes now follow the listing parser's 1–100
+range, including the initial users/roles size of 20, without rewriting valid
+custom sizes during reconciliation. Retained rows cannot be selected while a
+query is pending, failed or suspended for navigation; bulk dispatch applies the
+same guard. Existing successful cross-page and sort selection is unchanged.
+Regression tests reproduced the rejected 20-row save and stale-row bulk target
+before the repairs. The complete gridworkflow Go package and 102 focused UI
+tests pass on the candidate merged with current master; the master security
+and recovery changes are retained. The complete `make check` passed Go
+tidy/format/vet/lint and race/coverage, then canonical `npm ci`, 138 manifest
+checks, 1,004 UI tests, lint/format/types/build and embedded-asset verification.
+After master adopted GoDI v0.11.0, its dependency-only change was merged
+without changing any UI source or asset bytes. Go tidy/format/vet/lint and the
+full race/coverage pass were repeated successfully; the local clean-consumer
+probe and starter smoke helper tests also pass. The helper run uses the
+available Playwright package for imports only. These review repairs have not
+repeated the Docker/PostgreSQL browser run.
+
 Completion audit follow-up: complete. Named views now show unsaved changes until
 an explicit successful save. Per-view and per-table `knownColumns` snapshots add
 new configured columns while preserving deliberately hidden ones. Legacy
@@ -2020,3 +2038,39 @@ Axios transition, logout and response-fence classification now use its effective
 request, not the root login transition; terminal readiness cannot bypass the
 fence through that spelling. Absolute root identity URLs retain their explicit
 transition behavior. No publication or deployment is part of these fixes.
+
+### Terminal external-recovery refusal (2026-10-31)
+
+The independent recovery document now distinguishes the versioned same-origin
+`403 reauthentication_required` response from a temporary recovery failure.
+Terminal refusal explains that the current session cannot be recovered and
+promotes the existing trusted sign-in link; it does not offer another recovery
+attempt or automatically start a new login. HTTP 503, network failures and
+unrecognized response contracts retain an explicit bounded retry. Successful
+recovery and its two-safe-GET CSRF continuation are unchanged. No business
+request is retained or replayed, and no authentication check is relaxed.
+
+SSO recovery failures emit one structured warning with a source-owned stage,
+HTTP status and public response code. Request context attributes, raw errors,
+URLs, headers, cookies, proofs, session references and user identifiers are not
+copied into this event. Stages distinguish intent, native snapshot, provider
+verification, proof construction, native completion and CSRF operations without
+exposing the underlying credentials. The failure response remains unchanged;
+stage diagnostics do not prove the cause of a previously observed refusal.
+
+Validation: focused document/coordinator and real-DOM Node suites pass (37
+tests). Server diagnostic tests assert response classification and exact log
+fields, including exclusion of synthetic request credentials and context
+identity. Read-only review found no blocking issues; the optional missing
+sign-in-link case now has explicit guidance and coverage.
+
+All `make check` component gates pass: module tidiness, formatting, Go vet,
+Go lint (v2.15.0), full Go race/coverage, clean npm installation, 137 manifest
+tests, 950 unit tests, ESLint, Prettier, the core and positive/negative typed-host
+resource graphs, and production assets/CSS-layer verification. These were not
+one uninterrupted passing invocation: resource-limited child-process failures
+were retained as failed evidence, then the affected resource stages passed
+after reclaiming unused disposable fixtures/cache and increasing the Node heap.
+The final redaction test additionally preserves the log buffer while decoding
+it so the raw-output privacy assertion remains effective. No publication,
+release, deployment or production-session reproduction is included.

@@ -558,8 +558,14 @@ export function useDataGrid({
     }
   }
 
+  // Retained rows belong to the last successful query, not an in-flight/failed one.
+  const selectionDisabled = computed(
+    () => loading.value || !!loadError.value || navigationSuspended.value,
+  )
+
   // Selection handlers
   const toggleSelectAll = (): void => {
+    if (selectionDisabled.value) return
     const ids = items.value
       .map((row) => dataGridRowId(row, config.value))
       .filter((id): id is string | number => id !== undefined)
@@ -574,6 +580,7 @@ export function useDataGrid({
   }
 
   const toggleSelectItem = (id: string | number): void => {
+    if (selectionDisabled.value) return
     if (config.value.workflow && !items.value.some((row) => row.selectionId === id)) return
     const index = selectedItems.value.indexOf(id)
     if (index > -1) selectedItems.value.splice(index, 1)
@@ -631,6 +638,7 @@ export function useDataGrid({
     filterableColumns,
     hasFilters,
     allSelected,
+    selectionDisabled,
 
     // Actions
     loadData,

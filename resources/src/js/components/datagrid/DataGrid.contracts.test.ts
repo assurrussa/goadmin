@@ -775,6 +775,28 @@ describe('DataGrid repaired baseline defects: real table UI and safe rendering',
     expect(element.querySelector('checkbox')).toBeNull()
     expect(element.querySelectorAll('button[role="checkbox"]')).toHaveLength(2)
   })
+  it('disables both real selection controls for retained stale rows', async () => {
+    const onToggleSelectAll = vi.fn()
+    const onToggleSelectItem = vi.fn()
+    const { element, props } = table([row('1', { selectionId: '1' })], {
+      config: config({
+        workflow: { key: 'users', preferencesUrl: '/prefs', exportUrl: '/export' },
+        behaviour: { selectable: true },
+      }),
+      selectionDisabled: true,
+      onToggleSelectAll,
+      onToggleSelectItem,
+    })
+    const controls = Array.from(element.querySelectorAll<HTMLButtonElement>('[role="checkbox"]'))
+    expect(controls).toHaveLength(2)
+    expect(controls.every((control) => control.disabled)).toBe(true)
+    controls.forEach((control) => control.click())
+    expect(onToggleSelectAll).not.toHaveBeenCalled()
+    expect(onToggleSelectItem).not.toHaveBeenCalled()
+    props.selectionDisabled = false
+    await nextTick()
+    expect(controls.every((control) => !control.disabled)).toBe(true)
+  })
   it('clicking the real row Checkbox emits exactly one selection callback', () => {
     const onToggleSelectItem = vi.fn()
     const { element } = table([row()], {

@@ -130,6 +130,117 @@ describe('opt-in workflow lifecycle', () => {
     grid.handleSearch('changed')
     expect(grid.selectedItems.value).toEqual([])
   })
+  it.each(['search', 'filter'] as const)(
+    'blocks stale-row selection immediately during the %s debounce',
+    async (condition) => {
+      const { grid } = mount()
+      await settle()
+      if (condition === 'search') grid.handleSearch('new query')
+      else grid.handleFilterChange({ status: 'active' })
+      expect(grid.loading.value).toBe(true)
+      expect(grid.selectionDisabled.value).toBe(true)
+      grid.toggleSelectAll()
+      expect(grid.selectedItems.value).toEqual([])
+      grid.toggleSelectItem('9007199254740993')
+      expect(grid.selectedItems.value).toEqual([])
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    },
+  )
+  it('cannot select retained rows while a new filter is loading or failed', async () => {
+    const { grid, model } = mount()
+    await settle()
+    let finish!: (value: Response) => void
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
+    const request = grid.loadData({ filters: { status: 'active' } })
+    grid.toggleSelectAll()
+    expect(grid.selectedItems.value).toEqual([])
+    grid.toggleSelectItem('9007199254740993')
+    expect(grid.selectedItems.value).toEqual([])
+    finish(response({}, 500))
+    await request
+    grid.toggleSelectAll()
+    expect(grid.selectedItems.value).toEqual([])
+    grid.toggleSelectItem('9007199254740993')
+    expect(grid.selectedItems.value).toEqual([])
+    model.pendingAction.value = 'delete'
+    await model.executeBulk()
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+  })
+  it('keeps selection blocked until the newest query succeeds, then uses its rows', async () => {
+    const { grid, model } = mount()
+    await settle()
+    const pending: Array<(value: Response) => void> = []
+    fetchMock.mockImplementationOnce(() => new Promise((resolve) => pending.push(resolve)))
+    fetchMock.mockImplementationOnce(() => new Promise((resolve) => pending.push(resolve)))
+    const older = grid.loadData({ filters: { status: 'older' } })
+    const newer = grid.loadData({ filters: { status: 'newer' } })
+    pending[0]!(response(page(['2'])))
+    await older
+    grid.toggleSelectAll()
+    expect(grid.loading.value).toBe(true)
+    expect(grid.selectedItems.value).toEqual([])
+    const latest = {
+      ...page(['3']),
+      meta: { title: '', description: '', filters: { status: 'newer', _search: '' } },
+    }
+    pending[1]!(response(latest))
+    await newer
+    grid.toggleSelectAll()
+    expect(grid.selectedItems.value).toEqual(['3'])
+    fetchMock.mockResolvedValueOnce(response({ results: [{ id: '3', status: 'succeeded' }] }))
+    fetchMock.mockResolvedValueOnce(response(latest))
+    model.pendingAction.value = 'delete'
+    await model.executeBulk()
+    const command = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')
+    expect(JSON.parse(String(command?.[1]?.body))).toEqual({ action: 'delete', ids: ['3'] })
+  })
+  it('never sends old-filter rows selected during loading after the new result arrives', async () => {
+    const { grid, model } = mount()
+    await settle()
+    let finish!: (value: Response) => void
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
+    const request = grid.loadData({ filters: { status: 'active' } })
+    grid.toggleSelectAll()
+    finish(
+      response({
+        ...page(['2']),
+        meta: { title: '', description: '', filters: { status: 'active', _search: '' } },
+      }),
+    )
+    await request
+    model.pendingAction.value = 'delete'
+    await model.executeBulk()
+    expect(grid.items.value.map((row) => row.selectionId)).toEqual(['2'])
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+  })
+  it.each(['loading', 'failed', 'navigation'] as const)(
+    'does not dispatch bulk against a %s grid',
+    async (state) => {
+      const { grid, model } = mount()
+      await settle()
+      grid.toggleSelectAll()
+      if (state === 'loading') grid.loading.value = true
+      if (state === 'failed') grid.loadError.value = 'Load failed'
+      if (state === 'navigation') grid.suspendForNavigation()
+      // Even a caller retaining a stale selection cannot bypass the command guard.
+      grid.selectedItems.value = ['9007199254740993']
+      model.pendingAction.value = 'delete'
+      await model.executeBulk()
+      expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+      grid.toggleSelectAll()
+      expect(grid.selectedItems.value).toEqual(['9007199254740993'])
+    },
+  )
   it('retains local edits on optimistic conflicts and prevents a second overwrite', async () => {
     const { model } = mount()
     await settle()

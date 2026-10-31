@@ -45,6 +45,7 @@
       :sort-order="sortOrder"
       :selected-items="selectedItems"
       :all-selected="allSelected"
+      :selection-disabled="selectionDisabled"
       :show-inline-create="config.behaviour?.inlineCreatable && items.length > 0"
       @sort="handleSort"
       @toggle-select-all="toggleSelectAll"
@@ -196,6 +197,7 @@ const {
   // Computed
   filterableColumns,
   allSelected,
+  selectionDisabled,
 
   // Actions
   handleSearch,

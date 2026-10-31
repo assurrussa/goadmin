@@ -460,6 +460,7 @@ export function useDataGridWorkflow(
     const endpoint = workflow.value?.bulkUrl
     if (
       !endpoint ||
+      grid.selectionDisabled.value ||
       !workflow.value?.bulkActions?.some((value) => value.key === action) ||
       busy.value ||
       !grid.selectedItems.value.length

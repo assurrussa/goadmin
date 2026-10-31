@@ -169,7 +169,8 @@ func (s schema) validateState(state State) error {
 	if len(state.Search) > 4096 || !utf8.ValidString(state.Search) {
 		return errors.New("invalid search")
 	}
-	if state.Limit != 10 && state.Limit != 25 && state.Limit != 50 && state.Limit != 100 {
+	// Match the listing parser, including configured defaults such as 20.
+	if state.Limit < 1 || state.Limit > 100 {
 		return errors.New("invalid page size")
 	}
 	if state.SortOrder != "asc" && state.SortOrder != "desc" {
@@ -313,7 +314,7 @@ func (s schema) reconcile(p Payload) Payload {
 		if st.SortOrder != "asc" && st.SortOrder != "desc" {
 			st.SortOrder = s.defaults.SortOrder
 		}
-		if st.Limit != 10 && st.Limit != 25 && st.Limit != 50 && st.Limit != 100 {
+		if st.Limit < 1 || st.Limit > 100 {
 			st.Limit = s.defaults.Limit
 		}
 	}

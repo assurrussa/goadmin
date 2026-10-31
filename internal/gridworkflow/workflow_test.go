@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -223,6 +224,60 @@ func TestViewValidationRejectsUnsupportedState(t *testing.T) {
 	base.Views[0].State.Limit = 25
 	base.Views = append(base.Views, base.Views[0])
 	require.Error(t, s.validate(base))
+}
+
+func TestSavedViewPreservesListingPageSizes(t *testing.T) {
+	// The list parser accepts every size in 1..100, including the users/roles
+	// default of 20. Saving and loading a view must use that same contract.
+	for limit := 1; limit <= 100; limit++ {
+		t.Run(strconv.Itoa(limit), func(t *testing.T) {
+			cfg := testConfig()
+			cfg.PageSize = 20
+			s := newSchema(cfg)
+			p := Payload{SchemaVersion: 1, Columns: []string{"id"}, Views: []View{{
+				ID: "mine", Name: "Mine", State: State{
+					SortBy: "id", SortOrder: "desc", Limit: limit, Columns: []string{"id"},
+				},
+			}}}
+			require.NoError(t, s.validate(p))
+			require.Equal(t, limit, s.reconcile(p).Views[0].State.Limit)
+		})
+	}
+	for _, limit := range []int{-1, 0, 101} {
+		t.Run("invalid_"+strconv.Itoa(limit), func(t *testing.T) {
+			cfg := testConfig()
+			cfg.PageSize = 20
+			s := newSchema(cfg)
+			state := State{SortBy: "id", SortOrder: "desc", Limit: limit, Columns: []string{"id"}}
+			require.Error(t, s.validateState(state))
+			p := Payload{SchemaVersion: 1, Columns: []string{"id"}, Views: []View{{ID: "mine", Name: "Mine", State: state}}}
+			require.Equal(t, 20, s.reconcile(p).Views[0].State.Limit)
+		})
+	}
+}
+
+func TestPreferencesSaveDefaultTwentyRowView(t *testing.T) {
+	cfg := testConfig()
+	cfg.PageSize = 20 // Built-in users and roles start with this page size.
+	store := &memoryStore{}
+	app, _ := testApp(t, store, cfg, nil)
+	body := `{"version":0,"payload":{"schemaVersion":1,"columns":["id"],"views":[
+  {"id":"mine","name":"Mine","state":{"columns":["id"],"sortBy":"id","sortOrder":"desc","limit":20}}
+  ]}}`
+	req := httptest.NewRequestWithContext(t.Context(), "PUT", "/queues/table-preferences", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	r, err := app.Test(req)
+	require.NoError(t, err)
+	require.NoError(t, r.Body.Close())
+	require.Equal(t, 200, r.StatusCode)
+	require.Equal(t, 1, store.saves)
+
+	r, err = app.Test(httptest.NewRequestWithContext(t.Context(), "GET", "/queues/table-preferences", nil))
+	require.NoError(t, err)
+	defer r.Body.Close()
+	var got Preferences
+	require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
+	require.Equal(t, 20, got.Payload.Views[0].State.Limit)
 }
 
 func TestSelectedExportCallbackErrorsKeepSafeStatus(t *testing.T) {

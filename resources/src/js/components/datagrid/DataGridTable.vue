@@ -14,6 +14,7 @@
             >
               <Checkbox
                 :model-value="allSelected"
+                :disabled="selectionDisabled"
                 :aria-label="t('Выбрать все строки')"
                 class="absolute left-4 top-1/2 -mt-2 sm:left-6"
                 @update:model-value="$emit('toggle-select-all')"
@@ -78,10 +79,11 @@
             >
               <Checkbox
                 :disabled="
-                  config.workflow &&
-                  (!item.selectionId ||
-                    (selectedItems.length >= 100 &&
-                      !selectedItems.includes(getItemId(item, config))))
+                  selectionDisabled ||
+                  (config.workflow &&
+                    (!item.selectionId ||
+                      (selectedItems.length >= 100 &&
+                        !selectedItems.includes(getItemId(item, config)))))
                 "
                 :model-value="selectedItems.includes(getItemId(item, config))"
                 :aria-label="t('Выбрать строку {id}', undefined, { id: getItemId(item, config) })"
@@ -239,6 +241,7 @@ interface Props {
   sortOrder: 'asc' | 'desc'
   selectedItems: (string | number)[]
   allSelected: boolean
+  selectionDisabled?: boolean
 }
 
 // Define props with defaults
@@ -249,6 +252,7 @@ const props = withDefaults(defineProps<Props>(), {
   sortOrder: 'desc',
   selectedItems: () => [],
   allSelected: false,
+  selectionDisabled: false,
 })
 
 // Define emits

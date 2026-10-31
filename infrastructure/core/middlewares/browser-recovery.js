@@ -90,6 +90,17 @@
           }
           return;
         }
+        if (response.status === 403 && body.code === "reauthentication_required") {
+          heading("Нужно войти заново");
+          status.textContent = signIn
+            ? "Эту сессию нельзя восстановить. Войдите заново, чтобы продолжить. Сохранение и отправка не повторялись."
+            : "Эту сессию нельзя восстановить. Откройте страницу входа приложения, чтобы продолжить. Сохранение и отправка не повторялись.";
+          if (signIn) {
+            signIn.hidden = false;
+            signIn.classList.add("primary-action");
+          }
+          return;
+        }
         if (response.status !== 409 || body.code !== "authentication_recovery_continue") break;
       }
       throw new Error("recovery not confirmed");
