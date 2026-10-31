@@ -159,6 +159,7 @@ func Run(
 	app.SetNativeCSRFTokenProvider(csrfProvider)
 	app.SetCapabilities(cfg.Capabilities)
 	app.SetCommandTransaction(deps.System.CommandTransaction)
+	app.SetGridWorkflowDependencies(deps.System.GridDB, deps.System.AdminActionAudit)
 	app.SetPermissionDefinitions(options.permissionDefinitions)
 	app.SetUsersFeatureDependencies(deps.Repos.UserRepo, deps.System.AdminAuthService)
 

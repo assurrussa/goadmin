@@ -62,6 +62,12 @@ func TestUserCommandUsesManagedSQLExecutor(t *testing.T) {
 	require.Contains(t, executor.query, "UPDATE users SET")
 	require.Contains(t, executor.query, "version = version + 1")
 	require.Equal(t, int64(42), executor.args[len(executor.args)-1])
+	require.NoError(t, repo.SoftDeleteByID(ctx, 42))
+	require.Equal(t, 3, executor.calls)
+	require.Contains(t, executor.query, "UPDATE users SET deleted_at")
+	require.NoError(t, repo.RestoreByID(ctx, 42))
+	require.Equal(t, 4, executor.calls)
+	require.Contains(t, executor.query, "deleted_at")
 }
 
 func TestUserListCountAndRowsPreserveBoundSearchAndSort(t *testing.T) {

@@ -15,7 +15,7 @@
 
     <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
       <!-- Поиск -->
-      <div v-if="config.behaviour?.searchable" class="relative">
+      <div v-if="searchable" class="relative">
         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
           <Search class="h-4 w-4 text-text-tertiary" />
         </div>
@@ -64,6 +64,7 @@
 
 <script setup lang="ts">
 import { t } from '@/i18n'
+import { computed } from 'vue'
 
 import type { Config, Meta } from '@/composables/useDataGrid.ts'
 import { Download, Plus, RefreshCcw, Search } from 'lucide-vue-next'
@@ -86,6 +87,13 @@ const props = withDefaults(defineProps<Props>(), {
   title: '',
   description: '',
 })
+
+// Keep legacy explicit flags authoritative; current API responses advertise searchMode.
+const searchable = computed(
+  () =>
+    props.config.behaviour?.searchable ??
+    ['server', 'client'].includes(props.config.behaviour?.searchMode ?? ''),
+)
 
 // Define emits
 defineEmits<{

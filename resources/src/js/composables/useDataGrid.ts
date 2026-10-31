@@ -12,6 +12,7 @@ import {
 
 // Type definitions
 interface DataItem {
+  selectionId?: string
   item: DataItemValue
   actions: Array<DataItemAction>
   values?: Record<string, unknown>
@@ -39,7 +40,22 @@ interface Column {
   badges?: Record<string | number, { label: string; variant: string }>
 }
 
+interface GridWorkflow {
+  key: string
+  preferencesUrl: string
+  exportUrl: string
+  bulkUrl?: string
+  bulkActions?: Array<{ key: string; label: string }>
+}
+
+export const dataGridRowId = (row: DataItem, config: Config): string | number | undefined => {
+  if (config.workflow) return row.selectionId
+  const id = row.item[config.ui?.idKey || 'id']
+  return typeof id === 'string' || typeof id === 'number' ? id : undefined
+}
+
 interface Config {
+  workflow?: GridWorkflow
   routePath?: string
   columns?: Column[]
   ui?: {
@@ -50,6 +66,7 @@ interface Config {
     idKey?: string
   }
   behaviour?: {
+    searchMode?: 'server' | 'client' | 'none'
     searchable?: boolean
     creatable?: boolean
     inlineCreatable?: boolean
@@ -218,6 +235,9 @@ export function useDataGrid({
       cancelPendingQuery()
       loading.value = navigationSuspended.value
       loadError.value = null
+      selectedItems.value = []
+      items.value = []
+      if (config.value.workflow) config.value = {}
     },
     { flush: 'sync' },
   )
@@ -233,8 +253,8 @@ export function useDataGrid({
     const selected = new Set(selectedItems.value)
     return (
       items.value.length > 0 &&
-      items.value.every(({ item }) => {
-        const id = item[config.value.ui?.idKey || 'id']
+      items.value.every((row) => {
+        const id = dataGridRowId(row, config.value)
         return (typeof id === 'string' || typeof id === 'number') && selected.has(id)
       })
     )
@@ -242,7 +262,8 @@ export function useDataGrid({
 
   const hydrateResponse = (result: ApiResponse): void => {
     items.value = result.data || []
-    selectedItems.value = []
+    if (!result.config?.workflow || result.config.workflow.key !== config.value.workflow?.key)
+      selectedItems.value = []
     metaInfo.value = result.meta || null
     pagination.value = result.meta?.pagination || result.pagination || null
     config.value = result.config || {}
@@ -473,11 +494,13 @@ export function useDataGrid({
   }
 
   const handleSearch = (query: string): void => {
+    selectedItems.value = []
     searchQuery.value = query
     scheduleQuery(500)
   }
 
   const handleFilterChange = (newFilters: Record<string, unknown>): void => {
+    selectedItems.value = []
     filters.value = ordinaryFilters({ ...filters.value, ...newFilters })
     scheduleQuery(300)
   }
@@ -537,28 +560,41 @@ export function useDataGrid({
 
   // Selection handlers
   const toggleSelectAll = (): void => {
-    if (allSelected.value) {
-      selectedItems.value = []
-    } else {
-      selectedItems.value = [
-        ...new Set(
-          items.value
-            .map((item) => item.item[config.value.ui?.idKey || 'id'])
-            .filter(
-              (id): id is string | number => typeof id === 'string' || typeof id === 'number',
-            ),
-        ),
-      ]
+    const ids = items.value
+      .map((row) => dataGridRowId(row, config.value))
+      .filter((id): id is string | number => id !== undefined)
+    if (!config.value.workflow) {
+      selectedItems.value = allSelected.value ? [] : [...new Set(ids)]
+      return
     }
+    const page = new Set(ids)
+    selectedItems.value = allSelected.value
+      ? selectedItems.value.filter((id) => !page.has(id))
+      : [...new Set([...selectedItems.value, ...ids])].slice(0, 100)
   }
 
   const toggleSelectItem = (id: string | number): void => {
+    if (config.value.workflow && !items.value.some((row) => row.selectionId === id)) return
     const index = selectedItems.value.indexOf(id)
-    if (index > -1) {
-      selectedItems.value.splice(index, 1)
-    } else {
+    if (index > -1) selectedItems.value.splice(index, 1)
+    else if (!config.value.workflow || selectedItems.value.length < 100)
       selectedItems.value.push(id)
-    }
+  }
+
+  const clearSensitiveData = (): void => {
+    requestSequence++
+    abortActiveRequest()
+    cancelPendingQuery()
+    items.value = []
+    selectedItems.value = []
+    metaInfo.value = null
+    pagination.value = null
+    config.value = {}
+    filters.value = {}
+    searchQuery.value = ''
+    hasLoaded.value = false
+    loading.value = false
+    navigationSuspended.value = true
   }
 
   // Lifecycle
@@ -575,6 +611,7 @@ export function useDataGrid({
   })
 
   return {
+    clearSensitiveData,
     // State
     metaInfo,
     loading,

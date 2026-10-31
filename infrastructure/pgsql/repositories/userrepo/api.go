@@ -222,7 +222,7 @@ func (r *Repo) SoftDeleteByID(ctx context.Context, id int64) error {
 			"deleted_at": time.Now(),
 		}).Where(squirrel.Eq{"id": id})
 
-	if _, err := r.pgsql.DB().Execx(ctx, op, sqlBuilder); err != nil {
+	if _, err := admintx.Wrap(r.pgsql.DB()).Execx(ctx, op, sqlBuilder); err != nil {
 		return fmt.Errorf("%s: error soft delete: %w", op, outbox.ErrorTransform(err))
 	}
 
@@ -243,7 +243,7 @@ func (r *Repo) RestoreByID(ctx context.Context, id int64) error {
 			"updated_at": time.Now(), //nolint:goconst // required
 		}).Where(squirrel.Eq{"id": id})
 
-	if _, err := r.pgsql.DB().Execx(ctx, op, sqlBuilder); err != nil {
+	if _, err := admintx.Wrap(r.pgsql.DB()).Execx(ctx, op, sqlBuilder); err != nil {
 		return fmt.Errorf("%s: error restore: %w", op, outbox.ErrorTransform(err))
 	}
 

@@ -18,3 +18,9 @@ test('uses an explicit slot render function for the persistent admin layout', ()
   assert.match(appEntry, /mod\.default\.layout = renderAdminLayout/)
   assert.doesNotMatch(appEntry, /mod\.default\.layout = AdminLayout as unknown as LayoutComponent/)
 })
+
+test('installs grid history provenance eagerly before Inertia initializes lazy pages', () => {
+  const tracker = appEntry.indexOf("import '@/components/datagrid/historyRestoration'")
+  assert.ok(tracker >= 0, 'tracker must be imported by the eager app entrypoint')
+  assert.ok(tracker < appEntry.indexOf('createInertiaApp({'))
+})

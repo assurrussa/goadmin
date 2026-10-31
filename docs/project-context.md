@@ -170,6 +170,43 @@ per-admin browser opt-in for visible-only minute refresh. See
 [dashboard cards](dashboard.md) for the public callback, permission and lifecycle
 contract. The supported package list and database schema are unchanged.
 
+## Personal table workflows
+
+The assembled runtime opts users, admins, roles, permissions, active jobs and
+failed jobs into personal table workflows. Other grids retain their existing
+behavior unless explicitly configured. One `goadmin_admin_preferences` table
+stores versioned JSONB by administrator and fixed resource namespace; native
+session identity owns every read/write. CAS conflicts do not overwrite another
+tab. Payloads are limited to 64 KiB and 20 private named views per resource.
+
+Views capture search, filters, sorting, page size and ordered visible columns;
+rows, page number and selected IDs are never persisted. Explicit URL/history
+state takes priority over a default view. Selection retains up to 100 exact
+string IDs across paging/sorting, and resets on query/view/resource/session
+changes. New read-only CSV exports use current visible columns and the existing
+decorator masking: filtered up to 10,000 rows, or selected up to 100. The original
+`/users/export` retains its fixed legacy schema.
+The owned HTTP server uses a bounded 16 KiB read/header buffer so a selected
+export of 100 UUIDs fits alongside the native session cookie.
+
+Bulk user delete/restore excludes active administrators. Each item joins
+canonical status, projection and audit in one transaction; subject locks order
+membership creation against status changes. Creating new membership rechecks
+current active status. Queue commands retain transactional audits, and live
+leased jobs cannot be removed. Partial results distinguish success, ineligible,
+failure, unknown and unprocessed; unknown results stop the batch without replay.
+Role preview suppresses mutation metadata and native mutation fences still apply.
+
+Each saved view and the table preferences carry their own `knownColumns`
+snapshot. Reconciliation drops removed fields and appends newly configured
+columns in configuration order while retaining intentionally hidden fields.
+Legacy documents without a snapshot adopt the current schema as a baseline;
+their hidden columns remain hidden. Reads never persist this reconciliation.
+Named views show unsaved changes until an explicit successful save, including
+after a save conflict. Queue pages refresh authoritative counts through guarded,
+uncached `GET /queues/stats` after confirmed commands. Failed refreshes retain
+the previous values with a stale-data message; session changes discard them.
+
 ## Record editing navigation
 
 Users and administrators share an internal edit-form layout. Save stays on the

@@ -102,9 +102,11 @@ export function createSessionCoordinator(options: SessionCoordinatorOptions = {}
   let controller: AbortController | null = null
   let timer: ReturnType<typeof setTimeout> | undefined
   let disposeEvents: (() => void) | undefined
+  const stateListeners = new Set<(state: SessionState) => void>()
   const setState = (next: SessionState) => {
     state = next
     options.onState?.(next)
+    stateListeners.forEach((listener) => listener(next))
   }
   const terminal = () =>
     state === 'reauthentication_required' ||
@@ -360,6 +362,12 @@ export function createSessionCoordinator(options: SessionCoordinatorOptions = {}
     }
   }
   return {
+    subscribe: (listener: (state: SessionState) => void) => {
+      stateListeners.add(listener)
+      return () => {
+        stateListeners.delete(listener)
+      }
+    },
     ensure,
     repair: () => {
       if (!enabled) return Promise.resolve()

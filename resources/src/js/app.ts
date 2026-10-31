@@ -1,5 +1,7 @@
 // Establish the core layer order before component and extension styles.
 import '../css/app.css'
+// Install history provenance before Inertia can restore a lazily loaded grid page.
+import '@/components/datagrid/historyRestoration'
 import { initLocale } from '@/i18n'
 import { createApp, h, defineComponent, Fragment, ref } from 'vue'
 import { createInertiaApp, router, usePage } from '@inertiajs/vue3'

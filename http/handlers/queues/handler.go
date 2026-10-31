@@ -2,10 +2,8 @@ package queues
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
@@ -15,6 +13,7 @@ import (
 	outbox "github.com/assurrussa/goadmin/infrastructure/outbox"
 	"github.com/assurrussa/goadmin/infrastructure/pgsql/repositories/adminactionauditrepo"
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
+	"github.com/assurrussa/goadmin/internal/gridworkflow"
 	"github.com/assurrussa/goadmin/shared"
 )
 
@@ -33,6 +32,8 @@ type jobsFailedRepository interface {
 	GetByID(ctx context.Context, id outbox.JobID) (outbox.JobFailedModel, error)
 	CountExact(ctx context.Context) (int64, error)
 }
+
+const jobsKey = "jobs"
 
 type Handler struct {
 	adminApp       *adminapp.App
@@ -58,7 +59,7 @@ func NewHandler(
 
 	jobsGrid := datagrid.NewHandler(datagrid.FilterConfig[outbox.JobModel]{
 		RoutePath:        jobsRoute,
-		Entity:           "jobs",
+		Entity:           jobsKey,
 		Title:            "Очередь задач",
 		Repository:       jobsRepo,
 		DefaultSort:      "createdAt", //nolint:goconst // required
@@ -79,7 +80,7 @@ func NewHandler(
 			{Key: "payloadPreview", Label: "Payload", Type: "text"}, //nolint:goconst // required
 		},
 		Actions: []datagrid.Action[outbox.JobModel]{
-			{Key: "delete", Label: "Удалить", Icon: "trash", Variant: "danger"},
+			{Key: queueDeleteAction, Label: "Удалить", Icon: "trash", Variant: "danger"},
 		},
 		RowDecorators: []datagrid.RowDecorator[outbox.JobModel]{
 			datagrid.NewRowDecorator(
@@ -127,8 +128,8 @@ func NewHandler(
 			{Key: "payloadPreview", Label: "Payload", Type: "text"},
 		},
 		Actions: []datagrid.Action[outbox.JobFailedModel]{
-			{Key: "retry", Label: "Повторить", Icon: "arrow-path", Variant: "primary"},
-			{Key: "delete", Label: "Удалить", Icon: "trash", Variant: "danger"},
+			{Key: queueRetryAction, Label: "Повторить", Icon: "arrow-path", Variant: "primary"},
+			{Key: queueDeleteAction, Label: "Удалить", Icon: "trash", Variant: "danger"},
 		},
 		RowDecorators: []datagrid.RowDecorator[outbox.JobFailedModel]{
 			datagrid.NewRowDecorator(
@@ -168,17 +169,25 @@ func (h *Handler) RegisterGroupRoutes(route fiber.Router, _ ...fiber.Handler) {
 	guarded := route.Group(h.routePath, h.adminApp.Guard(integrationroles.PermissionDomainQueues, integrationroles.PermissionActionRead)) //nolint:lll // required
 
 	guarded.Get("", h.Index)
+	guarded.Get("/stats", gridworkflow.APIHandler(h.Stats))
 	guarded.Get("/jobs", h.JobsPage)
 	guarded.Get("/jobs-failed", h.FailedPage)
 
 	jobs := guarded.Group("/jobs")
+	h.registerJobsWorkflow(jobs)
 	jobs.Get("/data", h.jobsGrid.HandleData)
 	jobs.Post("/data", h.jobsGrid.HandleData)
+	jobs.Post("/bulk",
+		h.adminApp.Guard(integrationroles.PermissionDomainQueues, integrationroles.PermissionActionDelete),
+		gridworkflow.APIHandler(h.BulkJobs),
+	)
 	jobs.Delete(":id", h.adminApp.Guard(integrationroles.PermissionDomainQueues, integrationroles.PermissionActionDelete), h.DeleteJob) //nolint:lll // required
 
 	failed := guarded.Group("/jobs-failed")
+	h.registerFailedWorkflow(failed)
 	failed.Get("/data", h.jobsFailedGrid.HandleData)
 	failed.Post("/data", h.jobsFailedGrid.HandleData)
+	failed.Post("/bulk", h.bulkFailedGuard, gridworkflow.APIHandler(h.BulkFailedJobs))
 	failed.Delete(
 		":id",
 		h.adminApp.Guard(integrationroles.PermissionDomainQueues, integrationroles.PermissionActionDelete),
@@ -202,7 +211,7 @@ func (h *Handler) Index(c fiber.Ctx) error {
 		"jobsApiUrl":   h.jobsRoute,
 		"failedApiUrl": h.jobsFailed,
 		"stats": map[string]any{
-			"jobs":   jobsCount,
+			jobsKey:  jobsCount,
 			"failed": failedCount,
 		},
 	})
@@ -217,6 +226,7 @@ func (h *Handler) JobsPage(c fiber.Ctx) error {
 	return h.adminApp.HTTPManager().Render(c, "queues/ActivePage", map[string]any{
 		"title":       "Активные задачи",
 		"jobsApiUrl":  h.jobsRoute,
+		"statsApiUrl": h.routePath + "/stats",
 		"jobsCount":   jobsCount,
 		"failedCount": failedCount,
 	})
@@ -231,6 +241,7 @@ func (h *Handler) FailedPage(c fiber.Ctx) error {
 	return h.adminApp.HTTPManager().Render(c, "queues/FailedPage", map[string]any{
 		"title":        "DLQ / Ошибки",
 		"failedApiUrl": h.jobsFailed,
+		"statsApiUrl":  h.routePath + "/stats",
 		"jobsCount":    jobsCount,
 		"failedCount":  failedCount,
 	})
@@ -244,17 +255,9 @@ func (h *Handler) DeleteJob(c fiber.Ctx) error {
 	if h.auditWriter == nil {
 		return errors.New("admin action audit writer is required")
 	}
-	record := h.newAuditRecord(c, adminactionauditrepo.ActionQueueJobDeleted, "queue_job", id.String(), "")
-	err = h.adminApp.TxManager().RunInTx(c, func(ctx context.Context) error {
-		affected, err := h.jobsRepo.DeleteJob(ctx, id)
-		if err != nil {
-			return fmt.Errorf("delete job %d: %w", id, err)
-		}
-		if affected != 1 {
-			return outbox.ErrNoJobs
-		}
-		return h.auditWriter.RecordAdminAction(ctx, record)
-	})
+	record := h.newAuditRecord(c, adminactionauditrepo.ActionQueueJobDeleted, "queue_job", id.String())
+	err = h.deleteJob(c, id, record)
+
 	if errors.Is(err, outbox.ErrNoJobs) {
 		return fiber.NewError(fiber.StatusNotFound, "Задача не найдена")
 	}
@@ -275,17 +278,9 @@ func (h *Handler) DeleteFailedJob(c fiber.Ctx) error {
 	if h.auditWriter == nil {
 		return errors.New("admin action audit writer is required")
 	}
-	record := h.newAuditRecord(c, adminactionauditrepo.ActionQueueFailedDelete, "queue_failed_job", id.String(), "")
-	err = h.adminApp.TxManager().RunInTx(c, func(ctx context.Context) error {
-		affected, err := h.jobsFailedRepo.Delete(ctx, id)
-		if err != nil {
-			return fmt.Errorf("delete failed job %d: %w", id, err)
-		}
-		if affected != 1 {
-			return outbox.ErrNoJobs
-		}
-		return h.auditWriter.RecordAdminAction(ctx, record)
-	})
+	record := h.newAuditRecord(c, adminactionauditrepo.ActionQueueFailedDelete, "queue_failed_job", id.String())
+	err = h.deleteFailedJob(c, id, record)
+
 	if errors.Is(err, outbox.ErrNoJobs) {
 		return fiber.NewError(fiber.StatusNotFound, "Запись не найдена в DLQ")
 	}
@@ -305,43 +300,9 @@ func (h *Handler) RetryFailedJob(c fiber.Ctx) error {
 	if h.auditWriter == nil {
 		return errors.New("admin action audit writer is required")
 	}
-	record := h.newAuditRecord(c, adminactionauditrepo.ActionQueueFailedRetry, "queue_failed_job", id.String(), "")
+	record := h.newAuditRecord(c, adminactionauditrepo.ActionQueueFailedRetry, "queue_failed_job", id.String())
 
-	availableAt := time.Now()
-
-	err = h.adminApp.TxManager().RunInTx(c, func(ctx context.Context) error {
-		failedJob, err := h.jobsFailedRepo.GetByID(ctx, id)
-		if err != nil {
-			return fmt.Errorf("load failed job %d: %w", id, err)
-		}
-
-		affected, err := h.jobsFailedRepo.Delete(ctx, id)
-		if err != nil {
-			return fmt.Errorf("cleanup failed job: %w", err)
-		}
-		if affected != 1 {
-			return outbox.ErrNoJobs
-		}
-
-		newJobID := outbox.NewJobID()
-		_, err = h.jobsRepo.Create(ctx, outbox.JobModel{
-			ID:            newJobID,
-			Queue:         ensureQueue(failedJob.Queue),
-			Name:          failedJob.Name,
-			SchemaVersion: failedJob.SchemaVersion,
-			Payload:       failedJob.Payload,
-			Attempts:      0,
-			ReservedAt:    sql.NullTime{},
-			AvailableAt:   availableAt,
-			CreatedAt:     availableAt,
-		})
-		if err != nil {
-			return fmt.Errorf("create retry job: %w", err)
-		}
-
-		record.RelatedTargetID = newJobID.String()
-		return h.auditWriter.RecordAdminAction(ctx, record)
-	})
+	_, err = h.retryFailedJob(c, id, record)
 	if err != nil {
 		if errors.Is(err, outbox.ErrNoJobs) {
 			return fiber.NewError(fiber.StatusNotFound, "Задача не найдена в DLQ")
@@ -358,17 +319,15 @@ func (h *Handler) newAuditRecord(
 	action string,
 	targetType string,
 	targetID string,
-	relatedTargetID string,
 ) adminactionauditrepo.Record {
 	actor := shared.MustGetAdminAuth(c)
 	return adminactionauditrepo.Record{
-		ActorAdminID:    actor.ID,
-		ActorSubjectID:  actor.AuthSubjectID().String(),
-		Action:          action,
-		TargetType:      targetType,
-		TargetID:        targetID,
-		RelatedTargetID: relatedTargetID,
-		RequestID:       requestid.FromContext(c),
+		ActorAdminID:   actor.ID,
+		ActorSubjectID: actor.AuthSubjectID().String(),
+		Action:         action,
+		TargetType:     targetType,
+		TargetID:       targetID,
+		RequestID:      requestid.FromContext(c),
 	}
 }
 
@@ -379,6 +338,16 @@ func (h *Handler) getID(c fiber.Ctx) (outbox.JobID, error) {
 	}
 
 	return outbox.Parse[outbox.JobID](id)
+}
+
+// Stats refreshes authoritative counters after commands without replacing page state.
+func (h *Handler) Stats(c fiber.Ctx) error {
+	c.Set("Cache-Control", "no-store")
+	jobs, failed, err := h.loadStats(c)
+	if err != nil {
+		return err
+	}
+	return c.JSON(fiber.Map{jobsKey: jobs, "failed": failed})
 }
 
 func (h *Handler) loadStats(ctx context.Context) (jobsCount int64, failedCount int64, errReturn error) {

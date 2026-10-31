@@ -143,7 +143,8 @@ func (r *Repo) DeleteJob(ctx context.Context, jobID outbox.JobID) (int64, error)
 
 	sqlBuilder := outbox.BuilderDollar().
 		Delete(tableName).
-		Where(squirrel.Eq{"id": jobID})
+		Where(squirrel.Eq{"id": jobID}).
+		Where("(reserved_at IS NULL OR reserved_at <= NOW())")
 
 	result, err := r.pgsql.DB().Execx(ctx, op, sqlBuilder)
 	if err != nil {

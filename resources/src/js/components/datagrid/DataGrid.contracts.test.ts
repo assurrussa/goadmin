@@ -211,6 +211,34 @@ describe('DataGrid passing contracts: exact public action callbacks', () => {
 })
 
 describe('DataGridHeader passing contracts', () => {
+  it.each([
+    [{ searchMode: 'server' }, true],
+    [{ searchMode: 'client' }, true],
+    [{ searchMode: 'none' }, false],
+    [{ searchMode: 'server', searchable: false }, false],
+    [{ searchMode: 'none', searchable: true }, true],
+    [{}, false],
+  ] as const)('maps API behaviour %j to search visibility %s', (behaviour, visible) => {
+    const { element } = mount(DataGridHeader, {
+      config: config({ behaviour }),
+      meta: null,
+      searchQuery: '',
+    })
+    expect(element.querySelector('input') !== null).toBe(visible)
+  })
+  it('searches through the real grid using the server searchMode API shape', async () => {
+    vi.useFakeTimers()
+    const { element } = grid(fixture({ config: config({ behaviour: { searchMode: 'server' } }) }))
+    await settle()
+    const input = element.querySelector('input')!
+    expect(input).not.toBeNull()
+    input.value = 'operator query'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await vi.advanceTimersByTimeAsync(500)
+    await settle()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(query().get('search')).toBe('operator query')
+  })
   it('uses meta title/description and configured create label', () => {
     const { element } = mount(DataGridHeader, {
       meta: { title: 'Title', description: 'Description' },

@@ -16,6 +16,7 @@ import (
 	datagrid "github.com/assurrussa/goadmin/infrastructure/core/datagrid"
 	goinertia "github.com/assurrussa/goadmin/infrastructure/inertia"
 	outbox "github.com/assurrussa/goadmin/infrastructure/outbox"
+	"github.com/assurrussa/goadmin/infrastructure/pgsql/repositories/adminactionauditrepo"
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 	"github.com/assurrussa/goadmin/internal/envs"
 	"github.com/assurrussa/goadmin/services/adminservice"
@@ -98,7 +99,17 @@ type App struct {
 	capabilities            map[string]bool
 	users                   UserRepo
 	userSubjects            SubjectEmailStore
+	gridDB                  outbox.StoragePgsqlDBEngine
+	gridAudit               adminactionauditrepo.Writer
 }
+
+// SetGridWorkflowDependencies binds optional built-in table persistence.
+func (a *App) SetGridWorkflowDependencies(db outbox.StoragePgsqlDBEngine, audit adminactionauditrepo.Writer) {
+	a.gridDB, a.gridAudit = db, audit
+}
+
+func (a *App) GridDB() outbox.StoragePgsqlDBEngine    { return a.gridDB }
+func (a *App) GridAudit() adminactionauditrepo.Writer { return a.gridAudit }
 
 func Must(opts Options) *App {
 	app, err := NewApp(opts)

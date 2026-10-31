@@ -1,5 +1,91 @@
 # Implementation Notes
 
+## Personal table workflows (2026-10-31)
+
+Completion audit follow-up: complete. Named views now show unsaved changes until
+an explicit successful save. Per-view and per-table `knownColumns` snapshots add
+new configured columns while preserving deliberately hidden ones. Legacy
+payloads establish the current baseline without unhiding columns. Queue pages
+refresh server counts after confirmed commands, retain stale counts on refresh
+failure, and discard them when the session changes.
+
+Four PostgreSQL race tests execute actual HTTP user bulk versus membership
+creation in both orders, real worker claim versus deletion in both orders,
+concurrent failed-job retries, and rollback after an actual audit INSERT failure.
+They passed with `go test -race -tags=integration`; lock waiters are observed
+through PostgreSQL rather than inferred from goroutine start. The same command
+flags passed the complete `internal/gridworkflow` and `migrations` packages.
+Independent source review has no remaining findings.
+
+Final verification: `make check` passed Go tidy/format/vet/lint and the full
+race/coverage pass. Its resource phase encountered the existing intermittent
+Vite asset-test HTTP parser failure (`HPE_INVALID_CONSTANT`); the complete
+resource gate then passed via `make resources`: 133 manifest checks, 995 UI
+tests, lint/format/types/build and embedded-asset verification. The passed Go
+checks were reused. `make externalconsumer-local` and `make starter-smoke-test`
+also passed. Dependencies are unchanged.
+
+Fresh full `make starter-smoke` run `20261031t091844z-30539782` passed all ten
+scenario groups for both presentation packs. The expanded matrix proves both
+CSV modes on all six grids, native CSRF/origin and role-preview rejection across
+11 mutation cases, RBAC denial, forged-input rejection, owner isolation,
+view create/update/rename/delete and dirty feedback, restoration after real
+logout/login, and server-derived queue counters after bulk commands. Existing
+selection, conflict, partial-result and locale/theme/keyboard checks also pass.
+Both browser error lists are empty; desktop EN/light and mobile RU/dark
+screenshots were visually reviewed. Reports and earlier failed attempts remain
+under `output/playwright/starter-smoke/`. Owned stacks, volumes and the isolated
+integration PostgreSQL container were removed. No publication or production
+deployment was performed.
+
+Accepted scope: all six built-in DataGrid tables (users, admins, roles,
+permissions, active jobs, failed jobs) gain personal server-owned views, column
+preferences and visible-column CSV exports (filtered up to 10,000; selected up
+to 100). Explicit selection survives paging/sorting, resets on query/view/owner
+changes and never persists. Bulk changes cover users delete/restore and jobs
+delete/retry only; active administrators are excluded from user bulk changes.
+Each item owns a transaction and a result; unknown outcomes are never replayed.
+
+Storage: one `goadmin_admin_preferences` table, keyed by admin and namespace,
+versioned JSONB (64 KiB, 20 named views). Views capture conditions, page size and
+columns, never rows, current page or selection. Explicit URL/history wins over
+the default view. CAS conflicts preserve local edits. Logout/session changes
+discard page work and late responses.
+
+Prerequisites: canonical user status and projection join one transaction;
+membership provisioning and user mutations lock subject before membership and
+projection; live leased jobs cannot be deleted. Existing audit and native
+CSRF/role-preview restrictions remain authoritative. Optional metadata preserves
+legacy grids and the original `/users/export` contract.
+
+Implemented shared backend storage/export, the shared Vue workflow, all six
+built-in registrations and safe commands. No new dependencies or public package
+paths were introduced. Generated embedded assets and public consumer coverage
+are updated. Production Inertia error handling is covered explicitly: companion
+API errors retain sanitized JSON 400/401/409/413/500 rather than redirecting.
+
+Initial validation: `make check` passed Go race/coverage, 133 manifest checks,
+971 UI tests, lint/format/types/build and embedded-asset verification.
+`make externalconsumer-local` passed on the final source. Real PostgreSQL tests
+proved CAS concurrency, owner/namespace isolation, cascade deletion, canonical
+and projection rollback, provisioning serialization, and live-lease protection.
+Independent security/data/lifecycle review has no remaining findings.
+
+Full starter run `20261031t082906z-f10c0302` passed ten scenario groups for each
+presentation pack, including real saved views/columns, default versus explicit
+URL, cross-page selection/cap100, selected/filtered CSV, real second-tab 409,
+user delete/restore with administrator skip, and queue delete/retry. Both browser
+error lists are empty. Desktop EN/light and mobile RU/dark screenshots were
+visually reviewed. Owned stacks, volumes and the extra integration PostgreSQL
+container were removed.
+
+Real acceptance exposed and corrected lazy history provenance, missing search
+visibility for the actual searchMode wire property, and Inertia redirecting API
+errors. A transport regression reproduced HTTP 431 for 100 UUIDs plus a cookie;
+a bounded 16 KiB request buffer fixes it. Initial failed runs remain separate
+evidence; final acceptance uses freshly built images and isolated data.
+No publication or production deployment was performed.
+
 ## Dashboard review follow-up (2026-10-29)
 
 Goal: retain the complete last successful card content, including a status-only

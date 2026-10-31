@@ -44,11 +44,36 @@ func (r *Repo) ProvisionAdminMembership(
 	account goauth.Account,
 	publicID identity.UserID,
 ) (int64, error) {
+	var id int64
+	provision := func(txCtx context.Context) error {
+		var err error
+		id, err = r.provisionLockedMembership(txCtx, account, publicID)
+		return err
+	}
+	if _, managed := admintx.Executor(ctx); managed {
+		err := provision(ctx)
+		return id, err
+	}
+	err := r.trxManager.RunInTx(ctx, provision)
+	return id, err
+}
+
+func (r *Repo) provisionLockedMembership(ctx context.Context, account goauth.Account, publicID identity.UserID) (int64, error) {
 	if account.IsZero() {
 		return 0, goauth.ErrAccountNotFound
 	}
 	if publicID.IsZero() {
 		return 0, errors.New("invalid admin public id")
+	}
+	// All membership creation and user status commands serialize on the subject,
+	// before inspecting membership. The supplied account may be stale.
+	var status string
+	if err := admintx.Wrap(r.pgsql.DB()).ScanOne(ctx, "admin.membership.lock", &status,
+		`SELECT status FROM auth_subjects WHERE id = $1 FOR UPDATE`, account.Subject.ID); err != nil {
+		return 0, fmt.Errorf("lock admin subject: %w", err)
+	}
+	if status != string(goauth.SubjectStatusActive) {
+		return 0, goauth.ErrMembershipDenied
 	}
 
 	existing, err := r.GetBySubjectID(ctx, account.Subject.ID)

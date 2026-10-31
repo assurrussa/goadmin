@@ -100,7 +100,10 @@ func New(opts Options) (*Server, error) {
 		ServerHeader: opts.serverHeader, CaseSensitive: opts.caseSensitive,
 		StrictRouting: opts.strictRouting, ErrorHandler: opts.errHandler,
 		BodyLimit: opts.bodyLimit, JSONEncoder: json.Marshal, JSONDecoder: json.Unmarshal,
-		ReadTimeout: opts.readTimeout, WriteTimeout: opts.writeTimeout, IdleTimeout: opts.idleTimeout,
+		// A bounded selection of 100 UUIDs plus the native session cookie exceeds
+		// Fiber's 4 KiB default request-header buffer.
+		ReadBufferSize: 16 * 1024,
+		ReadTimeout:    opts.readTimeout, WriteTimeout: opts.writeTimeout, IdleTimeout: opts.idleTimeout,
 	})
 
 	// A managed WebSocket handler closes the underlying hijacked connection to

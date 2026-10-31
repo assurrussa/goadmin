@@ -18,6 +18,7 @@ import (
 	datagrid "github.com/assurrussa/goadmin/infrastructure/core/datagrid"
 	goinertia "github.com/assurrussa/goadmin/infrastructure/inertia"
 	authcore "github.com/assurrussa/goadmin/internal/auth"
+	"github.com/assurrussa/goadmin/internal/gridworkflow"
 )
 
 //go:generate toolsmocks
@@ -195,11 +196,14 @@ func NewHandler(
 		Actions: []datagrid.Action[authcore.Profile]{
 			{Key: "view", Label: "Просмотр", Icon: "eye", Variant: "secondary"},
 			{Key: "edit", Label: "Редактировать", Icon: "edit", Variant: "primary"},
-			{Key: "delete", Label: "Удалить", Icon: "trash", Variant: "danger", CanView: func(_ context.Context, u authcore.Profile) bool {
-				return !u.DeletedAt.Valid
-			}},
 			{
-				Key:     "restore",
+				Key: userDeleteAction, Label: "Удалить", Icon: "trash", Variant: "danger",
+				CanView: func(_ context.Context, u authcore.Profile) bool {
+					return !u.DeletedAt.Valid
+				},
+			},
+			{
+				Key:     userRestoreAction,
 				Label:   "Восстановить",
 				Icon:    "rotate",
 				Variant: "info",
@@ -276,9 +280,14 @@ func phoneOrDash(phone *int64) string {
 
 func (h *Handler) RegisterGroupRoutes(route fiber.Router, _ ...fiber.Handler) {
 	groupGuard := route.Group(h.routePath, h.adminApp.Guard(authcore.PermissionDomainUsers, authcore.PermissionActionRead)) //nolint:lll // required
+	h.registerWorkflow(groupGuard)
 	h.dataGridHandler.RegisterRoutes(groupGuard, "")
 	groupGuard.Get("export", h.Export)
 	groupGuard.Post("refresh", h.Refresh)
+	groupGuard.Post("bulk",
+		h.adminApp.Guard(authcore.PermissionDomainUsers, authcore.PermissionActionDelete),
+		gridworkflow.APIHandler(h.Bulk),
+	)
 	groupGuard.Get(":id", h.View)
 	groupGuard.Get(":id/edit", h.adminApp.Guard(authcore.PermissionDomainUsers, authcore.PermissionActionUpdate), h.Edit)        //nolint:lll // required
 	groupGuard.Put(":id", h.adminApp.Guard(authcore.PermissionDomainUsers, authcore.PermissionActionUpdate), h.Update)           //nolint:lll // required
@@ -435,15 +444,8 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 		return fmt.Errorf("user handler delete: %w", err)
 	}
 
-	user, err := h.userRepo.GetByID(c, id)
-	if err != nil {
-		return fmt.Errorf("user handler delete: load subject: %w", err)
-	}
-	if _, err := h.subjects.SetSubjectStatus(c, user.AuthSubjectID(), goauth.SubjectStatusDisabled); err != nil {
-		return fmt.Errorf("user handler delete: disable subject: %w", err)
-	}
-	if err := h.userRepo.SoftDeleteByID(c, id); err != nil {
-		return fmt.Errorf("user handler delete: soft delete: %w", err)
+	if err := h.changeUserStatus(c, id, false, false); err != nil {
+		return err
 	}
 
 	h.adminApp.HTTPManager().WithFlashSuccess(c, "Пользователь помечен как удалён")
@@ -457,15 +459,8 @@ func (h *Handler) Restore(c fiber.Ctx) error {
 		return fmt.Errorf("user handler restore: %w", err)
 	}
 
-	user, err := h.userRepo.GetByID(c, id)
-	if err != nil {
-		return fmt.Errorf("user handler restore: load subject: %w", err)
-	}
-	if _, err := h.subjects.SetSubjectStatus(c, user.AuthSubjectID(), goauth.SubjectStatusActive); err != nil {
-		return fmt.Errorf("user handler restore: activate subject: %w", err)
-	}
-	if err := h.userRepo.RestoreByID(c, id); err != nil {
-		return fmt.Errorf("user handler restore: %w", err)
+	if err := h.changeUserStatus(c, id, true, false); err != nil {
+		return err
 	}
 
 	h.adminApp.HTTPManager().WithFlashSuccess(c, "Пользователь восстановлен")

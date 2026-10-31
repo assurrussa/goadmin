@@ -311,6 +311,7 @@ func NewHandler(
 // RegisterGroupRoutes регистрирует маршруты для администраторов.
 func (h *Handler) RegisterGroupRoutes(route fiber.Router, _ ...fiber.Handler) {
 	readRoutes := route.Group(h.routePath, h.adminApp.Guard(integrationroles.PermissionDomainAdmins, integrationroles.PermissionActionRead)) //nolint:lll // required
+	h.registerWorkflow(readRoutes)
 	h.dataGridHandler.RegisterRoutes(readRoutes, "")
 	readRoutes.Post("refresh", h.Refresh)
 	readRoutes.Get("create", h.adminApp.Guard(integrationroles.PermissionDomainAdmins, integrationroles.PermissionActionCreate), h.Create) //nolint:lll // required

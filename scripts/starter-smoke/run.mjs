@@ -7,6 +7,7 @@ import { expect as baseExpect } from 'playwright/test'
 import { terminalUpload, taskStatus, deferred, deadline } from './helpers.mjs'
 import { waitForPaint } from './paint.mjs'
 import { dashboardAcceptance } from './dashboard.mjs'
+import { tableWorkflowAcceptance } from './table-workflow.mjs'
 
 const expect = baseExpect.configure({ timeout: 20000 })
 
@@ -429,6 +430,8 @@ async function runCase(name, config) {
     await logout(page)
     await login(page, credentials.email, credentials.password)
     check('UI-created admin and queues:read role assignment; real restricted login, menu filtering, server 403 and logout protection')
+    await tableWorkflowAcceptance({ page, context, config, credentials, ownedSQL, folder, name, expect, language, login, logout, result })
+    check('table workflows: view CRUD/dirty/relogin, native CSRF/RBAC/preview/owner isolation, both CSV modes on six grids, cross-page cap100, real conflict, bulk results and server queue counters')
     assert.deepEqual(result.pageErrors, [], 'uncaught browser errors')
     assert.deepEqual(result.consoleErrors, [], 'browser console errors')
     result.result = 'passed'

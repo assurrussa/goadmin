@@ -33,21 +33,40 @@
         <div class="flex gap-3">
           <div class="px-4 py-3 rounded-lg bg-card border border-border-secondary">
             <p class="text-xs text-text-tertiary">{{ t('В очереди') }}</p>
-            <p class="text-2xl font-semibold text-text-primary">{{ counters.jobs }}</p>
+            <p
+              data-queue-count="jobs"
+              data-queue-counter="jobs"
+              :data-stale="statsStale"
+              class="text-2xl font-semibold text-text-primary"
+            >
+              {{ counters?.jobs ?? '—' }}
+            </p>
           </div>
           <div class="px-4 py-3 rounded-lg bg-error/5 border border-error/20">
             <p class="text-xs text-error">{{ t('С ошибкой') }}</p>
-            <p class="text-2xl font-semibold text-error">{{ counters.failed }}</p>
+            <p
+              data-queue-count="failed"
+              data-queue-counter="failed"
+              :data-stale="statsStale"
+              class="text-2xl font-semibold text-error"
+            >
+              {{ counters?.failed ?? '—' }}
+            </p>
           </div>
         </div>
       </div>
 
+      <p v-if="statsError" role="alert" class="text-sm text-error">{{ t(statsError) }}</p>
+      <p v-else-if="statsLoading" role="status" class="text-sm text-text-secondary">
+        {{ t('Обновление счётчиков...') }}
+      </p>
       <DataGrid
         ref="jobsGridRef"
         :api-url="jobsApi"
         :initial-data="null"
         @action-table="handleTableAction"
         @action-row="handleRowAction"
+        @bulk-complete="refreshStats"
       />
     </Card>
   </div>
@@ -56,7 +75,8 @@
 <script setup lang="ts">
 import { t } from '@/i18n'
 
-import { computed, reactive, ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useQueueStats } from '@/composables/useQueueStats'
 import { Link, router, usePage } from '@inertiajs/vue3'
 import AppHead from '@/components/layout/AppHead.vue'
 import DataGrid from '@/components/datagrid/DataGrid.vue'
@@ -70,6 +90,10 @@ const props = defineProps({
   jobsApiUrl: {
     type: String,
     default: '/queues/jobs',
+  },
+  statsApiUrl: {
+    type: String,
+    default: '/queues/stats',
   },
   jobsCount: {
     type: Number,
@@ -90,10 +114,16 @@ const tabs = [
   { label: 'DLQ / Ошибки', href: '/queues/jobs-failed' },
 ]
 
-const counters = reactive({
-  jobs: Number(props.jobsCount ?? 0),
-  failed: Number(props.failedCount ?? 0),
-})
+const {
+  counters,
+  error: statsError,
+  loading: statsLoading,
+  stale: statsStale,
+  refreshStats,
+} = useQueueStats(
+  () => props.statsApiUrl,
+  () => ({ jobs: props.jobsCount, failed: props.failedCount }),
+)
 
 const pageTitle = computed(() => props.title || t('Активные задачи'))
 const jobsApi = computed(() => props.jobsApiUrl || '/queues/jobs')
@@ -104,7 +134,6 @@ const isActive = (href: string) => {
   }
   return pathname === href || pathname.startsWith(`${href}/`)
 }
-const clamp = (value: number) => (value < 0 ? 0 : value)
 
 const extractId = (item: Record<string, unknown>): string | number | null => {
   const raw = item.id
@@ -125,6 +154,7 @@ const refreshJobs = () => jobsGridRef.value?.refreshData()
 function handleTableAction(actionId: string) {
   if (actionId === 'refresh') {
     refreshJobs()
+    void refreshStats()
   }
 }
 
@@ -139,7 +169,7 @@ function handleRowAction(actionKey: string, item: Record<string, unknown>) {
       preserveScroll: true,
       onSuccess: () => {
         refreshJobs()
-        counters.jobs = clamp(counters.jobs - 1)
+        void refreshStats()
       },
     })
   }
