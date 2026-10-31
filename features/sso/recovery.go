@@ -1,6 +1,7 @@
 package sso
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/url"
@@ -9,13 +10,32 @@ import (
 	browser "github.com/assurrussa/gossoclient"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/adaptor"
+
+	"github.com/assurrussa/goadmin/host"
 )
 
 const (
-	ssoRecoveryPath        = "/auth/session/recover"
-	ssoRecoveryHeader      = "X-Goadmin-Auth-Recovery"
-	ssoSameOrigin          = "same-origin"
-	ssoRecoveryUnavailable = "authentication_unavailable"
+	ssoRecoveryPath             = "/auth/session/recover"
+	ssoRecoveryHeader           = "X-Goadmin-Auth-Recovery"
+	ssoSameOrigin               = "same-origin"
+	ssoRecoveryUnavailable      = "authentication_unavailable"
+	ssoRecoveryReauthentication = "reauthentication_required"
+)
+
+// Recovery stages are fixed source-owned labels, never request/error strings.
+type recoveryStage string
+
+const (
+	recoveryIntentStage      recoveryStage = "intent"
+	recoveryNativeStage      recoveryStage = "native_snapshot"
+	recoveryRequestStage     recoveryStage = "request_adapter"
+	recoveryProviderStage    recoveryStage = "provider_verify"
+	recoveryProofStage       recoveryStage = "proof_build"
+	recoveryCommitStage      recoveryStage = "native_complete"
+	recoveryCSRFRequestStage recoveryStage = "csrf_request"
+	recoveryCSRFCreateStage  recoveryStage = "csrf_create"
+	recoveryCSRFCheckStage   recoveryStage = "csrf_check"
+	recoveryCSRFCookieStage  recoveryStage = "csrf_cookie"
 )
 
 type ssoRecoveryResponse struct {
@@ -50,36 +70,34 @@ func (f *Feature) recover(c fiber.Ctx) error {
 	c.Set(ssoRecoveryHeader, "1")
 	c.Set(fiber.HeaderCacheControl, "no-store")
 	if !f.recoveryIntent(c) || f.csrf == nil {
-		return recoveryFailure(c, browser.ErrDenied)
+		return f.failRecovery(c, recoveryIntentStage, browser.ErrDenied)
 	}
 	snapshot, err := f.app.BeginOwnedExternalAdminRecovery(c)
 	if err != nil {
-		return recoveryFailure(c, err)
+		return f.failRecovery(c, recoveryNativeStage, err)
 	}
 	old := snapshot.Binding()
 	r, err := adaptor.ConvertRequest(c, true)
 	if err != nil {
 		_ = f.app.CancelExternalAdminRecovery(c, snapshot)
-		return recoveryFailure(c, browser.ErrDenied)
+		return f.failRecovery(c, recoveryRequestStage, browser.ErrDenied)
 	}
 	proof, err := f.rp.Client.Verify(r)
 	if err != nil {
 		_ = f.app.CancelExternalAdminRecovery(c, snapshot)
-		return recoveryFailure(c, err)
+		return f.failRecovery(c, recoveryProviderStage, err)
 	}
 	fresh, err := Build(proof, old.LocalSubject, old.LinkID)
 	if err != nil {
 		_ = f.app.CancelExternalAdminRecovery(c, snapshot)
+		return f.failRecovery(c, recoveryProofStage, err)
 	}
-	if err == nil {
-		err = f.app.CompleteExternalAdminRecovery(c, snapshot, fresh)
-	}
-	if err != nil {
-		return recoveryFailure(c, err)
+	if err = f.app.CompleteExternalAdminRecovery(c, snapshot, fresh); err != nil {
+		return f.failRecovery(c, recoveryCommitStage, err)
 	}
 	request, err := f.app.AdminCSRFRequest(c)
 	if err != nil {
-		return recoveryFailure(c, err)
+		return f.failRecovery(c, recoveryCSRFRequestStage, err)
 	}
 	origin, _ := url.Parse(f.rp.Config.Origin)
 	request.Domain = origin.Hostname()
@@ -89,23 +107,38 @@ func (f *Feature) recover(c fiber.Ctx) error {
 	}
 	token, err := f.csrf.Create(c, request)
 	if err != nil {
-		return recoveryFailure(c, browser.ErrUnavailable)
+		return f.failRecovery(c, recoveryCSRFCreateStage, browser.ErrUnavailable)
 	}
 	if _, valid, err := f.csrf.Check(c, request, token.Token); err != nil || !valid {
-		return recoveryFailure(c, browser.ErrUnavailable)
+		return f.failRecovery(c, recoveryCSRFCheckStage, browser.ErrUnavailable)
 	}
 	if err := f.app.WriteAdminCSRFCookie(c, f.rp.csrfCookie, token.Token, f.csrf.TokenTTL()); err != nil {
-		return recoveryFailure(c, browser.ErrUnavailable)
+		return f.failRecovery(c, recoveryCSRFCookieStage, browser.ErrUnavailable)
 	}
 	return c.Status(http.StatusConflict).JSON(ssoRecoveryResponse{
 		Status: http.StatusConflict, Code: "authentication_recovery_continue",
 	})
 }
 
-func recoveryFailure(c fiber.Ctx, err error) error {
-	status, code := http.StatusForbidden, "reauthentication_required"
+func (f *Feature) failRecovery(c fiber.Ctx, stage recoveryStage, err error) error {
+	var logger host.Logger
+	if f.app != nil {
+		logger = f.app.Logger()
+	}
+	return writeRecoveryFailure(c, logger, stage, err)
+}
+
+func writeRecoveryFailure(c fiber.Ctx, logger host.Logger, stage recoveryStage, err error) error {
+	status, code := http.StatusForbidden, ssoRecoveryReauthentication
 	if errors.Is(err, browser.ErrUnavailable) || !admissionDenied(err) {
 		status, code = http.StatusServiceUnavailable, ssoRecoveryUnavailable
+	}
+	// Deliberately use an empty context: request context may carry identity,
+	// credentials or other caller-supplied attributes. Never log the raw error,
+	// request URL/headers, proof, session or browser binding.
+	if logger != nil {
+		logger.WarnContext(context.Background(), "admin authentication recovery failed",
+			"recovery_stage", string(stage), "status", status, "code", code)
 	}
 	return c.Status(status).JSON(ssoRecoveryResponse{Status: status, Code: code})
 }

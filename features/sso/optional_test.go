@@ -132,7 +132,9 @@ func TestStorageFailureIsNotPermanentAdmissionDenial(t *testing.T) {
 
 func TestRecoveryStorageFailureIsRetryable(t *testing.T) {
 	app := fiber.New()
-	app.Get("/test", func(c fiber.Ctx) error { return recoveryFailure(c, errors.New("database timeout")) })
+	app.Get("/test", func(c fiber.Ctx) error {
+		return writeRecoveryFailure(c, nil, recoveryNativeStage, errors.New("database timeout"))
+	})
 	response, err := app.Test(httptest.NewRequestWithContext(t.Context(), "GET", "/test", nil))
 	if err != nil {
 		t.Fatal(err)

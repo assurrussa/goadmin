@@ -8,8 +8,9 @@ p { line-height: 1.6; }
 .note { color: #526174; font-size: 13px; }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
 button, a { font: inherit; }
-button { padding: 11px 18px; border: 0; border-radius: 8px; color: #fff; background: #2563eb; cursor: pointer; }
+button, a.primary-action { padding: 11px 18px; border: 0; border-radius: 8px; color: #fff; background: #2563eb; cursor: pointer; }
 a { color: #2459c9; text-underline-offset: 3px; }
+a.primary-action { color: #fff; display: inline-block; text-decoration: none; }
 button:focus-visible, a:focus-visible { outline: 3px solid #81aaff; outline-offset: 4px; }
 [hidden] { display: none !important; }
 @media (prefers-color-scheme: dark) {
@@ -17,5 +18,6 @@ button:focus-visible, a:focus-visible { outline: 3px solid #81aaff; outline-offs
   main { background: #1b2434; border-color: #334155; box-shadow: none; }
   .eyebrow, .note { color: #b1bfd1; }
   a { color: #93b8ff; }
+  a.primary-action { color: #fff; }
 }
 @media (max-width: 480px) { body { padding: 16px; } main { padding: 24px; } }
