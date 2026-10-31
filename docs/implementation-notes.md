@@ -2,6 +2,19 @@
 
 ## Appearance and personalization (2026-10-31)
 
+PR review follow-up: preserve the existing `sso-settings-title`,
+`profile-settings-title` and `security-settings-title` deep links by mapping them
+to the new Account/Security sections. The AuthHub account-menu URL remains
+compatible. Mounted regressions cover those legacy links, all new section keys,
+unknown-hash fallback and real hash-history Back/Forward. Four regressions fail
+against the original PR source; all 28 settings tests pass with the aliases.
+Verification passed: 142 manifest checks, 1051 UI tests, ESLint, Prettier, core
+Vue type-checking, the complete typed-host positive/negative checks and the
+rebuilt embedded assets. The first typed-host compiler exited without a status
+or diagnostics during memory pressure; the unchanged gate passed on a serial
+1536 MiB heap rerun. Matching-lock installed dependencies were reused with
+private writable caches; no dependency installation or Go checks were repeated.
+
 Completion audit follow-up: complete. Saved personal versions survive cached
 Inertia history; public brand versions also remain monotonic across owner/logout
 boundaries and delayed successful PUT bodies. A retained branding editor reloads

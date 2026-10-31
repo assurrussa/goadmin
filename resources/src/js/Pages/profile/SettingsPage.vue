@@ -296,9 +296,15 @@ const settingsSections = computed(() => [
   ...(appearance.brandingRead ? [{ key: 'branding', label: 'Бренд админки' }] : []),
 ])
 const section = ref('interface')
+const legacySections: Record<string, string> = {
+  'sso-settings-title': 'account',
+  'profile-settings-title': 'account',
+  'security-settings-title': 'security',
+}
 const syncSection = () => {
   const hash = window.location.hash.slice(1)
-  section.value = settingsSections.value.some((item) => item.key === hash) ? hash : 'interface'
+  const target = legacySections[hash] ?? hash
+  section.value = settingsSections.value.some((item) => item.key === target) ? target : 'interface'
 }
 onMounted(() => {
   syncSection()
