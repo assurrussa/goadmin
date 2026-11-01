@@ -17,7 +17,9 @@ import {
 } from './index'
 import { reconcileUploadCompletion, uploadFiles } from '@/services/fileUploadService'
 
-const capability = { props: { adminSessionMaintenance: { version: 1, sessionEpoch: 'one' } } }
+const capability = {
+  props: { adminSessionMaintenance: { version: 1, sessionEpoch: 'one' } },
+}
 function ready(epoch = 'one', revision = 1) {
   const now = Date.now()
   return new Response(
@@ -36,7 +38,12 @@ function ready(epoch = 'one', revision = 1) {
         renewed: false,
       },
     }),
-    { headers: { 'Content-Type': 'application/json', 'X-Goadmin-Auth-Recovery': '1' } },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goadmin-Auth-Recovery': '1',
+      },
+    },
   )
 }
 const response = (
@@ -89,7 +96,9 @@ describe('public admin transport', () => {
       }
       sessionCoordinator.reportFailure('session_changed')
       for (const path of ['/auth/login', '/auth/logout']) {
-        await expect(client.post(path, {})).rejects.toMatchObject({ code: 'session_changed' })
+        await expect(client.post(path, {})).rejects.toMatchObject({
+          code: 'session_changed',
+        })
       }
       expect(sends).toHaveBeenCalledTimes(2)
       // An absolute root login overrides baseURL under Axios's default policy.
@@ -109,15 +118,24 @@ describe('public admin transport', () => {
       await ensureSessionReady()
       document.cookie = 'csrf_token=new-login-proof; path=/'
       const refusal = { status: 409, code: 'session_changed' }
-      const headers = { 'content-type': 'application/json', 'x-goadmin-auth-error': '1' }
+      const headers = {
+        'content-type': 'application/json',
+        'x-goadmin-auth-error': '1',
+      }
       const draft = { text: 'unsaved A draft' }
       if (transport === 'fetch') {
         request.mockImplementation(async (_input, init) => {
           expect(new Headers(init?.headers).get('X-Goadmin-Session-Epoch')).toBe('one')
           expect(new Headers(init?.headers).get('X-CSRF-Token')).toBe('new-login-proof')
-          return new Response(JSON.stringify(refusal), { status: 409, headers })
+          return new Response(JSON.stringify(refusal), {
+            status: 409,
+            headers,
+          })
         })
-        const result = await adminFetch('/save', { method: 'POST', body: JSON.stringify(draft) })
+        const result = await adminFetch('/save', {
+          method: 'POST',
+          body: JSON.stringify(draft),
+        })
         expect(result.status).toBe(409)
         expect(request).toHaveBeenCalledTimes(2)
       } else {
@@ -148,7 +166,10 @@ describe('public admin transport', () => {
     await ensureSessionReady()
     for (const target of ['/auth/login', '/auth/logout']) {
       request.mockResolvedValueOnce(new Response(null, { status: 204 }))
-      await adminFetch(target, { method: 'POST', headers: { 'X-Goadmin-Session-Epoch': 'wrong' } })
+      await adminFetch(target, {
+        method: 'POST',
+        headers: { 'X-Goadmin-Session-Epoch': 'wrong' },
+      })
       expect(new Headers(request.mock.lastCall?.[1]?.headers).has('X-Goadmin-Session-Epoch')).toBe(
         false,
       )
@@ -206,11 +227,68 @@ describe('public admin transport', () => {
     expect(request).toHaveBeenCalledTimes(2)
   })
 
-  it('preserves the legacy transport without capability opt-in', async () => {
+  it('sends current CSRF without capability opt-in and never negotiates or replays', async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response('ok'))
     vi.stubGlobal('fetch', fetch)
+    document.cookie = 'csrf_token=legacy-proof; path=/'
     await adminFetch('/legacy', { method: 'POST', body: 'draft' })
-    expect(fetch).toHaveBeenCalledExactlyOnceWith('/legacy', { method: 'POST', body: 'draft' })
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch.mock.calls[0]?.[1]).toMatchObject({
+      method: 'POST',
+      body: 'draft',
+    })
+    const headers = new Headers(fetch.mock.calls[0]?.[1]?.headers)
+    expect(headers.get('X-CSRF-Token')).toBe('legacy-proof')
+    expect(headers.has('X-Goadmin-Session-Maintenance')).toBe(false)
+    expect(headers.has('X-Inertia')).toBe(false)
+    expect(fetch.mock.calls[0]?.[1]?.mode).toBe('same-origin')
+  })
+
+  it.each(['PUT', 'PATCH', 'DELETE', 'post'])(
+    'uses fresh cookie and keeps caller headers for legacy %s',
+    async (method) => {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(new Response(null, { status: 419 }))
+      vi.stubGlobal('fetch', fetch)
+      document.cookie = 'csrf_token=fresh-proof; path=/'
+      const headers = new Headers({
+        Accept: 'application/json',
+        'X-CSRF-Token': 'stale',
+      })
+      expect((await adminFetch('/auth/branding', { method, headers, mode: 'cors' })).status).toBe(
+        419,
+      )
+      const sent = new Headers(fetch.mock.calls[0]?.[1]?.headers)
+      expect(sent.get('X-CSRF-Token')).toBe('fresh-proof')
+      expect(sent.get('Accept')).toBe('application/json')
+      expect(headers.get('X-CSRF-Token')).toBe('stale')
+      expect(fetch.mock.calls[0]?.[1]?.mode).toBe('same-origin')
+      expect(fetch).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it.each(['GET', 'HEAD', 'OPTIONS'])(
+    'does not attach CSRF to legacy safe method %s',
+    async (method) => {
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response('ok'))
+      vi.stubGlobal('fetch', fetch)
+      document.cookie = 'csrf_token=private-proof; path=/'
+      await adminFetch('/read', { method })
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).has('X-CSRF-Token')).toBe(false)
+    },
+  )
+
+  it('does not leak CSRF cross-origin or invent a missing proof', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response('ok'))
+    vi.stubGlobal('fetch', fetch)
+    document.cookie = 'csrf_token=private-proof; path=/'
+    await adminFetch('https://untrusted.example/save', { method: 'PUT' })
+    expect(fetch.mock.calls[0]?.[1]).toEqual({ method: 'PUT' })
+    document.cookie = 'csrf_token=; Max-Age=0; path=/'
+    await adminFetch('/save', { method: 'PUT' })
+    expect(new Headers(fetch.mock.calls[1]?.[1]?.headers).has('X-CSRF-Token')).toBe(false)
+    expect(fetch).toHaveBeenCalledTimes(2)
   })
 
   it('leaves the Axios maintenance negotiation header absent without capability opt-in', async () => {
@@ -263,7 +341,10 @@ describe('public admin transport', () => {
           }),
           {
             status: 503,
-            headers: { 'X-Goadmin-Auth-Error': '1', 'Content-Type': 'application/json' },
+            headers: {
+              'X-Goadmin-Auth-Error': '1',
+              'Content-Type': 'application/json',
+            },
           },
         ),
       )
@@ -280,7 +361,10 @@ describe('public admin transport', () => {
     const rejected = () =>
       new Response(JSON.stringify({ status: 503, code: 'authentication_unavailable' }), {
         status: 503,
-        headers: { 'X-Goadmin-Auth-Error': '1', 'Content-Type': 'application/json' },
+        headers: {
+          'X-Goadmin-Auth-Error': '1',
+          'Content-Type': 'application/json',
+        },
       })
     const fetch = vi
       .fn<typeof globalThis.fetch>()
@@ -312,7 +396,11 @@ describe('public admin transport', () => {
     configureSessionMaintenance(capability)
     const abort = new AbortController()
     const pending = expect(
-      adminFetch('/save', { method: 'POST', body: 'draft', signal: abort.signal }),
+      adminFetch('/save', {
+        method: 'POST',
+        body: 'draft',
+        signal: abort.signal,
+      }),
     ).rejects.toMatchObject({ code: 'cancelled' })
     abort.abort()
     await pending
@@ -409,7 +497,10 @@ describe('public admin transport', () => {
           }),
           {
             status: 419,
-            headers: { 'X-Goadmin-Auth-Error': '1', 'Content-Type': 'application/json' },
+            headers: {
+              'X-Goadmin-Auth-Error': '1',
+              'Content-Type': 'application/json',
+            },
           },
         ),
       )
@@ -432,7 +523,10 @@ describe('public admin transport', () => {
   it('shares a 419 repair across Axios and the Inertia invalid observer without replay', async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async () => ready())
     vi.stubGlobal('fetch', fetch)
-    const failedHeaders = { 'x-goadmin-auth-error': '1', 'content-type': 'application/json' }
+    const failedHeaders = {
+      'x-goadmin-auth-error': '1',
+      'content-type': 'application/json',
+    }
     const failedData = { status: 419, code: 'csrf_needs_sync' }
     const sends = vi.fn<AxiosAdapter>().mockImplementation(async (config) => {
       const failed = response(config, 419, JSON.stringify(failedData))
@@ -582,7 +676,10 @@ describe('public admin transport', () => {
       vi.fn<typeof globalThis.fetch>().mockResolvedValue(
         new Response(JSON.stringify({ status: 503, code: 'authentication_unavailable' }), {
           status: 503,
-          headers: { 'X-Goadmin-Auth-Recovery': '1', 'Content-Type': 'application/json' },
+          headers: {
+            'X-Goadmin-Auth-Recovery': '1',
+            'Content-Type': 'application/json',
+          },
         }),
       ),
     )
@@ -607,7 +704,10 @@ describe('public admin transport', () => {
       vi.fn<typeof globalThis.fetch>().mockResolvedValue(
         new Response(JSON.stringify({ status: 503, code: 'authentication_unavailable' }), {
           status: 503,
-          headers: { 'X-Goadmin-Auth-Recovery': '1', 'Content-Type': 'application/json' },
+          headers: {
+            'X-Goadmin-Auth-Recovery': '1',
+            'Content-Type': 'application/json',
+          },
         }),
       ),
     )
@@ -641,7 +741,10 @@ describe('public admin transport', () => {
         JSON.stringify({ status: 401, code: 'reauthentication_required' }),
         {
           status: 401,
-          headers: { 'X-Goadmin-Auth-Error': '1', 'Content-Type': 'application/json' },
+          headers: {
+            'X-Goadmin-Auth-Error': '1',
+            'Content-Type': 'application/json',
+          },
         },
       )
       const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input) => {
@@ -654,7 +757,10 @@ describe('public admin transport', () => {
       vi.stubGlobal('fetch', fetch)
       configureSessionMaintenance(capability)
       await ensureSessionReady()
-      const request = adminFetch('/save', { method: 'POST', body: 'original command' })
+      const request = adminFetch('/save', {
+        method: 'POST',
+        body: 'original command',
+      })
       const result =
         failure === 'network' ? expect(request).rejects.toThrow('network failed') : request
       await flush()
@@ -699,7 +805,10 @@ describe('public admin transport', () => {
                 status: 401,
                 code: 'reauthentication_required',
               })
-              failed.headers = { 'x-goadmin-auth-error': '1', 'content-type': 'application/json' }
+              failed.headers = {
+                'x-goadmin-auth-error': '1',
+                'content-type': 'application/json',
+              }
               reject(
                 new AxiosError('original rejection', 'ERR_BAD_RESPONSE', config, undefined, failed),
               )
@@ -733,8 +842,14 @@ describe('public admin transport', () => {
   it('never replays an Axios mutation that returned an auth error', async () => {
     vi.stubGlobal('fetch', vi.fn<typeof globalThis.fetch>().mockResolvedValue(ready()))
     const sends = vi.fn<AxiosAdapter>().mockImplementation(async (config) => {
-      const failed = response(config, 503, { status: 503, code: 'authentication_unavailable' })
-      failed.headers = { 'x-goadmin-auth-error': '1', 'content-type': 'application/json' }
+      const failed = response(config, 503, {
+        status: 503,
+        code: 'authentication_unavailable',
+      })
+      failed.headers = {
+        'x-goadmin-auth-error': '1',
+        'content-type': 'application/json',
+      }
       throw new AxiosError('unavailable', 'ERR_BAD_RESPONSE', config, undefined, failed)
     })
     axios.defaults.adapter = sends

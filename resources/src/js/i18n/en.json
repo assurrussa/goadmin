@@ -805,5 +805,7 @@
   "Пример ссылки": "Example link",
   "Сбросить бренд для всех пользователей?": "Reset branding for all users?",
   "Название, логотипы и акцент будут заменены настройками по умолчанию для всей админки. Черновик будет удалён после успешного сброса.": "The name, logos and accent will return to defaults for the whole admin installation. Your draft will be removed after a successful reset.",
-  "Подтвердить сброс": "Confirm reset"
+  "Подтвердить сброс": "Confirm reset",
+  "Сеанс или защита запроса устарели. Войдите снова и повторите сохранение. Изменения остаются на странице.": "Your session or request protection has expired. Sign in again and retry saving. Your changes remain on this page.",
+  "Нет доступа для сохранения. Изменения остаются на странице.": "You do not have permission to save. Your changes remain on this page."
 }

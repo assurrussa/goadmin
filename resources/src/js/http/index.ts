@@ -160,7 +160,19 @@ export function adminFetch(
 ): Promise<Response> {
   const { retrySafeRead = false, ...init } = options
   const target = String(input)
-  if (!sessionCoordinator.isEnabled() || !sameOrigin(target)) return fetch(input, init)
+  if (!sameOrigin(target)) return fetch(input, init)
+  if (!sessionCoordinator.isEnabled()) {
+    // CSRF is mandatory even when a host cannot negotiate session renewal.
+    // Read the current proof at send time; never leak it to another origin.
+    const headers = new Headers(init.headers)
+    if (unsafe(init.method)) {
+      const csrf = getCurrentCSRFToken()
+      if (csrf) headers.set('X-CSRF-Token', csrf)
+    }
+    // fetch may retain custom headers on redirects: contain the readable proof
+    // to this origin even if the server redirects to an external destination.
+    return fetch(input, { ...init, mode: 'same-origin', headers })
+  }
   return sendAdminFetch(input, init, retrySafeRead)
 }
 
@@ -229,7 +241,10 @@ async function sendAdminFetch(
       !unsafe(init.method) &&
       ['GET', 'HEAD'].includes((init.method ?? 'GET').toUpperCase())
     ) {
-      await ensureSessionReady({ signal: init.signal ?? undefined, force: true })
+      await ensureSessionReady({
+        signal: init.signal ?? undefined,
+        force: true,
+      })
       const retried = await send()
       response = retried.response
       fence = retried.fence
@@ -302,7 +317,9 @@ export function installSessionAxiosInterceptor(client: AxiosInstance = axios): (
     if (logout(target)) sessionCoordinator.reportFailure('reauthentication_required')
     if (!transition(target)) {
       const fence = sessionCoordinator.commandFence()
-      await ensureSessionReady({ signal: config.signal as AbortSignal | undefined })
+      await ensureSessionReady({
+        signal: config.signal as AbortSignal | undefined,
+      })
       sessionCoordinator.assertCommandFence(fence)
     }
     if (config.signal?.aborted) throw new SessionReadinessError('cancelled')

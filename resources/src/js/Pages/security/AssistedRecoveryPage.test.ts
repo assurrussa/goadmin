@@ -3,14 +3,18 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { createApp, nextTick } from 'vue'
 import AssistedRecoveryPage from './AssistedRecoveryPage.vue'
 vi.mock('@inertiajs/vue3', () => ({ router: { get: vi.fn() } }))
-vi.mock('@/components/layout/AppHead.vue', () => ({ default: { render: () => null } }))
+vi.mock('@/components/layout/AppHead.vue', () => ({
+  default: { render: () => null },
+}))
 let app: ReturnType<typeof createApp> | undefined
 afterEach(() => {
   setLocale('ru')
   app?.unmount()
+  document.cookie = 'csrf_token=; Max-Age=0; path=/'
   vi.unstubAllGlobals()
 })
 it('selects the resolved canonical subject and fences uncertain issuance without replay', async () => {
+  document.cookie = 'csrf_token=native-proof; path=/'
   const fetch = vi.fn<(url: string, options: RequestInit) => Promise<Response>>(async () => {
     throw new Error('response lost')
   })
@@ -21,7 +25,13 @@ it('selects the resolved canonical subject and fences uncertain issuance without
     title: '',
     nativeCSRF: 'native-proof',
     search: 'existing@example.test',
-    targets: [{ subject: 'canonical-subject', name: 'Synthetic', email: 'existing@example.test' }],
+    targets: [
+      {
+        subject: 'canonical-subject',
+        name: 'Synthetic',
+        email: 'existing@example.test',
+      },
+    ],
   })
   app.mount(root)
   const option = root.querySelectorAll('option')[1]
@@ -32,10 +42,10 @@ it('selects the resolved canonical subject and fences uncertain issuance without
   await nextTick()
   await nextTick()
   expect(fetch).toHaveBeenCalledTimes(1)
-  expect(fetch.mock.calls[0]?.[1]?.headers).toEqual({
-    'Content-Type': 'application/x-www-form-urlencoded',
-    'X-CSRF-Token': 'native-proof',
-  })
+  const sentHeaders = new Headers(fetch.mock.calls[0]?.[1]?.headers)
+  expect(sentHeaders.get('Content-Type')).toBe('application/x-www-form-urlencoded')
+  expect(sentHeaders.get('X-CSRF-Token')).toBe('native-proof')
+  expect(document.cookie).toContain('csrf_token=native-proof')
   expect(root.textContent).toContain('Результат неизвестен')
   setLocale('en')
   await nextTick()

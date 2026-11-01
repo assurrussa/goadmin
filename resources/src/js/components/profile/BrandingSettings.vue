@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import { adminFetch } from '@/http'
 import { appearance, paintAppearance } from '@/appearance/state'
 import { deriveBrandPalette, readBrand } from '@/appearance/brand'
+import { AppearanceSaveError, notifySaveFailure } from '@/appearance/saveFeedback'
 import { t } from '@/i18n'
 import AppButton from '@/components/ui/AppButton.vue'
 import {
@@ -48,7 +49,12 @@ watch(
     const token = ++epoch
     invalidateLogos()
     controller?.abort()
-    Object.assign(draft, { name: '', accentColor: '', logoLight: undefined, logoDark: undefined })
+    Object.assign(draft, {
+      name: '',
+      accentColor: '',
+      logoLight: undefined,
+      logoDark: undefined,
+    })
     urls.light = ''
     urls.dark = ''
     resetOpen.value = false
@@ -98,7 +104,7 @@ async function load(keep = false) {
       signal: controller.signal,
       headers: { Accept: 'application/json' },
     })
-    if (!response.ok) throw new Error()
+    if (!response.ok) throw new AppearanceSaveError(response.status)
     const doc = await response.json()
     if (!alive || token !== epoch) return
     const brand = readBrand({ version: doc.version, ...doc.payload })
@@ -190,7 +196,10 @@ async function apply(reset = false) {
     const response = await adminFetch('/auth/branding', {
       method: 'PUT',
       signal: controller.signal,
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ version: version.value, ...draft, reset }),
     })
     if (!alive || token !== epoch) return
@@ -198,7 +207,7 @@ async function apply(reset = false) {
       status.value = 'conflict'
       return
     }
-    if (!response.ok) throw new Error()
+    if (!response.ok) throw new AppearanceSaveError(response.status)
     const doc = await response.json()
     if (!alive || token !== epoch) return
     const brand = readBrand({ version: doc.version, ...doc.payload })
@@ -209,10 +218,10 @@ async function apply(reset = false) {
       paintAppearance()
     }
     status.value = 'saved'
-  } catch {
+  } catch (cause) {
     if (alive && token === epoch) {
       status.value = 'error'
-      error.value = 'Не удалось сохранить. Ваши изменения остаются на странице.'
+      error.value = notifySaveFailure(cause)
     }
   }
 }
@@ -223,7 +232,9 @@ async function apply(reset = false) {
     class="min-w-0 space-y-6 rounded-xl border border-border-primary bg-card p-6"
   >
     <div>
-      <h2 id="branding-title" class="text-xl font-semibold">{{ t('Бренд админки') }}</h2>
+      <h2 id="branding-title" class="text-xl font-semibold">
+        {{ t('Бренд админки') }}
+      </h2>
       <p class="mt-2 text-sm text-text-secondary">
         {{
           t(

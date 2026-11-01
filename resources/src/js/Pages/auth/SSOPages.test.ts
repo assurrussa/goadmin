@@ -79,7 +79,7 @@ describe('shared SSO pages', () => {
     expect(fetch).toHaveBeenCalledTimes(1)
     const [url, options] = fetch.mock.calls[0]
     expect(url).toBe('/sso-link')
-    expect(options.headers['X-CSRF-Token']).toBe('synthetic')
+    expect(new Headers(options.headers).get('X-CSRF-Token')).toBe('synthetic')
     expect(options.body.get('confirm')).toBe('link-this-identity')
     expect(root.textContent).toContain('Результат запроса неизвестен')
     expect(root.querySelector('a[href="/sso-link"]')).not.toBeNull()
@@ -130,7 +130,12 @@ describe('shared SSO pages', () => {
             renewed: false,
           },
         }),
-        { headers: { 'Content-Type': 'application/json', 'X-Goadmin-Auth-Recovery': '1' } },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goadmin-Auth-Recovery': '1',
+          },
+        },
       ),
     )
     await new Promise((done) => setTimeout(done, 0))
@@ -169,11 +174,19 @@ describe('shared SSO pages', () => {
               renewed: false,
             },
           }),
-          { headers: { 'Content-Type': 'application/json', 'X-Goadmin-Auth-Recovery': '1' } },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Goadmin-Auth-Recovery': '1',
+            },
+          },
         ),
       )
       .mockResolvedValueOnce(
-        new Response('{}', { status: 403, headers: { 'Content-Type': 'application/json' } }),
+        new Response('{}', {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        }),
       )
     vi.stubGlobal('fetch', fetch)
     configureSessionMaintenance({
@@ -207,7 +220,7 @@ describe('shared SSO pages', () => {
     expect(fetch).toHaveBeenCalledTimes(1)
     expect(fetch.mock.calls[0][0]).toBe('/sso-link/reauth')
     expect(fetch.mock.calls[0][1].credentials).toBe('same-origin')
-    expect(fetch.mock.calls[0][1].headers['X-CSRF-Token']).toBe('error-token')
+    expect(new Headers(fetch.mock.calls[0][1].headers).get('X-CSRF-Token')).toBe('error-token')
     expect(fetch.mock.calls[0][1].body.get('csrf')).toBe('error-token')
     expect(fetch.mock.calls[0][1].body.get('confirm')).toBe('reauthenticate-local')
     expect(errorPage.querySelector('button')?.hasAttribute('disabled')).toBe(true)
@@ -229,7 +242,7 @@ describe('shared SSO pages', () => {
     linkReauth.dispatchEvent(new Event('submit', { cancelable: true }))
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(fetch).toHaveBeenCalledTimes(3)
-    expect(fetch.mock.calls[2][1].headers['X-CSRF-Token']).toBe('link-token')
+    expect(new Headers(fetch.mock.calls[2][1].headers).get('X-CSRF-Token')).toBe('link-token')
     expect(fetch.mock.calls[2][1].body.get('confirm')).toBe('reauthenticate-local')
     expect(
       linkPage.querySelector('form[action="/sso-link/reauth"] button')?.hasAttribute('disabled'),

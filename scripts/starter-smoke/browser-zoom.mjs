@@ -20,7 +20,7 @@ export async function withBrowserZoom(options, run) {
     }))
     await writeFile(path.join(extension, 'worker.js'), 'chrome.runtime.onInstalled.addListener(() => {});')
     context = await chromium.launchPersistentContext(path.join(temporary, 'profile'), {
-      ...options, channel: 'chromium', headless: true, viewport: null,
+      ...options, channel: 'chromium', headless: true, chromiumSandbox: true, viewport: null,
       ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : {}),
       args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`, '--window-size=1440,1000'],
     })
@@ -43,3 +43,4 @@ export async function withBrowserZoom(options, run) {
     await rm(temporary, { recursive: true, force: true })
   }
 }
+
