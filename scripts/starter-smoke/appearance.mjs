@@ -175,7 +175,9 @@ export async function appearanceAcceptance({ page, context, browser, config, cre
       ['PUT', '/auth/branding', { version: branding.version, name: 'MUST NOT SAVE', accentColor: '' }],
     ]) {
       const denied = await send(method, url, data, csrf, csrf ? 'https://foreign.example.test' : config.url)
-      assert.equal(denied.status(), 302)
+      assert.equal(denied.status(), 419)
+      assert.match(denied.headers()['content-type'], /application\/json/)
+      assert.equal(denied.headers().location, undefined)
     }
   }
   assert.equal((await get('/auth/branding')).payload.name, brandTitle)
@@ -245,3 +247,4 @@ export async function appearanceAcceptance({ page, context, browser, config, cre
     densityGeometry: { compactRowHeight, comfortableRowHeight },
     browserZoom200Percent: true, nativeCSRF: true, nativeRBAC: true, preview: true }
 }
+

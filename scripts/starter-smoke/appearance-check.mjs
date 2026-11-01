@@ -12,7 +12,7 @@ assert.equal(manifest.owner, 'goadmin-starter-smoke-v1')
 const selected = process.argv[3]
 if (selected) assert.ok(manifest.cases[selected], 'Unknown smoke case')
 const report = { runId: manifest.runId, profile: 'appearance-only', cases: {} }
-const browser = await chromium.launch({ headless: true,
+const browser = await chromium.launch({ headless: true, chromiumSandbox: true,
   ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : {}) })
 async function login(page, email, password) {
   await page.goto('/auth/login')
@@ -54,3 +54,4 @@ try {
   await browser.close()
   await writeFile(path.join(folder, `appearance${selected ? `-${selected}` : ''}-report.json`), JSON.stringify(report, null, 2) + '\n')
 }
+

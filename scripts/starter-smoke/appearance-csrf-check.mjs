@@ -12,7 +12,7 @@ assert.equal(manifest.owner, 'goadmin-starter-smoke-v1')
 const selected = process.argv[3]
 if (selected) assert.ok(manifest.cases[selected], 'Unknown smoke case')
 const report = { runId: manifest.runId, profile: 'appearance-csrf', cases: {} }
-const browser = await chromium.launch({ headless: true,
+const browser = await chromium.launch({ headless: true, chromiumSandbox: true,
   ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : {}) })
 try {
   for (const [name, config] of Object.entries(manifest.cases).filter(([name]) => !selected || selected === name)) {
@@ -144,3 +144,4 @@ try {
   await browser.close()
   await writeFile(path.join(folder, 'appearance-csrf-report.json'), JSON.stringify(report, null, 2) + '\n')
 }
+
