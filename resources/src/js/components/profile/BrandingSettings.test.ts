@@ -4,6 +4,10 @@ import BrandingSettings from './BrandingSettings.vue'
 import { appearance, syncAppearance, disposeAppearance } from '@/appearance/state'
 import { emptyBrand } from '@/appearance/brand'
 const fetch = vi.hoisted(() => vi.fn())
+const notifyError = vi.hoisted(() => vi.fn())
+vi.mock('@/composables/useNotifications', () => ({
+  useNotifications: () => ({ error: notifyError }),
+}))
 vi.mock('@/http', () => ({ adminFetch: (...args: unknown[]) => fetch(...args) }))
 let app: ReturnType<typeof createApp> | undefined
 const brand = (name = 'Live', color = '#2563eb', version = 1, pending = false) => ({
@@ -41,6 +45,7 @@ function click(root: HTMLElement, text: string) {
 }
 beforeEach(() => {
   fetch.mockReset()
+  notifyError.mockReset()
   appearance.brand = { ...emptyBrand }
   syncAppearance({
     props: {
@@ -63,6 +68,21 @@ afterEach(() => {
   vi.unstubAllGlobals()
   document.body.replaceChildren()
 })
+it.each([401, 403, 419])('shows %s save failure, keeps the brand draft and never replays', async (status) => {
+  const root = await mount()
+  input(root, 0, 'Unsaved brand')
+  fetch.mockResolvedValueOnce(result({}, status))
+  click(root, 'Применить')
+  await flush()
+  expect((root.querySelector('input') as HTMLInputElement).value).toBe('Unsaved brand')
+  expect(appearance.brand.name).toBe('Live')
+  expect(root.textContent).toContain(status === 403 ? 'Нет доступа' : 'Сеанс или защита')
+  expect(notifyError).toHaveBeenCalledTimes(1)
+  expect(notifyError.mock.calls[0]?.[0]).toContain('Изменения остаются на странице.')
+  await flush()
+  expect(fetch).toHaveBeenCalledTimes(2) // initial read and exactly one PUT
+})
+
 it('keeps name and accent preview isolated until explicit successful Apply', async () => {
   const root = await mount()
   const accent = document.documentElement.style.getPropertyValue('--color-primary')
@@ -400,3 +420,4 @@ it('fences late branding GET bodies across an owner transition while reloading t
   expect(root.querySelector('input')!.value).toBe('New owner snapshot')
   expect(root.textContent).not.toContain('Old private response')
 })
+

@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import { adminFetch } from '@/http'
 import { appearance, paintAppearance } from '@/appearance/state'
 import { deriveBrandPalette, readBrand } from '@/appearance/brand'
+import { AppearanceSaveError, notifySaveFailure } from '@/appearance/saveFeedback'
 import { t } from '@/i18n'
 import AppButton from '@/components/ui/AppButton.vue'
 import {
@@ -98,7 +99,7 @@ async function load(keep = false) {
       signal: controller.signal,
       headers: { Accept: 'application/json' },
     })
-    if (!response.ok) throw new Error()
+    if (!response.ok) throw new AppearanceSaveError(response.status)
     const doc = await response.json()
     if (!alive || token !== epoch) return
     const brand = readBrand({ version: doc.version, ...doc.payload })
@@ -198,7 +199,7 @@ async function apply(reset = false) {
       status.value = 'conflict'
       return
     }
-    if (!response.ok) throw new Error()
+    if (!response.ok) throw new AppearanceSaveError(response.status)
     const doc = await response.json()
     if (!alive || token !== epoch) return
     const brand = readBrand({ version: doc.version, ...doc.payload })
@@ -209,10 +210,10 @@ async function apply(reset = false) {
       paintAppearance()
     }
     status.value = 'saved'
-  } catch {
+  } catch (cause) {
     if (alive && token === epoch) {
       status.value = 'error'
-      error.value = 'Не удалось сохранить. Ваши изменения остаются на странице.'
+      error.value = notifySaveFailure(cause)
     }
   }
 }
@@ -369,3 +370,4 @@ async function apply(reset = false) {
     </Dialog>
   </section>
 </template>
+

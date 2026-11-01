@@ -2,6 +2,7 @@ import { reactive } from 'vue'
 import { applyLocale, installLocalePreferenceHandler } from '@/i18n'
 import { adminFetch } from '@/http'
 import { applyBrand, emptyBrand, readBrand } from './brand'
+import { AppearanceSaveError, notifySaveFailure } from './saveFeedback'
 
 export type Preferences = {
   schemaVersion: 1
@@ -45,6 +46,7 @@ export const appearance = reactive({
   brand: { ...emptyBrand },
   dark: false,
   resolving: false,
+  error: '',
 })
 let generation = 0
 let controller: AbortController | undefined
@@ -115,6 +117,7 @@ export function syncAppearance(pageLike: unknown) {
     pending = false
     appearance.resolving = false
     appearance.status = 'saved'
+    appearance.error = ''
   }
   appearance.readOnly = readOnly
   appearance.brandingRead = !!access?.brandingRead
@@ -151,6 +154,7 @@ export function discardAppearance() {
   appearance.brandingRead = false
   appearance.brandingUpdate = false
   appearance.status = 'saved'
+  appearance.error = ''
   appearance.draft = device()
   appearance.saved = { ...appearance.draft }
   paintAppearance()
@@ -191,6 +195,7 @@ export async function saveAppearance() {
   const payload = { ...appearance.draft }
   pending = true
   appearance.status = 'saving'
+  appearance.error = ''
   const request = new AbortController()
   controller = request
   try {
@@ -205,7 +210,7 @@ export async function saveAppearance() {
       appearance.status = 'conflict'
       return
     }
-    if (!response.ok) throw new Error('save')
+    if (!response.ok) throw new AppearanceSaveError(response.status)
     const doc = (await response.json()) as AppearanceDocument
     if (epoch !== generation) return
     if (doc.owner !== owner || !Number.isSafeInteger(doc.version) || !doc.payload)
@@ -213,8 +218,11 @@ export async function saveAppearance() {
     appearance.version = doc.version
     appearance.saved = readPreferences(doc.payload)
     appearance.status = 'saved'
-  } catch {
-    if (epoch === generation) appearance.status = 'error'
+  } catch (cause) {
+    if (epoch === generation) {
+      appearance.status = 'error'
+      appearance.error = notifySaveFailure(cause)
+    }
   } finally {
     if (epoch === generation) {
       pending = false
@@ -262,3 +270,4 @@ export async function reloadAppearance(applyDraft = false) {
     }
   }
 }
+

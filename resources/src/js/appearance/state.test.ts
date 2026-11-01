@@ -12,6 +12,10 @@ import {
 import { deriveBrandPalette, safeLogo, emptyBrand } from './brand'
 import { setLocale } from '@/i18n'
 const fetch = vi.hoisted(() => vi.fn())
+const notifyError = vi.hoisted(() => vi.fn())
+vi.mock('@/composables/useNotifications', () => ({
+  useNotifications: () => ({ error: notifyError }),
+}))
 vi.mock('@/http', () => ({ adminFetch: (...args: unknown[]) => fetch(...args) }))
 const preferences = { schemaVersion: 1, theme: 'system', locale: 'ru', density: 'default' }
 const doc = (owner = 'a', version = 1, payload = preferences) => ({ owner, version, payload })
@@ -28,6 +32,7 @@ const flush = async () => {
 }
 beforeEach(() => {
   fetch.mockReset()
+  notifyError.mockReset()
   appearance.brand = { ...emptyBrand }
   localStorage.clear()
   syncAppearance(page())
@@ -36,6 +41,20 @@ afterEach(() => {
   disposeAppearance()
   localStorage.clear()
 })
+it.each([401, 403, 419])('shows a useful toast for %s and keeps the draft without replay', async (status) => {
+  fetch.mockResolvedValueOnce(result({}, status))
+  editAppearance({ theme: 'dark' })
+  await flush()
+  expect(appearance.status).toBe('error')
+  expect(appearance.draft.theme).toBe('dark')
+  expect(appearance.saved.theme).toBe('system')
+  expect(appearance.error).toContain(status === 403 ? 'Нет доступа' : 'Сеанс или защита')
+  expect(notifyError).toHaveBeenCalledExactlyOnceWith(appearance.error)
+  editAppearance({ density: 'compact' })
+  await flush()
+  expect(fetch).toHaveBeenCalledTimes(1)
+})
+
 it('serializes requests and coalesces edits made in flight', async () => {
   let finish!: (value: unknown) => void
   fetch.mockReturnValueOnce(
@@ -262,3 +281,4 @@ it('keeps global branding monotonic across account switches and logout with stal
   syncAppearance({ props: { ...page().props, branding: { version: 3, name: 'Newest' } } })
   expect(appearance.brand).toMatchObject({ version: 3, name: 'Newest' })
 })
+

@@ -67,7 +67,7 @@ function change(key: keyof Preferences, event: Event) {
     <p v-if="appearance.readOnly" role="status">{{ t('Изменения недоступны в этом сеансе.') }}</p>
     <p v-else-if="appearance.status === 'saving'" role="status">{{ t('Сохраняем...') }}</p>
     <div v-else-if="appearance.status === 'error'" role="alert" class="space-y-3">
-      <p>{{ t('Не удалось сохранить. Ваши изменения остаются на странице.') }}</p>
+      <p>{{ t(appearance.error || 'Не удалось сохранить. Ваши изменения остаются на странице.') }}</p>
       <div class="flex flex-wrap gap-2">
         <AppButton @click="saveAppearance">{{ t('Повторить') }}</AppButton
         ><AppButton variant="secondary" @click="reloadAppearance(false)">{{
@@ -89,3 +89,4 @@ function change(key: keyof Preferences, event: Event) {
     <p v-else role="status" class="text-sm text-text-secondary">{{ t('Сохранено') }}</p>
   </section>
 </template>
+

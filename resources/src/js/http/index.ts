@@ -160,7 +160,19 @@ export function adminFetch(
 ): Promise<Response> {
   const { retrySafeRead = false, ...init } = options
   const target = String(input)
-  if (!sessionCoordinator.isEnabled() || !sameOrigin(target)) return fetch(input, init)
+  if (!sameOrigin(target)) return fetch(input, init)
+  if (!sessionCoordinator.isEnabled()) {
+    // CSRF is mandatory even when a host cannot negotiate session renewal.
+    // Read the current proof at send time; never leak it to another origin.
+    const headers = new Headers(init.headers)
+    if (unsafe(init.method)) {
+      const csrf = getCurrentCSRFToken()
+      if (csrf) headers.set('X-CSRF-Token', csrf)
+    }
+    // fetch may retain custom headers on redirects: contain the readable proof
+    // to this origin even if the server redirects to an external destination.
+    return fetch(input, { ...init, mode: 'same-origin', headers })
+  }
   return sendAdminFetch(input, init, retrySafeRead)
 }
 
@@ -352,3 +364,4 @@ export function createAdminAxios(config?: Parameters<typeof axios.create>[0]): A
   installSessionAxiosInterceptor(client)
   return client
 }
+

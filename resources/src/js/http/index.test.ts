@@ -206,11 +206,58 @@ describe('public admin transport', () => {
     expect(request).toHaveBeenCalledTimes(2)
   })
 
-  it('preserves the legacy transport without capability opt-in', async () => {
+  it('sends current CSRF without capability opt-in and never negotiates or replays', async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response('ok'))
     vi.stubGlobal('fetch', fetch)
+    document.cookie = 'csrf_token=legacy-proof; path=/'
     await adminFetch('/legacy', { method: 'POST', body: 'draft' })
-    expect(fetch).toHaveBeenCalledExactlyOnceWith('/legacy', { method: 'POST', body: 'draft' })
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', body: 'draft' })
+    const headers = new Headers(fetch.mock.calls[0]?.[1]?.headers)
+    expect(headers.get('X-CSRF-Token')).toBe('legacy-proof')
+    expect(headers.has('X-Goadmin-Session-Maintenance')).toBe(false)
+    expect(headers.has('X-Inertia')).toBe(false)
+    expect(fetch.mock.calls[0]?.[1]?.mode).toBe('same-origin')
+  })
+
+  it.each(['PUT', 'PATCH', 'DELETE', 'post'])(
+    'uses fresh cookie and keeps caller headers for legacy %s',
+    async (method) => {
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(null, { status: 419 }))
+      vi.stubGlobal('fetch', fetch)
+      document.cookie = 'csrf_token=fresh-proof; path=/'
+      const headers = new Headers({ Accept: 'application/json', 'X-CSRF-Token': 'stale' })
+      expect((await adminFetch('/auth/branding', { method, headers, mode: 'cors' })).status).toBe(419)
+      const sent = new Headers(fetch.mock.calls[0]?.[1]?.headers)
+      expect(sent.get('X-CSRF-Token')).toBe('fresh-proof')
+      expect(sent.get('Accept')).toBe('application/json')
+      expect(headers.get('X-CSRF-Token')).toBe('stale')
+      expect(fetch.mock.calls[0]?.[1]?.mode).toBe('same-origin')
+      expect(fetch).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it.each(['GET', 'HEAD', 'OPTIONS'])(
+    'does not attach CSRF to legacy safe method %s',
+    async (method) => {
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response('ok'))
+      vi.stubGlobal('fetch', fetch)
+      document.cookie = 'csrf_token=private-proof; path=/'
+      await adminFetch('/read', { method })
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).has('X-CSRF-Token')).toBe(false)
+    },
+  )
+
+  it('does not leak CSRF cross-origin or invent a missing proof', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response('ok'))
+    vi.stubGlobal('fetch', fetch)
+    document.cookie = 'csrf_token=private-proof; path=/'
+    await adminFetch('https://untrusted.example/save', { method: 'PUT' })
+    expect(fetch.mock.calls[0]?.[1]).toEqual({ method: 'PUT' })
+    document.cookie = 'csrf_token=; Max-Age=0; path=/'
+    await adminFetch('/save', { method: 'PUT' })
+    expect(new Headers(fetch.mock.calls[1]?.[1]?.headers).has('X-CSRF-Token')).toBe(false)
+    expect(fetch).toHaveBeenCalledTimes(2)
   })
 
   it('leaves the Axios maintenance negotiation header absent without capability opt-in', async () => {
@@ -746,3 +793,4 @@ describe('public admin transport', () => {
     expect(sessionCoordinator.getState()).toBe('authentication_unavailable')
   })
 })
+
