@@ -51,7 +51,7 @@ let packCache:
       dark: Record<string, string>
     }
   | undefined
-function packPalette(dark: boolean): Record<string, string> {
+function packPalette(dark: boolean, fallback = true): Record<string, string> {
   const root = document.documentElement
   const attributes = [...root.attributes].filter(
     (attribute) => !['style', 'class', 'data-theme-mode'].includes(attribute.name),
@@ -92,7 +92,7 @@ function packPalette(dark: boolean): Record<string, string> {
         const primary = computed.getPropertyValue('--color-primary').trim()
         const contrast = computed.getPropertyValue('--color-primary-contrast').trim()
         return {
-          '--color-primary': primary || `hsl(217 69% ${variant ? 74 : 46}%)`,
+          '--color-primary': primary,
           '--color-primary-contrast': contrast || (variant ? 'hsl(220 18% 12%)' : '#ffffff'),
         }
       }
@@ -101,7 +101,34 @@ function packPalette(dark: boolean): Record<string, string> {
       frame.remove()
     }
   }
-  return { ...packCache[dark ? 'dark' : 'light'] }
+  const palette = { ...packCache[dark ? 'dark' : 'light'] }
+  if (fallback && !palette['--color-primary'])
+    palette['--color-primary'] = `hsl(217 69% ${dark ? 74 : 46}%)`
+  return palette
+}
+/** Convert the active host theme primary to the sRGB hex required by input[type=color].
+ * Canvas resolves modern CSS colors (including oklch) without inventing a fallback.
+ */
+export function themePrimaryHex(dark: boolean): string | undefined {
+  const color = packPalette(dark, false)['--color-primary']
+  if (!color) return undefined
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = 1
+  const context = canvas.getContext('2d', { willReadFrequently: true })
+  if (!context) return undefined
+  // Invalid assignments leave fillStyle unchanged; two sentinels distinguish them
+  // from a legitimate color equal to either sentinel.
+  context.fillStyle = '#010203'
+  context.fillStyle = color
+  const first = context.fillStyle
+  context.fillStyle = '#040506'
+  context.fillStyle = color
+  if (first !== context.fillStyle) return undefined
+  context.clearRect(0, 0, 1, 1)
+  context.fillRect(0, 0, 1, 1)
+  const [r, g, b, a] = context.getImageData(0, 0, 1, 1).data
+  if (a !== 255) return undefined
+  return `#${[r, g, b].map((v) => v!.toString(16).padStart(2, '0')).join('')}`
 }
 /** Maintain AA contrast for accent text and filled controls, including pale custom accents. */
 export function deriveBrandPalette(hex: string, dark: boolean): Record<string, string> {
