@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { createServer } from 'node:http'
 import { chromium } from 'playwright'
 import { expect as baseExpect } from 'playwright/test'
 
@@ -19,11 +20,34 @@ try {
     assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(new URL(config.url).hostname), 'Local fixture required')
     const credentials = JSON.parse(await readFile(path.join(folder, `${name}.credentials.json`), 'utf8'))
     const context = await browser.newContext({ baseURL: config.url })
-    const result = report.cases[name] = { result: 'running', commands: [], pageErrors: [] }
+    const result = report.cases[name] = { result: 'running', commands: [], observedMutations: [], pageErrors: [] }
     const page = await context.newPage()
+    const origin = new URL(config.url).origin
+    const cdp = await context.newCDPSession(page)
+    const requestTrace = []
+    const wireModes = new Map()
+    const networkFailures = []
+    await cdp.send('Network.enable')
+    cdp.on('Network.requestWillBeSent', event => {
+      requestTrace.push({ id: event.requestId, url: event.request.url, method: event.request.method })
+    })
+    cdp.on('Network.requestWillBeSentExtraInfo', event => {
+      const mode = Object.entries(event.headers).find(([key]) => key.toLowerCase() === 'sec-fetch-mode')?.[1]
+      if (mode) wireModes.set(event.requestId, mode)
+    })
+    cdp.on('Network.loadingFailed', event => {
+      networkFailures.push({ id: event.requestId, blockedReason: event.blockedReason })
+    })
+    let targetServer
     page.on('pageerror', error => result.pageErrors.push(error.message))
     page.on('request', request => {
-      if (['PUT', 'PATCH'].includes(request.method())) result.commands.push({ path: new URL(request.url()).pathname, method: request.method() })
+      if (!['PUT', 'PATCH'].includes(request.method())) return
+      const url = new URL(request.url())
+      const observation = { origin: url.origin, path: url.pathname, method: request.method() }
+      // Redirect candidates can emit request events before Chrome blocks them.
+      // Keep observations, but count original same-origin business commands separately.
+      result.observedMutations.push(observation)
+      if (url.origin === origin) result.commands.push({ path: url.pathname, method: request.method() })
     })
     try {
       await page.goto('/auth/login')
@@ -55,7 +79,15 @@ try {
       assert.equal(saved.status(), 200)
       assert.ok((await saved.request().allHeaders())['x-csrf-token'])
       assert.equal((await saved.request().allHeaders())['x-inertia'], undefined)
-      assert.equal((await saved.request().allHeaders())['sec-fetch-mode'], 'same-origin')
+      let freshRequest
+      await expect.poll(() => {
+        freshRequest = requestTrace.find(request => request.method === 'PUT' && request.url === new URL('/auth/branding', config.url).href)
+        return Boolean(freshRequest)
+      }, { message: 'Observe the exact successful original PUT' }).toBe(true)
+      // Playwright allHeaders can omit this header on macOS. ExtraInfo observes
+      // the actual wire header for this request, not an unrelated earlier read.
+      await expect.poll(() => wireModes.get(freshRequest.id)).toBe('same-origin')
+      result.fetchMode = wireModes.get(freshRequest.id)
       assert.equal(result.commands.length, 1)
 
       await input.fill('Unsaved CSRF regression draft')
@@ -99,24 +131,40 @@ try {
       assert.equal(result.commands.length, 5)
 
       // The browser must not forward the readable proof on an external
-      // redirect. Both origins are loopback; the target is intercepted locally.
-      const target = new URL('/csrf-redirect-target', config.url)
-      target.hostname = target.hostname === 'localhost' ? '127.0.0.1' : 'localhost'
-      let targetReached = false
-      await page.route(target.href, async route => {
-        targetReached = true
-        await route.fulfill({ status: 200, body: 'Unexpected redirect target' })
+      // redirect. Use a real loopback target: an observable browser request
+      // candidate is not evidence that a request or its token reached a server.
+      const targetRequests = []
+      targetServer = createServer((request, response) => {
+        targetRequests.push({ csrfPresent: Boolean(request.headers['x-csrf-token']) })
+        response.writeHead(200, { 'Content-Type': 'text/plain' })
+        response.end('Unexpected redirect target')
       })
+      await new Promise((resolve, reject) => {
+        targetServer.once('error', reject)
+        targetServer.listen(0, '127.0.0.1', resolve)
+      })
+      const address = targetServer.address()
+      assert.ok(address && typeof address !== 'string')
+      const target = new URL(`http://127.0.0.1:${address.port}/csrf-redirect-target`)
+      assert.notEqual(target.origin, origin)
       const redirect = async route => {
         if (route.request().method() !== 'PUT') return route.continue()
         await route.fulfill({ status: 302, headers: { Location: target.href } })
       }
       await page.route('**/auth/branding', redirect)
       await input.fill('Unsaved redirect draft')
+      const commandsBeforeRedirect = result.commands.length
+      const traceBeforeRedirect = requestTrace.length
       await apply.click()
       await expect(brand.getByRole('alert')).toContainText(/Не удалось сохранить|Could not save|Failed to save/)
-      assert.equal(targetReached, false)
+      const redirectTrace = () => requestTrace.slice(traceBeforeRedirect)
+      await expect.poll(() => redirectTrace().some(request => request.url === target.href && networkFailures.some(failure => failure.id === request.id && failure.blockedReason === 'origin'))).toBe(true)
+      assert.equal(redirectTrace().filter(request => request.method === 'PUT' && request.url === new URL('/auth/branding', config.url).href).length, 1)
+      assert.equal(result.commands.length, commandsBeforeRedirect + 1)
       assert.equal(result.commands.length, 6)
+      assert.equal(targetRequests.length, 0, 'No request may reach the actual redirect target server')
+      assert.equal(targetRequests.filter(request => request.csrfPresent).length, 0, 'No CSRF proof may reach the target')
+      result.redirectGuard = { originalCommands: 1, blockedReason: 'origin', targetServerHits: targetRequests.length, targetCSRFHits: targetRequests.filter(request => request.csrfPresent).length }
       await expect(input).toHaveValue('Unsaved redirect draft')
       await page.unroute('**/auth/branding', redirect)
 
@@ -135,13 +183,20 @@ try {
       await expect(page).toHaveURL(/\/auth\/profile\/settings#branding$/)
       assert.equal(result.commands.length, 7)
       assert.ok(result.commands.every(command => command.path === '/auth/branding'))
+      assert.equal(targetRequests.length, 0, 'The redirect target must also remain untouched by late requests')
+      assert.equal(targetRequests.filter(request => request.csrfPresent).length, 0)
       assert.deepEqual(result.pageErrors, [])
       result.result = 'passed'
       result.originalNameUnchanged = original
-    } finally { await context.close() }
+    } finally {
+      try { await context.close() } finally {
+        if (targetServer?.listening) await new Promise((resolve, reject) => targetServer.close(error => error ? reject(error) : resolve()))
+      }
+    }
   }
 } finally {
   await browser.close()
   await writeFile(path.join(folder, 'appearance-csrf-report.json'), JSON.stringify(report, null, 2) + '\n')
 }
+
 
