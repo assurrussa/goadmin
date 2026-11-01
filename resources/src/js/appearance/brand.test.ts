@@ -1,5 +1,5 @@
-import { expect, it } from 'vitest'
-import { deriveBrandPalette } from './brand'
+import { expect, it, vi } from 'vitest'
+import { deriveBrandPalette, themePrimaryHex } from './brand'
 
 function luminance(color: string) {
   const element = document.createElement('span')
@@ -80,4 +80,42 @@ it('resolves both host pack palettes without inheriting the applied live custom 
     }
   }
   expect(root.outerHTML.slice(0, root.outerHTML.indexOf('>') + 1)).toBe(before)
+})
+
+it('resolves an oklch theme token through canvas without using the live override', () => {
+  const root = document.documentElement
+  const oldTheme = root.getAttribute('data-admin-theme')
+  const oldStyle = root.getAttribute('style')
+  const sheet = document.createElement('style')
+  sheet.textContent = ":root[data-admin-theme='test.oklch'] { --color-primary: oklch(65% .18 35); }"
+  document.head.append(sheet)
+  root.dataset.adminTheme = 'test.oklch'
+  root.style.setProperty('--color-primary', '#ff00ff')
+  let color = ''
+  const assigned: string[] = []
+  const context = {
+    get fillStyle() {
+      return color
+    },
+    set fillStyle(value: string) {
+      color = value
+      assigned.push(value)
+    },
+    clearRect() {},
+    fillRect() {},
+    getImageData: () => ({ data: new Uint8ClampedArray([212, 102, 70, 255]) }),
+  }
+  const spy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as never)
+  try {
+    expect(themePrimaryHex(false)).toBe('#d46646')
+    expect(assigned).toContain('oklch(65% .18 35)')
+    expect(assigned).not.toContain('#ff00ff')
+  } finally {
+    spy.mockRestore()
+    sheet.remove()
+    if (oldTheme === null) root.removeAttribute('data-admin-theme')
+    else root.setAttribute('data-admin-theme', oldTheme)
+    if (oldStyle === null) root.removeAttribute('style')
+    else root.setAttribute('style', oldStyle)
+  }
 })

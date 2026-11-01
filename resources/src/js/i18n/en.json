@@ -780,6 +780,8 @@
   "Загружаем...": "Loading…",
   "Название админки": "Admin name",
   "Акцентный цвет": "Accent color",
+  "Выбрать акцентный цвет": "Choose accent color",
+  "Сбросить цвет": "Reset color",
   "Логотип для светлой темы": "Light theme logo",
   "Логотип для тёмной темы": "Dark theme logo",
   "Удалить логотип": "Remove logo",

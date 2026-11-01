@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { adminFetch } from '@/http'
 import { appearance, paintAppearance } from '@/appearance/state'
-import { deriveBrandPalette, readBrand } from '@/appearance/brand'
+import { deriveBrandPalette, readBrand, themePrimaryHex } from '@/appearance/brand'
 import { AppearanceSaveError, notifySaveFailure } from '@/appearance/saveFeedback'
 import { t } from '@/i18n'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -33,6 +33,15 @@ function invalidateLogos() {
 const version = ref(0)
 const loaded = ref(false)
 const resetOpen = ref(false)
+const pickerColor = computed(() => {
+  if (/^#[\da-f]{6}$/i.test(draft.accentColor)) return draft.accentColor
+  // Read the host pack, not the currently applied brand override.
+  return themePrimaryHex(appearance.dark)
+})
+function setPickerColor(event: Event) {
+  draft.accentColor = (event.target as HTMLInputElement).value
+}
+
 let baseline = { name: '', accentColor: '' }
 const status = ref('loading')
 const error = ref('')
@@ -259,10 +268,19 @@ async function apply(reset = false) {
         >{{ t('Акцентный цвет')
         }}<input
           v-model="draft.accentColor"
-          placeholder="#2563EB"
+          placeholder="#RRGGBB"
           maxlength="7"
           class="appearance-select rounded-lg border border-border-primary bg-card px-3"
       /></label>
+      <div class="flex flex-wrap items-center gap-3">
+        <label v-if="pickerColor" class="flex items-center gap-2 text-sm font-medium">
+          {{ t('Выбрать акцентный цвет') }}
+          <input type="color" :value="pickerColor" @input="setPickerColor" />
+        </label>
+        <AppButton variant="secondary" size="sm" @click="draft.accentColor = ''">{{
+          t('Сбросить цвет')
+        }}</AppButton>
+      </div>
       <div v-for="variant in ['light', 'dark'] as const" :key="variant" class="space-y-2">
         <label class="flex flex-col gap-2 text-sm font-medium"
           >{{ t(variant === 'light' ? 'Логотип для светлой темы' : 'Логотип для тёмной темы')

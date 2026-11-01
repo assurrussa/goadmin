@@ -5,6 +5,10 @@ import { appearance, syncAppearance, disposeAppearance } from '@/appearance/stat
 import { emptyBrand } from '@/appearance/brand'
 const fetch = vi.hoisted(() => vi.fn())
 const notifyError = vi.hoisted(() => vi.fn())
+vi.mock('@/appearance/brand', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/appearance/brand')>()),
+  themePrimaryHex: (dark: boolean) => (dark ? '#aabbcc' : '#112233'),
+}))
 vi.mock('@/composables/useNotifications', () => ({
   useNotifications: () => ({ error: notifyError }),
 }))
@@ -433,4 +437,66 @@ it('fences late branding GET bodies across an owner transition while reloading t
   await flush()
   expect(root.querySelector('input')!.value).toBe('New owner snapshot')
   expect(root.textContent).not.toContain('Old private response')
+})
+
+it('shows the theme primary without saving it, tracks theme changes and syncs picker and HEX', async () => {
+  fetch.mockReset()
+  fetch.mockResolvedValueOnce(result(brand('Live', '')))
+  const root = await mount()
+  const hex = root.querySelectorAll<HTMLInputElement>('input')[1]!
+  const picker = root.querySelector<HTMLInputElement>('input[type=color]')!
+  expect(hex.value).toBe('')
+  expect(picker.value).toBe('#112233')
+  appearance.dark = true
+  await nextTick()
+  expect(picker.value).toBe('#aabbcc')
+  picker.value = '#123456'
+  picker.dispatchEvent(new Event('input', { bubbles: true }))
+  await nextTick()
+  expect(hex.value).toBe('#123456')
+  hex.value = '#abcdef'
+  hex.dispatchEvent(new Event('input', { bubbles: true }))
+  await nextTick()
+  expect(picker.value).toBe('#abcdef')
+  hex.value = 'invalid'
+  hex.dispatchEvent(new Event('input', { bubbles: true }))
+  await nextTick()
+  click(root, 'Применить')
+  await flush()
+  expect(root.textContent).toContain('Укажите HEX-цвет')
+  expect(fetch).toHaveBeenCalledTimes(1)
+})
+
+it('resets only the accent draft and preserves name and logos on save', async () => {
+  const root = await mount()
+  input(root, 0, 'Keep title')
+  click(root, 'Сбросить цвет')
+  await nextTick()
+  expect(root.querySelectorAll<HTMLInputElement>('input')[1]!.value).toBe('')
+  expect(root.querySelector<HTMLInputElement>('input[type=color]')!.value).toBe('#112233')
+  fetch.mockResolvedValueOnce(result(brand('Keep title', '', 2)))
+  click(root, 'Применить')
+  await flush()
+  const payload = JSON.parse(fetch.mock.calls[1]![1].body)
+  expect(payload).toEqual({ version: 1, name: 'Keep title', accentColor: '', reset: false })
+  expect(appearance.brand.accentColor).toBe('')
+})
+
+it('resetting the accent keeps a pending uploaded logo and edited name', async () => {
+  const root = await mount()
+  input(root, 0, 'Keep title')
+  const files = deferredLogos(root)
+  files.select()
+  await files.read(0, 'cG5n')
+  await files.decode(0)
+  click(root, 'Сбросить цвет')
+  fetch.mockResolvedValueOnce(result(brand('Keep title', '', 2)))
+  click(root, 'Применить')
+  await flush()
+  expect(JSON.parse(fetch.mock.calls[1]![1].body)).toMatchObject({
+    name: 'Keep title',
+    accentColor: '',
+    logoLight: 'cG5n',
+    reset: false,
+  })
 })
