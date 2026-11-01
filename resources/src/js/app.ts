@@ -17,7 +17,12 @@ import { useAuthUserStore } from '@/stores/authUser'
 import { useAdminWebSocket } from '@/composables/useAdminWebSocket'
 import { createAdminWebSocketPlugin } from '@/plugins/adminWebSocket'
 import { hasAdminCapability, setAdminCapabilities } from '@/composables/useAdminCapabilities'
-import { syncAppearance, discardAppearance, disposeAppearance } from '@/appearance/state'
+import {
+  syncAppearance,
+  discardAppearance,
+  pauseAppearance,
+  disposeAppearance,
+} from '@/appearance/state'
 import InertiaFallbackPage from '@/components/system/InertiaFallbackPage.vue'
 import AuthFailureNotice from '@/components/system/AuthFailureNotice.vue'
 import { createAuthFailureHandler } from '@/auth/browserAuthFailures'
@@ -185,7 +190,8 @@ void createInertiaApp({
             state === 'access_denied' ||
             state === 'session_changed'
           ) {
-            discardAppearance()
+            if (state === 'reauthentication_required') pauseAppearance()
+            else discardAppearance()
             authUserStore.setAuthUser(null)
             profileStore.setAvatarUrl(null)
             currentAuthId = null
@@ -193,8 +199,8 @@ void createInertiaApp({
             authFailureLogin.value = true
             authFailureMessage.value =
               state === 'session_changed'
-                ? 'Сеанс изменился. Данные формы сохранены. Войдите снова перед отправкой.'
-                : 'Сеанс завершён или доступ закрыт. Данные формы сохранены. Войдите снова.'
+                ? 'Сеанс изменился. Войдите снова; несохранённые данные могут быть потеряны.'
+                : 'Сеанс завершён или доступ закрыт. Войдите снова; несохранённые данные могут быть потеряны.'
           } else if (state === 'csrf_needs_sync') {
             manualRetryAfterRepair = true
             authFailureMessage.value = 'Восстанавливаем доступ. Данные формы остаются на странице.'
@@ -203,7 +209,7 @@ void createInertiaApp({
               'Сервис авторизации временно недоступен. Данные формы сохранены. Повторите попытку.'
           } else if (state === 'ready') {
             authFailureMessage.value = manualRetryAfterRepair
-              ? 'Доступ восстановлен. Данные формы сохранены на странице. Нажмите «Сохранить» ещё раз.'
+              ? 'Доступ восстановлен. Проверьте данные формы и сохраните вручную.'
               : ''
             manualRetryAfterRepair = false
             authFailureLogin.value = false
@@ -239,7 +245,7 @@ void createInertiaApp({
       const authFailureHandler = createAuthFailureHandler({
         origin: window.location.origin,
         clearAuth: () => {
-          discardAppearance()
+          pauseAppearance()
           currentAuthId = null
           authUserStore.setAuthUser(null)
           profileStore.setAvatarUrl(null)

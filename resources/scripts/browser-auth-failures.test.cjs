@@ -186,7 +186,7 @@ test('opt-in 401 recovers once without clearing, navigating or replaying the com
   await flush()
   assert.deepEqual(f.calls, ['disconnect', 'recover'])
   assert.match(f.notices.at(-1), /Доступ восстановлен/)
-  assert.match(f.notices.at(-1), /ещё раз/)
+  assert.match(f.notices.at(-1), /сохраните вручную/)
   // Late parallel failures do not undo successful recovery.
   f.handler(eventFor(f.value))
   assert.deepEqual(f.calls, ['disconnect', 'recover'])
@@ -204,7 +204,7 @@ for (const outcome of [false, 'reject']) {
     f.handler(eventFor(f.value))
     await flush()
     assert.deepEqual(f.calls, ['disconnect', 'recover', 'clear', 'disconnect', 'login-button'])
-    assert.match(f.notices.at(-1), /Данные формы остались/)
+    assert.match(f.notices.at(-1), /несохранённые данные могут быть потеряны/)
     assert.equal(f.calls.includes('navigate'), false)
   })
 }

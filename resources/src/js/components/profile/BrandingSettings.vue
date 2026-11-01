@@ -2,6 +2,12 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { adminFetch } from '@/http'
 import { appearance, paintAppearance } from '@/appearance/state'
+import {
+  clearBrandingRecovery,
+  hasBrandingRecovery,
+  registerBrandingRecovery,
+  takeBrandingRecovery,
+} from '@/appearance/brandingRecovery'
 import { deriveBrandPalette, readBrand, themePrimaryHex } from '@/appearance/brand'
 import { AppearanceSaveError, notifySaveFailure } from '@/appearance/saveFeedback'
 import { t } from '@/i18n'
@@ -79,7 +85,23 @@ watch(
   },
   { flush: 'sync' },
 )
+const unregisterRecovery = registerBrandingRecovery(() => {
+  if (!loaded.value || !permission.value || !appearance.owner) return
+  return {
+    owner: appearance.owner,
+    origin: location.origin,
+    path: '/auth/profile/settings',
+    created: Date.now(),
+    version: version.value,
+    name: draft.name,
+    accentColor: draft.accentColor,
+    baseline: { ...baseline },
+    ...(draft.logoLight === '' ? { logoLight: '' as const } : {}),
+    ...(draft.logoDark === '' ? { logoDark: '' as const } : {}),
+  }
+})
 onUnmounted(() => {
+  unregisterRecovery()
   alive = false
   invalidateLogos()
   epoch++
@@ -109,6 +131,40 @@ async function load(keep = false) {
   controller?.abort()
   controller = new AbortController()
   try {
+    if (!keep && permission.value && hasBrandingRecovery(appearance.owner)) {
+      // Verify the current cookie's actor and rights, not potentially stale history props.
+      const identity = await adminFetch('/auth/profile/settings', {
+        signal: controller.signal,
+        cache: 'no-store',
+        redirect: 'error',
+        headers: { Accept: 'text/html, application/xhtml+xml', 'X-Inertia': 'true' },
+      })
+      if (!alive || token !== epoch) return
+      if (
+        !identity.ok ||
+        identity.redirected ||
+        identity.headers.get('x-inertia') !== 'true' ||
+        !identity.headers.get('content-type')?.toLowerCase().includes('application/json')
+      )
+        throw new Error('Identity unavailable')
+      const page = await identity.json()
+      if (!alive || token !== epoch) return
+      const props = page?.props
+      const actor = props?.authuser?.idExact ?? props?.authuser?.id
+      if (
+        page?.component !== 'profile/SettingsPage' ||
+        actor == null ||
+        String(actor) !== appearance.owner ||
+        props?.appearance?.owner !== appearance.owner ||
+        props?.appearance?.unavailable === true ||
+        props?.appearanceAccess?.readOnly !== false ||
+        props?.appearanceAccess?.brandingRead !== true ||
+        props?.appearanceAccess?.brandingUpdate !== true
+      ) {
+        clearBrandingRecovery()
+        throw new Error('Identity or permission changed')
+      }
+    }
     const response = await adminFetch('/auth/branding', {
       signal: controller.signal,
       headers: { Accept: 'application/json' },
@@ -116,7 +172,10 @@ async function load(keep = false) {
     if (!response.ok) throw new AppearanceSaveError(response.status)
     const doc = await response.json()
     if (!alive || token !== epoch) return
+    if (!Number.isSafeInteger(doc.version) || doc.version < 0)
+      throw new Error('Invalid branding version')
     const brand = readBrand({ version: doc.version, ...doc.payload })
+    let recoveryConflict = false
     if (keep) {
       version.value = brand.version
       if (draft.name === baseline.name) draft.name = brand.name
@@ -124,9 +183,28 @@ async function load(keep = false) {
       if (draft.logoLight === undefined) urls.light = brand.logoLightUrl
       if (draft.logoDark === undefined) urls.dark = brand.logoDarkUrl
       baseline = { name: brand.name, accentColor: brand.accentColor }
-    } else hydrate(brand)
+    } else {
+      hydrate(brand)
+      const recovery = permission.value ? takeBrandingRecovery(appearance.owner) : undefined
+      if (recovery) {
+        recoveryConflict = recovery.version !== brand.version
+        // Keep the rejected version until the user explicitly accepts a fresh one.
+        if (recoveryConflict) version.value = recovery.version
+        if (recovery.name !== recovery.baseline.name) draft.name = recovery.name
+        if (recovery.accentColor !== recovery.baseline.accentColor)
+          draft.accentColor = recovery.accentColor
+        if (recovery.logoLight === '') {
+          draft.logoLight = ''
+          urls.light = ''
+        }
+        if (recovery.logoDark === '') {
+          draft.logoDark = ''
+          urls.dark = ''
+        }
+      }
+    }
     loaded.value = true
-    status.value = 'ready'
+    status.value = recoveryConflict ? 'conflict' : 'ready'
     error.value = ''
   } catch {
     if (alive && token === epoch) {

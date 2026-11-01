@@ -53,7 +53,7 @@ test('validation and navigation synchronize auth from the live Inertia page', as
   )
   const inertiaPageModule = { exports: {} }
   vm.runInNewContext(compile(path.join(__dirname, '../src/js/inertiaPage.ts')), inertiaPageModule)
-  const calls = { connected: 0, disconnected: 0, login: 0, presentation: 0, cancellations: 0 }
+  const calls = { connected: 0, disconnected: 0, login: 0, presentation: 0, cancellations: 0, paused: 0 }
   const authStore = {
     authUser: null,
     setAuthUser(user) {
@@ -123,7 +123,7 @@ test('validation and navigation synchronize auth from the live Inertia page', as
     '@/components/system/InertiaFallbackPage.vue': { default: component },
     '@/components/system/AuthFailureNotice.vue': { default: component },
     '@/stores/theme': { useThemeStore: () => ({ init() {} }) },
-    '@/appearance/state': { syncAppearance() {}, discardAppearance() {}, disposeAppearance() {} },
+    '@/appearance/state': { syncAppearance() {}, discardAppearance() {}, pauseAppearance() { calls.paused++ }, disposeAppearance() {} },
     '@/stores/adminProfile': { useAdminProfileStore: () => profileStore },
     '@/stores/authUser': { useAuthUserStore: () => authStore },
     '@/composables/useAdminWebSocket': {
@@ -317,6 +317,7 @@ test('validation and navigation synchronize auth from the live Inertia page', as
         },
       })
       assertUser(null)
+      assert.equal(calls.paused, 1)
       assert.equal(calls.login, 1)
       assert.equal(calls.disconnected, 3)
       dispatch('error', { errors: { title: 'Required' } })
