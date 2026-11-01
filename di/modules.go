@@ -48,19 +48,13 @@ func ModuleBootstrap() sharedgodi.Dependencies {
 			sharedgodi.NewDependency(provideAdminActionAuditRepo),
 			sharedgodi.NewDependency(provideFirstAdminSetup),
 			sharedgodi.NewDependency(provideAdminAuthService, sharedgodi.WithKey(KeyAdminAuthService)),
-			sharedgodi.NewDependency(
-				provideAdminJobsRepo,
-				sharedgodi.WithKey(KeyAdminJobsRepo),
-				sharedgodi.WithMatch(new(bootstrap.JobsRepo)),
-				sharedgodi.WithMatch(new(outbox.JobsRepository)),
-				sharedgodi.WithMatch(new(outbox.JobsStatRepository)),
-			),
-			sharedgodi.NewDependency(
-				provideAdminJobsFailedRepo,
-				sharedgodi.WithKey(KeyAdminJobsFailedRepo),
-				sharedgodi.WithMatch(new(bootstrap.JobsFailedRepo)),
-				sharedgodi.WithMatch(new(outbox.JobsFailedRepository)),
-			),
+			sharedgodi.NewDependency(provideAdminJobsRepo, sharedgodi.WithKey(KeyAdminJobsRepo)).
+				As[bootstrap.JobsRepo]().
+				As[outbox.JobsRepository]().
+				As[outbox.JobsStatRepository](),
+			sharedgodi.NewDependency(provideAdminJobsFailedRepo, sharedgodi.WithKey(KeyAdminJobsFailedRepo)).
+				As[bootstrap.JobsFailedRepo]().
+				As[outbox.JobsFailedRepository](),
 		),
 	)
 }
