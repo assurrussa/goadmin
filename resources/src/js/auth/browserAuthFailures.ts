@@ -140,7 +140,7 @@ export function createAuthFailureHandler(effects: AuthFailureEffects) {
     effects.clearAuth()
     effects.disconnect()
     effects.showNotice(
-      'Не удалось восстановить доступ. Данные формы остались на странице. Войдите снова перед повторной отправкой.',
+      'Не удалось восстановить доступ. Войдите снова; несохранённые данные могут быть потеряны.',
     )
     effects.showLogin?.()
   }
@@ -192,7 +192,7 @@ export function createAuthFailureHandler(effects: AuthFailureEffects) {
             ? ''
             : readOnly
               ? 'Восстанавливаем доступ.'
-              : 'Восстанавливаем доступ. Данные формы остаются на странице.',
+              : 'Восстанавливаем доступ. Несохранённые данные могут быть потеряны.',
         )
         // Keep only a validated GET destination, never a request body or mutation callback.
         void effects
@@ -212,7 +212,7 @@ export function createAuthFailureHandler(effects: AuthFailureEffects) {
                 effects.showNotice(
                   readOnly
                     ? 'Доступ восстановлен. Повторите переход.'
-                    : 'Доступ восстановлен. Данные формы сохранены на странице. Нажмите «Сохранить» ещё раз.',
+                    : 'Доступ восстановлен. Проверьте данные формы и сохраните вручную.',
                 )
               }
             } else {

@@ -15,6 +15,7 @@ import {
   sessionCoordinator,
   reportSessionAuthFailure,
 } from './index'
+import { pauseBrandingRecovery, registerBrandingRecovery } from '@/appearance/brandingRecovery'
 import { reconcileUploadCompletion, uploadFiles } from '@/services/fileUploadService'
 
 const capability = {
@@ -569,6 +570,29 @@ describe('public admin transport', () => {
     configureSessionMaintenance(capability)
     expect((await adminFetch(target)).status).toBe(200)
     expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('never creates branding recovery on explicit logout', async () => {
+    registerBrandingRecovery(() => ({
+      owner: '1',
+      origin: location.origin,
+      path: '/auth/profile/settings',
+      created: Date.now(),
+      name: 'Private',
+      accentColor: '#123456',
+      baseline: { name: '', accentColor: '' },
+    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response('signed out')),
+    )
+    configureSessionMaintenance(capability, {
+      onState: (state) => {
+        if (state === 'reauthentication_required') pauseBrandingRecovery()
+      },
+    })
+    await adminFetch('/logout', { method: 'POST' })
+    expect(sessionStorage.length).toBe(0)
   })
 
   it('cancels waiting commands on explicit logout without waiting for readiness', async () => {

@@ -314,6 +314,7 @@ onUnmounted(() => window.removeEventListener('hashchange', syncSection))
 watch(settingsSections, () => {
   if (!settingsSections.value.some((item) => item.key === section.value))
     section.value = 'interface'
+  else if (window.location.hash === '#branding' && appearance.brandingRead) syncSection()
 })
 
 const { authmail } = useAdminCapabilities()

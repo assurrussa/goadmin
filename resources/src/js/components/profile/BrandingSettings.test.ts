@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createApp, nextTick } from 'vue'
 import BrandingSettings from './BrandingSettings.vue'
-import { appearance, syncAppearance, disposeAppearance } from '@/appearance/state'
+import { appearance, syncAppearance, disposeAppearance, pauseAppearance } from '@/appearance/state'
 import { emptyBrand } from '@/appearance/brand'
 const fetch = vi.hoisted(() => vi.fn())
 const notifyError = vi.hoisted(() => vi.fn())
@@ -25,6 +25,19 @@ const result = (data: unknown, status = 200) => ({
   ok: status < 400,
   status,
   json: async () => data,
+})
+const verified = (owner = '1', update = true) => ({
+  ok: true,
+  redirected: false,
+  headers: new Headers({ 'X-Inertia': 'true', 'Content-Type': 'application/json' }),
+  json: async () => ({
+    component: 'profile/SettingsPage',
+    props: {
+      authuser: { idExact: owner },
+      appearance: { owner },
+      appearanceAccess: { readOnly: false, brandingRead: true, brandingUpdate: update },
+    },
+  }),
 })
 const flush = async () => {
   for (let i = 0; i < 10; i++) await Promise.resolve()
@@ -77,6 +90,7 @@ afterEach(() => {
   app = undefined
   disposeAppearance()
   vi.unstubAllGlobals()
+  sessionStorage.clear()
   document.body.replaceChildren()
 })
 it.each([401, 403, 419])(
@@ -499,4 +513,182 @@ it('resetting the accent keeps a pending uploaded logo and edited name', async (
     logoLight: 'cG5n',
     reset: false,
   })
+})
+
+function restoreActor(id: string, canUpdate = true) {
+  syncAppearance({
+    props: {
+      authuser: { id },
+      appearance: {
+        owner: id,
+        version: 1,
+        payload: { schemaVersion: 1, theme: 'light', locale: 'ru', density: 'default' },
+      },
+      appearanceAccess: { brandingRead: true, brandingUpdate: canUpdate },
+    },
+  })
+}
+
+it('restores only the same actor draft against fresh branding without replaying a PUT', async () => {
+  const root = await mount()
+  input(root, 0, 'Unsaved title')
+  input(root, 1, '#123456')
+  click(root, 'Удалить логотип')
+  pauseAppearance()
+  app?.unmount()
+  app = undefined
+  root.remove()
+  restoreActor('1')
+  fetch.mockResolvedValueOnce(verified())
+  fetch.mockResolvedValueOnce(result(brand('New server title', '#abcdef', 9)))
+  const restored = await mount()
+  expect(restored.querySelectorAll<HTMLInputElement>('input')[0]!.value).toBe('Unsaved title')
+  expect(restored.querySelectorAll<HTMLInputElement>('input')[1]!.value).toBe('#123456')
+  expect(fetch.mock.calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(0)
+  expect(restored.textContent).toContain('Черновик сохранён')
+  fetch.mockResolvedValueOnce(result(brand('New server title', '#abcdef', 9)))
+  click(restored, 'Получить новую версию для применения черновика')
+  await flush()
+  fetch.mockResolvedValueOnce(result(brand('Unsaved title', '#123456', 10)))
+  click(restored, 'Применить')
+  await flush()
+  expect(JSON.parse(fetch.mock.calls.at(-1)![1].body)).toMatchObject({
+    version: 9,
+    name: 'Unsaved title',
+    accentColor: '#123456',
+    logoLight: '',
+    reset: false,
+  })
+})
+
+it.each([
+  ['2', true],
+  ['1', false],
+])('discards draft for changed actor or revoked rights (%s, %s)', async (id, allowed) => {
+  const root = await mount()
+  input(root, 1, '#123456')
+  pauseAppearance()
+  app?.unmount()
+  app = undefined
+  root.remove()
+  restoreActor(id, allowed)
+  fetch.mockResolvedValueOnce(result(brand('Fresh', '#abcdef', 9)))
+  const restored = await mount()
+  expect(restored.querySelectorAll<HTMLInputElement>('input')[1]!.value).toBe('#abcdef')
+  expect(sessionStorage.length).toBe(0)
+  expect(fetch.mock.calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(0)
+})
+
+it('never stores uploaded logo bytes in recovery and keeps fresh server logos', async () => {
+  const root = await mount()
+  const files = deferredLogos(root)
+  files.select()
+  await files.read(0, 'cG5n')
+  await files.decode(0)
+  input(root, 1, '#123456')
+  pauseAppearance()
+  expect(JSON.stringify(sessionStorage)).not.toContain('cG5n')
+  app?.unmount()
+  app = undefined
+  root.remove()
+  restoreActor('1')
+  fetch.mockResolvedValueOnce(verified())
+  fetch.mockResolvedValueOnce(result(brand('Live', '', 1)))
+  const restored = await mount()
+  fetch.mockResolvedValueOnce(result(brand('Live', '#123456', 10)))
+  click(restored, 'Применить')
+  await flush()
+  const payload = JSON.parse(fetch.mock.calls.at(-1)![1].body)
+  expect(payload.accentColor).toBe('#123456')
+  expect(payload).not.toHaveProperty('logoLight')
+})
+
+it('keeps a conflict unresolved across a second reauthentication', async () => {
+  const root = await mount()
+  input(root, 1, '#123456')
+  pauseAppearance()
+  app?.unmount()
+  app = undefined
+  root.remove()
+  restoreActor('1')
+  fetch.mockResolvedValueOnce(verified())
+  fetch.mockResolvedValueOnce(result(brand('New server', '#abcdef', 9)))
+  const first = await mount()
+  expect(first.textContent).toContain('Черновик сохранён')
+  pauseAppearance()
+  app?.unmount()
+  app = undefined
+  first.remove()
+  restoreActor('1')
+  fetch.mockResolvedValueOnce(verified())
+  fetch.mockResolvedValueOnce(result(brand('New server', '#abcdef', 9)))
+  const second = await mount()
+  expect(second.textContent).toContain('Черновик сохранён')
+  expect(second.querySelectorAll<HTMLInputElement>('input')[1]!.value).toBe('#123456')
+  const apply = [...second.querySelectorAll('button')].find(
+    (button) => button.textContent?.trim() === 'Применить',
+  )!
+  expect(apply.disabled).toBe(true)
+  click(second, 'Применить')
+  expect(fetch.mock.calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(0)
+  fetch.mockResolvedValueOnce(result(brand('New server', '#abcdef', 9)))
+  click(second, 'Получить новую версию для применения черновика')
+  await flush()
+  fetch.mockResolvedValueOnce(result(brand('New server', '#123456', 10)))
+  click(second, 'Применить')
+  await flush()
+  expect(JSON.parse(fetch.mock.calls.at(-1)![1].body)).toMatchObject({
+    version: 9,
+    accentColor: '#123456',
+  })
+})
+
+it.each([
+  ['2', true],
+  ['1', false],
+])('does not restore when fresh server identity or update rights differ', async (owner, update) => {
+  const root = await mount()
+  input(root, 1, '#123456')
+  pauseAppearance()
+  app?.unmount()
+  app = undefined
+  root.remove()
+  restoreActor('1') // stale history props still claim the original actor and rights
+  fetch.mockResolvedValueOnce(verified(owner, update))
+  const restored = await mount()
+  expect(restored.querySelectorAll<HTMLInputElement>('input')[1]!.value).toBe('')
+  expect(restored.textContent).toContain('Не удалось загрузить бренд')
+  expect(sessionStorage.length).toBe(0)
+  expect(fetch.mock.calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(0)
+})
+
+it('does not restore until the identity probe succeeds, and never follows redirects', async () => {
+  const root = await mount()
+  input(root, 1, '#123456')
+  pauseAppearance()
+  app?.unmount()
+  app = undefined
+  root.remove()
+  restoreActor('1')
+  fetch.mockResolvedValueOnce({
+    ok: false,
+    redirected: false,
+    headers: new Headers(),
+    json: async () => ({}),
+  })
+  const restored = await mount()
+  const [url, init] = fetch.mock.calls.at(-1)!
+  expect(url).toBe('/auth/profile/settings')
+  expect(init).toMatchObject({
+    cache: 'no-store',
+    redirect: 'error',
+    headers: { 'X-Inertia': 'true' },
+  })
+  expect(restored.querySelectorAll<HTMLInputElement>('input')[1]!.value).toBe('')
+  expect(fetch.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0)
+  fetch.mockResolvedValueOnce(verified())
+  fetch.mockResolvedValueOnce(result(brand('Live', '#2563eb', 1)))
+  click(restored, 'Повторить')
+  await flush()
+  expect(restored.querySelectorAll<HTMLInputElement>('input')[1]!.value).toBe('#123456')
 })

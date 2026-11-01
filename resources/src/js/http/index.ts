@@ -1,3 +1,4 @@
+import { clearBrandingRecovery } from '@/appearance/brandingRecovery'
 import axios, {
   type AxiosInstance,
   type AxiosResponse,
@@ -161,6 +162,7 @@ export function adminFetch(
   const { retrySafeRead = false, ...init } = options
   const target = String(input)
   if (!sameOrigin(target)) return fetch(input, init)
+  if (logout(target)) clearBrandingRecovery()
   if (!sessionCoordinator.isEnabled()) {
     // CSRF is mandatory even when a host cannot negotiate session renewal.
     // Read the current proof at send time; never leak it to another origin.
@@ -309,11 +311,12 @@ function observeAxios(response: AxiosResponse, fence: ResponseFence | undefined)
 export function installSessionAxiosInterceptor(client: AxiosInstance = axios): () => void {
   const responseFences = new WeakMap<object, ResponseFence>()
   const requestID = client.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-    if (!sessionCoordinator.isEnabled()) return config
     // Axios combines baseURL even with a leading slash; WHATWG URL resolution
     // would misclassify /api/auth/login as the root identity transition.
     const target = client.getUri(config)
     if (!sameOrigin(target)) return config
+    if (logout(target)) clearBrandingRecovery()
+    if (!sessionCoordinator.isEnabled()) return config
     if (logout(target)) sessionCoordinator.reportFailure('reauthentication_required')
     if (!transition(target)) {
       const fence = sessionCoordinator.commandFence()

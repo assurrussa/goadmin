@@ -2,6 +2,11 @@ import { reactive } from 'vue'
 import { applyLocale, installLocalePreferenceHandler } from '@/i18n'
 import { adminFetch } from '@/http'
 import { applyBrand, emptyBrand, readBrand } from './brand'
+import {
+  clearBrandingRecovery,
+  pauseBrandingRecovery,
+  validateBrandingRecovery,
+} from './brandingRecovery'
 import { AppearanceSaveError, notifySaveFailure } from './saveFeedback'
 
 export type Preferences = {
@@ -108,6 +113,16 @@ export function syncAppearance(pageLike: unknown) {
     (!!props.authuser && !doc?.payload)
   const readOnly = !!access?.readOnly || unavailable
   const owner = typeof doc?.owner === 'string' ? doc.owner : ''
+  if (props.authuser)
+    validateBrandingRecovery(
+      owner,
+      !!owner &&
+        authID !== undefined &&
+        String(authID) === owner &&
+        !readOnly &&
+        !!access?.brandingRead &&
+        !!access?.brandingUpdate,
+    )
   const identityChanged = owner !== appearance.owner
   const fence = identityChanged || readOnly !== appearance.readOnly
   if (fence) {
@@ -142,7 +157,8 @@ export function syncAppearance(pageLike: unknown) {
   if (unavailable) appearance.status = 'error'
   paintAppearance()
 }
-export function discardAppearance() {
+export function discardAppearance(preserveRecovery = false) {
+  if (!preserveRecovery) clearBrandingRecovery()
   generation++
   controller?.abort()
   controller = undefined
@@ -159,8 +175,12 @@ export function discardAppearance() {
   appearance.saved = { ...appearance.draft }
   paintAppearance()
 }
+export function pauseAppearance() {
+  pauseBrandingRecovery()
+  discardAppearance(true)
+}
 export function disposeAppearance() {
-  discardAppearance()
+  discardAppearance(true)
   media?.removeEventListener('change', paintAppearance)
   initialized = false
 }

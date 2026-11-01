@@ -206,6 +206,7 @@ it('recovers an opted-in failure in the current page without replacing or submit
   expect(recoverAuth).toHaveBeenCalledTimes(1)
   expect(element.querySelector('input')).toBe(input)
   expect(input.value).toBe('unsaved draft')
+  expect(element.querySelector('[role="alert"]')?.textContent).toContain('могут быть потеряны')
   expect(navigate).not.toHaveBeenCalled()
   const login = [...element.querySelectorAll<HTMLButtonElement>('aside button')].find((button) =>
     button.textContent?.includes('Войти снова'),
