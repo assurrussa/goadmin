@@ -41,7 +41,9 @@ function change(key: keyof Preferences, event: Event) {
     class="space-y-6 rounded-xl border border-border-primary bg-card p-6"
   >
     <div>
-      <h2 id="appearance-title" class="text-xl font-semibold">{{ t('Интерфейс') }}</h2>
+      <h2 id="appearance-title" class="text-xl font-semibold">
+        {{ t('Интерфейс') }}
+      </h2>
       <p class="mt-2 text-sm text-text-secondary">
         {{ t('Изменения сохраняются автоматически для вашей учётной записи.') }}
       </p>
@@ -64,10 +66,16 @@ function change(key: keyof Preferences, event: Event) {
         </option>
       </select>
     </div>
-    <p v-if="appearance.readOnly" role="status">{{ t('Изменения недоступны в этом сеансе.') }}</p>
-    <p v-else-if="appearance.status === 'saving'" role="status">{{ t('Сохраняем...') }}</p>
+    <p v-if="appearance.readOnly" role="status">
+      {{ t('Изменения недоступны в этом сеансе.') }}
+    </p>
+    <p v-else-if="appearance.status === 'saving'" role="status">
+      {{ t('Сохраняем...') }}
+    </p>
     <div v-else-if="appearance.status === 'error'" role="alert" class="space-y-3">
-      <p>{{ t(appearance.error || 'Не удалось сохранить. Ваши изменения остаются на странице.') }}</p>
+      <p>
+        {{ t(appearance.error || 'Не удалось сохранить. Ваши изменения остаются на странице.') }}
+      </p>
       <div class="flex flex-wrap gap-2">
         <AppButton @click="saveAppearance">{{ t('Повторить') }}</AppButton
         ><AppButton variant="secondary" @click="reloadAppearance(false)">{{
@@ -76,7 +84,9 @@ function change(key: keyof Preferences, event: Event) {
       </div>
     </div>
     <div v-else-if="appearance.status === 'conflict'" role="alert" class="space-y-3">
-      <p>{{ t('Настройки изменены в другом окне. Выберите, какие изменения сохранить.') }}</p>
+      <p>
+        {{ t('Настройки изменены в другом окне. Выберите, какие изменения сохранить.') }}
+      </p>
       <div class="flex flex-wrap gap-2">
         <AppButton @click="reloadAppearance(true)">{{
           t('Применить мои изменения к новой версии')
@@ -86,7 +96,8 @@ function change(key: keyof Preferences, event: Event) {
         }}</AppButton>
       </div>
     </div>
-    <p v-else role="status" class="text-sm text-text-secondary">{{ t('Сохранено') }}</p>
+    <p v-else role="status" class="text-sm text-text-secondary">
+      {{ t('Сохранено') }}
+    </p>
   </section>
 </template>
-

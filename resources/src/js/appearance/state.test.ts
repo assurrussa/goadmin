@@ -16,11 +16,26 @@ const notifyError = vi.hoisted(() => vi.fn())
 vi.mock('@/composables/useNotifications', () => ({
   useNotifications: () => ({ error: notifyError }),
 }))
-vi.mock('@/http', () => ({ adminFetch: (...args: unknown[]) => fetch(...args) }))
-const preferences = { schemaVersion: 1, theme: 'system', locale: 'ru', density: 'default' }
-const doc = (owner = 'a', version = 1, payload = preferences) => ({ owner, version, payload })
+vi.mock('@/http', () => ({
+  adminFetch: (...args: unknown[]) => fetch(...args),
+}))
+const preferences = {
+  schemaVersion: 1,
+  theme: 'system',
+  locale: 'ru',
+  density: 'default',
+}
+const doc = (owner = 'a', version = 1, payload = preferences) => ({
+  owner,
+  version,
+  payload,
+})
 const page = (owner = 'a', readOnly = false) => ({
-  props: { authuser: { id: owner }, appearance: doc(owner), appearanceAccess: { readOnly } },
+  props: {
+    authuser: { id: owner },
+    appearance: doc(owner),
+    appearanceAccess: { readOnly },
+  },
 })
 const result = (data: unknown, status = 200) => ({
   ok: status < 400,
@@ -41,19 +56,22 @@ afterEach(() => {
   disposeAppearance()
   localStorage.clear()
 })
-it.each([401, 403, 419])('shows a useful toast for %s and keeps the draft without replay', async (status) => {
-  fetch.mockResolvedValueOnce(result({}, status))
-  editAppearance({ theme: 'dark' })
-  await flush()
-  expect(appearance.status).toBe('error')
-  expect(appearance.draft.theme).toBe('dark')
-  expect(appearance.saved.theme).toBe('system')
-  expect(appearance.error).toContain(status === 403 ? 'Нет доступа' : 'Сеанс или защита')
-  expect(notifyError).toHaveBeenCalledExactlyOnceWith(appearance.error)
-  editAppearance({ density: 'compact' })
-  await flush()
-  expect(fetch).toHaveBeenCalledTimes(1)
-})
+it.each([401, 403, 419])(
+  'shows a useful toast for %s and keeps the draft without replay',
+  async (status) => {
+    fetch.mockResolvedValueOnce(result({}, status))
+    editAppearance({ theme: 'dark' })
+    await flush()
+    expect(appearance.status).toBe('error')
+    expect(appearance.draft.theme).toBe('dark')
+    expect(appearance.saved.theme).toBe('system')
+    expect(appearance.error).toContain(status === 403 ? 'Нет доступа' : 'Сеанс или защита')
+    expect(notifyError).toHaveBeenCalledExactlyOnceWith(appearance.error)
+    editAppearance({ density: 'compact' })
+    await flush()
+    expect(fetch).toHaveBeenCalledTimes(1)
+  },
+)
 
 it('serializes requests and coalesces edits made in flight', async () => {
   let finish!: (value: unknown) => void
@@ -96,7 +114,14 @@ it('pauses on conflict and merges only changed fields with fresh server fields',
   expect(fetch).toHaveBeenCalledTimes(1)
   fetch.mockResolvedValueOnce(result(doc('a', 5, { ...preferences, locale: 'en' })))
   fetch.mockResolvedValueOnce(
-    result(doc('a', 6, { ...preferences, theme: 'dark', locale: 'en', density: 'compact' })),
+    result(
+      doc('a', 6, {
+        ...preferences,
+        theme: 'dark',
+        locale: 'en',
+        density: 'compact',
+      }),
+    ),
   )
   await reloadAppearance(true)
   await flush()
@@ -198,7 +223,10 @@ it('seeds private first paint from validated head attributes instead of device s
 
 it('ignores a stale private appearance document on an anonymous page', () => {
   syncAppearance({
-    props: { appearance: doc('old', 8, { ...preferences, theme: 'dark' }), authuser: null },
+    props: {
+      appearance: doc('old', 8, { ...preferences, theme: 'dark' }),
+      authuser: null,
+    },
   })
   expect(appearance.owner).toBe('')
   expect(appearance.draft.theme).toBe('system')
@@ -209,7 +237,10 @@ it('ignores a stale private appearance document on an anonymous page', () => {
 it('uses exact decimal owner identity above the safe JavaScript integer range', async () => {
   const exact = '9007199254740993'
   syncAppearance({
-    props: { appearance: doc(exact), authuser: { id: Number(exact), idExact: exact } },
+    props: {
+      appearance: doc(exact),
+      authuser: { id: Number(exact), idExact: exact },
+    },
   })
   expect(appearance.owner).toBe(exact)
   expect(appearance.readOnly).toBe(false)
@@ -234,7 +265,10 @@ it('keeps saved preferences after history navigation and uses the current versio
 })
 it('accepts newer same-owner props but does not downgrade through a permission fence', () => {
   syncAppearance({
-    props: { ...page().props, appearance: doc('a', 3, { ...preferences, locale: 'en' }) },
+    props: {
+      ...page().props,
+      appearance: doc('a', 3, { ...preferences, locale: 'en' }),
+    },
   })
   syncAppearance(page('a', true))
   expect(appearance.version).toBe(3)
@@ -257,7 +291,10 @@ it('keeps a conflict draft paused when navigating to older same-owner props', as
 })
 it('accepts lower server versions after logout and a new login to the same account', () => {
   syncAppearance({
-    props: { ...page().props, appearance: doc('a', 4, { ...preferences, locale: 'en' }) },
+    props: {
+      ...page().props,
+      appearance: doc('a', 4, { ...preferences, locale: 'en' }),
+    },
   })
   syncAppearance({ props: { authuser: null } })
   syncAppearance(page())
@@ -266,19 +303,29 @@ it('accepts lower server versions after logout and a new login to the same accou
 })
 
 it('keeps global branding monotonic across account switches and logout with stale props', () => {
-  syncAppearance({ props: { ...page().props, branding: { version: 2, name: 'Published' } } })
   syncAppearance({
-    props: { ...page('b').props, appearance: doc('b', 0), branding: { version: 1, name: 'Old' } },
+    props: { ...page().props, branding: { version: 2, name: 'Published' } },
+  })
+  syncAppearance({
+    props: {
+      ...page('b').props,
+      appearance: doc('b', 0),
+      branding: { version: 1, name: 'Old' },
+    },
   })
   expect(appearance.owner).toBe('b')
   expect(appearance.version).toBe(0)
   expect(appearance.brand).toMatchObject({ version: 2, name: 'Published' })
   syncAppearance({
-    props: { authuser: null, branding: { version: 1, name: 'Old anonymous page' } },
+    props: {
+      authuser: null,
+      branding: { version: 1, name: 'Old anonymous page' },
+    },
   })
   expect(appearance.owner).toBe('')
   expect(appearance.brand).toMatchObject({ version: 2, name: 'Published' })
-  syncAppearance({ props: { ...page().props, branding: { version: 3, name: 'Newest' } } })
+  syncAppearance({
+    props: { ...page().props, branding: { version: 3, name: 'Newest' } },
+  })
   expect(appearance.brand).toMatchObject({ version: 3, name: 'Newest' })
 })
-

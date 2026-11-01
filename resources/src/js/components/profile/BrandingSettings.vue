@@ -49,7 +49,12 @@ watch(
     const token = ++epoch
     invalidateLogos()
     controller?.abort()
-    Object.assign(draft, { name: '', accentColor: '', logoLight: undefined, logoDark: undefined })
+    Object.assign(draft, {
+      name: '',
+      accentColor: '',
+      logoLight: undefined,
+      logoDark: undefined,
+    })
     urls.light = ''
     urls.dark = ''
     resetOpen.value = false
@@ -191,7 +196,10 @@ async function apply(reset = false) {
     const response = await adminFetch('/auth/branding', {
       method: 'PUT',
       signal: controller.signal,
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ version: version.value, ...draft, reset }),
     })
     if (!alive || token !== epoch) return
@@ -224,7 +232,9 @@ async function apply(reset = false) {
     class="min-w-0 space-y-6 rounded-xl border border-border-primary bg-card p-6"
   >
     <div>
-      <h2 id="branding-title" class="text-xl font-semibold">{{ t('Бренд админки') }}</h2>
+      <h2 id="branding-title" class="text-xl font-semibold">
+        {{ t('Бренд админки') }}
+      </h2>
       <p class="mt-2 text-sm text-text-secondary">
         {{
           t(
@@ -370,4 +380,3 @@ async function apply(reset = false) {
     </Dialog>
   </section>
 </template>
-

@@ -49,14 +49,28 @@ try {
       // Save unchanged branding: exercises a real protected PUT without
       // changing this owned fixture's configuration or logos.
       const success = page.waitForResponse(r => new URL(r.url()).pathname === '/auth/branding' && r.request().method() === 'PUT')
-      await apply.click()
+      // Two synchronous events must still send only one protected command.
+      await apply.evaluate(button => { button.click(); button.click() })
       const saved = await success
       assert.equal(saved.status(), 200)
       assert.ok((await saved.request().allHeaders())['x-csrf-token'])
       assert.equal((await saved.request().allHeaders())['x-inertia'], undefined)
+      assert.equal((await saved.request().allHeaders())['sec-fetch-mode'], 'same-origin')
       assert.equal(result.commands.length, 1)
 
       await input.fill('Unsaved CSRF regression draft')
+      const currentProof = (await context.cookies()).find(cookie => cookie.name === 'csrf_token')
+      assert.ok(currentProof)
+      await context.addCookies([{ ...currentProof, value: 'invalid-stale-proof' }])
+      const stale = page.waitForResponse(r => new URL(r.url()).pathname === '/auth/branding' && r.request().method() === 'PUT')
+      await apply.click()
+      const staleResponse = await stale
+      assert.equal(staleResponse.status(), 419)
+      assert.match(staleResponse.headers()['content-type'], /application\/json/)
+      assert.equal(staleResponse.headers().location, undefined)
+      await expect(input).toHaveValue('Unsaved CSRF regression draft')
+      assert.equal(result.commands.length, 2)
+
       await context.clearCookies({ name: 'csrf_token' })
       const rejected = page.waitForResponse(r => new URL(r.url()).pathname === '/auth/branding' && r.request().method() === 'PUT')
       await apply.click()
@@ -65,12 +79,46 @@ try {
       assert.match(failure.headers()['content-type'], /application\/json/)
       assert.equal(failure.headers().location, undefined)
       await expect(input).toHaveValue('Unsaved CSRF regression draft')
-      await expect(page.locator('.notification').filter({ hasText: /Сеанс или защита|session or request protection/ })).toBeVisible()
+      await expect(page.locator('.notification').filter({ hasText: /Сеанс или защита|session or request protection/ }).last()).toBeVisible()
       // A real later read repairs the cookie but must not replay the command.
       await page.evaluate(() => fetch('/auth/profile/settings', { credentials: 'same-origin' }))
       await expect.poll(async () => (await context.cookies()).some(cookie => cookie.name === 'csrf_token')).toBe(true)
-      assert.equal(result.commands.length, 2)
+      assert.equal(result.commands.length, 3)
       await expect(input).toHaveValue('Unsaved CSRF regression draft')
+
+      // Repair only makes a subsequent explicit click eligible; never replay.
+      const retried = page.waitForResponse(r => new URL(r.url()).pathname === '/auth/branding' && r.request().method() === 'PUT')
+      await apply.click()
+      assert.equal((await retried).status(), 200)
+      assert.equal(result.commands.length, 4)
+      await expect(input).toHaveValue('Unsaved CSRF regression draft')
+      await input.fill(original)
+      const restored = page.waitForResponse(r => new URL(r.url()).pathname === '/auth/branding' && r.request().method() === 'PUT')
+      await apply.click()
+      assert.equal((await restored).status(), 200)
+      assert.equal(result.commands.length, 5)
+
+      // The browser must not forward the readable proof on an external
+      // redirect. Both origins are loopback; the target is intercepted locally.
+      const target = new URL('/csrf-redirect-target', config.url)
+      target.hostname = target.hostname === 'localhost' ? '127.0.0.1' : 'localhost'
+      let targetReached = false
+      await page.route(target.href, async route => {
+        targetReached = true
+        await route.fulfill({ status: 200, body: 'Unexpected redirect target' })
+      })
+      const redirect = async route => {
+        if (route.request().method() !== 'PUT') return route.continue()
+        await route.fulfill({ status: 302, headers: { Location: target.href } })
+      }
+      await page.route('**/auth/branding', redirect)
+      await input.fill('Unsaved redirect draft')
+      await apply.click()
+      await expect(brand.getByRole('alert')).toContainText(/Не удалось сохранить|Could not save|Failed to save/)
+      assert.equal(targetReached, false)
+      assert.equal(result.commands.length, 6)
+      await expect(input).toHaveValue('Unsaved redirect draft')
+      await page.unroute('**/auth/branding', redirect)
 
       // Remove the login while keeping its proof: a rejected session must not
       // redirect, replay a PUT, navigate away, or discard the mounted draft.
@@ -83,9 +131,9 @@ try {
       assert.ok([401, 419].includes(expiredResponse.status()))
       assert.match(expiredResponse.headers()['content-type'], /application\/json/)
       assert.equal(expiredResponse.headers().location, undefined)
-      await expect(input).toHaveValue('Unsaved CSRF regression draft')
+      await expect(input).toHaveValue('Unsaved redirect draft')
       await expect(page).toHaveURL(/\/auth\/profile\/settings#branding$/)
-      assert.equal(result.commands.length, 3)
+      assert.equal(result.commands.length, 7)
       assert.ok(result.commands.every(command => command.path === '/auth/branding'))
       assert.deepEqual(result.pageErrors, [])
       result.result = 'passed'

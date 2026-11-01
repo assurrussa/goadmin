@@ -241,7 +241,10 @@ async function sendAdminFetch(
       !unsafe(init.method) &&
       ['GET', 'HEAD'].includes((init.method ?? 'GET').toUpperCase())
     ) {
-      await ensureSessionReady({ signal: init.signal ?? undefined, force: true })
+      await ensureSessionReady({
+        signal: init.signal ?? undefined,
+        force: true,
+      })
       const retried = await send()
       response = retried.response
       fence = retried.fence
@@ -314,7 +317,9 @@ export function installSessionAxiosInterceptor(client: AxiosInstance = axios): (
     if (logout(target)) sessionCoordinator.reportFailure('reauthentication_required')
     if (!transition(target)) {
       const fence = sessionCoordinator.commandFence()
-      await ensureSessionReady({ signal: config.signal as AbortSignal | undefined })
+      await ensureSessionReady({
+        signal: config.signal as AbortSignal | undefined,
+      })
       sessionCoordinator.assertCommandFence(fence)
     }
     if (config.signal?.aborted) throw new SessionReadinessError('cancelled')
@@ -364,4 +369,3 @@ export function createAdminAxios(config?: Parameters<typeof axios.create>[0]): A
   installSessionAxiosInterceptor(client)
   return client
 }
-

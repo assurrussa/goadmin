@@ -202,7 +202,10 @@ export async function saveAppearance() {
     const response = await adminFetch('/auth/profile/appearance', {
       method: 'PATCH',
       signal: request.signal,
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ version: appearance.version, payload }),
     })
     if (epoch !== generation) return
@@ -270,4 +273,3 @@ export async function reloadAppearance(applyDraft = false) {
     }
   }
 }
-

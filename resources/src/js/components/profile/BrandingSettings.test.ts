@@ -8,7 +8,9 @@ const notifyError = vi.hoisted(() => vi.fn())
 vi.mock('@/composables/useNotifications', () => ({
   useNotifications: () => ({ error: notifyError }),
 }))
-vi.mock('@/http', () => ({ adminFetch: (...args: unknown[]) => fetch(...args) }))
+vi.mock('@/http', () => ({
+  adminFetch: (...args: unknown[]) => fetch(...args),
+}))
 let app: ReturnType<typeof createApp> | undefined
 const brand = (name = 'Live', color = '#2563eb', version = 1, pending = false) => ({
   version,
@@ -53,7 +55,12 @@ beforeEach(() => {
       appearance: {
         owner: '1',
         version: 0,
-        payload: { schemaVersion: 1, theme: 'light', locale: 'ru', density: 'default' },
+        payload: {
+          schemaVersion: 1,
+          theme: 'light',
+          locale: 'ru',
+          density: 'default',
+        },
       },
       branding: { version: 1, name: 'Live', accentColor: '#2563eb' },
       appearanceAccess: { brandingRead: true, brandingUpdate: true },
@@ -68,20 +75,23 @@ afterEach(() => {
   vi.unstubAllGlobals()
   document.body.replaceChildren()
 })
-it.each([401, 403, 419])('shows %s save failure, keeps the brand draft and never replays', async (status) => {
-  const root = await mount()
-  input(root, 0, 'Unsaved brand')
-  fetch.mockResolvedValueOnce(result({}, status))
-  click(root, 'Применить')
-  await flush()
-  expect((root.querySelector('input') as HTMLInputElement).value).toBe('Unsaved brand')
-  expect(appearance.brand.name).toBe('Live')
-  expect(root.textContent).toContain(status === 403 ? 'Нет доступа' : 'Сеанс или защита')
-  expect(notifyError).toHaveBeenCalledTimes(1)
-  expect(notifyError.mock.calls[0]?.[0]).toContain('Изменения остаются на странице.')
-  await flush()
-  expect(fetch).toHaveBeenCalledTimes(2) // initial read and exactly one PUT
-})
+it.each([401, 403, 419])(
+  'shows %s save failure, keeps the brand draft and never replays',
+  async (status) => {
+    const root = await mount()
+    input(root, 0, 'Unsaved brand')
+    fetch.mockResolvedValueOnce(result({}, status))
+    click(root, 'Применить')
+    await flush()
+    expect((root.querySelector('input') as HTMLInputElement).value).toBe('Unsaved brand')
+    expect(appearance.brand.name).toBe('Live')
+    expect(root.textContent).toContain(status === 403 ? 'Нет доступа' : 'Сеанс или защита')
+    expect(notifyError).toHaveBeenCalledTimes(1)
+    expect(notifyError.mock.calls[0]?.[0]).toContain('Изменения остаются на странице.')
+    await flush()
+    expect(fetch).toHaveBeenCalledTimes(2) // initial read and exactly one PUT
+  },
+)
 
 it('keeps name and accent preview isolated until explicit successful Apply', async () => {
   const root = await mount()
@@ -168,8 +178,12 @@ it('sends explicit empty logo for removal and reset through the same CAS API', a
 
 function deferredLogos(root: HTMLElement) {
   const readers: Array<{ result: string; onload: (() => void) | null }> = []
-  const images: Array<{ width: number; height: number; onload: (() => void) | null; src: string }> =
-    []
+  const images: Array<{
+    width: number
+    height: number
+    onload: (() => void) | null
+    src: string
+  }> = []
   vi.stubGlobal(
     'FileReader',
     class {
@@ -420,4 +434,3 @@ it('fences late branding GET bodies across an owner transition while reloading t
   expect(root.querySelector('input')!.value).toBe('New owner snapshot')
   expect(root.textContent).not.toContain('Old private response')
 })
-
