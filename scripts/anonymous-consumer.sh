@@ -13,6 +13,7 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/goadmin-consumer.XXXXXXXX")
 mkdir -p "$work/home" "$work/config" "$work/tmp" "$work/bin"
 anonymous() {
   env -i PATH="$work/bin:$PATH" HOME="$work/home" XDG_CONFIG_HOME="$work/config" \
+    HTTP_PROXY="${HTTP_PROXY:-}" HTTPS_PROXY="${HTTPS_PROXY:-}" NO_PROXY="${NO_PROXY:-}" \
     TMPDIR="$work/tmp" GOPATH="$work/gopath" GOMODCACHE="$work/modules" GOCACHE="$work/build" \
     GOENV=off GOWORK=off GOFLAGS= GOTOOLCHAIN=local GOAUTH=off GOPRIVATE= GONOPROXY= GONOSUMDB= \
     GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org 'GOVCS=*:off' \
