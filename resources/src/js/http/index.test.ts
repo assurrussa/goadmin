@@ -578,6 +578,7 @@ describe('public admin transport', () => {
       origin: location.origin,
       path: '/auth/profile/settings',
       created: Date.now(),
+      version: 1,
       name: 'Private',
       accentColor: '#123456',
       baseline: { name: '', accentColor: '' },

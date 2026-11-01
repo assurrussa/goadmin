@@ -51,6 +51,10 @@ async function mount() {
   await flush()
   return root
 }
+function unmountApp() {
+  app?.unmount()
+  app = undefined
+}
 function input(root: HTMLElement, index: number, value: string) {
   const field = root.querySelectorAll('input')[index]!
   field.value = value
@@ -535,8 +539,7 @@ it('restores only the same actor draft against fresh branding without replaying 
   input(root, 1, '#123456')
   click(root, 'Удалить логотип')
   pauseAppearance()
-  app?.unmount()
-  app = undefined
+  unmountApp()
   root.remove()
   restoreActor('1')
   fetch.mockResolvedValueOnce(verified())
@@ -568,8 +571,7 @@ it.each([
   const root = await mount()
   input(root, 1, '#123456')
   pauseAppearance()
-  app?.unmount()
-  app = undefined
+  unmountApp()
   root.remove()
   restoreActor(id, allowed)
   fetch.mockResolvedValueOnce(result(brand('Fresh', '#abcdef', 9)))
@@ -588,8 +590,7 @@ it('never stores uploaded logo bytes in recovery and keeps fresh server logos', 
   input(root, 1, '#123456')
   pauseAppearance()
   expect(JSON.stringify(sessionStorage)).not.toContain('cG5n')
-  app?.unmount()
-  app = undefined
+  unmountApp()
   root.remove()
   restoreActor('1')
   fetch.mockResolvedValueOnce(verified())
@@ -607,8 +608,7 @@ it('keeps a conflict unresolved across a second reauthentication', async () => {
   const root = await mount()
   input(root, 1, '#123456')
   pauseAppearance()
-  app?.unmount()
-  app = undefined
+  unmountApp()
   root.remove()
   restoreActor('1')
   fetch.mockResolvedValueOnce(verified())
@@ -616,8 +616,7 @@ it('keeps a conflict unresolved across a second reauthentication', async () => {
   const first = await mount()
   expect(first.textContent).toContain('Черновик сохранён')
   pauseAppearance()
-  app?.unmount()
-  app = undefined
+  unmountApp()
   first.remove()
   restoreActor('1')
   fetch.mockResolvedValueOnce(verified())
@@ -650,8 +649,7 @@ it.each([
   const root = await mount()
   input(root, 1, '#123456')
   pauseAppearance()
-  app?.unmount()
-  app = undefined
+  unmountApp()
   root.remove()
   restoreActor('1') // stale history props still claim the original actor and rights
   fetch.mockResolvedValueOnce(verified(owner, update))
@@ -666,8 +664,7 @@ it('does not restore until the identity probe succeeds, and never follows redire
   const root = await mount()
   input(root, 1, '#123456')
   pauseAppearance()
-  app?.unmount()
-  app = undefined
+  unmountApp()
   root.remove()
   restoreActor('1')
   fetch.mockResolvedValueOnce({
