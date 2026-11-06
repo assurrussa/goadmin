@@ -101,7 +101,8 @@ export function takeBrandingRecovery(owner: string): BrandingRecovery | undefine
       typeof item.baseline?.accentColor !== 'string'
     )
       return
-    // Old drafts have a solid accent. Reject malformed pairs as a whole.
+    // Old drafts have a solid accent. Draft text may be incomplete; validate it
+    // on Apply, preserving both endpoints and unrelated edits during recovery.
     item.accentColorEnd ??= ''
     item.baseline.accentColorEnd ??= ''
     const validPair = (start: string, end: unknown) =>
@@ -109,7 +110,7 @@ export function takeBrandingRecovery(owner: string): BrandingRecovery | undefine
       (start === '' || /^#[\da-f]{6}$/i.test(start)) &&
       (end === '' || (start !== '' && /^#[\da-f]{6}$/i.test(end)))
     if (
-      !validPair(item.accentColor, item.accentColorEnd) ||
+      typeof item.accentColorEnd !== 'string' ||
       !validPair(item.baseline.accentColor, item.baseline.accentColorEnd)
     )
       return

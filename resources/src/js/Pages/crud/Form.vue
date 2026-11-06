@@ -43,20 +43,36 @@ const form = useForm({ values: initial() })
 const draftRevision = ref(props.record?.revision)
 const errors = computed(() => form.errors as Record<string, string>)
 const fieldValidity = ref<Record<string, boolean>>({})
+const editedFields = ref(new Set<string>())
+const formState = computed(() => ({
+  errors: form.errors,
+  processing: form.processing,
+  isDirty:
+    form.isDirty ||
+    (props.mode === 'update' &&
+      activeFields.value.some((field) => !field.read && editedFields.value.has(field.key))),
+}))
 function submit() {
   if (
     form.processing ||
     activeFields.value.some((field) => fieldValidity.value[field.key] === false)
   )
     return
-  form.transform((data) =>
-    props.mode === 'update' ? { ...data.values, _revision: draftRevision.value } : data.values,
-  )
+  form.transform((data) => {
+    if (props.mode !== 'update') return data.values
+    const values = Object.fromEntries(
+      activeFields.value
+        .filter((field) => field.read || editedFields.value.has(field.key))
+        .map((field) => [field.key, data.values[field.key]]),
+    )
+    return { ...values, _revision: draftRevision.value }
+  })
   const options = {
     onSuccess: () => {
       draftRevision.value = props.record?.revision
       form.defaults({ values: initial() })
       form.reset()
+      editedFields.value.clear()
     },
   }
   const suffix =
@@ -78,6 +94,7 @@ watch(
     form.reset()
     form.clearErrors()
     fieldValidity.value = {}
+    editedFields.value.clear()
   },
 )
 function reload() {
@@ -93,7 +110,7 @@ onUnmounted(() => form.cancel())
 <template>
   <AppHead :title="resource.title" />
   <RecordEditForm
-    :form="form"
+    :form="formState"
     :fields="activeFields.map((field) => field.key)"
     :return-href="listHref"
     :label="t(mode === 'create' ? 'Создание' : 'Редактирование')"
@@ -106,6 +123,7 @@ onUnmounted(() => form.cancel())
       v-model="form.values[field.key]"
       :error="errors[field.key]"
       :disabled="form.processing"
+      @update:model-value="editedFields.add(field.key)"
       @update:valid="fieldValidity[field.key] = $event"
     />
     <AppButton

@@ -578,6 +578,34 @@ it('restores only the same actor draft against fresh branding without replaying 
   })
 })
 
+it('recovers incomplete color text with unrelated edits and validates before Apply', async () => {
+  const root = await mount()
+  input(root, 0, 'Unsaved title')
+  input(root, 1, '#12')
+  click(root, 'Удалить логотип')
+  pauseAppearance()
+  unmountApp()
+  root.remove()
+  restoreActor('1')
+  fetch.mockResolvedValueOnce(verified())
+  fetch.mockResolvedValueOnce(result(brand()))
+  const restored = await mount()
+  expect(restored.querySelectorAll<HTMLInputElement>('input')[0]!.value).toBe('Unsaved title')
+  expect(restored.querySelectorAll<HTMLInputElement>('input')[1]!.value).toBe('#12')
+  click(restored, 'Применить')
+  await flush()
+  expect(fetch.mock.calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(0)
+  input(restored, 1, '#123456')
+  fetch.mockResolvedValueOnce(result(brand('Unsaved title', '#123456', 2)))
+  click(restored, 'Применить')
+  await flush()
+  expect(JSON.parse(fetch.mock.calls.at(-1)![1].body)).toMatchObject({
+    name: 'Unsaved title',
+    accentColor: '#123456',
+    logoLight: '',
+  })
+})
+
 it.each([
   ['2', true],
   ['1', false],

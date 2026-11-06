@@ -198,6 +198,108 @@ it('keeps record identity outside create input and cancels work on unmount', () 
   app = undefined
   expect(mocks.cancel).toHaveBeenCalledOnce()
 })
+it('omits untouched optional write-only updates but preserves explicit replacements and failed drafts', async () => {
+  const root = mount(Form, {
+    resource: {
+      ...resource,
+      fields: [
+        ...resource.fields,
+        { key: 'apiKey', label: 'API key', type: 'text', read: false, create: true, update: true },
+        {
+          key: 'requiredSecret',
+          label: 'Required secret',
+          type: 'text',
+          read: false,
+          create: true,
+          update: true,
+          required: true,
+        },
+      ],
+    },
+    mode: 'update',
+    values: { name: 'A', active: false },
+    record: { id: 'a', revision: '1', data: {} },
+  })
+  const submit = () =>
+    root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }))
+  submit()
+  expect(mocks.put.mock.calls.at(-1)?.[1]).toEqual({
+    name: 'A',
+    active: false,
+    _revision: '1',
+  })
+  const input = root.querySelector<HTMLInputElement>('[name=apiKey]')!
+  const leaving = () => {
+    const event = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(event)
+    return event.defaultPrevented
+  }
+  expect(leaving()).toBe(false)
+  input.value = 'replacement'
+  input.dispatchEvent(new Event('input'))
+  await nextTick()
+  submit()
+  expect(mocks.put.mock.calls.at(-1)?.[1].apiKey).toBe('replacement')
+  const form = mocks.form as { errors: Record<string, string> }
+  form.errors = { form: 'Conflict' }
+  await nextTick()
+  submit()
+  expect(mocks.put.mock.calls.at(-1)?.[1].apiKey).toBe('replacement')
+  input.value = ''
+  input.dispatchEvent(new Event('input'))
+  await nextTick()
+  submit()
+  expect(mocks.put.mock.calls.at(-1)?.[1].apiKey).toBe('')
+  expect(leaving()).toBe(true) // An explicit empty replacement still needs saving.
+  mocks.put.mock.calls.at(-1)![2].onSuccess()
+  await nextTick()
+  expect(leaving()).toBe(false)
+  submit()
+  expect(mocks.put.mock.calls.at(-1)?.[1]).not.toHaveProperty('apiKey')
+})
+it.each(['number', 'boolean'] as const)(
+  'requires deliberate %s write-only updates even when the zero value is valid',
+  async (type) => {
+    const root = mount(Form, {
+      resource: {
+        ...resource,
+        fields: [
+          ...resource.fields,
+          {
+            key: 'secret',
+            label: 'Secret',
+            type,
+            read: false,
+            create: true,
+            update: true,
+            required: true,
+          },
+        ],
+      },
+      mode: 'update',
+      values: { name: 'A', active: false },
+      record: { id: 'a', revision: '1', data: {} },
+    })
+    const submit = () =>
+      root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }))
+    submit()
+    expect(mocks.put.mock.calls.at(-1)?.[1]).not.toHaveProperty('secret')
+    const input = root.querySelector<HTMLInputElement>('[name=secret]')!
+    if (type === 'number') {
+      input.value = '0'
+      input.dispatchEvent(new Event('input'))
+    } else {
+      input.checked = false
+      input.dispatchEvent(new Event('change'))
+    }
+    await nextTick()
+    submit()
+    expect(mocks.put.mock.calls.at(-1)?.[1].secret).toBe(type === 'number' ? 0 : false)
+    const event = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+  },
+)
 it('binds localized dates to scalar ISO values with accessible server errors', async () => {
   const update = vi.fn()
   const root = mount(Field, {

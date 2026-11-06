@@ -77,6 +77,9 @@ func validate[R, C, U any](d Definition[R, C, U]) error {
 		if f.Read && row[f.Key] == nil || f.Create && create[f.Key] == nil || f.Update && update[f.Key] == nil {
 			return fail("field missing explicit JSON key on its typed DTO")
 		}
+		if !f.Read && f.Update && !f.Required && update[f.Key].Kind() != reflect.Pointer {
+			return fail("optional write-only update fields require pointer DTO fields")
+		}
 		switch f.Type {
 		case "text", "textarea", "number", "boolean", fieldDate:
 		case fieldSelect:

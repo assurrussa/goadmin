@@ -43,6 +43,15 @@ readable declared fields are serialized or exported. Undeclared/read-only input
 is rejected. Keep secrets out of readable fields, including hidden table columns.
 Optional selects accept the blank option; nullable pointer fields also accept
 null. The server applies these checks to requests and readable callback output.
+Optional write-only update fields (`Read: false`, `Update: true`, `Required: false`)
+require pointer fields in the update DTO. Untouched fields are omitted from edit
+submissions; omitted input and explicit JSON `null` both decode to nil. The host
+update callback must treat nil as "leave the existing value unchanged" and a
+nonnil pointer, including an empty string, zero or false, as an explicit
+replacement. Required write-only fields must be explicitly edited on every update;
+the server rejects an omitted required field instead of accepting an invented
+empty/zero default.
+Unreadable values are never returned to populate the edit form.
 `FieldErrors` contains safe messages only; other errors are sanitized and logged.
 Detail pages preserve record text literally. Only declared option labels and
 boolean UI labels are translated. Lists and detail pages display an absent boolean
