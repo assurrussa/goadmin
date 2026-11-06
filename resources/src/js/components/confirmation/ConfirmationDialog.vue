@@ -32,7 +32,10 @@ const requests = computed(() =>
       }
     "
   >
-    <DialogContent class="goadmin-confirmation-dialog max-w-md">
+    <DialogContent
+      aria-modal="true"
+      class="goadmin-confirmation-dialog max-h-[calc(100dvh-2rem)] max-w-md overflow-y-auto"
+    >
       <DialogHeader>
         <div
           class="mb-2 flex h-10 w-10 items-center justify-center rounded-lg"
@@ -49,7 +52,7 @@ const requests = computed(() =>
           t(request.message, undefined, request.params)
         }}</DialogDescription>
       </DialogHeader>
-      <DialogFooter>
+      <DialogFooter class="gap-2">
         <AppButton
           variant="secondary"
           data-confirmation-cancel

@@ -105,6 +105,13 @@ it('renders a localized destructive dialog, focuses Cancel and settles acceptanc
   await settle()
   const dialog = document.querySelector<HTMLElement>('.goadmin-confirmation-dialog')!
   expect(dialog.getAttribute('role')).toBe('dialog')
+  expect(dialog.getAttribute('aria-modal')).toBe('true')
+  expect(document.getElementById(dialog.getAttribute('aria-labelledby')!)?.textContent).toContain(
+    'Подтвердите действие',
+  )
+  expect(document.getElementById(dialog.getAttribute('aria-describedby')!)?.textContent).toContain(
+    'Вы уверены, что хотите удалить запись?',
+  )
   expect(dialog.textContent).toContain('Подтвердите действие')
   expect(dialog.textContent).toContain('Вы уверены, что хотите удалить запись?')
   const cancel = dialog.querySelector<HTMLButtonElement>('[data-confirmation-cancel]')!
@@ -192,6 +199,41 @@ it('ignores a late click from the previous dialog when another request opens', a
   expect(controller.active.value?.message).toBe('Next action')
   controller.settle(controller.active.value!.id, false)
   expect(await nextAnswer).toBe(false)
+})
+
+it('cancels with the close button without dispatching and restores the opener', async () => {
+  const { trigger, ask } = mount()
+  const action = vi.fn()
+  trigger.focus()
+  const answer = ask({ message: 'Delete?' }, action)
+  await settle()
+  document.querySelector<HTMLButtonElement>('[data-ui="dialog"][data-part="close"]')!.click()
+  await settle()
+  expect(await answer).toBe(false)
+  expect(action).not.toHaveBeenCalled()
+  expect(document.querySelector('.goadmin-confirmation-dialog')).toBeNull()
+  expect(document.activeElement).toBe(trigger)
+})
+
+it('keeps focus in a consecutive dialog and returns to the surviving original opener', async () => {
+  const { trigger, ask, controller } = mount()
+  trigger.focus()
+  const first = ask({ message: 'First action' })
+  await settle()
+  const firstAccept = document.querySelector<HTMLButtonElement>('[data-confirmation-accept]')!
+  firstAccept.focus()
+  firstAccept.click()
+  const second = ask({ message: 'Second action' })
+  await settle()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  const dialog = document.querySelector<HTMLElement>('.goadmin-confirmation-dialog')!
+  expect(dialog.contains(document.activeElement)).toBe(true)
+  expect(await first).toBe(true)
+  controller.settle(controller.active.value!.id, false)
+  expect(await second).toBe(false)
+  await settle()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  expect(document.activeElement).toBe(trigger)
 })
 
 it.each(['navigation', 'actor', 'history'] as const)(

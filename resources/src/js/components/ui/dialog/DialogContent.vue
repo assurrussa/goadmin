@@ -14,6 +14,8 @@ import {
 } from 'reka-ui'
 import { cn } from '@/lib/utils'
 
+defineOptions({ inheritAttrs: false })
+
 const props = defineProps<DialogContentProps & { class?: HTMLAttributes['class'] }>()
 const emits = defineEmits<DialogContentEmits>()
 
@@ -32,7 +34,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
     <DialogContent
       data-ui="dialog"
       data-part="content"
-      v-bind="forwarded"
+      v-bind="{ ...$attrs, ...forwarded }"
       :class="
         cn(
           'fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-[var(--goadmin-dialog-radius,var(--radius-xl))] border border-[var(--goadmin-dialog-border,var(--color-border))] bg-[var(--goadmin-dialog-bg,var(--color-card))] text-[var(--goadmin-dialog-text,var(--color-card-foreground))] p-[var(--goadmin-dialog-padding,1.5rem)] shadow-[var(--goadmin-dialog-shadow,0_10px_15px_-3px_rgb(0_0_0/0.1),0_4px_6px_-4px_rgb(0_0_0/0.1))] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]',
