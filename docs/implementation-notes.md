@@ -1,5 +1,24 @@
 # Implementation Notes
 
+## PR 85 export-filter collision correction (2026-11-06)
+
+Base `048fb87`, same branch and checkout. Filterable fields named `scope` or
+`columns` collided with filtered CSV export controls, changing the repository
+constraints even when no business filter was entered. Extend constructor
+validation to reject only those filterable columns. Both names remain usable
+as readable/writable fields and sortable display columns; `ids` remains filterable.
+Retain the documented integer-only GET filter contract; decimal filtering is a
+separate extension. No frontend, schema, dependency or permission changes.
+
+The expanded constructor regression fails on the original code for exactly
+`scope` and `columns`, then passes with the fix. Targeted CRUD/workflow tests
+and Go diagnostics pass; independent final diff review found no actionable
+issues. `make check` passes Go race/coverage, 144 resource contract checks,
+1,204 UI tests, types, lint and the embedded asset build. The renderer contract
+and generated assets are unchanged. `make externalconsumer-local` passes.
+The full browser matrix and PostgreSQL integration test were not repeated for
+this constructor-only correction. Retained test applications and data are unchanged.
+
 ## PR 85 third review (2026-11-06)
 
 Review head `ea5e755`, same PR and checkout. Two SDK edge cases were confirmed:

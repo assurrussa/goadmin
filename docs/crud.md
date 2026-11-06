@@ -107,9 +107,12 @@ CAS, 20-view/64-KiB limits, column reconciliation and URL precedence. Selection
 holds up to 100 exact IDs, never persists, and follows existing query/owner reset
 rules. CSV exports visible columns, either selected records (100) or filtered
 records (10,000 with truncation feedback). Generic bulk actions are not included.
-Filterable columns cannot use `page`, `limit`, `search`, `sortBy` or `sortOrder`:
-these query names control pagination, search and sorting. The constructor rejects
-such columns; the same keys remain valid for fields and non-filterable columns.
+Filterable columns cannot use `page`, `limit`, `search`, `sortBy`, `sortOrder`,
+`scope` or `columns`: these query names control pagination, search, sorting and
+CSV export. The constructor rejects such columns; the same keys remain valid
+for fields and non-filterable columns. `ids` remains a valid filter key.
+Number GET filters follow the shared grid's integer-only parsing; CRUD input
+fields still support fractional values.
 
 ## Custom fields and bundle compatibility
 
