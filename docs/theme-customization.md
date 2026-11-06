@@ -16,8 +16,9 @@ autosave per administrator; conflicts retain the local draft for explicit
 resolution. The header's theme and locale controls use the same account state.
 The system theme choice follows the current device's operating-system setting.
 Anonymous device preferences remain separate from authenticated accounts. Both
-admin and auth headers expose explicit System/Light/Dark choices and retain the
-System selection while the effective operating-system theme changes.
+admin and auth headers use one button that cycles System → Light → Dark → System.
+Its icon and localized tooltip identify the selected preference; System remains
+selected while the effective operating-system theme changes.
 
 Settings use a grouped desktop sidebar and a compact mobile section selector.
 Personal settings and installation-wide branding remain distinct. Branding groups

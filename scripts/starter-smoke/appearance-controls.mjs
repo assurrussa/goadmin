@@ -1,39 +1,38 @@
 import assert from 'node:assert/strict'
 
 const themeLabels = {
-  system: /^(Системная|System)$/,
+  system: /^(Системная \(светлая\)|Системная \(тёмная\)|System \(light\)|System \(dark\))$/,
   light: /^(Светлая|Light)$/,
   dark: /^(Тёмная|Dark)$/,
 }
+const themeModes = ['system', 'light', 'dark']
 const themeTrigger = page => page.getByRole('button', { name: /^(Выбрать тему|Choose theme|Select theme):/, includeHidden: true })
 
-// Select the stored preference, then inspect the radio tick independently of
-// the effective paint. The System tick must survive either OS color scheme.
+// Cycle the stored preference independently of effective System paint. Wait
+// for each account save so another step cannot race the persistence request.
 export async function selectTheme(page, expect, mode) {
   assert.ok(themeLabels[mode], `unsupported theme ${mode}`)
   const trigger = themeTrigger(page)
-  await trigger.click()
-  await expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
-  await expect(trigger).toHaveAttribute('aria-expanded', 'true')
-  await expect(page.getByRole('menuitemradio')).toHaveCount(3)
-  const option = page.getByRole('menuitemradio', { name: themeLabels[mode], exact: true })
-  const changed = await option.getAttribute('aria-checked') !== 'true'
+  await expect(trigger).toBeVisible()
   const authenticated = await page.locator('[data-profile-menu-trigger]').count() > 0
-  const saved = changed && authenticated ? page.waitForResponse(response => {
-    if (new URL(response.url()).pathname !== '/auth/profile/appearance' || response.request().method() !== 'PATCH') return false
-    return response.request().postDataJSON()?.payload?.theme === mode
-  }) : undefined
-  await option.click()
-  if (saved) assert.equal((await saved).status(), 200, `persist ${mode} theme preference`)
+  for (let step = 0; step < themeModes.length; step++) {
+    const title = await trigger.getAttribute('title')
+    const current = themeModes.find(candidate => themeLabels[candidate].test(title ?? ''))
+    assert.ok(current, `unknown theme preference ${title}`)
+    if (current === mode) break
+    const next = themeModes[(themeModes.indexOf(current) + 1) % themeModes.length]
+    const saved = authenticated ? page.waitForResponse(response => {
+      if (new URL(response.url()).pathname !== '/auth/profile/appearance' || response.request().method() !== 'PATCH') return false
+      return response.request().postDataJSON()?.payload?.theme === next
+    }) : undefined
+    await trigger.focus()
+    await page.keyboard.press('Enter')
+    if (saved) assert.equal((await saved).status(), 200, `persist ${next} theme preference`)
+    await expect(trigger).toHaveAttribute('title', themeLabels[next])
+  }
+  await expect(trigger).toHaveAttribute('title', themeLabels[mode])
+  await expect(trigger).not.toHaveAttribute('aria-haspopup', 'menu')
   if (mode !== 'system') await expect(page.locator('html')).toHaveAttribute('data-theme-mode', mode)
-  await trigger.focus()
-  await page.keyboard.press('Enter')
-  const selected = page.getByRole('menuitemradio', { name: themeLabels[mode], exact: true })
-  await expect(selected).toHaveAttribute('aria-checked', 'true')
-  await expect(page.locator('[role="menuitemradio"][aria-checked="true"]')).toHaveCount(1)
-  await page.keyboard.press('Escape')
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false')
-  await expect(trigger).toBeFocused()
 }
 
 export async function assertSystemTheme(page, expect) {

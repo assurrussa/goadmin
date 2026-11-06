@@ -11,7 +11,8 @@
 </template>
 
 <script setup lang="ts">
-import { t } from '@/i18n'
+import { useConfirmation } from '@/composables/useConfirmation'
+const confirm = useConfirmation()
 
 import { computed, ref } from 'vue'
 import { router } from '@inertiajs/vue3'
@@ -62,14 +63,22 @@ function handleAction(actionId: string) {
       console.warn('Unknown action:', actionId)
   }
 }
-function handleDataAction(actionKey: string, item: Record<string, unknown>) {
+async function handleDataAction(actionKey: string, item: Record<string, unknown>) {
+  const syncUrl = `${apiUrl.value}/sync`
   switch (actionKey) {
     case 'sync':
-      if (confirm(t('Синхронизировать разрешения с кодовой базой?'))) {
-        router.visit(`${apiUrl.value}/sync`, {
-          method: 'post',
-        })
-      }
+      await confirm(
+        {
+          message: 'Синхронизировать разрешения с кодовой базой?',
+          confirmLabel: 'Синхронизировать',
+          variant: 'primary',
+        },
+        () => {
+          router.visit(syncUrl, {
+            method: 'post',
+          })
+        },
+      )
       break
     default:
       console.warn('Unknown action:', actionKey, 'for item:', item)

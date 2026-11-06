@@ -1,3 +1,11 @@
+const confirmation = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<boolean>>())
+vi.mock('@/composables/useConfirmation', () => ({
+  useConfirmation: () => async (options: unknown, onConfirm: () => void | Promise<void>) => {
+    const accepted = await confirmation(options)
+    if (accepted) await onConfirm()
+    return accepted
+  },
+}))
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, h, nextTick, type App } from 'vue'
 import Active from './ActivePage.vue'
@@ -56,7 +64,7 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue({ ok: true, json: async () => ({ jobs: 42, failed: 17 }) } as Response)
   vi.stubGlobal('fetch', fetchMock)
-  vi.stubGlobal('confirm', () => true)
+  confirmation.mockReset().mockResolvedValue(true)
   state.delete.mockReset()
   state.post.mockReset()
 })
@@ -90,9 +98,34 @@ for (const [name, component] of [
     )
     expect(root.querySelector('[data-queue-count="jobs"]')?.textContent).toBe('5')
   })
+  it(`${name} awaits confirmation and cancellation preserves requests and counters`, async () => {
+    let resolve!: (accepted: boolean) => void
+    confirmation.mockReturnValue(
+      new Promise<boolean>((done) => {
+        resolve = done
+      }),
+    )
+    const root = mount(component)
+    click(root, 'Delete one')
+    expect(state.delete).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(confirmation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: { id: 'job' },
+        confirmLabel: 'Удалить',
+        variant: 'danger',
+      }),
+    )
+    resolve(false)
+    await settle()
+    expect(state.delete).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(root.querySelector('[data-queue-count="jobs"]')?.textContent).toBe('5')
+  })
   it(`${name} single-delete success refreshes server counts rather than subtracting locally`, async () => {
     const root = mount(component)
     click(root, 'Delete one')
+    await settle()
     expect(state.delete).toHaveBeenCalledOnce()
     const callbacks = state.delete.mock.calls[0][1]
     expect(callbacks.onSuccess).toBeTypeOf('function')

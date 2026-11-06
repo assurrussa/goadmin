@@ -73,6 +73,8 @@
 </template>
 
 <script setup lang="ts">
+import { useConfirmation } from '@/composables/useConfirmation'
+const confirm = useConfirmation()
 import { t } from '@/i18n'
 
 import { computed, ref } from 'vue'
@@ -158,26 +160,35 @@ function handleTableAction(actionId: string) {
   }
 }
 
-function handleRowAction(actionKey: string, item: Record<string, unknown>) {
+async function handleRowAction(actionKey: string, item: Record<string, unknown>) {
+  const baseUrl = failedApi.value
   const id = extractId(item)
   if (!id) return
 
   if (actionKey === 'delete') {
-    if (!confirm(t('Удалить запись #{id} из DLQ?', undefined, { id: id }))) return
-
-    router.delete(`${failedApi.value}/${encodeURIComponent(String(id))}`, {
-      preserveScroll: true,
-      onSuccess: () => {
-        refreshFailed()
-        void refreshStats()
+    await confirm(
+      {
+        message: 'Удалить запись #{id} из DLQ?',
+        params: { id },
+        confirmLabel: 'Удалить',
+        variant: 'danger',
       },
-    })
+      () => {
+        router.delete(`${baseUrl}/${encodeURIComponent(String(id))}`, {
+          preserveScroll: true,
+          onSuccess: () => {
+            refreshFailed()
+            void refreshStats()
+          },
+        })
+      },
+    )
     return
   }
 
   if (actionKey === 'retry') {
     router.post(
-      `${failedApi.value}/${encodeURIComponent(String(id))}/retry`,
+      `${baseUrl}/${encodeURIComponent(String(id))}/retry`,
       {},
       {
         preserveScroll: true,

@@ -1,3 +1,11 @@
+const confirmation = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<boolean>>())
+vi.mock('@/composables/useConfirmation', () => ({
+  useConfirmation: () => async (options: unknown, onConfirm: () => void | Promise<void>) => {
+    const accepted = await confirmation(options)
+    if (accepted) await onConfirm()
+    return accepted
+  },
+}))
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, h, nextTick } from 'vue'
 import IndexPage from './IndexPage.vue'

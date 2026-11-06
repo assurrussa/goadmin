@@ -12,9 +12,10 @@
 </template>
 
 <script setup lang="ts">
+import { useConfirmation } from '@/composables/useConfirmation'
+const confirm = useConfirmation()
 import { useRecordNavigation } from '@/composables/useRecordNavigation'
 const { recordHref } = useRecordNavigation('/admins')
-import { t } from '@/i18n'
 import { computed, ref } from 'vue'
 import DataGrid from '@/components/datagrid/DataGrid.vue'
 import type { ApiResponse } from '@/composables/useDataGrid'
@@ -70,7 +71,9 @@ function handleDataCreate() {
   router.get(`${apiUrl.value}/create`)
 }
 
-function handleDataAction(actionKey: string, item: Record<string, unknown>) {
+async function handleDataAction(actionKey: string, item: Record<string, unknown>) {
+  const id = item.id
+  const baseUrl = apiUrl.value
   switch (actionKey) {
     case 'view':
       router.get(recordHref(item.id))
@@ -79,13 +82,17 @@ function handleDataAction(actionKey: string, item: Record<string, unknown>) {
       router.get(recordHref(item.id, true))
       break
     case 'delete':
-      if (
-        confirm(
-          t('Вы уверены, что хотите удалить запись #{id}?', undefined, { id: String(item.id) }),
-        )
-      ) {
-        router.delete(`${apiUrl.value}/${item.id}`)
-      }
+      await confirm(
+        {
+          message: 'Вы уверены, что хотите удалить запись #{id}?',
+          params: { id: String(id) },
+          confirmLabel: 'Удалить',
+          variant: 'danger',
+        },
+        () => {
+          router.delete(`${baseUrl}/${id}`)
+        },
+      )
       break
     default:
       console.warn('Unknown action:', actionKey, 'for item:', item)

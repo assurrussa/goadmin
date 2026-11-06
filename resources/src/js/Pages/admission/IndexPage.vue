@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useConfirmation } from '@/composables/useConfirmation'
+const confirm = useConfirmation()
 import { computed, ref } from 'vue'
 import { router } from '@inertiajs/vue3'
 import { t, registerTranslations, formatDateTime } from '@/i18n'
@@ -134,12 +136,31 @@ function approve(row: RequestRow) {
     expiresAt: until(),
   })
 }
-function reject(row: RequestRow) {
-  if (window.confirm(t('Admission confirm reject')))
-    send('/admissions/reject', { subject: row.ExternalSubject, version: row.Version })
+async function reject(row: RequestRow) {
+  const body = { subject: row.ExternalSubject, version: row.Version }
+  await confirm(
+    {
+      message: 'Admission confirm reject',
+      confirmLabel: 'Отклонить',
+      variant: 'danger',
+    },
+    () => {
+      send('/admissions/reject', body)
+    },
+  )
 }
-function revoke(row: Invitation) {
-  if (window.confirm(t('Admission confirm revoke'))) send('/admissions/revoke', { id: row.ID })
+async function revoke(row: Invitation) {
+  const id = row.ID
+  await confirm(
+    {
+      message: 'Admission confirm revoke',
+      confirmLabel: 'Отозвать',
+      variant: 'danger',
+    },
+    () => {
+      send('/admissions/revoke', { id })
+    },
+  )
 }
 function invitationState(row: Invitation) {
   if (row.Revoked) return 'Admission revoked'

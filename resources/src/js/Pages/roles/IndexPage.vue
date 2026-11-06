@@ -27,6 +27,8 @@
 </template>
 
 <script setup lang="ts">
+import { useConfirmation } from '@/composables/useConfirmation'
+const confirm = useConfirmation()
 import { t } from '@/i18n'
 
 import { computed, ref } from 'vue'
@@ -81,23 +83,32 @@ function handleCreate() {
   router.get(`${apiUrl.value}/create`)
 }
 
-function handleRowAction(actionKey: string, item: Record<string, unknown>) {
+async function handleRowAction(actionKey: string, item: Record<string, unknown>) {
   const roleId = item.id
+  const baseUrl = apiUrl.value
   if (!roleId) {
     return
   }
 
   switch (actionKey) {
     case 'view':
-      router.get(`${apiUrl.value}/${roleId}`)
+      router.get(`${baseUrl}/${roleId}`)
       break
     case 'edit':
-      router.get(`${apiUrl.value}/${roleId}/edit`)
+      router.get(`${baseUrl}/${roleId}/edit`)
       break
     case 'delete':
-      if (confirm(t('Удалить роль #{id}?', undefined, { id: String(roleId) }))) {
-        router.delete(`${apiUrl.value}/${roleId}`)
-      }
+      await confirm(
+        {
+          message: 'Удалить роль #{id}?',
+          params: { id: String(roleId) },
+          confirmLabel: 'Удалить',
+          variant: 'danger',
+        },
+        () => {
+          router.delete(`${baseUrl}/${roleId}`)
+        },
+      )
       break
     default:
       console.warn('Unknown row action:', actionKey, item)

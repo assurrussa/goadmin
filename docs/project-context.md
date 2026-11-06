@@ -293,7 +293,8 @@ owner-scoped CAS boundary as table preferences but an independent typed schema.
 Anonymous theme and locale use a separate device document. Login hydrates the
 verified account before paint; logout discards private drafts and pending work.
 The legacy shared browser choices are not imported into an account automatically.
-Admin/auth headers expose all three theme preferences. Settings have a grouped
+Admin/auth headers cycle System/Light/Dark with one button, retaining live OS
+updates while System is selected. Settings have a grouped
 sidebar and mobile section selector, retaining existing section hash URLs.
 
 Core branding adds installation-wide name, accent and light/dark PNG logos.

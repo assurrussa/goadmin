@@ -7,6 +7,7 @@ import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import Field from '@/crud/Field.vue'
+import { useConfirmation } from '@/composables/useConfirmation'
 import {
   crudReturnHref,
   crudRecordHref,
@@ -23,32 +24,55 @@ const props = defineProps<{
 }>()
 const page = usePage()
 const mutating = ref(false)
+const confirming = ref(false)
+const confirm = useConfirmation()
 const listHref = computed(() => crudReturnHref(props.resource.basePath, page.url))
 const error = computed(() => (page.props.errors as Record<string, string> | undefined)?.form)
-function run(key: string) {
-  if (mutating.value) return
+async function run(key: string) {
+  if (mutating.value || confirming.value) return
   const action = props.resource.actions.find((action) => action.key === key)
   if (key !== 'delete' && !action) return
-  if (
-    !props.record.actions?.includes(key) ||
-    !window.confirm(t(action?.confirmation || 'Вы уверены, что хотите удалить запись?'))
-  )
-    return
-  const base = `${props.resource.basePath}/records/${encodeURIComponent(props.record.id)}`
-  const suffix =
-    listHref.value === props.resource.basePath
-      ? ''
-      : `?${new URLSearchParams({ returnTo: listHref.value })}`
-  const data = { _revision: props.record.revision }
-  const onStart = () => {
-    mutating.value = true
+  if (!props.record.actions?.includes(key)) return
+  const basePath = props.resource.basePath
+  const id = props.record.id
+  const revision = props.record.revision
+  const returnTo = listHref.value
+  confirming.value = true
+  try {
+    await confirm(
+      {
+        message: action?.confirmation || 'Вы уверены, что хотите удалить запись?',
+        confirmLabel: action?.label || 'Удалить',
+        variant: key === 'delete' ? 'danger' : 'primary',
+      },
+      () => {
+        if (
+          mutating.value ||
+          props.resource.basePath !== basePath ||
+          props.record.id !== id ||
+          props.record.revision !== revision
+        )
+          return
+        const base = `${basePath}/records/${encodeURIComponent(id)}`
+        const suffix = returnTo === basePath ? '' : `?${new URLSearchParams({ returnTo })}`
+        const data = { _revision: revision }
+        const onStart = () => {
+          mutating.value = true
+        }
+        const onFinish = () => {
+          mutating.value = false
+        }
+        if (key === 'delete') router.delete(base + suffix, { data, onStart, onFinish })
+        else
+          router.post(`${base}/actions/${encodeURIComponent(key)}${suffix}`, data, {
+            onStart,
+            onFinish,
+          })
+      },
+    )
+  } finally {
+    confirming.value = false
   }
-  const onFinish = () => {
-    mutating.value = false
-  }
-  if (key === 'delete') router.delete(base + suffix, { data, onStart, onFinish })
-  else
-    router.post(`${base}/actions/${encodeURIComponent(key)}${suffix}`, data, { onStart, onFinish })
 }
 </script>
 <template>

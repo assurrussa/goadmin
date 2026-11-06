@@ -1,3 +1,11 @@
+const confirmation = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<boolean>>())
+vi.mock('@/composables/useConfirmation', () => ({
+  useConfirmation: () => async (options: unknown, onConfirm: () => void | Promise<void>) => {
+    const accepted = await confirmation(options)
+    if (accepted) await onConfirm()
+    return accepted
+  },
+}))
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, h, nextTick } from 'vue'
 import WaitingPage from '../auth/AdmissionWaitingPage.vue'
@@ -53,6 +61,7 @@ afterEach(() => {
   apps.splice(0).forEach((app) => app.unmount())
   document.body.innerHTML = ''
   post.mockReset()
+  confirmation.mockReset()
   setLocale('ru')
 })
 describe('SSO waiting isolation', () => {
@@ -172,6 +181,83 @@ describe('SSO moderation UI', () => {
     }
     expect(post).not.toHaveBeenCalled()
   })
+  it.each([true, false])('waits for rejection confirmation accepted=%s', async (accepted) => {
+    let resolve!: (accepted: boolean) => void
+    confirmation.mockReturnValue(
+      new Promise<boolean>((done) => {
+        resolve = done
+      }),
+    )
+    const root = await moderator()
+    const reject = [...root.querySelectorAll('button')].find((button) =>
+      button.textContent!.includes('Отклонить'),
+    )!
+    reject.click()
+    expect(post).not.toHaveBeenCalled()
+    expect(confirmation).toHaveBeenCalledWith({
+      message: 'Admission confirm reject',
+      confirmLabel: 'Отклонить',
+      variant: 'danger',
+    })
+    resolve(accepted)
+    await nextTick()
+    if (accepted)
+      expect(post).toHaveBeenCalledWith(
+        '/admissions/reject',
+        { subject: 'user', version: 4 },
+        expect.anything(),
+      )
+    else expect(post).not.toHaveBeenCalled()
+  })
+  it.each([true, false])(
+    'waits for invitation revocation confirmation accepted=%s',
+    async (accepted) => {
+      let resolve!: (accepted: boolean) => void
+      confirmation.mockReturnValue(
+        new Promise<boolean>((done) => {
+          resolve = done
+        }),
+      )
+      const root = document.createElement('div')
+      const invitation = {
+        ID: 'invite-1',
+        ExternalSubject: 'user',
+        ExpiresAt: '2030-01-01',
+        Revoked: false,
+        AcceptedSubject: '',
+      }
+      const app = createApp(IndexPage, {
+        records: [],
+        invitations: [invitation],
+        inviteRoles: [],
+        approveRoles: [],
+        canInvite: true,
+        canReject: false,
+      })
+      apps.push(app)
+      app.mount(root)
+      const revoke = [...root.querySelectorAll('button')].find((button) =>
+        button.textContent!.includes('Отозвать'),
+      )!
+      revoke.click()
+      expect(post).not.toHaveBeenCalled()
+      invitation.ID = 'changed'
+      expect(confirmation).toHaveBeenCalledWith({
+        message: 'Admission confirm revoke',
+        confirmLabel: 'Отозвать',
+        variant: 'danger',
+      })
+      resolve(accepted)
+      await nextTick()
+      if (accepted)
+        expect(post).toHaveBeenCalledWith(
+          '/admissions/revoke',
+          { id: 'invite-1' },
+          expect.anything(),
+        )
+      else expect(post).not.toHaveBeenCalled()
+    },
+  )
   it('has no enabled mutation for a read-only view', () => {
     const root = document.createElement('div')
     const app = createApp(IndexPage, {

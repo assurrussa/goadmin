@@ -60,6 +60,11 @@ They receive ID and expected revision, with no additional input body. `Authorize
 receives the action key as its operation. Action visibility is not authorization;
 every command repeats current permission and record checks.
 
+Built-in action confirmations use the shared localized admin dialog, including
+operation-specific buttons and destructive styling. Cancellation, navigation,
+actor changes and requester disposal never continue a pending action. Browser
+unload and unsaved-navigation guards retain their separate existing behavior.
+
 ## Routes and personal tables
 
 The module reserves its complete base namespace. It owns list `/`, GET/POST

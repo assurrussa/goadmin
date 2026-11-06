@@ -11,10 +11,10 @@ test('CRUD renderer fingerprint is deterministic and matches the Go requirement 
  const source=path.join(__dirname,'../../features/crud/client_generated.go')
  if(fs.existsSync(source)) assert.ok(fs.readFileSync(source,'utf8').includes(JSON.stringify(fingerprint)))
 })
-test('shared calendar source participates in renderer compatibility while tests do not', (t) => {
+test('shared calendar and confirmation source participate in renderer compatibility while tests do not', (t) => {
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'goadmin-crud-contract-'))
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}))
- for(const relative of ['src/js/crud','src/js/Pages/crud','src/js/components/date']) fs.mkdirSync(path.join(root,relative),{recursive:true})
+ for(const relative of ['src/js/crud','src/js/Pages/crud','src/js/components/date','src/js/components/confirmation']) fs.mkdirSync(path.join(root,relative),{recursive:true})
  const date=path.join(root,'src/js/components/date/LocalizedDatePicker.vue')
  fs.writeFileSync(date,'calendar v1')
  const first=crudFingerprint(root)
@@ -22,4 +22,7 @@ test('shared calendar source participates in renderer compatibility while tests 
  assert.equal(crudFingerprint(root),first)
  fs.writeFileSync(date,'calendar v2')
  assert.notEqual(crudFingerprint(root),first)
+ const calendar=crudFingerprint(root)
+ fs.writeFileSync(path.join(root,'src/js/components/confirmation/confirmation.ts'),'confirmation v1')
+ assert.notEqual(crudFingerprint(root),calendar)
 })

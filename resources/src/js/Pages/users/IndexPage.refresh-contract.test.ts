@@ -1,3 +1,11 @@
+const confirmation = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<boolean>>())
+vi.mock('@/composables/useConfirmation', () => ({
+  useConfirmation: () => async (options: unknown, onConfirm: () => void | Promise<void>) => {
+    const accepted = await confirmation(options)
+    if (accepted) await onConfirm()
+    return accepted
+  },
+}))
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, h, nextTick, reactive, type App } from 'vue'
 import UsersPage from './IndexPage.vue'
@@ -68,7 +76,7 @@ describe('redirected page props own refresh/mutation results', () => {
     expect(fetch).not.toHaveBeenCalled()
     // Permissions has sync rather than a delete action; its refresh above covers redirected props.
     if (routePath === '/permissions') return
-    vi.stubGlobal('confirm', () => true)
+    confirmation.mockResolvedValue(true)
     router.delete.mockImplementation(() => {
       props.data = data(routePath, 'Authoritative mutation page')
     })

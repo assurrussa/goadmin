@@ -273,7 +273,7 @@ export async function appearanceAcceptance({ page, context, browser, config, cre
   result.appearance = { crossBrowser: true, relogin: true, autosave: true, ownerIsolation: true,
     history: { appearance: true, branding: true }, longBrandMobile: true,
     settingsNavigation: { desktopGroups: true, mobileSelect: true, brandingPermission: true },
-    themeMenu: { explicitModes: true, liveSystemAndReload: true },
+    themeButton: { threeModeCycle: true, liveSystemAndReload: true },
     branding: { published: true, publicPNG: true, etag: true, reset: true, resetCancelAndKeyboard: true,
       customContrast, appliedLightAndDark: true },
     densityGeometry: { compactRowHeight, comfortableRowHeight },

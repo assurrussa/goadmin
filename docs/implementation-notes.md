@@ -1,5 +1,51 @@
 # Implementation Notes
 
+## Theme button and shared action confirmation (2026-11-06)
+
+Base: `a58c07d`, same branch and checkout. The user's feedback supersedes the
+theme dropdown: one button now cycles System -> Light -> Dark, retaining account
+preferences, localized current-mode labels and live system-theme updates.
+Data actions use one application-scoped confirmation provider and the existing
+dialog/button primitives. Messages, titles and operation labels follow RU/EN;
+deletion remains semantic red. Concurrent prompts fail closed; navigation,
+actor/read-only transitions and requester disposal cancel pending decisions.
+Rendered request IDs fence late clicks and close events from previous dialogs.
+Callers snapshot targets/revisions and pass the mutation as a callback. The
+provider checks its epoch and requester immediately before dispatching that
+callback, avoiding the extra race gap of an awaited boolean decision.
+
+Migrate built-in CRUD, users/admins/roles, permissions, queues, admission and
+attachment actions. Preserve the existing unsaved-navigation/browser-unload
+guards: Inertia's cancelled PendingVisit does not include the original visit
+callbacks, so an asynchronous cancel/revisit would change that separate contract.
+No public package, permission or data-schema changes. Shared confirmation sources
+join the CRUD renderer fingerprint. Validate targeted lifecycle/caller tests,
+the repository gate, consumer and full browser acceptance for both packs; update
+retained runtimes without resetting data or volumes and commit the final result.
+
+Complete. Initial `make check` passed Go tidy/format/vet/lint, full race/coverage
+and resources. Independent review found a cancellation race between Promise
+continuations; three red regressions for navigation, actor change and history now
+pass with callback dispatch inside the final epoch fence. History/popstate and
+accepted page changes cancel pending prompts too. Late DOM events retain their
+original request ID. The final affected `make resources` passed 144 contract
+checks, 1,176 UI tests, types, formatting, lint, build and embedded asset checks.
+Go diagnostics, targeted CRUD/host/public-surface checks, clean local consumer
+and smoke helper tests passed. Go behavior is unchanged apart from the generated
+renderer fingerprint. Native paint passed 64 cases, minimum 5.072:1, with the
+exact final CSS hash.
+
+Full source run `20261106t110002z-4f167e53` passed all 12 groups for each pack with
+zero page, console or diagnostic errors. It verifies keyboard theme cycling,
+live System behavior and persistence, RU/EN custom confirmation text/buttons,
+initial Cancel focus, Escape/cancel without deletion, accepted commands and
+deletion, and mobile geometry. Both mobile confirmation screenshots were inspected.
+Source builds used the documented temporary read-only shared Go cache proxy.
+Retained run `20261106t060043z-395904ab` was upgraded by replacing only app images;
+new backups, whole-table checksums and native-session probes confirm preserved
+Products, branding, preferences and sessions. Temporary acceptance stacks and
+the proxy are cleaned up; user-facing runtimes stay running. No publication.
+
 ## UI consistency follow-up (2026-11-06)
 
 Recheck after `50c3a2f`: opening Products anonymously and signing in exposed an

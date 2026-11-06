@@ -1,4 +1,6 @@
 {
+  "Вы уверены, что хотите удалить запись?": "Are you sure you want to delete the record?",
+  "Подтвердите действие": "Confirm action",
   "Не удалось обновить пользователя.": "Could not update the user.",
   "Пользователь успешно обновлён!": "User updated successfully!",
   "К списку": "Back to list",
