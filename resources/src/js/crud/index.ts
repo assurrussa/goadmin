@@ -30,7 +30,7 @@ export interface CrudResource {
   basePath: string
   title: string
   fields: CrudField[]
-  actions: Array<{ key: string; label: string; confirmation: string }>
+  actions: Array<{ key: string; label: string; confirmation?: string }>
 }
 export interface CrudRecord {
   id: string

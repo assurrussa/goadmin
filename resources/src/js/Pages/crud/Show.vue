@@ -41,7 +41,11 @@ async function run(key: string) {
   try {
     await confirm(
       {
-        message: action?.confirmation || 'Вы уверены, что хотите удалить запись?',
+        message:
+          action?.confirmation ||
+          (key === 'delete'
+            ? 'Вы уверены, что хотите удалить запись?'
+            : 'Вы уверены, что хотите выполнить действие?'),
         confirmLabel: action?.label || 'Удалить',
         variant: key === 'delete' ? 'danger' : 'primary',
       },

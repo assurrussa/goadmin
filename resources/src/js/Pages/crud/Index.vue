@@ -38,7 +38,11 @@ async function action(key: string, row: Record<string, unknown>) {
   try {
     await confirm(
       {
-        message: command?.confirmation || 'Вы уверены, что хотите удалить запись?',
+        message:
+          command?.confirmation ||
+          (key === 'delete'
+            ? 'Вы уверены, что хотите удалить запись?'
+            : 'Вы уверены, что хотите выполнить действие?'),
         confirmLabel: command?.label || 'Удалить',
         variant: key === 'delete' ? 'danger' : 'primary',
       },
