@@ -55,7 +55,8 @@ timezone conversion. Partial or impossible dates block submission and never reus
 the previous complete value. Admission expiry uses the same control with local
 24-hour minute fields and keeps its existing timestamp conversion.
 
-Single-record `Actions` declare a key, permission, confirmation and callback.
+Single-record `Actions` declare a key, permission, optional confirmation and
+callback.
 They receive ID and expected revision, with no additional input body. `Authorize`
 receives the action key as its operation. Action visibility is not authorization;
 every command repeats current permission and record checks.
@@ -64,6 +65,9 @@ Built-in action confirmations use the shared localized admin dialog, including
 operation-specific buttons and destructive styling. Cancellation, navigation,
 actor changes and requester disposal never continue a pending action. Browser
 unload and unsaved-navigation guards retain their separate existing behavior.
+Commands without a confirmation use a neutral action question; only Delete
+uses the default deletion question. The client resource type follows the same
+optional confirmation contract as the Go action JSON.
 
 ## Routes and personal tables
 

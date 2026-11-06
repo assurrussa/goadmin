@@ -1,5 +1,30 @@
 # Implementation Notes
 
+## Theme/confirmation completion audit (2026-11-06)
+
+Base: `7226909`, same branch and checkout. Recheck the three-state theme button
+and all action confirmation paths, retaining data, preferences and runtime volumes.
+Independent theme review found no defect (8 focused tests). Confirmation review
+found that a valid custom CRUD command without its optional confirmation asked
+about deleting the record. Index and detail now use a neutral command fallback;
+Delete retains its destructive question. The TypeScript resource's confirmation
+is optional, matching the existing Go JSON `omitempty` contract. Eight real
+page/provider/dialog regressions cover both locales, both pages, Cancel and
+accepted command/delete dispatch with the original revision. Custom bulk and
+branding reset confirmations retain busy/owner/revision fences; native unsaved
+navigation and browser-unload guards keep their previously documented contract.
+The 64 focused page/dialog/theme/branding/workflow tests passed, followed by
+`make check`: full Go race/coverage, 144 contract checks, 1,184 UI tests, types,
+lint, formatting, build and embedded asset verification. Clean local consumer
+passed. The native 64-case paint report matches the unchanged final CSS.
+Full source run `20261106t114119z-8bb94a88` passed all 12 groups for each pack,
+with no page, console or diagnostic errors. Retained runtimes were updated
+without recreating their PostgreSQL services or volumes. Fresh private backups,
+unchanged Products/branding/preferences checksums and successful probes using
+pre-existing sessions confirm preservation. Temporary acceptance stacks and the
+read-only build-cache proxy are removed after verification. No backend storage,
+permission or wire-contract changes; the client type is aligned with the wire.
+
 ## Theme button and shared action confirmation (2026-11-06)
 
 Base: `a58c07d`, same branch and checkout. The user's feedback supersedes the
