@@ -107,6 +107,11 @@
               </AppStatus>
               <!-- Boolean values -->
               <span
+                v-else-if="column.type === 'boolean' && getColumnValue(item, column.key) === ''"
+                class="text-text-tertiary"
+                >—</span
+              >
+              <span
                 v-else-if="column.type === 'boolean'"
                 :class="getColumnValue(item, column.key) ? 'text-success' : 'text-error'"
                 class="inline-flex items-center"
@@ -148,8 +153,8 @@
                     class="h-8 w-8 p-0"
                     :class="getActionClass(action)"
                     @click="$emit('action', action.key, item.item)"
-                    :title="action.label"
-                    :aria-label="action.label"
+                    :title="t(action.label)"
+                    :aria-label="t(action.label)"
                   >
                     <Pencil v-if="action.key === 'edit'" class="h-4 w-4" />
                     <Eye v-else-if="['show', 'view'].includes(action.key)" class="h-4 w-4" />

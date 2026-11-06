@@ -15,7 +15,7 @@ removed direct-delivery manager. Core and PostgreSQL Outbox pins are v0.17.0,
 including the no-attempt `DeferAt` contract required for authorization outages.
 Realtime resolves the
 published `gowebsocket v0.2.1` dependency. GoCache resolves v0.2.2. GoInertia
-v0.11.1 retains its protocol v2 default, matching the embedded frontend.
+v0.11.2 retains its protocol v2 default, matching the embedded frontend.
 
 The module is intended to be consumed by clean host applications through a small
 supported package list. Do not model future host integration as copying

@@ -407,6 +407,62 @@ describe('DataGridTable passing contracts: rendering, sort and identity', () => 
     expect(text(cells[0])).toBe('Да')
     expect(text(cells[1])).toBe('Нет')
   })
+  it.each([
+    ['ru', 'Да', 'Нет'],
+    ['en', 'Yes', 'No'],
+  ])('keeps absent boolean values distinct from false in %s', (locale, yes, no) => {
+    applyLocale(locale)
+    try {
+      const { element } = table(
+        [
+          row('x', {
+            item: { id: 'x', nullable: true, yes: true, no: false },
+            values: { nullable: null },
+            actions: [],
+          }),
+        ],
+        {
+          config: config({
+            columns: ['nullable', 'missing', 'yes', 'no'].map((key) =>
+              column(key, { type: 'boolean' }),
+            ),
+          }),
+        },
+      )
+      const cells = element.querySelectorAll('td')
+      expect([...cells].map(text)).toEqual(['—', '—', yes, no])
+      for (const cell of [cells[0], cells[1]]) {
+        expect(cell.querySelector('svg, .text-error, .text-success')).toBeNull()
+      }
+      expect(cells[2].querySelector('svg')).not.toBeNull()
+      expect(cells[3].querySelector('svg')).not.toBeNull()
+    } finally {
+      applyLocale('ru')
+    }
+  })
+  it.each([
+    ['ru', ['Просмотр', 'Редактировать', 'Удалить', 'Host custom label']],
+    ['en', ['View', 'Edit', 'Delete', 'Host custom label']],
+  ] as const)('localizes row icon action names and tooltips in %s', (locale, labels) => {
+    applyLocale(locale)
+    try {
+      const { element } = table([
+        row('x', {
+          actions: [
+            { key: 'view', label: 'Просмотр' },
+            { key: 'edit', label: 'Редактировать' },
+            { key: 'delete', label: 'Удалить' },
+            { key: 'show', label: 'Host custom label' },
+          ],
+        }),
+      ])
+      const actions = [...element.querySelectorAll('tbody button')]
+      expect(actions.map((action) => action.getAttribute('aria-label'))).toEqual(labels)
+      expect(actions.map((action) => action.getAttribute('title'))).toEqual(labels)
+    } finally {
+      applyLocale('ru')
+    }
+  })
   it('renders select badge labels including a numeric zero key and falls back for unknown values', () => {
     const { element } = table([row('x', { item: { id: 'x', status: 0, unknown: 'other' } })], {
       config: config({

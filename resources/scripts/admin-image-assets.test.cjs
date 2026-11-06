@@ -146,7 +146,11 @@ test('Vite serves GET/HEAD, query strings, additions, changes and deletions with
   write(image(root, 'nested/новое image.png'), 'first')
   const alias = '/images/' + encodeURIComponent('новое image.png')
   assert.equal((await request(server, alias)).body.toString(), 'first')
-  write(image(root, 'nested/новое image.png'), 'changed content')
+  // A client can receive Content-Length bytes before Vite's stream reaches EOF.
+  // Replace the inode so the previous response cannot read the appended bytes.
+  const replacement = path.join(root, 'replacement.png')
+  write(replacement, 'changed content')
+  fs.renameSync(replacement, image(root, 'nested/новое image.png'))
   assert.equal((await request(server, alias)).body.toString(), 'changed content')
   fs.unlinkSync(image(root, 'nested/новое image.png'))
   assert.equal((await request(server, alias)).status, 404)

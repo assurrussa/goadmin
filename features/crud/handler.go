@@ -47,10 +47,10 @@ func (h *handler[R, C, U]) RegisterGroupRoutes(router fiber.Router, _ ...fiber.H
 		APIErrorComponent: h.apiFailure,
 	}
 	cfg.Actions = []datagrid.Action[projected]{
-		{Key: "view", Label: "View"},
+		{Key: "view", Label: "Просмотр"},
 		{
 			Key:   "edit",
-			Label: "Edit",
+			Label: "Редактировать",
 			CanView: func(ctx context.Context,
 				row projected,
 			) bool {
@@ -63,7 +63,7 @@ func (h *handler[R, C, U]) RegisterGroupRoutes(router fiber.Router, _ ...fiber.H
 
 		{
 			Key:   string(Delete),
-			Label: "Delete",
+			Label: "Удалить",
 			CanView: func(ctx context.Context,
 				row projected,
 			) bool {
