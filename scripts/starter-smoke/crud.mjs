@@ -131,33 +131,31 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await expect(display('Available')).toHaveText('2026-12-01')
   await expect(display('Status')).toHaveText('Draft')
   await expect(display('Category')).toHaveText('Premium')
-  const confirm = async dialog => {
-    assert.equal(dialog.type(), 'confirm')
-    assert.equal(dialog.message(), 'Publish this product?')
-    await dialog.accept()
+  const confirmCommand = async (label, message) => {
+    await page.getByRole('button', { name: label, exact: true }).click()
+    const dialog = page.locator('.goadmin-confirmation-dialog')
+    await expect(dialog).toBeVisible()
+    await expect(dialog).toContainText(message)
+    await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
+    await dialog.locator('[data-confirmation-accept]').click()
+    await expect(dialog).toHaveCount(0)
   }
-  page.once('dialog', confirm)
   const [published] = await Promise.all([
     page.waitForResponse(response => new URL(response.url()).pathname === `${recordPath}/actions/publish` && response.request().method() === 'POST'),
-    page.getByRole('button', { name: 'Publish', exact: true }).click(),
+    confirmCommand('Publish', 'Publish this product?'),
   ])
   assert.equal(published.status(), 303)
   await expect(page).toHaveURL(new RegExp(`${recordPath}$`))
   await expect(display('Status')).toHaveText('Published')
   await expect(page.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0)
-  page.once('dialog', async dialog => {
-    assert.equal(dialog.message(), 'Unpublish this product?')
-    await dialog.accept()
-  })
   const [unpublished] = await Promise.all([
     page.waitForResponse(response => new URL(response.url()).pathname === `${recordPath}/actions/unpublish` && response.request().method() === 'POST'),
-    page.getByRole('button', { name: 'Unpublish', exact: true }).click(),
+    confirmCommand('Unpublish', 'Unpublish this product?'),
   ])
   assert.equal(unpublished.status(), 303)
   await expect(display('Status')).toHaveText('Draft')
   await expect(page.getByRole('button', { name: 'Unpublish', exact: true })).toHaveCount(0)
-  page.once('dialog', confirm)
-  await page.getByRole('button', { name: 'Publish', exact: true }).click()
+  await confirmCommand('Publish', 'Publish this product?')
   await expect(display('Status')).toHaveText('Published')
   report.unpublish = { confirmed: true, draftRestored: true, republish: true }
   await page.getByRole('link', { name: 'Edit', exact: true }).click()
@@ -344,6 +342,17 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(display('Name')).toHaveText(canonicalValues.name)
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Russian mobile Show must fit the viewport')
+  await page.getByRole('button', { name: 'Удалить', exact: true }).click()
+  const mobileConfirmation = page.locator('.goadmin-confirmation-dialog')
+  await expect(mobileConfirmation).toContainText('Подтвердите действие')
+  await expect(mobileConfirmation).toContainText('Вы уверены, что хотите удалить запись?')
+  await expect(mobileConfirmation.getByRole('button', { name: 'Отмена', exact: true })).toBeFocused()
+  const dialogBounds = await mobileConfirmation.boundingBox()
+  assert.ok(dialogBounds.x >= 0 && dialogBounds.x + dialogBounds.width <= 390)
+  if (folder) await page.screenshot({ path: path.join(folder, `${name}-confirmation-mobile-ru.png`), fullPage: true })
+  await page.keyboard.press('Escape')
+  await expect(mobileConfirmation).toHaveCount(0)
+  assert.ok((await get(`/products/data?search=${encodeURIComponent(prefix)}`)).data.length === 1, 'Cancel must retain the record')
   if (folder) await page.screenshot({ path: path.join(folder, `${name}-crud-show-mobile-ru.png`), fullPage: true })
   await page.getByRole('link', { name: 'Редактировать', exact: true }).click()
   await expect(field('name')).toHaveValue(canonicalValues.name)
@@ -378,20 +387,19 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   report.mobile = { locale: 'ru', viewport: '390x844', show: true, edit: true, noHorizontalOverflow: true }
 
   await page.goto(`${recordPath}?${new URLSearchParams({ returnTo })}`)
-  let deleteConfirmed = false
-  page.once('dialog', async dialog => {
-    assert.equal(dialog.type(), 'confirm')
-    assert.match(dialog.message(), /delete|удал/i)
-    deleteConfirmed = true
-    await dialog.accept()
-  })
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
+  const deleteDialog = page.locator('.goadmin-confirmation-dialog')
+  await expect(deleteDialog).toContainText('Are you sure you want to delete the record?')
+  await deleteDialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(deleteDialog).toHaveCount(0)
+  assert.equal((await get(`/products/data?search=${encodeURIComponent(prefix)}`)).data.length, 1)
   const [deleted] = await Promise.all([
     page.waitForResponse(response => new URL(response.url()).pathname === recordPath && response.request().method() === 'DELETE'),
-    page.getByRole('button', { name: 'Delete', exact: true }).click(),
+    confirmCommand('Delete', 'Are you sure you want to delete the record?'),
   ])
   assert.equal(deleted.status(), 303)
   await expect(page).toHaveURL(/\/products(?:\?.*)?$/)
-  assert.equal(deleteConfirmed, true)
+  report.confirmation = { localizedRUEN: true, cancelNoMutation: true, mobile: true, initialFocusCancel: true, acceptedDelete: true }
   const actualQuery = new URL(page.url()).searchParams
   const expectedQuery = new URL(returnTo, config.url).searchParams
   actualQuery.sort()

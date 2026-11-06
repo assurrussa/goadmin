@@ -46,7 +46,7 @@ it('keeps one service owner through auth/admin page changes and cleans subscript
   await nextTick()
   await nextTick()
   expect(mocks.success).toHaveBeenCalledExactlyOnceWith('Saved')
-  expect(mocks.on).toHaveBeenCalledTimes(1)
+  expect(mocks.on).toHaveBeenCalledTimes(2)
   const finish = mocks.on.mock.calls[0]![1] as () => void
   finish()
   pageName.value = 'admin'
@@ -62,7 +62,7 @@ it('keeps one service owner through auth/admin page changes and cleans subscript
   expect(mocks.error).toHaveBeenCalledExactlyOnceWith('Failed')
   app.unmount()
   app = undefined
-  expect(mocks.stop).toHaveBeenCalledTimes(1)
+  expect(mocks.stop).toHaveBeenCalledTimes(2)
   mocks.page.props.flash = { success: 'Too late' }
   finish()
   await nextTick()
@@ -78,5 +78,5 @@ it('ignores pending flash work after its frame unmounts', async () => {
   app = undefined
   await nextTick()
   expect(mocks.success).not.toHaveBeenCalled()
-  expect(mocks.stop).toHaveBeenCalledTimes(1)
+  expect(mocks.stop).toHaveBeenCalledTimes(2)
 })

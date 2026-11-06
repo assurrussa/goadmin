@@ -1,7 +1,7 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const crypto = require('node:crypto')
-const roots = ['src/js/crud', 'src/js/Pages/crud', 'src/js/components/date']
+const roots = ['src/js/crud', 'src/js/Pages/crud', 'src/js/components/date', 'src/js/components/confirmation']
 function crudFingerprint(resourceRoot = path.resolve(__dirname, '..')) {
   const hash = crypto.createHash('sha256')
   for (const root of roots) {

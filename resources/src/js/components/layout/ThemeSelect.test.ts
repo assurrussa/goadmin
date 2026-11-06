@@ -4,7 +4,13 @@ import { createPinia } from 'pinia'
 import ThemeSelect from './ThemeSelect.vue'
 import AuthLayout from './AuthLayout.vue'
 import AdminHeaderUtilities from './AdminHeaderUtilities.vue'
-import { appearance, deviceKey, disposeAppearance, syncAppearance } from '@/appearance/state'
+import {
+  appearance,
+  deviceKey,
+  disposeAppearance,
+  editAppearance,
+  syncAppearance,
+} from '@/appearance/state'
 
 vi.mock('@inertiajs/vue3', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@inertiajs/vue3')>()),
@@ -45,99 +51,94 @@ async function mount(component: Component = ThemeSelect) {
   await flush()
   return root
 }
-function key(element: Element, value: string) {
-  element.dispatchEvent(
-    new KeyboardEvent('keydown', { key: value, bubbles: true, cancelable: true }),
-  )
+function themeButton(root: HTMLElement) {
+  return root.querySelector<HTMLButtonElement>('button[aria-label^="Выбрать тему"]')!
 }
-async function open(root: HTMLElement) {
-  const trigger = root.querySelector<HTMLButtonElement>('button[aria-label^="Выбрать тему"]')!
-  key(trigger, 'Enter')
-  await flush()
-  expect(trigger.getAttribute('aria-haspopup')).toBe('menu')
-  expect(trigger.getAttribute('aria-expanded')).toBe('true')
-  return [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')]
-}
-it.each([
-  ['light', 'Светлая'],
-  ['dark', 'Тёмная'],
-  ['system', 'Системная'],
-] as const)(
-  'selects explicit %s by keyboard and checks the stored preference',
-  async (mode, label) => {
-    const root = await mount()
-    const options = await open(root)
-    expect(options.map((item) => item.textContent?.trim())).toEqual([
-      'Системная',
-      'Светлая',
-      'Тёмная',
-    ])
-    const item = options.find((item) => item.textContent?.trim() === label)!
-    item.focus()
-    key(item, 'Enter')
+it.each([false, true])('cycles System → Light → Dark → System with OS dark=%s', async (dark) => {
+  media.matches = dark
+  media.addEventListener.mock.calls[0]![1]()
+  const root = await mount()
+  const button = themeButton(root)
+  expect(button.title).toBe(dark ? 'Системная (тёмная)' : 'Системная (светлая)')
+  expect(button.querySelector('.lucide-monitor')).not.toBeNull()
+  expect(button.hasAttribute('aria-haspopup')).toBe(false)
+  for (const [mode, title, icon] of [
+    ['light', 'Светлая', 'sun'],
+    ['dark', 'Тёмная', 'moon'],
+    ['system', dark ? 'Системная (тёмная)' : 'Системная (светлая)', 'monitor'],
+  ] as const) {
+    button.click()
     await flush()
     expect(appearance.draft.theme).toBe(mode)
     expect(JSON.parse(localStorage.getItem(deviceKey)!).theme).toBe(mode)
-    const reopened = await open(root)
-    expect(
-      reopened
-        .filter((item) => item.getAttribute('aria-checked') === 'true')
-        .map((item) => item.textContent?.trim()),
-    ).toEqual([label])
-    key(document.querySelector('[role="menu"]')!, 'Escape')
-    await flush()
-    expect(root.querySelector('button')!.getAttribute('aria-expanded')).toBe('false')
-  },
-)
-it('keeps System checked when live OS changes resolve to dark and light', async () => {
+    expect(button.title).toBe(title)
+    expect(button.getAttribute('aria-label')).toBe('Выбрать тему: ' + title)
+    expect(button.querySelector('.lucide-' + icon)).not.toBeNull()
+    expect(document.querySelector('[role="menu"]')).toBeNull()
+  }
+})
+it('retains System preference and monitor icon as the OS changes live', async () => {
   const root = await mount()
-  expect(root.querySelector('button')!.title).toBe('Системная (светлая)')
-  media.matches = true
-  media.addEventListener.mock.calls[0]![1]()
-  await flush()
-  expect(root.querySelector('button')!.title).toBe('Системная (тёмная)')
-  const options = await open(root)
-  expect(options[0]!.getAttribute('aria-checked')).toBe('true')
-  expect(options[2]!.getAttribute('aria-checked')).toBe('false')
-  media.matches = false
-  media.addEventListener.mock.calls[0]![1]()
-  await flush()
-  expect(root.querySelector('button')!.title).toBe('Системная (светлая)')
-  expect(appearance.draft.theme).toBe('system')
+  const button = themeButton(root)
+  for (const dark of [true, false]) {
+    media.matches = dark
+    media.addEventListener.mock.calls[0]![1]()
+    await flush()
+    expect(button.title).toBe(dark ? 'Системная (тёмная)' : 'Системная (светлая)')
+    expect(button.querySelector('.lucide-monitor')).not.toBeNull()
+    expect(appearance.draft.theme).toBe('system')
+    expect(document.documentElement.dataset.themeMode).toBe(dark ? 'dark' : 'light')
+  }
   expect(localStorage.getItem(deviceKey)).toBeNull()
 })
-it('moves radio focus with arrow keys and fences a menu after live permission changes', async () => {
+it('restores a saved preference and localizes the button label', async () => {
   const root = await mount()
-  const options = await open(root)
-  options[0]!.focus()
-  key(options[0]!, 'ArrowDown')
-  await new Promise((resolve) => setTimeout(resolve, 0))
+  themeButton(root).click()
   await flush()
-  expect(document.activeElement).toBe(options[1])
-  appearance.readOnly = true
+  apps.splice(0).forEach((app) => app.unmount())
+  disposeAppearance()
+  syncAppearance({ props: {} })
+  const restored = await mount()
+  expect(appearance.draft.theme).toBe('light')
+  editAppearance({ locale: 'en' })
   await flush()
-  expect(options.every((item) => item.getAttribute('aria-disabled') === 'true')).toBe(true)
-  options[2]!.click()
-  key(options[2]!, 'Enter')
+  const button = restored.querySelector<HTMLButtonElement>('button')!
+  expect(button.title).toBe('Light')
+  expect(button.getAttribute('aria-label')).toBe('Choose theme: Light')
+  button.click()
   await flush()
-  expect(appearance.draft.theme).toBe('system')
+  expect(button.title).toBe('Dark')
+  expect(button.getAttribute('aria-label')).toBe('Choose theme: Dark')
 })
-it.each(['readOnly', 'resolving'] as const)('fences theme selection while %s', async (flag) => {
-  appearance[flag] = true
-  const root = await mount()
-  const trigger = root.querySelector<HTMLButtonElement>('button')!
-  expect(trigger.disabled).toBe(true)
-  key(trigger, 'Enter')
-  trigger.click()
-  await flush()
-  expect(document.querySelector('[role="menu"]')).toBeNull()
-  expect(appearance.draft.theme).toBe('system')
-})
+it.each(['readOnly', 'resolving'] as const)(
+  'fences theme cycling while %s changes live',
+  async (flag) => {
+    const root = await mount()
+    const button = themeButton(root)
+    appearance[flag] = true
+    await flush()
+    expect(button.disabled).toBe(true)
+    button.click()
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flush()
+    expect(appearance.draft.theme).toBe('system')
+    expect(localStorage.getItem(deviceKey)).toBeNull()
+    appearance[flag] = false
+    await flush()
+    button.click()
+    await flush()
+    expect(appearance.draft.theme).toBe('light')
+  },
+)
 it.each([
   ['auth shell', AuthLayout],
   ['admin header', AdminHeaderUtilities],
-] as const)('mounts the same three-mode menu in %s', async (_label, component) => {
+] as const)('mounts the same cycling button in %s', async (_label, component) => {
   const root = await mount(component)
-  expect(await open(root)).toHaveLength(3)
-  expect(root.querySelector('button[title="Системная (светлая)"]')).not.toBeNull()
+  const button = themeButton(root)
+  expect(button.title).toBe('Системная (светлая)')
+  button.click()
+  await flush()
+  expect(button.title).toBe('Светлая')
+  expect(document.querySelector('[role="menu"]')).toBeNull()
 })

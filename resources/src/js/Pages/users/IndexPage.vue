@@ -12,6 +12,8 @@
 </template>
 
 <script setup lang="ts">
+import { useConfirmation } from '@/composables/useConfirmation'
+const confirm = useConfirmation()
 import { useRecordNavigation } from '@/composables/useRecordNavigation'
 const { recordHref } = useRecordNavigation('/users')
 import { t } from '@/i18n'
@@ -105,7 +107,9 @@ function handleDataCreate() {
   router.get(`${apiUrl.value}/create`)
 }
 
-function handleDataAction(actionKey: string, item: Record<string, unknown>) {
+async function handleDataAction(actionKey: string, item: Record<string, unknown>) {
+  const id = item.id
+  const baseUrl = apiUrl.value
   switch (actionKey) {
     case 'view':
       router.get(recordHref(item.id))
@@ -114,24 +118,30 @@ function handleDataAction(actionKey: string, item: Record<string, unknown>) {
       router.get(recordHref(item.id, true))
       break
     case 'delete':
-      if (
-        confirm(
-          t('Вы уверены, что хотите удалить запись #{id}?', undefined, { id: String(item.id) }),
-        )
-      ) {
-        router.delete(`${apiUrl.value}/${item.id}`)
-      }
+      await confirm(
+        {
+          message: 'Вы уверены, что хотите удалить запись #{id}?',
+          params: { id: String(id) },
+          confirmLabel: 'Удалить',
+          variant: 'danger',
+        },
+        () => {
+          router.delete(`${baseUrl}/${id}`)
+        },
+      )
       break
     case 'restore':
-      if (
-        confirm(
-          t('Вы уверены, что хотите восстановить запись #{id}?', undefined, {
-            id: String(item.id),
-          }),
-        )
-      ) {
-        router.post(`${apiUrl.value}/${item.id}/restore`, {})
-      }
+      await confirm(
+        {
+          message: 'Вы уверены, что хотите восстановить запись #{id}?',
+          params: { id: String(id) },
+          confirmLabel: 'Восстановить',
+          variant: 'primary',
+        },
+        () => {
+          router.post(`${baseUrl}/${id}/restore`, {})
+        },
+      )
       break
     default:
       console.warn('Unknown action:', actionKey, 'for item:', item)

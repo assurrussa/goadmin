@@ -105,6 +105,8 @@
 </template>
 
 <script setup lang="ts">
+import { useConfirmation } from '@/composables/useConfirmation'
+const confirm = useConfirmation()
 import { t } from '@/i18n'
 
 import { computed, ref } from 'vue'
@@ -246,21 +248,30 @@ const handleDelete = async (file: RichTextAttachmentFile) => {
     return
   }
 
-  const confirmed = window.confirm(t('Удалить файл?'))
-  if (!confirmed) {
-    return
-  }
+  const id = file.id
+  await confirm(
+    {
+      message: 'Удалить файл?',
+      confirmLabel: 'Удалить',
+      variant: 'danger',
+    },
+    async () => {
+      if (!props.allowDeleteUnattached || isAttached(id) || deletingIds.value.has(id)) {
+        return
+      }
 
-  deletingIds.value.add(file.id)
+      deletingIds.value.add(id)
 
-  try {
-    await deleteUploadedFile(file.id)
-    emit('removed', file.id)
-  } catch (error) {
-    console.error('RichTextAttachmentList: failed to delete file', error)
-    alert(t('Не удалось удалить файл. Проверьте консоль для подробностей.'))
-  } finally {
-    deletingIds.value.delete(file.id)
-  }
+      try {
+        await deleteUploadedFile(id)
+        emit('removed', id)
+      } catch (error) {
+        console.error('RichTextAttachmentList: failed to delete file', error)
+        alert(t('Не удалось удалить файл. Проверьте консоль для подробностей.'))
+      } finally {
+        deletingIds.value.delete(id)
+      }
+    },
+  )
 }
 </script>

@@ -1,3 +1,6 @@
+vi.mock('@/composables/useConfirmation', () => ({
+  useConfirmation: () => vi.fn().mockResolvedValue(false),
+}))
 import { afterEach, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, h } from 'vue'
 import Dashboard from './IndexPage.vue'

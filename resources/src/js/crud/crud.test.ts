@@ -10,9 +10,17 @@ const mocks = vi.hoisted(() => ({
   put: vi.fn(),
   remove: vi.fn(),
   cancel: vi.fn(),
+  confirm: vi.fn().mockResolvedValue(true),
   on: vi.fn(),
   page: { url: '/products/records/a/edit?returnTo=%2Fproducts%3Fpage%3D3', props: {} },
   form: undefined as unknown,
+}))
+vi.mock('@/composables/useConfirmation', () => ({
+  useConfirmation: () => async (options: unknown, action: () => void) => {
+    const accepted = await mocks.confirm(options)
+    if (accepted) await action()
+    return accepted
+  },
 }))
 vi.mock('@inertiajs/vue3', () => ({
   usePage: () => mocks.page,
@@ -49,6 +57,9 @@ vi.mock('@inertiajs/vue3', () => ({
 }))
 let app: ReturnType<typeof createApp> | undefined
 let unregister: (() => void) | undefined
+const settleConfirmation = async () => {
+  for (let i = 0; i < 6; i++) await nextTick()
+}
 function mount(component: Parameters<typeof createApp>[0], props: Record<string, unknown>) {
   const root = document.createElement('div')
   document.body.append(root)
@@ -320,10 +331,6 @@ it('does not adopt a new server revision for an old dirty draft after conflict',
 
 it('dispatches a confirmed record command once until its request finishes', async () => {
   mocks.post.mockImplementationOnce((_url, _data, options) => options.onStart())
-  vi.stubGlobal(
-    'confirm',
-    vi.fn(() => true),
-  )
   const root = mount(Show, {
     resource: {
       ...resource,
@@ -342,21 +349,18 @@ it('dispatches a confirmed record command once until its request finishes', asyn
   )!
   button.click()
   button.click()
-  await nextTick()
+  await settleConfirmation()
   expect(mocks.post).toHaveBeenCalledOnce()
   expect(button.disabled).toBe(true)
   const options = mocks.post.mock.calls[0][2]
   options.onFinish()
   await nextTick()
   button.click()
+  await settleConfirmation()
   expect(mocks.post).toHaveBeenCalledTimes(2)
 })
 
 it('keeps action controls usable when a global before hook cancels before request start', async () => {
-  vi.stubGlobal(
-    'confirm',
-    vi.fn(() => true),
-  )
   const root = mount(Show, {
     resource: {
       ...resource,
@@ -369,8 +373,34 @@ it('keeps action controls usable when a global before hook cancels before reques
     (button) => button.textContent?.trim() === 'Publish',
   )!
   button.click()
-  await nextTick()
+  await settleConfirmation()
   expect(button.disabled).toBe(false)
   button.click()
+  await settleConfirmation()
   expect(mocks.post).toHaveBeenCalledTimes(2)
+})
+
+it('waits for confirmation and rejects a record whose revision changed while the dialog was open', async () => {
+  let accept!: (answer: boolean) => void
+  mocks.confirm.mockImplementationOnce(
+    () =>
+      new Promise<boolean>((resolve) => {
+        accept = resolve
+      }),
+  )
+  const record = reactive({ id: 'a', revision: '1', data: { name: 'A' }, actions: ['delete'] })
+  const root = mount(Show, {
+    resource,
+    record,
+    permissions: { create: true, update: true, delete: true },
+  })
+  const button = [...root.querySelectorAll('button')].find(
+    (button) => button.textContent?.trim() === 'Удалить',
+  )!
+  button.click()
+  expect(mocks.remove).not.toHaveBeenCalled()
+  record.revision = '2'
+  accept(true)
+  await settleConfirmation()
+  expect(mocks.remove).not.toHaveBeenCalled()
 })

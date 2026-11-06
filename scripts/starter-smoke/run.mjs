@@ -140,7 +140,7 @@ async function runCase(name, config) {
     await selectTheme(page, expect, 'light')
     await selectTheme(page, expect, 'system')
     await assertSystemTheme(page, expect)
-    result.themeMenu = { auth: ['system', 'light', 'dark'], liveSystemAndReload: true, keyboardRadio: true }
+    result.themeButton = { auth: ['system', 'light', 'dark'], liveSystemAndReload: true, keyboardCycle: true }
     await page.goto('/auth/register')
     await fill(page, { name: 'Smoke Owner', lastName: 'Initial', email: credentials.email,
       username: `smoke-${name}`, password: credentials.password, passwordConfirm: credentials.password,

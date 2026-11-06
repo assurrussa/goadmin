@@ -73,6 +73,8 @@
 </template>
 
 <script setup lang="ts">
+import { useConfirmation } from '@/composables/useConfirmation'
+const confirm = useConfirmation()
 import { t } from '@/i18n'
 
 import { computed, ref } from 'vue'
@@ -158,20 +160,29 @@ function handleTableAction(actionId: string) {
   }
 }
 
-function handleRowAction(actionKey: string, item: Record<string, unknown>) {
+async function handleRowAction(actionKey: string, item: Record<string, unknown>) {
+  const baseUrl = jobsApi.value
   const id = extractId(item)
   if (!id) return
 
   if (actionKey === 'delete') {
-    if (!confirm(t('Удалить задачу #{id} из очереди?', undefined, { id: id }))) return
-
-    router.delete(`${jobsApi.value}/${encodeURIComponent(String(id))}`, {
-      preserveScroll: true,
-      onSuccess: () => {
-        refreshJobs()
-        void refreshStats()
+    await confirm(
+      {
+        message: 'Удалить задачу #{id} из очереди?',
+        params: { id },
+        confirmLabel: 'Удалить',
+        variant: 'danger',
       },
-    })
+      () => {
+        router.delete(`${baseUrl}/${encodeURIComponent(String(id))}`, {
+          preserveScroll: true,
+          onSuccess: () => {
+            refreshJobs()
+            void refreshStats()
+          },
+        })
+      },
+    )
   }
 }
 </script>

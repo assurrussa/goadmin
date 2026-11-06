@@ -6,10 +6,13 @@ import NotificationsContainer from '@/components/NotificationsContainer.vue'
 import UploadQueueContainer from '@/components/UploadQueueContainer.vue'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 import { useFlashMessages } from '@/composables/useFlashMessages'
+import { provideConfirmation } from '@/components/confirmation/confirmation'
+import ConfirmationDialog from '@/components/confirmation/ConfirmationDialog.vue'
 
 const { uploads } = useAdminCapabilities()
 useFlashMessages()
 provideUploadTaskTracker()
+const confirmation = provideConfirmation()
 </script>
 
 <template>
@@ -32,6 +35,7 @@ provideUploadTaskTracker()
     }}</a>
   </div>
   <slot />
+  <ConfirmationDialog :controller="confirmation" />
   <NotificationsContainer />
   <UploadQueueContainer v-if="uploads" />
 </template>

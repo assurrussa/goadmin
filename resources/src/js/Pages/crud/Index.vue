@@ -8,9 +8,12 @@ import DataGrid from '@/components/datagrid/DataGrid.vue'
 import type { ApiResponse } from '@/composables/useDataGrid'
 import { recordListHref } from '@/composables/useRecordNavigation'
 import { crudRecordHref, type CrudResource } from '@/crud'
+import { useConfirmation } from '@/composables/useConfirmation'
 const props = defineProps<{ resource: CrudResource; data: ApiResponse }>()
 const page = usePage()
 const mutating = ref(false)
+const confirming = ref(false)
+const confirm = useConfirmation()
 const error = computed(() => (page.props.errors as Record<string, string> | undefined)?.form)
 function source() {
   return recordListHref(props.resource.basePath, window.location.pathname + window.location.search)
@@ -19,8 +22,8 @@ function create() {
   if (mutating.value) return
   router.get(`${props.resource.basePath}/create`, { returnTo: source() })
 }
-function action(key: string, row: Record<string, unknown>) {
-  if (mutating.value) return
+async function action(key: string, row: Record<string, unknown>) {
+  if (mutating.value || confirming.value) return
   const id = String(row.id)
   if (key === 'view' || key === 'edit') {
     router.get(crudRecordHref(props.resource.basePath, id, key === 'edit', source()))
@@ -28,20 +31,39 @@ function action(key: string, row: Record<string, unknown>) {
   }
   const command = props.resource.actions.find((item) => item.key === key)
   if (key !== 'delete' && !command) return
-  if (!window.confirm(t(command?.confirmation || 'Вы уверены, что хотите удалить запись?'))) return
-  const path = `${props.resource.basePath}/records/${encodeURIComponent(id)}`
-  const suffix =
-    source() === props.resource.basePath ? '' : `?${new URLSearchParams({ returnTo: source() })}`
-  const data = { _revision: String(row._revision) }
-  const onStart = () => {
-    mutating.value = true
+  const basePath = props.resource.basePath
+  const revision = String(row._revision)
+  const returnTo = source()
+  confirming.value = true
+  try {
+    await confirm(
+      {
+        message: command?.confirmation || 'Вы уверены, что хотите удалить запись?',
+        confirmLabel: command?.label || 'Удалить',
+        variant: key === 'delete' ? 'danger' : 'primary',
+      },
+      () => {
+        if (mutating.value || props.resource.basePath !== basePath) return
+        const path = `${basePath}/records/${encodeURIComponent(id)}`
+        const suffix = returnTo === basePath ? '' : `?${new URLSearchParams({ returnTo })}`
+        const data = { _revision: revision }
+        const onStart = () => {
+          mutating.value = true
+        }
+        const onFinish = () => {
+          mutating.value = false
+        }
+        if (key === 'delete') router.delete(path + suffix, { data, onStart, onFinish })
+        else
+          router.post(`${path}/actions/${encodeURIComponent(key)}${suffix}`, data, {
+            onStart,
+            onFinish,
+          })
+      },
+    )
+  } finally {
+    confirming.value = false
   }
-  const onFinish = () => {
-    mutating.value = false
-  }
-  if (key === 'delete') router.delete(path + suffix, { data, onStart, onFinish })
-  else
-    router.post(`${path}/actions/${encodeURIComponent(key)}${suffix}`, data, { onStart, onFinish })
 }
 </script>
 <template>
