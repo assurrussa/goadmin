@@ -1,5 +1,36 @@
 # Implementation Notes
 
+## PR 85 review corrections (2026-11-06)
+
+Review base `181328cc`, head `db68ed7`. Independent backend and frontend review
+found three defects: CRUD Refresh did not load rows; saving unrelated fields
+could clear write-only values; incomplete HEX input discarded the
+entire branding recovery draft. The corrections connect Refresh to the existing
+grid loader, omit untouched write-only updates and retain editable
+color strings until explicit Apply validation. Both gradient endpoints still
+recover together under the existing owner, permission and expiration checks.
+
+Optional write-only update DTO fields must now be pointers. Host callbacks treat
+nil as unchanged and a nonnil empty/zero value as replacement. Required write-only
+fields require explicit input on every update; no unreadable value is sent to the
+browser. Explicit empty/zero replacements remain dirty until saved. Existing
+native navigation/unload confirmation UI is retained. No schema or dependency change.
+
+Validation: `make check` passed, followed by final `make resources` (144 resource
+contract checks and 1,196 UI tests) and `go test -race ./features/crud` for the
+last required-field regressions. Targeted Go lint, `make externalconsumer-local`
+and smoke-tool tests pass. Renderer fingerprint and embedded assets are rebuilt.
+Independent review of the corrections found no remaining actionable findings.
+
+Full browser run `20261106t125523z-c5fa264d` passes all 12 groups per pack and
+20 confirmation cases per pack, without page/console or diagnostic errors.
+Refresh is exercised in RU/EN against the actual endpoint with list conditions
+preserved. URL parameter order is compared semantically, not as raw query text.
+
+Retained test applications were replaced with these verified images after fresh
+backups. Products, branding and preference hashes are unchanged; pre-existing
+sessions still authenticate. Their PostgreSQL services and volumes remain intact.
+
 ## Shared confirmation viewport and accessibility (2026-11-06)
 
 Base: `34af3a1`, same branch and checkout. Restrict this follow-up to the shared

@@ -11,6 +11,7 @@ import { crudRecordHref, type CrudResource } from '@/crud'
 import { useConfirmation } from '@/composables/useConfirmation'
 const props = defineProps<{ resource: CrudResource; data: ApiResponse }>()
 const page = usePage()
+const grid = ref<InstanceType<typeof DataGrid> | null>(null)
 const mutating = ref(false)
 const confirming = ref(false)
 const confirm = useConfirmation()
@@ -21,6 +22,9 @@ function source() {
 function create() {
   if (mutating.value) return
   router.get(`${props.resource.basePath}/create`, { returnTo: source() })
+}
+function tableAction(key: string) {
+  if (key === 'refresh' && !mutating.value && !confirming.value) grid.value?.refreshData()
 }
 async function action(key: string, row: Record<string, unknown>) {
   if (mutating.value || confirming.value) return
@@ -75,10 +79,12 @@ async function action(key: string, row: Record<string, unknown>) {
   <p v-if="error" role="alert" class="mb-4 text-error">{{ t(error) }}</p>
   <div :inert="mutating || undefined" :aria-busy="mutating">
     <DataGrid
+      ref="grid"
       navigation-mode="inertia"
       :api-url="resource.basePath"
       :initial-data="data"
       @action-create="create"
+      @action-table="tableAction"
       @action-row="action"
     />
   </div>

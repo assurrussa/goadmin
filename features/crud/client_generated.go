@@ -5,4 +5,4 @@ package crud
 //go:generate node ../../resources/scripts/crud-contract.cjs
 
 // ClientFingerprint identifies the embedded CRUD renderer.
-const ClientFingerprint = "sha256:f7ac62d1bc1a0960b38af55db0d5386b6f22365b598562c32abd03cc222f01c4"
+const ClientFingerprint = "sha256:4af2f11da1928fd4fc83970c34f5f219ae36438ccf3a29f6015d559b3ab4e06b"

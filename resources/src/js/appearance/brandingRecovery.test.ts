@@ -72,14 +72,39 @@ it('recovers both gradient endpoints and preserves an explicit unresolved confli
     baseline: { accentColorEnd: '#345678' },
   })
 })
-it('normalizes legacy recovery to solid and rejects malformed pairs atomically', () => {
+it('normalizes legacy recovery to solid', () => {
   registerBrandingRecovery(snapshot)
   pauseBrandingRecovery()
   expect(takeBrandingRecovery('1')).toMatchObject({
     accentColorEnd: '',
     baseline: { accentColorEnd: '' },
   })
-  registerBrandingRecovery(() => ({ ...snapshot(), accentColor: '', accentColorEnd: '#abcdef' }))
+})
+it.each([
+  ['#12', '#abcdef'],
+  ['#123456', '#ab'],
+  ['', '#abcdef'],
+])('recovers the editable color pair %s / %s without losing unrelated changes', (start, end) => {
+  registerBrandingRecovery(() => ({
+    ...snapshot(),
+    name: 'Unsaved name',
+    accentColor: start!,
+    accentColorEnd: end!,
+    logoLight: '',
+  }))
+  pauseBrandingRecovery()
+  expect(takeBrandingRecovery('1')).toMatchObject({
+    name: 'Unsaved name',
+    accentColor: start,
+    accentColorEnd: end,
+    logoLight: '',
+  })
+})
+it('rejects invalid recovery types and invalid saved baselines', () => {
+  registerBrandingRecovery(() => ({ ...snapshot(), accentColorEnd: 123 as unknown as string }))
+  pauseBrandingRecovery()
+  expect(takeBrandingRecovery('1')).toBeUndefined()
+  registerBrandingRecovery(() => ({ ...snapshot(), baseline: { name: '', accentColor: '#12' } }))
   pauseBrandingRecovery()
   expect(takeBrandingRecovery('1')).toBeUndefined()
 })

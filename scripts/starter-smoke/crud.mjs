@@ -279,6 +279,16 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
     await expect(rowActions.getByRole('button', { name: label, exact: true })).toHaveAttribute('title', label)
   }
   report.rowActionLocales = ['ru', 'en']
+  const beforeRefresh = Object.fromEntries(new URL(page.url()).searchParams)
+  for (const [locale, label, button] of [['ru', 'Русский', 'Обновить'], ['en', 'English', 'Refresh']]) {
+    await language(page, label, locale)
+    const response = page.waitForResponse(response => new URL(response.url()).pathname === '/products/data' && response.request().method() === 'GET')
+    await page.getByRole('button', { name: button, exact: true }).click()
+    assert.equal((await response).status(), 200)
+    await ready()
+    assert.deepEqual(Object.fromEntries(new URL(page.url()).searchParams), beforeRefresh, 'Refresh keeps current list conditions')
+  }
+  report.refresh = { locales: ['ru', 'en'], requestStatus: 200, queryPreserved: true }
   const listURL = new URL(page.url())
   const returnTo = listURL.pathname + listURL.search
   await page.locator('[data-part="table"] tbody').getByRole('button', { name: 'View', exact: true }).click()
