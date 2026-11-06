@@ -30,12 +30,13 @@ Deployed dependency versions and binary sizes were not verified. Frontend asset
 sizes are not whole-application footprints; these observations do not establish
 minimum requirements or performance guarantees.
 
-After publication, install this release with
-`go get github.com/assurrussa/goadmin@v0.20.0`. Its planned dependency graph
-uses GoAuth v0.15.0, gossoclient v0.6.1, GoNotify v0.6.0, GoUploads v0.13.0
-and GoWebSocket v0.2.1 without sibling replacements. Until publication,
-[v0.19.0](https://github.com/assurrussa/goadmin/releases/tag/v0.19.0) is the
-latest tagged GoAdmin release.
+The latest published baseline, verified on 2026-11-06, is
+[v0.25.1](https://github.com/assurrussa/goadmin/releases/tag/v0.25.1):
+`go get github.com/assurrussa/goadmin@v0.25.1`.
+This PR #85 candidate selects GoAuth v0.17.0, gossoclient v0.6.1,
+GoNotify v0.6.0, GoUploads v0.13.0 and GoWebSocket v0.2.1 without sibling
+replacements. No new GoAdmin release version has been selected or published;
+see [release preparation](RELEASING.md).
 
 ## Before integrating
 
@@ -277,7 +278,7 @@ Verification is local by default. Hosted CI is manual-only, with no automatic
 push or pull-request runs. See [local checks and manual CI](docs/ci.md) for
 tool versions, disposable PostgreSQL/Redis setup, and the proven CI baseline.
 
-This checkout pins published `goauth v0.15.0`, `gossoclient v0.6.1` and
+This checkout pins published `goauth v0.17.0`, `gossoclient v0.6.1` and
 `gonotify v0.6.0`, including
 the shared transaction and optional-delivery API. Uploads resolve
 `gouploads v0.13.0` and WebSockets resolve `gowebsocket v0.2.1`. Outbox core and

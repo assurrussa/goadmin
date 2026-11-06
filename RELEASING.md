@@ -4,13 +4,14 @@ This module is published as `github.com/assurrussa/goadmin`.
 
 ## Current Baseline
 
-- The latest published baseline is [v0.20.3](https://github.com/assurrussa/goadmin/releases/tag/v0.20.3).
-  The proposed next candidate is `v0.21.0`; selection does not claim release
-  readiness, publication, host acceptance or deployment.
+- The latest published baseline, verified on 2026-11-06, is
+  [v0.25.1](https://github.com/assurrussa/goadmin/releases/tag/v0.25.1).
+  No new release version has been selected for PR #85. Historical proposals
+  below are retained as records, not unused release tags or readiness claims.
 
 - Go 1.27.3 is the minimum. Modular host assembly is a breaking source API:
   migrate hosts to `host.New`, explicit modules and `host.AdminConfig`.
-- The current root module pins published GoAuth `v0.15.0` (schema 14), including the
+- The current root module pins published GoAuth `v0.17.0` (schema 16), including the
   companion MFA and assisted-recovery APIs, without a sibling replacement. Verify the resulting
   natural dependency graph with the release gates below.
 - GoNotify v0.5.0 changes `host.NotificationManager` to
@@ -27,7 +28,7 @@ This module is published as `github.com/assurrussa/goadmin`.
 - The clean-history baseline was published as v0.7.0.
   Old history, PRs and tags remain in the private history archive; do not move
   or rewrite them. Verify the new remote tag and public module independently.
-- Current `go.mod` pins GoAuth v0.15.0, GoNotify v0.6.0 and gossoclient v0.6.1.
+- Current `go.mod` pins GoAuth v0.17.0, GoNotify v0.6.0 and gossoclient v0.6.1.
   GoInertia v0.11.1 retains protocol v2 by default, matching the embedded v2 frontend. GoCache
   resolves v0.2.2. GoDI and GoLogger retain their existing compatible pins.
 - `VERSION` is intentionally unset by default. Pass the exact planned or
@@ -46,6 +47,35 @@ This module is published as `github.com/assurrussa/goadmin`.
   Published verification rejects every replacement and legacy shared/Redis module.
 - The frontend advisory gate and its current zero-finding result are reviewed
   in [docs/dependency-advisory-review.md](docs/dependency-advisory-review.md).
+
+## PR #85 dependency upgrade preparation — not release-ready
+
+- Root and starter select published GoAuth v0.17.0, including its compatible
+  compression fixes: klauspost/compress v1.20.2 and brotli v1.2.7. Rebuild the
+  host with Go 1.27.3 or newer. This addresses the dependency behind the called
+  GO-2026-6865 finding; the final candidate must pass a fresh vulnerability scan.
+- The canonical GoAuth schema advances from 14 through 15 to 16. The existing
+  public migration facade delegates these additive migrations to GoAuth before
+  GoAdmin storage. Do not copy or edit upstream migration bytes.
+- Before migration, verify a recoverable database backup and all existing
+  signing, encryption, MFA and notification keys. Stop and join older writers
+  and notification workers; migrate once, then start only schema-16-compatible
+  writers/workers. Preserve queued envelopes, receipt IDs and original deadlines.
+  Do not resend notifications, extend expiry or reset auth state as an upgrade.
+- GoAuth v0.15.0/v0.16.0 binaries reject schema 16. A binary-only downgrade is
+  not a rollback. Do not use destructive development Reset/Down in production.
+  Restoration requires a reviewed pre-upgrade backup plus keys and accounting
+  for subsequent writes and external queue ownership.
+- New OIDC exact-request MFA step-up remains opt-in. The dependency update alone
+  does not enable mandatory MFA, alter host freshness policy or extend password
+  auth_time, central session identity or absolute expiry. See the upstream
+  [upgrade contract](https://github.com/assurrussa/goauth/blob/v0.17.0/RELEASING.md).
+- Apply PR #85's additive branding-gradient migration before the new binary;
+  existing installations keep a solid accent until a second color is selected.
+- No new GoAdmin release version is selected here. Historical proposed versions
+  below are not instructions to reuse an existing tag. Verify remote tags, then
+  run the final publish-readiness gate with the exact unused version. Source
+  preparation is not publication, downstream acceptance or production rollout.
 
 ## v0.21.0 proposed candidate — not published or release-ready
 

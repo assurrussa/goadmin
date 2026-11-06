@@ -2649,3 +2649,36 @@ after reclaiming unused disposable fixtures/cache and increasing the Node heap.
 The final redaction test additionally preserves the log buffer while decoding
 it so the raw-output privacy assertion remains effective. No publication,
 release, deployment or production-session reproduction is included.
+
+## PR #85 GoAuth v0.17.0 preparation (2026-11-06)
+
+The requested dependency upgrade is prepared on a separate local branch based
+on PR head d64e6df196807b0b02d33c0715b3cd534835af5b. Root and starter select
+published GoAuth v0.17.0 and the compatible compress v1.20.2 fix. The public
+migration facade continues to delegate canonical storage to GoAuth; no upstream
+migration bytes or production data were changed. The existing integration test
+now asserts schema 16 and its five step-up columns. OIDC step-up remains opt-in.
+
+The previous-head review independently passed 1,208 UI tests, types, lint,
+formatting, five focused Go packages and generated client/asset consistency.
+Its security scan found called GO-2026-6865 in compress v1.20.0; those older
+passes alone do not verify the new dependency graph.
+
+The authorized Mac QA verified all 1,594 source hashes of the input working-tree
+archive (SHA256 16a3a73147e9e6ff1488670eaa0990a9d9f16859208319afdf49378f0ee102de).
+Root/starter tidy changed only their go.sum files; those exact sums were imported
+back into the preparation branch. Full root race/coverage, starter race, vet,
+lint, module verification and the shared-cache local consumer passed. Isolated
+PostgreSQL 17.11 fresh/reset migrations and real-SDK SSO return integration
+passed with race detection and no skipped tests. The new scan reports zero
+called/imported vulnerabilities and three required-module advisories not called.
+These are fresh/reset migration checks, not a populated schema-14→16 upgrade
+preservation test. UI resources were not rerun for the dependency-only delta.
+
+Independent review found no actionable code/security issue; it caught stale
+README release-install wording, corrected separately as a documentation-only
+change. The complete publish-readiness aggregate, populated upgrade acceptance,
+anonymous public-dependency consumer and final-version release gates remain
+pending. The release documentation records schema 14→15→16 rollout and rollback
+constraints. No new GoAdmin release version has been selected, published or
+deployed.

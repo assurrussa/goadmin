@@ -60,6 +60,17 @@ INSERT INTO files (original_filename, filename, slug) VALUES ('sentinel.png', 's
 		requireTable(t, ctx, db, table)
 	}
 
+	// The public facade must install the pinned GoAuth schema, not leave a
+	// successful-looking host on its previous notification/step-up schema.
+	var authVersion int
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT max(version) FROM goauth_schema_version`).Scan(&authVersion))
+	require.Equal(t, 16, authVersion)
+	var stepUpColumns int
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.columns
+WHERE table_schema='public' AND table_name='auth_oidc_authorization_requests'
+AND column_name IN ('step_up_session','step_up_binding','step_up_session_id','step_up_cookie_digest','step_up_verified_at')`).Scan(&stepUpColumns))
+	require.Equal(t, 5, stepUpColumns)
+
 	// Additive gradient storage keeps existing installations solid by default.
 	var accentEnd string
 	require.NoError(t, db.QueryRowContext(ctx, `SELECT accent_color_end FROM goadmin_branding WHERE singleton=true`).Scan(&accentEnd))
