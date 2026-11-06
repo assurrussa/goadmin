@@ -1,5 +1,37 @@
 # Implementation Notes
 
+## PR 85 second review (2026-11-06)
+
+Review head `b2801aa`, same PR and checkout. A required write-only select with
+one option could not emit a deliberate change: the form preselected its only
+value but omitted it from updates. Write-only edit fields now start without a
+value; required empty selects show a disabled placeholder. Explicit selections
+remain dirty and are submitted, while create and readable defaults are preserved.
+
+Branding recovery and conflict refresh also inferred Solid from an empty
+gradient endpoint, losing the unfinished Gradient choice. The private recovery
+draft now carries the editor mode with legacy inference; mode and both colors
+are preserved together until explicit Apply validation. Persisted branding and
+the public API remain unchanged. Scope excludes native dirty-guard redesign.
+
+Both defects have failing-before/passing-after regressions. `make check` passes
+Go race/coverage, 144 resource contract checks, 1,202 UI tests, types, lint and
+the rebuilt assets. Clean consumer and smoke-tool checks pass. Independent
+review found no further actionable findings in the corrections.
+
+Full browser run `20261106t132327z-078b51fa` passes 12 groups and 20 confirmation
+cases per pack using the immutable images from `20261106t131208z-6d62a9ef`.
+Main pages and diagnostics have no errors. The real branding conflict runs in
+a separate tab and allows exactly its verified HTTP 409 and, if Chromium emits
+it, one matching resource-console message; other HTTP, console and page errors
+remain failures. Empty endpoint/mode validation and the corrected save pass.
+The initial container contrast-test timeout passed on an unchanged retry after
+the parallel local gate ended; the failed log is retained. The final acceptance
+uses fresh databases. Native dirty-guard UI and application permissions are unchanged.
+Retained test applications were updated after fresh backups; Products, branding
+and preference hashes are unchanged, and pre-existing sessions still authenticate.
+Their PostgreSQL services and volumes were preserved.
+
 ## PR 85 review corrections (2026-11-06)
 
 Review base `181328cc`, head `db68ed7`. Independent backend and frontend review

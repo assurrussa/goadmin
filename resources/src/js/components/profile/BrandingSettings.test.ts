@@ -578,6 +578,69 @@ it('restores only the same actor draft against fresh branding without replaying 
   })
 })
 
+it('recovers an unfinished gradient mode even when both colors match the solid baseline', async () => {
+  const root = await mount()
+  input(root, 0, 'Unsaved gradient')
+  const mode = root.querySelector('select')!
+  mode.value = 'gradient'
+  mode.dispatchEvent(new Event('change'))
+  await flush()
+  input(root, 3, '')
+  pauseAppearance()
+  unmountApp()
+  root.remove()
+  restoreActor('1')
+  fetch.mockResolvedValueOnce(verified())
+  fetch.mockResolvedValueOnce(result(brand()))
+  const restored = await mount()
+  expect(restored.querySelector('select')!.value).toBe('gradient')
+  expect(restored.querySelectorAll<HTMLInputElement>('input')[3]!.value).toBe('')
+  click(restored, 'Применить')
+  await flush()
+  expect(fetch.mock.calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(0)
+  expect(restored.textContent).toContain('Укажите HEX-цвет')
+  input(restored, 3, '#123456')
+  fetch.mockResolvedValueOnce(
+    result({
+      ...brand('Unsaved gradient', '#2563eb', 2),
+      payload: {
+        ...brand().payload,
+        name: 'Unsaved gradient',
+        accentColorEnd: '#123456',
+      },
+    }),
+  )
+  click(restored, 'Применить')
+  await flush()
+  expect(JSON.parse(fetch.mock.calls.at(-1)![1].body)).toMatchObject({
+    name: 'Unsaved gradient',
+    accentColor: '#2563eb',
+    accentColorEnd: '#123456',
+  })
+})
+
+it('keeps unfinished gradient mode while explicitly refreshing a conflicting draft', async () => {
+  const root = await mount()
+  input(root, 0, 'Draft')
+  fetch.mockResolvedValueOnce(result({}, 409))
+  click(root, 'Применить')
+  await flush()
+  const mode = root.querySelector('select')!
+  mode.value = 'gradient'
+  mode.dispatchEvent(new Event('change'))
+  await flush()
+  input(root, 3, '')
+  fetch.mockResolvedValueOnce(result(brand('Other', '#abcdef', 2)))
+  click(root, 'Получить новую версию для применения черновика')
+  await flush()
+  expect(root.querySelector('select')!.value).toBe('gradient')
+  expect(root.querySelectorAll<HTMLInputElement>('input')[1]!.value).toBe('#2563eb')
+  expect(root.querySelectorAll<HTMLInputElement>('input')[3]!.value).toBe('')
+  click(root, 'Применить')
+  await flush()
+  expect(fetch.mock.calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(1)
+})
+
 it('recovers incomplete color text with unrelated edits and validates before Apply', async () => {
   const root = await mount()
   input(root, 0, 'Unsaved title')

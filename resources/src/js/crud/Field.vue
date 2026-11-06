@@ -93,7 +93,13 @@ function change(event: Event) {
       class="appearance-select w-full rounded-lg border border-border-primary bg-card px-3 text-text-primary"
       @change="change"
     >
-      <option v-if="!field.required" value="">—</option>
+      <option
+        v-if="!field.required || modelValue === null || modelValue === ''"
+        value=""
+        :disabled="field.required"
+      >
+        —
+      </option>
       <option v-for="option in field.options" :key="option.value" :value="option.value">
         {{ t(option.label) }}
       </option>

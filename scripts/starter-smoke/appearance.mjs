@@ -3,6 +3,57 @@ import { selectTheme, assertSystemTheme, selectSettingsSection, assertSettingsNa
 import path from 'node:path'
 import { appearanceGeometry, appearanceVisualAcceptance } from './appearance-visual.mjs'
 
+// Keep the deliberate HTTP failure in its own page and validate every network,
+// console and page error there. The main acceptance page still requires zero errors.
+async function unfinishedGradientConflict({ context, config, expect, send, branding, brandTitle }) {
+  const page = await context.newPage()
+  const pageErrors = [], consoleErrors = [], failedResponses = []
+  page.on('pageerror', error => pageErrors.push(error.message))
+  page.on('console', message => { if (message.type() === 'error') consoleErrors.push({ text: message.text(), url: message.location().url }) })
+  page.on('response', response => {
+    if (response.status() >= 400) failedResponses.push({ url: response.url(), method: response.request().method(), status: response.status() })
+  })
+  try {
+    await page.goto('/auth/profile/settings#branding')
+    const end = page.getByLabel('Конечный цвет градиента', { exact: true })
+    await expect(end).toHaveValue('#FEFEFE')
+    assert.equal((await send('PUT', '/auth/branding', {
+      version: branding.version, name: brandTitle,
+      accentColor: branding.payload.accentColor, accentColorEnd: branding.payload.accentColorEnd,
+    })).status(), 200)
+    const apply = page.getByRole('button', { name: 'Применить', exact: true })
+    await end.fill('#123456')
+    const conflictResponse = page.waitForResponse(r => new URL(r.url()).pathname === '/auth/branding' && r.request().method() === 'PUT')
+    await apply.click()
+    assert.equal((await conflictResponse).status(), 409)
+    await end.fill('')
+    const freshResponse = page.waitForResponse(r => new URL(r.url()).pathname === '/auth/branding' && r.request().method() === 'GET')
+    await page.getByRole('button', { name: 'Получить новую версию для применения черновика', exact: true }).click()
+    assert.equal((await freshResponse).status(), 200)
+    await expect(apply).toBeEnabled()
+    await expect(page.getByLabel('Тип акцента', { exact: true })).toHaveValue('gradient')
+    await expect(end).toHaveValue('')
+    await apply.click()
+    await expect(page.getByText('Укажите HEX-цвет в формате #RRGGBB.', { exact: true })).toBeVisible()
+    await end.fill('#fefefe')
+    const correctedResponse = page.waitForResponse(r => new URL(r.url()).pathname === '/auth/branding' && r.request().method() === 'PUT')
+    await apply.click()
+    const corrected = await correctedResponse
+    assert.equal(corrected.status(), 200)
+    await corrected.finished()
+    await expect(apply).toBeEnabled()
+    const url = new URL('/auth/branding', config.url).href
+    assert.deepEqual(failedResponses, [{ url, method: 'PUT', status: 409 }])
+    assert.deepEqual(pageErrors, [])
+    assert.ok(consoleErrors.length <= 1)
+    for (const error of consoleErrors) {
+      assert.equal(error.url, url)
+      assert.equal(error.text, 'Failed to load resource: the server responded with a status of 409 (Conflict)')
+    }
+    return { preserved: true, expectedHTTPConflicts: 1, expectedConsoleMessages: consoleErrors.length }
+  } finally { await page.close() }
+}
+
 export async function appearanceAcceptance({ page, context, browser, config, credentials, folder, name, expect, login, logout, result }) {
   await page.setViewportSize({ width: 1440, height: 1000 })
   const get = async url => {
@@ -163,6 +214,7 @@ export async function appearanceAcceptance({ page, context, browser, config, cre
   assert.equal(branding.payload.name, brandTitle)
   assert.equal(branding.payload.accentColor, '#7C3AED')
   assert.equal(branding.payload.accentColorEnd, '#FEFEFE')
+  const gradientConflict = await unfinishedGradientConflict({ context, config, expect, send, branding, brandTitle })
   assert.ok(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--goadmin-primary-image').includes('linear-gradient(135deg')), 'Apply must publish gradient fill tokens')
   await page.locator('[data-profile-menu-trigger]').click()
   await page.locator('[role="menu"] a[href="/auth/profile"]').click()
@@ -274,7 +326,7 @@ export async function appearanceAcceptance({ page, context, browser, config, cre
     history: { appearance: true, branding: true }, longBrandMobile: true,
     settingsNavigation: { desktopGroups: true, mobileSelect: true, brandingPermission: true },
     themeButton: { threeModeCycle: true, liveSystemAndReload: true },
-    branding: { published: true, publicPNG: true, etag: true, reset: true, resetCancelAndKeyboard: true,
+    branding: { published: true, publicPNG: true, etag: true, reset: true, resetCancelAndKeyboard: true, unfinishedGradientConflict: gradientConflict,
       customContrast, appliedLightAndDark: true },
     densityGeometry: { compactRowHeight, comfortableRowHeight },
     browserZoom200Percent: true, nativeCSRF: true, nativeRBAC: true, preview: true }

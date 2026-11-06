@@ -23,6 +23,9 @@ selected while the effective operating-system theme changes.
 Settings use a grouped desktop sidebar and a compact mobile section selector.
 Personal settings and installation-wide branding remain distinct. Branding groups
 name, colors and logos with isolated light/dark previews and one Apply operation.
+An unfinished gradient keeps its selected mode and both color drafts during
+conflict refresh and same-user recovery. Clearing its second input does not
+silently switch the editor to Solid; complete the color or choose Solid explicitly.
 
 Default density leaves the chosen pack's geometry intact. Compact/comfortable
 choices set the documented shared size tokens at runtime; small or coarse-pointer
