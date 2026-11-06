@@ -161,11 +161,14 @@ void createInertiaApp({
         return page.props?.authuser ?? null
       }
 
-      const syncAuthState = (auth: AdminAuthUser | null) => {
-        const nextId = auth?.id ?? null
-
+      const syncAuthIdentity = (auth: AdminAuthUser | null) => {
         authUserStore.setAuthUser(auth)
         profileStore.setAvatarUrl(auth?.avatarUrl ?? null)
+      }
+
+      const syncAuthState = (auth: AdminAuthUser | null) => {
+        const nextId = auth?.id ?? null
+        syncAuthIdentity(auth)
 
         if (
           nextId &&
@@ -232,8 +235,13 @@ void createInertiaApp({
               !['reauthentication_required', 'access_denied', 'session_changed'].includes(
                 sessionCoordinator.getState(),
               )
-            )
+            ) {
               syncAppearance({ props: nextProps })
+              // Identity changes must invalidate the previous grid before the
+              // destination initializes from its own props. Realtime stays in
+              // success reconciliation, after capabilities/session configuration.
+              syncAuthIdentity(extractAuth({ props: nextProps }))
+            }
           },
           { flush: 'sync' },
         ),
