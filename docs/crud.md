@@ -6,7 +6,9 @@ with embedded list, detail, create and edit pages. Pass the module returned by
 no host Vue source or client rebuild. The opt-in `products` module in
 [the starter](../examples/starter/products.go) is a complete PostgreSQL example.
 Its optional Category select is independent of the read-only publication Status;
-only the separately guarded Publish command can change that status.
+only the separately guarded Publish/Unpublish commands change that status.
+Unpublish requires `products:unpublish` and returns a published record to draft;
+both transitions use owner/revision CAS and transactional audit.
 
 ## Resource ownership
 
@@ -47,6 +49,12 @@ boolean UI labels are translated. Lists and detail pages display an absent boole
 as an em dash, distinct from false. Standard row actions and their tooltips follow
 the current UI language; custom labels without a registered translation stay literal.
 
+Date fields use the shared localized calendar: RU displays `DD.MM.YYYY`, EN
+`DD/MM/YYYY`, with Monday-first weeks. Wire values remain `YYYY-MM-DD` without a
+timezone conversion. Partial or impossible dates block submission and never reuse
+the previous complete value. Admission expiry uses the same control with local
+24-hour minute fields and keeps its existing timestamp conversion.
+
 Single-record `Actions` declare a key, permission, confirmation and callback.
 They receive ID and expected revision, with no additional input body. `Authorize`
 receives the action key as its operation. Action visibility is not authorization;
@@ -66,6 +74,10 @@ explicitly through `host.PersistFlash`,
 because extension handlers finish before the core Inertia middleware. Input is
 retained on handled Inertia errors. CRUD drafts are
 not persisted through a full sign-in transition.
+Revision conflicts also emit the existing global flash toast while retaining
+the inline error and explicit reload action. One response is consumed once;
+a separate response with the same message remains a new notification. No durable
+notification inbox event or automatic mutation replay is created.
 
 Personal tables use `crud.<key>` under the current administrator, with existing
 CAS, 20-view/64-KiB limits, column reconciliation and URL precedence. Selection

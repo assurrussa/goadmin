@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { parseCSV } from './table-workflow.mjs'
+import { appearanceGeometry } from './appearance-visual.mjs'
 
 // Runs only inside run.mjs's authenticated, isolated starter case. All records
 // are created through the public host resource; no fixture SQL or route mocks.
@@ -26,6 +27,13 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
     })
   }
   const field = key => page.locator(`[name="${key}"]`)
+  const dateControl = () => page.locator('.date-control').filter({ has: field('available') })
+  const datePart = part => dateControl().locator(`[data-date-part="${part}"]`)
+  const setDate = async iso => {
+    const [year, month, day] = iso.split('-')
+    for (const [part, value] of Object.entries({ year, month, day })) await datePart(part).fill(value)
+    await expect(field('available')).toHaveValue(iso)
+  }
   const save = async (pathname, method) => {
     const [response] = await Promise.all([
       page.waitForResponse(response => new URL(response.url()).pathname === pathname && response.request().method() === method),
@@ -42,17 +50,49 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await expect(field('description')).toHaveJSProperty('tagName', 'TEXTAREA')
   await expect(field('stock')).toHaveAttribute('type', 'number')
   await expect(field('active')).toHaveAttribute('type', 'checkbox')
-  await expect(field('available')).toHaveAttribute('type', 'date')
+  await expect(field('available')).toHaveAttribute('type', 'hidden')
+  await expect(datePart('day')).toHaveAttribute('inputmode', 'numeric')
   await expect(field('category')).toHaveJSProperty('tagName', 'SELECT')
   await field('name').fill(prefix)
   await field('description').fill('First paragraph\nSecond paragraph')
   await field('stock').fill('12')
   await field('active').check()
-  await field('available').fill('2026-11-07')
+  await setDate('2028-02-29')
+  const createWrites = []
+  const trackCreate = request => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/products') createWrites.push(request.postDataJSON())
+  }
+  page.on('request', trackCreate)
+  await datePart('year').fill('2027')
+  await expect(field('available')).toHaveValue('')
+  assert.equal(await page.locator('form').evaluate(form => form.checkValidity()), false)
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await datePart('year').fill('2028')
+  await expect(field('available')).toHaveValue('2028-02-29')
+  await dateControl().getByRole('button', { name: 'Open calendar', exact: true }).click()
+  await expect(page.locator('.date-control-popover')).toBeVisible()
+  await expect(page.locator('.date-control-weekday').first()).toHaveText(/^Mon/i)
+  await page.keyboard.press('Escape')
+  await language(page, 'Русский', 'ru')
+  await expect(field('available')).toHaveValue('2028-02-29')
+  await expect(dateControl().locator('.date-control-separator').first()).toHaveText('.')
+  await dateControl().getByRole('button', { name: 'Открыть календарь', exact: true }).click()
+  await expect(page.locator('.date-control-weekday').first()).toHaveText(/^пн/iu)
+  await page.keyboard.press('Escape')
+  await language(page, 'English', 'en')
+  await expect(dateControl().locator('.date-control-separator').first()).toHaveText('/')
+  await dateControl().getByRole('button', { name: 'Clear date', exact: true }).click()
+  await expect(field('available')).toHaveValue('')
+  assert.equal(await page.locator('form').evaluate(form => form.checkValidity()), true)
+  await setDate('2026-11-07')
   // An optional select's own blank value must be a valid untouched input.
   await expect(field('category')).toHaveValue('')
   await expect(field('status')).toHaveCount(0)
   await save('/products', 'POST')
+  page.off('request', trackCreate)
+  assert.equal(createWrites.length, 1, 'An invalid leap date must not issue a create request')
+  assert.equal(createWrites[0].available, '2026-11-07')
+  report.calendar = { locales: ['en', 'ru'], isoPreserved: true, partialBlocked: true, leapValidation: true, clearOptional: true }
   await expect(page).toHaveURL(/\/products\/records\/[^/?]+\/edit(?:\?.*)?$/)
   const editPath = new URL(page.url()).pathname
   const recordPath = editPath.replace(/\/edit$/, '')
@@ -71,7 +111,7 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await field('stock').fill('27')
   await field('category').selectOption('premium')
   await field('active').uncheck()
-  await field('available').fill('2026-12-01')
+  await setDate('2026-12-01')
   await save(recordPath, 'PUT')
   await expect(page).toHaveURL(new RegExp(`${editPath}$`))
   await expect(field('name')).toHaveValue(updatedName)
@@ -105,6 +145,21 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await expect(page).toHaveURL(new RegExp(`${recordPath}$`))
   await expect(display('Status')).toHaveText('Published')
   await expect(page.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0)
+  page.once('dialog', async dialog => {
+    assert.equal(dialog.message(), 'Unpublish this product?')
+    await dialog.accept()
+  })
+  const [unpublished] = await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).pathname === `${recordPath}/actions/unpublish` && response.request().method() === 'POST'),
+    page.getByRole('button', { name: 'Unpublish', exact: true }).click(),
+  ])
+  assert.equal(unpublished.status(), 303)
+  await expect(display('Status')).toHaveText('Draft')
+  await expect(page.getByRole('button', { name: 'Unpublish', exact: true })).toHaveCount(0)
+  page.once('dialog', confirm)
+  await page.getByRole('button', { name: 'Publish', exact: true }).click()
+  await expect(display('Status')).toHaveText('Published')
+  report.unpublish = { confirmed: true, draftRestored: true, republish: true }
   await page.getByRole('link', { name: 'Edit', exact: true }).click()
   await expect(page).toHaveURL(new RegExp(`${editPath}(?:\\?.*)?$`))
   await expect(field('category')).toHaveValue('premium')
@@ -259,6 +314,10 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
     assert.equal(submitted._revision, pinned._revision, 'A rejected draft cannot adopt a fresh revision implicitly')
     assert.equal(submitted.name, localDraft)
     await expect(page.getByRole('alert')).toContainText('Record changed; reload before saving')
+    const conflictToast = page.locator('.notification--error').filter({ hasText: 'Record changed; reload before saving' })
+    await expect(conflictToast).toHaveCount(1)
+    await conflictToast.getByRole('button', { name: 'Dismiss notification', exact: true }).click()
+    await expect(conflictToast).toHaveCount(0)
     await expect(field('name')).toHaveValue(localDraft)
     await expect(field('stock')).toHaveValue('28')
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled()
@@ -278,7 +337,7 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await expect(page.getByRole('alert')).toHaveCount(0)
   assert.equal(reloadConfirmed, true)
   assert.equal(new URL(page.url()).searchParams.get('returnTo'), returnTo)
-  report.uiConflict = { rejectedRevisions, canonicalRevision: canonical._revision, retainedDraft: true, explicitReloadConfirmed: true }
+  report.uiConflict = { rejectedRevisions, canonicalRevision: canonical._revision, retainedDraft: true, explicitReloadConfirmed: true, oneToastPerResponse: true }
 
   await language(page, 'Русский', 'ru')
   await page.goto(`${recordPath}?${new URLSearchParams({ returnTo })}`)
@@ -292,6 +351,27 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Russian mobile Edit must fit the viewport')
   const booleanTarget = await field('active').evaluate(input => input.closest('label').getBoundingClientRect().height)
   assert.ok(booleanTarget >= 44, 'Mobile boolean field must have a 44px clickable label')
+  await dateControl().getByRole('button', { name: 'Открыть календарь', exact: true }).click()
+  await expect(page.locator('.date-control-popover')).toBeVisible()
+  const calendarGeometry = await page.locator('.date-control-popover').evaluate(node => {
+    const rect = node.getBoundingClientRect()
+    const style = getComputedStyle(node)
+    return { left: rect.left, right: rect.right, width: innerWidth,
+      background: style.backgroundColor, border: style.borderTopWidth, zIndex: style.zIndex,
+      days: [...node.querySelectorAll('.date-control-day')].map(day => {
+        const bounds = day.getBoundingClientRect(); return { width: bounds.width, height: bounds.height,
+          contained: bounds.left >= rect.left && bounds.right <= rect.right }
+      }) }
+  })
+  assert.ok(calendarGeometry.left >= 0 && calendarGeometry.right <= calendarGeometry.width)
+  assert.match(calendarGeometry.background, /^rgb\(/, 'Teleported calendar needs an opaque surface')
+  assert.equal(calendarGeometry.border, '1px')
+  assert.ok(Number(calendarGeometry.zIndex) >= 60)
+  assert.ok(calendarGeometry.days.length >= 28 && calendarGeometry.days.every(day => day.width >= 44 && day.height >= 44 && day.contained))
+  const calendarPaint = (await appearanceGeometry(page)).calendar
+  assert.ok(calendarPaint.length >= 28 && calendarPaint.every(day => day.contrast >= 4.5), `All enabled calendar days must remain readable: ${Math.min(...calendarPaint.map(day => day.contrast))}`)
+  if (folder) await page.screenshot({ path: path.join(folder, `${name}-crud-calendar-mobile-ru.png`), fullPage: true })
+  await page.keyboard.press('Escape')
   if (folder) await page.screenshot({ path: path.join(folder, `${name}-crud-edit-mobile-ru.png`), fullPage: true })
   await page.setViewportSize({ width: 1440, height: 1000 })
   await language(page, 'English', 'en')

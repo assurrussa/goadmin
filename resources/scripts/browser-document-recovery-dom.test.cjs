@@ -36,6 +36,7 @@ test('rendered terminal recovery promotes only the trusted sign-in anchor', asyn
     assert.equal(signIn.classList.contains('primary-action'), true);
     assert.equal(dom.window.getComputedStyle(signIn).backgroundColor, 'rgb(37, 99, 235)');
     assert.equal(dom.window.getComputedStyle(signIn).color, 'rgb(255, 255, 255)');
+    assert.equal(dom.window.getComputedStyle(signIn).borderRadius, '4px');
     assert.equal(document.getElementById('auth-recovery-retry').hidden, true);
     assert.equal(document.getElementById('auth-recovery-continue').hidden, true);
     assert.equal(requests.length, 1);

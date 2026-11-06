@@ -1,5 +1,5 @@
 import { t } from '@/i18n'
-import { watch, nextTick, onUnmounted } from 'vue'
+import { watch, nextTick, onUnmounted, toRaw } from 'vue'
 import { usePage, router } from '@inertiajs/vue3'
 import { useNotifications } from './useNotifications'
 
@@ -8,24 +8,21 @@ export function useFlashMessages() {
   const page = usePage()
   const { success, error, info, warning } = useNotifications()
   let active = true
-  let lastProcessedFlash = ''
-  let resetTimer: ReturnType<typeof setTimeout> | undefined
+  const processed = new WeakSet<object>()
 
   const processFlashMessages = async (flash: Record<string, string> | undefined) => {
     if (!active || !flash || Object.keys(flash).length === 0) return
     await nextTick()
     if (!active) return
-    const flashHash = JSON.stringify(flash)
-    if (lastProcessedFlash !== flashHash) {
-      lastProcessedFlash = flashHash
+    const responseFlash = toRaw(flash)
+    // watch and router.finish observe the same response object. A later response
+    // with identical text is a new notification, even immediately after closing it.
+    if (!processed.has(responseFlash)) {
+      processed.add(responseFlash)
       if (flash.success) success(t(flash.success))
       if (flash.error) error(t(flash.error))
       if (flash.info) info(t(flash.info))
       if (flash.warning) warning(t(flash.warning))
-      clearTimeout(resetTimer)
-      resetTimer = setTimeout(() => {
-        lastProcessedFlash = ''
-      }, 1000)
     }
   }
   const stopWatch = watch(
@@ -42,7 +39,6 @@ export function useFlashMessages() {
     active = false
     stopWatch()
     stopRouter()
-    clearTimeout(resetTimer)
   })
 }
 

@@ -563,6 +563,9 @@ func (h *handler[R, C, U]) failure(c fiber.Ctx, err error, raw map[string]json.R
 		}
 		h.app.WithFlashOld(c, old)
 		h.app.WithValidationErrors(c, safe)
+		if errors.Is(err, ErrConflict) {
+			h.app.WithFlashError(c, message)
+		}
 		target := h.listURL(c)
 		if c.Method() == fiber.MethodPost && c.Path() == h.d.BasePath {
 			target = h.d.BasePath + "/create"

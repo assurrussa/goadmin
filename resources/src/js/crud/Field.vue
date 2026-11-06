@@ -2,6 +2,7 @@
 defineOptions({ name: 'CrudField' })
 import { computed, useId } from 'vue'
 import { t } from '@/i18n'
+import LocalizedDatePicker from '@/components/date/LocalizedDatePicker.vue'
 import { resolveCrudField, crudValue, type CrudField, type CrudValue } from './index'
 const props = defineProps<{
   field: CrudField
@@ -10,7 +11,10 @@ const props = defineProps<{
   disabled?: boolean
   readonly?: boolean
 }>()
-const emit = defineEmits<{ 'update:modelValue': [value: CrudValue] }>()
+const emit = defineEmits<{
+  'update:modelValue': [value: CrudValue]
+  'update:valid': [valid: boolean]
+}>()
 const id = useId()
 const component = computed(() => resolveCrudField(props.field.component))
 function customChange(value: unknown) {
@@ -95,10 +99,10 @@ function change(event: Event) {
       </option>
     </select>
     <input
-      v-else-if="field.type !== 'boolean'"
+      v-else-if="field.type !== 'boolean' && field.type !== 'date'"
       :id="id"
       :name="field.key"
-      :type="field.type === 'date' ? 'date' : field.type === 'number' ? 'number' : 'text'"
+      :type="field.type === 'number' ? 'number' : 'text'"
       :value="String(modelValue ?? '')"
       :step="field.type === 'number' ? 'any' : undefined"
       :disabled="disabled"
@@ -108,6 +112,20 @@ function change(event: Event) {
       :aria-describedby="error ? `${id}-error` : undefined"
       class="appearance-select w-full rounded-lg border border-border-primary bg-card px-3 text-text-primary"
       @input="change"
+    />
+    <LocalizedDatePicker
+      v-else-if="field.type === 'date'"
+      :id="id"
+      :name="field.key"
+      :label="t(field.label)"
+      :model-value="modelValue === null ? null : String(modelValue ?? '')"
+      :required="field.required"
+      :disabled="disabled"
+      :readonly="readonly"
+      :error="error"
+      :describedby="error ? `${id}-error` : undefined"
+      @update:model-value="customChange"
+      @update:valid="emit('update:valid', $event)"
     />
     <p v-if="error" :id="`${id}-error`" class="text-sm text-error">{{ t(error) }}</p>
   </div>

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { selectTheme } from './appearance-controls.mjs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { tableExportMatrix, tableSecurityMatrix } from './table-contracts.mjs'
@@ -195,7 +196,7 @@ export async function tableWorkflowAcceptance({ page, context, config, credentia
   assert.deepEqual(filteredCSV[0], csv[0])
   report.selection = { acrossPages: 100, cap: 100, currentPageUnselectOnly: true, selectedCSVRows: csv.length - 1, filteredCSVRows: filteredCSV.length - 1 }
   await page.screenshot({ path: path.join(folder, `${name}-table-workflow-light-en.png`), fullPage: true })
-  await page.getByRole('button', { name: /Switch to dark theme|Переключить на темную тему/i }).click()
+  await selectTheme(page, expect, 'dark')
   await language(page, 'Русский', 'ru')
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(ui()).toContainText('Выбрано: 100 из 100')
@@ -203,7 +204,7 @@ export async function tableWorkflowAcceptance({ page, context, config, credentia
   await page.screenshot({ path: path.join(folder, `${name}-table-workflow-dark-mobile-ru.png`), fullPage: true })
   await page.setViewportSize({ width: 1440, height: 1000 })
   await language(page, 'English', 'en')
-  await page.getByRole('button', { name: /Switch to light theme|Переключить на светлую тему/i }).click()
+  await selectTheme(page, expect, 'light')
   const [searchResponse] = await Promise.all([
     page.waitForResponse(response => new URL(response.url()).pathname === '/users/data' && new URL(response.url()).searchParams.get('search') === 'no-match'),
     page.getByPlaceholder('Search...', { exact: true }).fill('no-match'),

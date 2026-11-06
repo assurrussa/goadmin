@@ -106,6 +106,7 @@ const focusFirstError = async () => {
   for (const key of [rawKey, toCamel(rawKey)]) {
     const element =
       controls.find((control) => control.getAttribute('name') === key) ??
+      controls.find((control) => control.getAttribute('data-field-name') === key) ??
       controls.find((control) => control.id === key)
     if (element) {
       element.focus()

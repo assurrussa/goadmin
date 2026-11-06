@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { selectTheme } from './appearance-controls.mjs'
 import path from 'node:path'
 
 // Real backend snapshots prove data/permissions. One explicit response override
@@ -41,7 +42,7 @@ export async function dashboardAcceptance({ page, folder, name, expect, language
   await auto.uncheck()
   await expect(host.locator('[data-dashboard-metric="source"]')).toHaveText('starter')
   await page.screenshot({ path: path.join(folder, `${name}-dashboard-light-en.png`), fullPage: true })
-  await page.getByRole('button', { name: /Switch to dark theme|Переключить на темную тему/i }).click()
+  await selectTheme(page, expect, 'dark')
   await language(page, 'Русский', 'ru')
   await expect(host.getByRole('heading', { name: 'Карточка хоста', exact: true })).toBeVisible()
   await page.setViewportSize({ width: 390, height: 844 })
@@ -49,7 +50,7 @@ export async function dashboardAcceptance({ page, folder, name, expect, language
   await page.screenshot({ path: path.join(folder, `${name}-dashboard-dark-mobile-ru.png`), fullPage: true })
   await page.setViewportSize({ width: 1440, height: 1000 })
   await language(page, 'English', 'en')
-  await page.getByRole('button', { name: /Switch to light theme|Переключить на светлую тему/i }).click()
+  await selectTheme(page, expect, 'light')
   await notices.getByRole('link', { name: 'Unread', exact: true }).click()
   await expect(page).toHaveURL(/\/notifications\?status=unread$/)
   result.dashboard = { cards: snapshot.cards.map((card) => card.key), unread: 2,

@@ -33,14 +33,14 @@ defineEmits<{ dismiss: []; login: [] }>()
     <button
       v-if="loginRequired"
       type="button"
-      class="mr-3 mt-3 rounded border border-border-primary px-3 py-1 focus-visible:outline"
+      class="mr-3 mt-3 rounded-[var(--goadmin-control-radius,4px)] border border-border-primary px-3 py-1 focus-visible:outline"
       @click="$emit('login')"
     >
       {{ t('Войти снова') }}
     </button>
     <button
       type="button"
-      class="mt-3 rounded border border-border-primary px-3 py-1 focus-visible:outline"
+      class="mt-3 rounded-[var(--goadmin-control-radius,4px)] border border-border-primary px-3 py-1 focus-visible:outline"
       @click="$emit('dismiss')"
     >
       {{ t('Закрыть уведомление') }}

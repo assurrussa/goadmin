@@ -43,7 +43,7 @@ const safePath = computed(() =>
     <p role="status">{{ t('Admission waiting ' + known) }}</p>
     <a
       :href="safePath"
-      class="mt-4 inline-block rounded-lg bg-primary px-4 py-2 text-primary-foreground"
+      class="mt-4 inline-block rounded-[var(--goadmin-control-radius,4px)] bg-primary px-4 py-2 text-primary-foreground"
     >
       {{ t('Admission retry') }}
     </a>

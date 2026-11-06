@@ -172,9 +172,7 @@ func TestProductsPostgresCASIsolationAndAuditRollback(t *testing.T) {
 	if err = repo.command(ctx, actor, current.ID, original.Revision, "deleted"); !errors.Is(err, crud.ErrConflict) {
 		t.Fatalf("stale delete %v", err)
 	}
-	if err = repo.command(ctx, actor, current.ID, current.Revision, "publish"); err != nil {
-		t.Fatal(err)
-	}
+	raceProductCommand(t, repo, actor, current.ID, current.Revision, "publish")
 	published, err := repo.get(ctx, actor, current.ID)
 	if err != nil || published.Data.Status != "published" {
 		t.Fatalf("publish %v %+v", err, published)
@@ -184,10 +182,77 @@ func TestProductsPostgresCASIsolationAndAuditRollback(t *testing.T) {
 		t.Fatalf("ordinary update changed publication: %+v %v", editedPublished, err)
 	}
 	published = editedPublished
+	if err = repo.command(ctx, actor, published.ID, published.Revision, "unknown"); !errors.Is(err, crud.ErrDenied) {
+		t.Fatalf("unknown command must be denied: %v", err)
+	}
+	for _, owner := range []host.Actor{actor, {AdminID: actor.AdminID + 1}} {
+		revision := published.Revision
+		if owner.AdminID == actor.AdminID {
+			revision = original.Revision
+		}
+		if err = repo.command(ctx, owner, published.ID, revision, "unpublish"); !errors.Is(err, crud.ErrConflict) {
+			t.Fatalf("stale/cross-owner unpublish: %v", err)
+		}
+	}
+	if _, err = db.ExecContext(ctx, "ALTER TABLE starter_product_events ADD CONSTRAINT test_unpublish_audit_failure CHECK(action <> 'unpublish') NOT VALID"); err != nil {
+		t.Fatal(err)
+	}
+	if err = repo.command(ctx, actor, published.ID, published.Revision, "unpublish"); err == nil {
+		t.Fatal("unpublish audit failure unexpectedly succeeded")
+	}
+	after, err = repo.get(ctx, actor, published.ID)
+	if err != nil || after != published {
+		t.Fatalf("unpublish escaped audit rollback: %+v %v", after, err)
+	}
+	if _, err = db.ExecContext(ctx, "ALTER TABLE starter_product_events DROP CONSTRAINT test_unpublish_audit_failure"); err != nil {
+		t.Fatal(err)
+	}
+	raceProductCommand(t, repo, actor, published.ID, published.Revision, "unpublish")
+	draft, err := repo.get(ctx, actor, published.ID)
+	if err != nil || draft.Data.Status != "draft" || draft.Revision == published.Revision {
+		t.Fatalf("unpublish: %+v %v", draft, err)
+	}
+	if err = repo.command(ctx, actor, draft.ID, draft.Revision, "unpublish"); !errors.Is(err, crud.ErrConflict) {
+		t.Fatalf("cannot unpublish a draft: %v", err)
+	}
+	if err = db.QueryRowContext(ctx, "SELECT count(*) FROM starter_product_events WHERE product_id=$1 AND action='unpublish'", draft.ID).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("unpublish audit count %d %v", count, err)
+	}
+	published = draft
 	if err = repo.command(ctx, actor, published.ID, published.Revision, "deleted"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = repo.get(ctx, actor, published.ID); !errors.Is(err, crud.ErrNotFound) {
 		t.Fatalf("delete %v", err)
+	}
+}
+
+func raceProductCommand(t *testing.T, repo productRepo, actor host.Actor, id, revision, action string) {
+	t.Helper()
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	var workers sync.WaitGroup
+	for range 2 {
+		workers.Go(func() {
+			<-start
+			results <- repo.command(t.Context(), actor, id, revision, action)
+		})
+	}
+	close(start)
+	workers.Wait()
+	close(results)
+	successes, conflicts := 0, 0
+	for err := range results {
+		switch {
+		case err == nil:
+			successes++
+		case errors.Is(err, crud.ErrConflict):
+			conflicts++
+		default:
+			t.Fatal(err)
+		}
+	}
+	if successes != 1 || conflicts != 1 {
+		t.Fatalf("%s CAS: %d successes, %d conflicts", action, successes, conflicts)
 	}
 }

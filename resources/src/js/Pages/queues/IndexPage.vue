@@ -8,7 +8,7 @@
         :key="tab.href"
         :href="tab.href"
         :aria-current="isActive(tab.href) ? 'page' : undefined"
-        class="px-3 py-2 rounded-lg text-sm font-medium border transition-colors"
+        class="px-3 py-2 rounded-[var(--goadmin-control-radius,4px)] text-sm font-medium border transition-colors"
         :class="
           isActive(tab.href)
             ? 'bg-primary text-primary-contrast border-primary'

@@ -51,6 +51,7 @@ vi.mock('@/components/form/FormInput.vue', () => ({
 const apps: ReturnType<typeof createApp>[] = []
 afterEach(() => {
   apps.splice(0).forEach((app) => app.unmount())
+  document.body.innerHTML = ''
   post.mockReset()
   setLocale('ru')
 })
@@ -91,6 +92,86 @@ describe('SSO waiting isolation', () => {
   })
 })
 describe('SSO moderation UI', () => {
+  async function moderator() {
+    const root = document.createElement('div')
+    document.body.append(root)
+    const app = createApp(IndexPage, {
+      records: [{ ID: 'request', ExternalSubject: 'user', Status: 'pending', Version: 4 }],
+      invitations: [],
+      inviteRoles: [{ ID: 1, PublicID: 'admin', Name: 'Admin' }],
+      approveRoles: [{ ID: 1, PublicID: 'admin', Name: 'Admin' }],
+      canInvite: true,
+      canReject: true,
+    })
+    apps.push(app)
+    app.mount(root)
+    const subject = root.querySelector<HTMLInputElement>('input[name=subject]')!
+    subject.value = 'user'
+    subject.dispatchEvent(new Event('input'))
+    for (const select of root.querySelectorAll('select')) {
+      select.options[0]!.selected = true
+      select.dispatchEvent(new Event('change'))
+    }
+    for (const [part, value] of Object.entries({
+      day: '06',
+      month: '11',
+      year: '2026',
+      hour: '23',
+      minute: '45',
+    })) {
+      const input = root.querySelector<HTMLInputElement>(`[data-date-part=${part}]`)!
+      input.value = value
+      input.dispatchEvent(new Event('input'))
+      await nextTick()
+    }
+    return root
+  }
+  it('converts local minute expiry to the existing UTC payload for invite and approval', async () => {
+    const root = await moderator()
+    const invite = [...root.querySelectorAll('button')].find((button) =>
+      button.textContent!.includes('Создать приглашение'),
+    )!
+    invite.click()
+    expect(post).toHaveBeenLastCalledWith(
+      '/admissions/invitations',
+      {
+        subject: 'user',
+        roleIds: [1],
+        expiresAt: new Date('2026-11-06T23:45').toISOString(),
+      },
+      expect.anything(),
+    )
+    post.mock.calls[0]![2].onFinish()
+    await nextTick()
+    const approve = [...root.querySelectorAll('button')].find((button) =>
+      button.textContent!.includes('Одобрить доступ'),
+    )!
+    approve.click()
+    expect(post).toHaveBeenLastCalledWith(
+      '/admissions/approve',
+      {
+        subject: 'user',
+        version: 4,
+        roleIds: [1],
+        expiresAt: new Date('2026-11-06T23:45').toISOString(),
+      },
+      expect.anything(),
+    )
+  })
+  it('blocks both mutations after a previously complete expiry becomes partial', async () => {
+    const root = await moderator()
+    const minute = root.querySelector<HTMLInputElement>('[data-date-part=minute]')!
+    minute.value = ''
+    minute.dispatchEvent(new Event('input'))
+    await nextTick()
+    for (const button of root.querySelectorAll('button')) {
+      if (/Создать приглашение|Одобрить доступ/.test(button.textContent ?? '')) {
+        expect(button.disabled).toBe(true)
+        button.dispatchEvent(new Event('click'))
+      }
+    }
+    expect(post).not.toHaveBeenCalled()
+  })
   it('has no enabled mutation for a read-only view', () => {
     const root = document.createElement('div')
     const app = createApp(IndexPage, {

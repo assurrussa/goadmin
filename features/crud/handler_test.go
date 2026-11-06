@@ -62,9 +62,9 @@ func mounted(t *testing.T, d Definition[testRow, testCreate, testUpdate], previe
 func mountedPolicy(t *testing.T, d Definition[testRow, testCreate, testUpdate], preview bool, deny bool, can func(context.Context, int64, host.PermissionDomain, host.PermissionAction) bool, flash ...bool) *fiber.App {
 	t.Helper()
 	fixture := hosttest.NewApp(t)
-	fixture.MockPermissionGuard.EXPECT().AdminGuard(gomock.Any()).DoAndReturn(func(_ host.PermissionKey, _ ...integrationroles.PermissionGuardOption) fiber.Handler {
+	fixture.MockPermissionGuard.EXPECT().AdminGuard(gomock.Any()).DoAndReturn(func(key host.PermissionKey, _ ...integrationroles.PermissionGuardOption) fiber.Handler {
 		return func(c fiber.Ctx) error {
-			if deny {
+			if deny || can != nil && !can(c.Context(), 9, key.Domain, key.Action) {
 				return fiber.ErrForbidden
 			}
 			return c.Next()
@@ -259,6 +259,25 @@ func TestCustomActionRechecksRevisionAndRecordAuthorization(t *testing.T) {
 	status, _, _ = request(t, mounted(t, d, false, false), "POST", "/people/records/42/actions/publish", `{"_revision":"v1"}`)
 	require.Equal(t, 403, status)
 	require.Equal(t, 1, calls)
+}
+
+func TestCommandsRequireTheirOwnPermission(t *testing.T) {
+	d := definition()
+	calls := []string{}
+	for _, key := range []string{"publish", "unpublish"} {
+		d.Actions = append(d.Actions, Action[testRow]{Key: key, Label: key, Permission: host.NewPermissionKey("crudtest", host.PermissionAction(key)), Run: func(context.Context, host.Actor, string, string) error {
+			calls = append(calls, key)
+			return nil
+		}})
+	}
+	app := mountedPolicy(t, d, false, false, func(_ context.Context, _ int64, _ host.PermissionDomain, action host.PermissionAction) bool {
+		return action != "unpublish"
+	})
+	status, _, _ := request(t, app, "POST", "/people/records/42/actions/publish", `{"_revision":"v1"}`)
+	require.Equal(t, 303, status)
+	status, _, _ = request(t, app, "POST", "/people/records/42/actions/unpublish", `{"_revision":"v1"}`)
+	require.Equal(t, 403, status)
+	require.Equal(t, []string{"publish"}, calls)
 }
 
 func TestSelectedExportRejectsUnexpectedCallbackRows(t *testing.T) {
@@ -573,10 +592,12 @@ func TestNumericBooleanAndNullDraftPersistAcrossConflict(t *testing.T) {
 		Props struct {
 			Errors map[string]string `json:"errors"`
 			Old    map[string]any    `json:"old"`
+			Flash  map[string]string `json:"flash"`
 		} `json:"props"`
 	}
 	require.NoError(t, json.NewDecoder(page.Body).Decode(&decoded))
 	require.Equal(t, "Record changed; reload before saving", decoded.Props.Errors["form"])
+	require.Equal(t, "Record changed; reload before saving", decoded.Props.Flash["error"])
 	require.InDelta(t, float64(28), decoded.Props.Old["stock"], 0)
 	require.Equal(t, true, decoded.Props.Old["active"])
 	require.Contains(t, decoded.Props.Old, "nullable")

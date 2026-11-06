@@ -25,7 +25,7 @@
           type="button"
           :aria-label="t('Закрыть уведомление')"
           @click="$emit('close')"
-          class="inline-flex h-11 w-11 items-center justify-center rounded-md text-text-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:text-text-primary transition ease-in-out duration-150"
+          class="inline-flex h-11 w-11 items-center justify-center rounded-[var(--goadmin-control-radius,4px)] text-text-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:text-text-primary transition ease-in-out duration-150"
         >
           <svg aria-hidden="true" class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
             <path

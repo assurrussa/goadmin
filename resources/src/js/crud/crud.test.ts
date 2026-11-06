@@ -187,7 +187,7 @@ it('keeps record identity outside create input and cancels work on unmount', () 
   app = undefined
   expect(mocks.cancel).toHaveBeenCalledOnce()
 })
-it('binds native dates and select values with labels and accessible error references', async () => {
+it('binds localized dates to scalar ISO values with accessible server errors', async () => {
   const update = vi.fn()
   const root = mount(Field, {
     field: { key: 'available', label: 'Available', type: 'date' },
@@ -196,16 +196,49 @@ it('binds native dates and select values with labels and accessible error refere
     'onUpdate:modelValue': update,
   })
   const input = root.querySelector('input')!
-  expect(input.type).toBe('date')
-  expect(input.value).toBe('2026-11-06')
+  expect(input.type).toBe('text')
+  expect(input.value).toBe('06')
+  expect(root.querySelector<HTMLInputElement>('input[name=available]')!.value).toBe('2026-11-06')
   expect(root.querySelector('label')!.htmlFor).toBe(input.id)
   expect(document.getElementById(input.getAttribute('aria-describedby')!)!.textContent).toContain(
     'Invalid date',
   )
-  input.value = '2026-12-01'
+  input.value = '01'
   input.dispatchEvent(new Event('input'))
   await nextTick()
-  expect(update).toHaveBeenCalledWith('2026-12-01')
+  expect(update).toHaveBeenCalledWith('2026-11-01')
+})
+
+it('blocks a partial optional date draft instead of submitting the previous complete date', async () => {
+  const root = mount(Form, {
+    resource: {
+      ...resource,
+      fields: [
+        {
+          key: 'available',
+          label: 'Available',
+          type: 'date',
+          read: true,
+          create: true,
+          update: true,
+        },
+      ],
+    },
+    mode: 'create',
+    values: { available: '2024-02-29' },
+  })
+  const day = root.querySelector<HTMLInputElement>('[data-date-part=day]')!
+  day.value = ''
+  day.dispatchEvent(new Event('input'))
+  await nextTick()
+  root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }))
+  expect(mocks.post).not.toHaveBeenCalled()
+  expect(root.querySelector('form')!.checkValidity()).toBe(false)
+  day.value = '28'
+  day.dispatchEvent(new Event('input'))
+  await nextTick()
+  root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }))
+  expect(mocks.post.mock.calls[0][1]).toEqual({ available: '2024-02-28' })
 })
 it('uses registered custom editors and fences disabled updates', async () => {
   unregister = registerCrudField(

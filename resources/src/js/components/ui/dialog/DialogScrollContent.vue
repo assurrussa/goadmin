@@ -57,7 +57,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
         <DialogClose
           data-ui="dialog"
           data-part="close"
-          class="absolute top-4 right-4 p-0.5 transition-colors rounded-md hover:bg-secondary"
+          class="absolute top-4 right-4 p-0.5 transition-colors rounded-[var(--goadmin-control-radius,4px)] hover:bg-secondary"
         >
           <X class="w-4 h-4" />
           <span class="sr-only">{{ t('core.ui.Close', 'Close') }}</span>

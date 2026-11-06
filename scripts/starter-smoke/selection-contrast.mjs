@@ -40,9 +40,15 @@ try {
         root.style.cssText = ''
         for (const [key, value] of Object.entries(BrandPalette.deriveBrandPalette(start, dark, end))) root.style.setProperty(key, value)
         document.body.innerHTML = `
-          <aside class="bg-card p-4"><a class="goadmin-selection-fill bg-primary/10 text-primary block p-3">Active navigation</a></aside>
+          <header data-ui="admin-header" class="bg-card p-4"><p data-brand-paint-probe>Header heading</p><a class="goadmin-selection-fill bg-primary/10 text-primary block p-3">Active navigation</a></header>
           <main class="bg-background p-4"><button class="goadmin-selection-fill bg-primary/10 text-primary hover:bg-surface-variant p-3">Active tab</button></main>
-          <button class="goadmin-primary-fill goadmin-semantic-fill bg-error text-white p-3">Semantic action</button>`
+          <button class="goadmin-primary-fill goadmin-semantic-fill bg-error text-white p-3">Semantic action</button>
+          <div data-row-scroll style="width:360px;overflow:auto"><table style="width:960px;border-collapse:collapse"><tbody>
+            ${['plain', 'selected'].map(state => `<tr data-row="${state}" class="goadmin-data-row ${state === 'selected' ? 'goadmin-selected-row' : ''}">
+              ${['first', 'middle', 'last'].map((cell, index) => `<td class="bg-card p-3 text-text-primary" style="min-width:${index === 1 ? 800 : 80}px;width:${index === 1 ? 800 : 80}px;${index === 0 ? 'position:sticky;left:0' : index === 2 ? 'position:sticky;right:0' : ''}">${state} ${cell}</td>`).join('')}
+            </tr>`).join('')}
+          </tbody></table></div>
+          <section data-ui="auth-shell" class="bg-background p-4"><p data-brand-paint-probe>Login heading</p></section>`
       }, { dark, start, end })
       for (const hover of [false, true]) {
         if (hover) await page.getByRole('button', { name: 'Active tab', exact: true }).hover()
@@ -56,6 +62,26 @@ try {
           surfaces: geometry.selections.map(item => ({ contrast: item.contrast, samples: item.samples })) })
         assert.ok(minimum >= 4.5, `${identity}: composited text contrast ${minimum}`)
         assert.equal(await page.locator('.goadmin-semantic-fill').evaluate(node => getComputedStyle(node).backgroundImage), 'none')
+        for (const decoration of geometry.decorations) assert.ok(decoration.contrast >= 4.5, `${identity}: decorative background contrast ${decoration.contrast}`)
+        const gradient = !!start && !!end
+        for (const selector of ['[data-ui="admin-header"]', '[data-ui="auth-shell"]']) {
+          assert.equal((await page.locator(selector).evaluate(node => getComputedStyle(node).backgroundImage)) !== 'none', gradient)
+        }
+        const rowPaint = async state => page.locator(`[data-row="${state}"] td`).evaluateAll(cells => cells.map(cell => ({
+          color: getComputedStyle(cell).backgroundColor, image: getComputedStyle(cell).backgroundImage,
+        })))
+        const assertUniform = paints => { assert.equal(new Set(paints.map(paint => paint.color)).size, 1); assert.ok(paints.every(paint => paint.image === 'none')) }
+        const selected = await rowPaint('selected'); assertUniform(selected)
+        const plain = await rowPaint('plain'); assertUniform(plain)
+        await page.getByText('plain first', { exact: true }).hover()
+        const hovered = await rowPaint('plain'); assertUniform(hovered)
+        assert.notEqual(hovered[0].color, plain[0].color)
+        await page.getByText('selected first', { exact: true }).hover()
+        assert.deepEqual(await rowPaint('selected'), selected, 'selection takes priority over hover')
+        await page.locator('[data-row-scroll]').evaluate(node => { node.scrollLeft = node.scrollWidth })
+        assert.deepEqual(await rowPaint('selected'), selected, 'sticky cells retain the row background after horizontal scroll')
+        await page.locator('[data-row-scroll]').evaluate(node => { node.scrollLeft = 0 })
+        for (const radius of await page.locator('button').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).borderRadius))) assert.equal(radius, '4px')
       }
     }
   }

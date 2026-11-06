@@ -8,7 +8,7 @@ p { line-height: 1.6; }
 .note { color: #526174; font-size: 13px; }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
 button, a { font: inherit; }
-button, a.primary-action { padding: 11px 18px; border: 0; border-radius: 8px; color: #fff; background: #2563eb; cursor: pointer; }
+button, a.primary-action { padding: 11px 18px; border: 0; border-radius: 4px; color: #fff; background: #2563eb; cursor: pointer; }
 a { color: #2459c9; text-underline-offset: 3px; }
 a.primary-action { color: #fff; display: inline-block; text-decoration: none; }
 button:focus-visible, a:focus-visible { outline: 3px solid #81aaff; outline-offset: 4px; }

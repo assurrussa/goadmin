@@ -138,7 +138,9 @@ it('shares shell height/content tokens while preserving the original defaults', 
   expect(
     header
       .querySelector('[data-profile-menu-trigger]')
-      ?.classList.contains('rounded-[var(--goadmin-menu-radius,1rem)]'),
+      ?.classList.contains(
+        'rounded-[var(--goadmin-menu-radius,var(--goadmin-control-radius,4px))]',
+      ),
   ).toBe(true)
   expect(header.classList.contains('h-[var(--goadmin-header-height,68px)]')).toBe(true)
   expect(header.firstElementChild?.classList.contains('h-full')).toBe(true)

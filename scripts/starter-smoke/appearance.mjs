@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { selectTheme, assertSystemTheme, selectSettingsSection, assertSettingsNavigation, assertBrandingLayout } from './appearance-controls.mjs'
 import path from 'node:path'
 import { appearanceGeometry, appearanceVisualAcceptance } from './appearance-visual.mjs'
 
@@ -40,13 +41,17 @@ export async function appearanceAcceptance({ page, context, browser, config, cre
   }
   // Inertia Back restores cached page props. A newer successful header save must
   // retain its version and paint when returning to the older settings page.
+  await assertSettingsNavigation(page, expect)
+  await set(/^(Theme|Тема)$/, 'system')
+  await selectTheme(page, expect, 'system')
+  await assertSystemTheme(page, expect)
   await set(/^(Theme|Тема)$/, 'light')
   await page.locator('[data-profile-menu-trigger]').click()
   await page.locator('[role="menu"] a[href="/auth/profile"]').click()
   await expect(page).toHaveURL(/\/auth\/profile$/)
   const [headerSave] = await Promise.all([
     page.waitForResponse(r => new URL(r.url()).pathname === '/auth/profile/appearance' && r.request().method() === 'PATCH'),
-    page.getByRole('button', { name: /Switch to dark theme|Переключить на темную тему/i }).click(),
+    selectTheme(page, expect, 'dark'),
   ])
   assert.equal(headerSave.status(), 200)
   const headerVersion = (await headerSave.json()).version
@@ -103,7 +108,8 @@ export async function appearanceAcceptance({ page, context, browser, config, cre
     await expect(fresh.locator('html')).toHaveAttribute('data-density', 'compact')
   } finally { await other.close() }
 
-  await page.goto('/auth/profile/settings#branding')
+  await selectSettingsSection(page, expect, 'branding')
+  await assertBrandingLayout(page, expect)
   const brandTitle = 'M'.repeat(80)
   await page.getByLabel('Название админки', { exact: true }).fill(brandTitle)
   const baselineAccent = (await appearanceGeometry(page)).accent
@@ -122,6 +128,9 @@ export async function appearanceAcceptance({ page, context, browser, config, cre
     customPreviews = geometry.panels
     customContrast.push({ accent, panels: geometry.panels })
   }
+  await expect(page.locator('[aria-labelledby="branding-title"] input[type="color"]')).toHaveCount(1)
+  await expect(page.getByLabel('Конечный цвет градиента', { exact: true })).toHaveCount(0)
+  await page.getByLabel('Тип акцента', { exact: true }).selectOption('gradient')
   await expect(page.locator('[aria-labelledby="branding-title"] input[type="color"]')).toHaveCount(2)
   await page.getByLabel('Конечный цвет градиента', { exact: true }).fill('#fefefe')
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
@@ -162,6 +171,10 @@ export async function appearanceAcceptance({ page, context, browser, config, cre
   await expect(page).toHaveURL(/\/auth\/profile\/settings#branding$/)
   await expect(page.locator('[data-ui="admin-brand"]').filter({ visible: true }).first()).toContainText(brandTitle)
   await page.setViewportSize({ width: 390, height: 844 })
+  await assertSettingsNavigation(page, expect)
+  await assertBrandingLayout(page, expect)
+  await selectSettingsSection(page, expect, 'interface')
+  await selectSettingsSection(page, expect, 'branding')
   await expect(page.getByLabel('Название админки', { exact: true })).toHaveValue(brandTitle)
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), '80 unbroken brand characters must reflow on mobile')
   await page.screenshot({ path: path.join(folder, `${name}-branding-long-mobile.png`), fullPage: true })
@@ -209,6 +222,8 @@ export async function appearanceAcceptance({ page, context, browser, config, cre
   } finally { assert.equal((await send('POST', '/auth/role-preview', { roleId: 0 })).status(), 200) }
   await logout(page)
   await login(page, credentials.restrictedEmail, credentials.password)
+  await page.goto('/auth/profile/settings#interface')
+  await assertSettingsNavigation(page, expect, { branding: false })
   assert.equal((await context.request.get('/auth/branding')).status(), 403)
   const restricted = await get('/auth/profile/appearance')
   assert.notEqual(restricted.owner, saved.owner)
@@ -233,8 +248,7 @@ export async function appearanceAcceptance({ page, context, browser, config, cre
   assert.ok(comfortableRowHeight > compactRowHeight, `comfortable table rows must be larger than compact rows: ${JSON.stringify({ compact, comfortable })}`)
   await page.goto('/auth/profile/settings#interface')
   await set(/^(Density|Плотность)$/, 'default')
-  const brandLink = page.getByRole('link', { name: 'Admin branding', exact: true })
-  await brandLink.focus(); await page.keyboard.press('Enter')
+  await selectSettingsSection(page, expect, 'branding', { keyboard: true })
   const resetButton = page.getByRole('button', { name: 'Reset branding', exact: true })
   await expect(resetButton).toBeEnabled()
   await resetButton.focus(); await page.keyboard.press('Enter')
@@ -258,6 +272,8 @@ export async function appearanceAcceptance({ page, context, browser, config, cre
   await appearanceVisualAcceptance({ browser, context, page, config, folder, name, expect, result, get, send })
   result.appearance = { crossBrowser: true, relogin: true, autosave: true, ownerIsolation: true,
     history: { appearance: true, branding: true }, longBrandMobile: true,
+    settingsNavigation: { desktopGroups: true, mobileSelect: true, brandingPermission: true },
+    themeMenu: { explicitModes: true, liveSystemAndReload: true },
     branding: { published: true, publicPNG: true, etag: true, reset: true, resetCancelAndKeyboard: true,
       customContrast, appliedLightAndDark: true },
     densityGeometry: { compactRowHeight, comfortableRowHeight },

@@ -201,7 +201,7 @@ async function submit(event: Event) {
         <button
           type="submit"
           :disabled="!subject"
-          class="rounded bg-primary px-4 py-2 text-primary-foreground"
+          class="rounded-[var(--goadmin-control-radius,4px)] bg-primary px-4 py-2 text-primary-foreground"
         >
           {{ t('Отправить приглашение') }}
         </button>

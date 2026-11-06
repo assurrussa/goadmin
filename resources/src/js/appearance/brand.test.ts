@@ -217,6 +217,32 @@ it('overrides inherited gradient fills in an unset preview and uses none for a s
 })
 
 it.each([false, true])(
+  'clears decorative backgrounds when a gradient is removed in dark=%s',
+  (dark) => {
+    const gradient = { ...emptyBrand, accentColor: '#1ca698', accentColorEnd: '#d04f47' }
+    applyBrand(gradient, dark)
+    expect(
+      document.documentElement.style.getPropertyValue('--goadmin-brand-surface-image'),
+    ).toContain('linear-gradient')
+    expect(document.documentElement.style.getPropertyValue('--goadmin-brand-auth-image')).toContain(
+      'linear-gradient',
+    )
+    applyBrand({ ...gradient, accentColorEnd: '' }, dark)
+    expect(document.documentElement.style.getPropertyValue('--goadmin-brand-surface-image')).toBe(
+      'none',
+    )
+    expect(document.documentElement.style.getPropertyValue('--goadmin-brand-auth-image')).toBe(
+      'none',
+    )
+    applyBrand(emptyBrand, dark)
+    expect(document.documentElement.style.getPropertyValue('--goadmin-brand-surface-image')).toBe(
+      '',
+    )
+    expect(document.documentElement.style.getPropertyValue('--goadmin-row-accent')).toBe('')
+  },
+)
+
+it.each([false, true])(
   'keeps selection text readable over the final tinted backgrounds in dark=%s',
   (dark) => {
     const channels = (color: string) => color.match(/[\d.]+/g)!.map(Number)

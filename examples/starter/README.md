@@ -145,9 +145,12 @@ Add `products` to `ADMIN_MODULES` to enable the host-owned example at `/products
 `STARTER_MIGRATE=1` or the explicit `migrate` command installs its own Products
 schema/ledger after the core migrations. Disabling the module retains its data.
 The example defines six simple fields, scoped PostgreSQL queries, per-record
-revision checks and transactional domain audit, plus a guarded Publish command.
+revision checks and transactional domain audit, plus guarded Publish/Unpublish
+commands.
 Each administrator sees their own records. Category is an optional editable
 select; publication Status is read-only in normal CRUD and changes only through
-the separately authorized Publish command. The versioned Products ledger upgrades
-existing example tables without resetting records. Standard pages use the embedded
+the separately authorized Publish/Unpublish commands. Unpublish requires its own
+`products:unpublish` permission and returns the record to draft, with owner/revision
+CAS and transactional audit. Unknown commands are rejected. The versioned Products
+ledger upgrades existing example tables without resetting records. Standard pages use the embedded
 renderer without a Vue extension. See [CRUD resources](../../docs/crud.md).

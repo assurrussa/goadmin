@@ -11,7 +11,7 @@ defineSlots<AdminShellSlots>()
     data-part="topbar"
     class="min-h-screen bg-background text-text-primary"
   >
-    <header class="border-b border-border-primary bg-card">
+    <header data-ui="admin-header" class="border-b border-border-primary bg-card">
       <div
         class="mx-auto flex min-h-16 max-w-[var(--goadmin-content-max-width,80rem)] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8"
       >

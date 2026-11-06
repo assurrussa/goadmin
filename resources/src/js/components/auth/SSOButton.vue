@@ -1,7 +1,7 @@
 <template>
   <a
     :href="href"
-    class="mb-4 block rounded-lg border border-primary px-4 py-3 text-center text-primary"
+    class="mb-4 block rounded-[var(--goadmin-control-radius,4px)] border border-primary px-4 py-3 text-center text-primary"
     >{{ t('Войти через SSO') }}</a
   >
 </template>

@@ -1,9 +1,10 @@
-// Read-only palette diagnostic for an already running smoke host; uses a separate browser context.
+// Palette diagnostic for an already running smoke host; uses a separate browser context.
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium } from 'playwright'
 import { expect } from 'playwright/test'
 import { waitForPaint, paintViolations } from './paint.mjs'
+import { selectTheme } from './appearance-controls.mjs'
 const folder = path.resolve(process.argv[2])
 const manifest = JSON.parse(await readFile(path.join(folder, 'run.json'), 'utf8'))
 if (manifest.owner !== 'goadmin-starter-smoke-v1') throw new Error('Not an owned smoke run')
@@ -29,10 +30,8 @@ try {
       await expect(page.locator('[data-profile-menu-trigger]')).toBeVisible()
       await page.goto('/auth/profile')
       for (const mode of ['light', 'dark']) {
-        if (mode === 'dark') {
-          await page.getByRole('button', { name: /Switch to dark theme|Переключить на темную тему/i }).click()
-          await page.reload()
-        }
+        await selectTheme(page, expect, mode)
+        await page.reload()
         await expect(page.locator('html')).toHaveAttribute('data-theme-mode', mode)
         try {
           await waitForPaint(page, name, mode, result.paint.light,

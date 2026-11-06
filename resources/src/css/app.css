@@ -331,6 +331,13 @@
     color: inherit;
   }
 
+  button,
+  input[type='button'],
+  input[type='submit'],
+  input[type='reset'] {
+    border-radius: var(--goadmin-control-radius, 4px);
+  }
+
   input:not([type='checkbox']):not([type='radio']),
   textarea,
   select {
@@ -663,14 +670,42 @@
 .goadmin-primary-fill:not(.goadmin-semantic-fill) {
   background-image: var(--goadmin-primary-image, none);
   color: var(--goadmin-primary-fill-foreground, var(--color-primary-foreground));
+  /* Fill and foreground must change atomically; interpolating black to white
+     produces unreadable intermediate text over an immediately changed image. */
+  transition-property: box-shadow, opacity;
 }
-.goadmin-selection-fill,
-.goadmin-selected-row > td {
+.goadmin-selection-fill {
   background-image: var(--goadmin-selection-image, none);
 }
 .goadmin-selection-fill {
   color: var(--goadmin-selection-foreground, var(--color-primary));
+  transition-property: box-shadow, opacity;
 }
-.goadmin-selected-row > td {
-  background-color: color-mix(in srgb, var(--color-primary) 10%, var(--color-card));
+.goadmin-data-row {
+  --goadmin-row-background: var(--color-card);
+}
+.goadmin-data-row:hover {
+  --goadmin-row-background: var(
+    --goadmin-table-row-hover,
+    color-mix(in srgb, var(--goadmin-row-accent, var(--color-primary)) 5%, var(--color-card))
+  );
+}
+.goadmin-data-row.goadmin-selected-row {
+  --goadmin-row-background: color-mix(
+    in srgb,
+    var(--goadmin-row-accent, var(--color-primary)) 12%,
+    var(--color-card)
+  );
+}
+.goadmin-data-row > td {
+  background-image: none;
+  background-color: var(--goadmin-row-background);
+}
+[data-ui='admin-header'] {
+  background-image: var(--goadmin-brand-surface-image, none);
+}
+[data-ui='auth-shell'] {
+  background-image: var(--goadmin-brand-auth-image, none);
+  background-size: 100% 28rem;
+  background-repeat: no-repeat;
 }

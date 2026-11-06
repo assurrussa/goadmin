@@ -15,7 +15,13 @@ permission-gated Admin Branding section. Interface changes apply immediately and
 autosave per administrator; conflicts retain the local draft for explicit
 resolution. The header's theme and locale controls use the same account state.
 The system theme choice follows the current device's operating-system setting.
-Anonymous device preferences remain separate from authenticated accounts.
+Anonymous device preferences remain separate from authenticated accounts. Both
+admin and auth headers expose explicit System/Light/Dark choices and retain the
+System selection while the effective operating-system theme changes.
+
+Settings use a grouped desktop sidebar and a compact mobile section selector.
+Personal settings and installation-wide branding remain distinct. Branding groups
+name, colors and logos with isolated light/dark previews and one Apply operation.
 
 Default density leaves the chosen pack's geometry intact. Compact/comfortable
 choices set the documented shared size tokens at runtime; small or coarse-pointer
@@ -31,6 +37,10 @@ Preview is local until Apply. Reset restores the original presentation. Input
 logos must be PNG/JPEG, at most 512 KiB and 1024x1024 each; published images are
 normalized PNG. The brand appears in the existing admin/auth brand slots.
 Custom packs should render that slot to receive the configured content.
+When both gradient stops are present, built-in headers and auth shells also use a
+restrained decorative background. Working surfaces stay neutral. DataGrid rows
+use uniform opaque brand tints for hover and selection, including sticky cells;
+selection takes priority over hover. Their cells do not repeat the gradient.
 
 The new JSON companions are `GET/PATCH /auth/profile/appearance` and
 `GET/PUT /auth/branding`. Current session identity owns personal documents; the
@@ -70,7 +80,7 @@ independent of that choice. Use `:root.dark` and
 | `--goadmin-sidebar-width` | `16rem` | Expanded/mobile sidebar and desktop content offset |
 | `--goadmin-sidebar-collapsed-width` | `5rem` | Collapsed desktop sidebar and content offset |
 | `--goadmin-content-max-width` | `80rem` | Header row and main content |
-| `--goadmin-menu-radius` | `1rem` | Profile dropdown trigger |
+| `--goadmin-menu-radius` | Control radius, then `4px` | Profile dropdown trigger; an explicit menu override takes priority |
 | `--goadmin-header-shadow` | `none` | Header shadow |
 | `--goadmin-sidebar-shadow` | `none` | Sidebar shadow |
 
@@ -94,7 +104,7 @@ fit. Custom colors are not automatically contrast-certified.
 | `--goadmin-control-height` | `2.25rem` (36px), md/default and default icons |
 | `--goadmin-control-height-lg` | `2.5rem` (40px) |
 | `--goadmin-control-height-xl` | `2.75rem` (44px), AppButton xl |
-| `--goadmin-control-radius` | Existing `--radius-md` (currently 8px); final fallback `0.375rem` |
+| `--goadmin-control-radius` | `4px` for buttons; other controls retain their `--radius-md` fallback |
 | `--goadmin-control-radius-xs` | `0.25rem` (4px), xs buttons |
 | `--goadmin-textarea-min-height` | `60px` |
 | `--goadmin-card-radius` | Existing `--radius-xl` (currently 12px); final fallback `0.75rem` |

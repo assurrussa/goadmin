@@ -70,7 +70,7 @@
           :title="`${isOpen(item, index) ? t('Свернуть') : t('Развернуть')} ${t(item.name)}`"
           :aria-expanded="isOpen(item, index)"
           :aria-controls="groupID(index)"
-          class="flex h-7 w-5 shrink-0 items-center justify-center rounded hover:bg-surface-variant focus-visible:ring-2 focus-visible:ring-primary"
+          class="flex h-7 w-5 shrink-0 items-center justify-center rounded-[var(--goadmin-control-radius,4px)] hover:bg-surface-variant focus-visible:ring-2 focus-visible:ring-primary"
           @click="toggleGroup(item, index)"
         >
           <ChevronDown

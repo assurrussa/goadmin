@@ -19,7 +19,7 @@
       <button
         type="button"
         @click="togglePasswordVisibility"
-        class="rounded-sm text-text-tertiary hover:text-text-secondary transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        class="rounded-[var(--goadmin-control-radius,4px)] text-text-tertiary hover:text-text-secondary transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         :disabled="readonly || disabled"
         :aria-label="showPassword ? t('Скрыть пароль') : t('Показать пароль')"
         :aria-pressed="showPassword"
