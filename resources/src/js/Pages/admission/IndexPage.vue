@@ -6,6 +6,7 @@ import AppHead from '@/components/layout/AppHead.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'
 import FormInput from '@/components/form/FormInput.vue'
+import LocalizedDatePicker from '@/components/date/LocalizedDatePicker.vue'
 
 registerTranslations({
   ru: {
@@ -86,6 +87,7 @@ const subject = ref('')
 const selectedInvite = ref<number[]>([])
 const selectedApproval = ref<Record<string, number[]>>({})
 const expires = ref('')
+const expiresValid = ref(false)
 const busy = ref(false)
 const error = ref('')
 const requests = computed(() => props.records ?? [])
@@ -110,7 +112,7 @@ function send(path: string, body: Record<string, string | number | number[]>) {
   })
 }
 function invite() {
-  if (!until()) {
+  if (!expiresValid.value || !until()) {
     error.value = t('Admission error')
     return
   }
@@ -121,7 +123,7 @@ function invite() {
   })
 }
 function approve(row: RequestRow) {
-  if (!until()) {
+  if (!expiresValid.value || !until()) {
     error.value = t('Admission error')
     return
   }
@@ -174,12 +176,21 @@ function invitationState(row: Invitation) {
           </option>
         </select>
       </label>
-      <label class="block space-y-2">
-        <span>{{ t('Admission expires') }}</span>
-        <input v-model="expires" type="datetime-local" :class="inputClass" required />
-      </label>
+      <div class="space-y-2">
+        <label for="admission-expires" class="block">{{ t('Admission expires') }}</label>
+        <LocalizedDatePicker
+          id="admission-expires"
+          :model-value="expires"
+          :label="t('Admission expires')"
+          with-time
+          required
+          :disabled="busy || (!canInvite && !approveRoles?.length)"
+          @update:model-value="expires = $event ?? ''"
+          @update:valid="expiresValid = $event"
+        />
+      </div>
       <AppButton
-        :disabled="busy || !canInvite || !subject || !selectedInvite.length || !expires"
+        :disabled="busy || !canInvite || !subject || !selectedInvite.length || !expiresValid"
         @click="invite"
       >
         {{ t('Admission invite') }}
@@ -211,7 +222,7 @@ function invitationState(row: Invitation) {
             </select>
           </label>
           <AppButton
-            :disabled="busy || !selectedApproval[row.ID]?.length || !expires"
+            :disabled="busy || !selectedApproval[row.ID]?.length || !expiresValid"
             @click="approve(row)"
           >
             {{ t('Admission approve') }}

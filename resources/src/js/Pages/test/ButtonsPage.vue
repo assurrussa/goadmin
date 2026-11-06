@@ -58,10 +58,10 @@
               <AppButton variant="primary" fullWidth>Full Width Button</AppButton>
             </div>
             <div>
-              <p class="text-sm text-text-secondary mb-2">Округлые:</p>
+              <p class="text-sm text-text-secondary mb-2">Единый радиус:</p>
               <div class="flex gap-4">
-                <AppButton variant="primary" rounded>Rounded Primary</AppButton>
-                <AppButton variant="secondary" rounded>Rounded Secondary</AppButton>
+                <AppButton variant="primary">Primary</AppButton>
+                <AppButton variant="secondary">Secondary</AppButton>
               </div>
             </div>
           </div>
@@ -70,12 +70,20 @@
         <!-- Группы кнопок -->
         <div class="mb-8">
           <h3 class="text-lg font-medium mb-4 text-text-primary">Группы кнопок</h3>
-          <div class="inline-flex rounded-md border border-border-primary overflow-hidden">
-            <AppButton variant="secondary" class="rounded-none border-0 first:rounded-l-md">
+          <div
+            class="inline-flex rounded-[var(--goadmin-control-radius,4px)] border border-border-primary overflow-hidden"
+          >
+            <AppButton
+              variant="secondary"
+              class="rounded-none border-0 first:rounded-l-[var(--goadmin-control-radius,4px)]"
+            >
               Первая
             </AppButton>
             <AppButton variant="secondary" class="rounded-none border-0">Вторая</AppButton>
-            <AppButton variant="secondary" class="rounded-none border-0 last:rounded-r-md">
+            <AppButton
+              variant="secondary"
+              class="rounded-none border-0 last:rounded-r-[var(--goadmin-control-radius,4px)]"
+            >
               Третья
             </AppButton>
           </div>

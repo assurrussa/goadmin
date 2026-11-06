@@ -26,7 +26,7 @@ type productData struct {
 	Status      string `json:"status"`
 }
 
-// Status is intentionally absent from writable DTOs: only Publish changes it.
+// Status is intentionally absent from writable DTOs: only explicit commands change it.
 type productInput struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
@@ -179,15 +179,22 @@ func (r productRepo) update(ctx context.Context, a host.Actor, id, revision stri
 }
 
 func (r productRepo) command(ctx context.Context, a host.Actor, id, revision, action string) error {
+	var query string
+	switch action {
+	case "publish":
+		query = "UPDATE starter_products SET status='published',revision=revision+1 WHERE owner_admin_id=$1 AND id::text=$2 AND revision::text=$3 AND status='draft'"
+	case "unpublish":
+		query = "UPDATE starter_products SET status='draft',revision=revision+1 WHERE owner_admin_id=$1 AND id::text=$2 AND revision::text=$3 AND status='published'"
+	case "deleted":
+		query = "DELETE FROM starter_products WHERE owner_admin_id=$1 AND id::text=$2 AND revision::text=$3"
+	default:
+		return crud.ErrDenied
+	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	query := "DELETE FROM starter_products WHERE owner_admin_id=$1 AND id::text=$2 AND revision::text=$3"
-	if action == "publish" {
-		query = "UPDATE starter_products SET status='published',revision=revision+1 WHERE owner_admin_id=$1 AND id::text=$2 AND revision::text=$3 AND status='draft'"
-	}
 	result, err := tx.ExecContext(ctx, query, a.AdminID, id, revision)
 	if err != nil {
 		return err
@@ -262,11 +269,19 @@ func productsModule(db *sql.DB) (host.Module, error) {
 			if op == "publish" && record.Data.Status != "draft" {
 				return crud.ErrDenied
 			}
+			if op == "unpublish" && record.Data.Status != "published" {
+				return crud.ErrDenied
+			}
 			return nil
 		},
-		Actions: []crud.Action[productData]{{Key: "publish", Label: "Publish", Confirmation: "Publish this product?", Permission: permission("publish"), Run: func(ctx context.Context, a host.Actor, id, revision string) error {
-			return r.command(ctx, a, id, revision, "publish")
-		}}},
+		Actions: []crud.Action[productData]{
+			{Key: "publish", Label: "Опубликовать", Confirmation: "Опубликовать этот товар?", Permission: permission("publish"), Run: func(ctx context.Context, a host.Actor, id, revision string) error {
+				return r.command(ctx, a, id, revision, "publish")
+			}},
+			{Key: "unpublish", Label: "Снять с публикации", Confirmation: "Снять этот товар с публикации?", Permission: permission("unpublish"), Run: func(ctx context.Context, a host.Actor, id, revision string) error {
+				return r.command(ctx, a, id, revision, "unpublish")
+			}},
+		},
 	})
 }
 

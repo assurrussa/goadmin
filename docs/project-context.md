@@ -293,12 +293,16 @@ owner-scoped CAS boundary as table preferences but an independent typed schema.
 Anonymous theme and locale use a separate device document. Login hydrates the
 verified account before paint; logout discards private drafts and pending work.
 The legacy shared browser choices are not imported into an account automatically.
+Admin/auth headers expose all three theme preferences. Settings have a grouped
+sidebar and mobile section selector, retaining existing section hash URLs.
 
 Core branding adds installation-wide name, accent and light/dark PNG logos.
 An optional second HEX stop creates a fixed 135-degree sRGB gradient. Both stops
 are one draft value during conflict resolution and short-lived branding recovery.
-Primary fills and soft selected surfaces use image tokens; text, borders and focus
-retain solid colors. Original stops are persisted, with contrast-adapted fills.
+Primary fills and navigation highlights use image tokens; text, borders and focus
+retain solid colors. Decorative gradient tint is restricted to built-in headers
+and auth shells. DataGrid hover/selection uses uniform opaque tints across all
+cells, including sticky columns. Original stops are persisted, with contrast-adapted fills.
 The editor requires `branding:read`/`branding:update`, uses explicit Apply and
 isolated preview, and commits configuration, images and audit atomically under
 CAS. Logos accept bounded PNG/JPEG input, normalized to PNG in PostgreSQL; no

@@ -42,8 +42,13 @@ function initial(): Record<string, CrudValue> {
 const form = useForm({ values: initial() })
 const draftRevision = ref(props.record?.revision)
 const errors = computed(() => form.errors as Record<string, string>)
+const fieldValidity = ref<Record<string, boolean>>({})
 function submit() {
-  if (form.processing) return
+  if (
+    form.processing ||
+    activeFields.value.some((field) => fieldValidity.value[field.key] === false)
+  )
+    return
   form.transform((data) =>
     props.mode === 'update' ? { ...data.values, _revision: draftRevision.value } : data.values,
   )
@@ -72,6 +77,7 @@ watch(
     form.defaults({ values: initial() })
     form.reset()
     form.clearErrors()
+    fieldValidity.value = {}
   },
 )
 function reload() {
@@ -95,11 +101,12 @@ onUnmounted(() => form.cancel())
   >
     <Field
       v-for="field in activeFields"
-      :key="field.key"
+      :key="`${resource.key}:${record?.id ?? ''}:${field.key}`"
       :field="field"
       v-model="form.values[field.key]"
       :error="errors[field.key]"
       :disabled="form.processing"
+      @update:valid="fieldValidity[field.key] = $event"
     />
     <AppButton
       v-if="mode === 'update' && errors.form"

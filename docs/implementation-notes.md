@@ -1,5 +1,80 @@
 # Implementation Notes
 
+## UI consistency follow-up (2026-11-06)
+
+Base: `29e4250`, current branch `tasks/crud-sdk-gradient-review-20261106`, no
+worktree. Accepted: grouped settings sidebar/mobile selector, compact branding
+blocks with isolated previews, explicit system/light/dark menus, soft gradient
+header/auth backgrounds, uniform opaque table hover/selection, 4px built-in
+button defaults, Products Unpublish, conflict flash toast, and one RU/EN calendar
+for CRUD dates and admission expiry. Reuse current preferences/branding schemas;
+keep ISO date and invitation timestamp semantics and public embedding contracts.
+
+Ownership: calendar worker owns shared date control/adapters, CRUD/admission
+integration and direct date dependency; settings worker owns settings/branding
+layout and theme menus. Root owns table/button/background CSS, Products and
+conflict flash, translations, smoke acceptance, docs, generated assets and final
+integration. No worker changes another owner's files without coordination.
+
+Transitions: Publish draft->published; Unpublish published->draft, each with its
+own permission, owner/revision CAS and transaction audit. Invalid/stale commands
+make no write. Conflict retains input/revision and exposes one toast plus inline
+feedback; no inbox event/replay. Date locale changes alter presentation only;
+partial input blocks submission instead of reusing an old complete value.
+
+Validation: targeted red/green regressions, Products PostgreSQL race checks,
+`make check`, clean consumer, both presentation packs' full browser acceptance
+and native paint/contrast checks. Regenerate CRUD fingerprint and embedded assets
+together, independently review the final change, then commit. Update the retained
+manual run `20261106t060043z-395904ab` without removing its databases or volumes;
+preserve its login, products and branding settings. No push or release requested.
+
+Implementation and final browser/runtime acceptance are complete. Added
+red/green regressions for conflict flash, date-error focus after processing
+unlocks, and identical flash messages from distinct responses. Flash consumption
+deduplicates response objects instead of suppressing equal text for one second.
+Calendar navigation is fenced to the API's four-digit AD range. Products
+PostgreSQL `-race` passed concurrent Publish/Unpublish winner/conflict, owner
+isolation, unknown-command denial and audit rollback. HTTP regression separately
+checks command-specific permission denial without invoking the callback.
+
+`make check` passed Go tidy/format/vet/lint, full race/coverage and resource
+gates. Resource checks passed 144 manifest checks and 1,143 UI tests, types,
+lint, formatting, typed host probes, build and embedded asset verification.
+Earlier integration type errors were corrected. Native Chromium paint passed
+64 cases (minimum 5.072:1), including decorative ancestor gradients, uniform
+sticky-row backgrounds and 4px button defaults. Its CSS hash matches the bundle.
+Clean local consumer and smoke helper checks passed.
+
+Visual inspection caught two contrast defects missed by initial assertions:
+foreground interpolation during a branded fill change, and translucent enabled
+outside-month dates. Fills now change atomically; enabled dates retain full
+opacity. After both packs passed 12 browser groups, screenshot review caught a
+transparent calendar portal root: Reka omits the caller's scoped attribute there.
+Its surface rule is now explicitly global; browser acceptance requires opaque
+paint, border, stacking and contained day geometry. The final affected resource
+gate passed after this correction, and the CRUD renderer fingerprint/assets were
+regenerated together. Independent source and focused fix reviews are clear.
+
+Final source run `20261106t091451z-4c1f2c82` passed all 12 scenario groups per
+presentation pack, with zero page, console or diagnostic errors. It covers RU/EN,
+light/dark, mobile, keyboard, system-theme changes, CRUD/commands/conflicts,
+table workflows, branding rights and native paint. Final settings and calendar
+screenshots were inspected. Admission datetime integration is covered by mounted
+component tests; that optional module is not enabled in the retained starter.
+Earlier failed runs remain diagnostics rather than acceptance evidence.
+
+Source builds used isolated 18778/18779 ports and a temporary checksum-preserving
+read-only shared Go download-cache proxy. Retained manual run
+`20261106t060043z-395904ab` was upgraded by replacing only its admin images, keeping
+18768/18769 addresses, PostgreSQL services, volumes and credentials. Private final
+pre-upgrade dumps were saved; ordered whole-table checksums of Products,
+branding and personal preferences were identical before/after. Native sessions
+captured before replacement still authenticate after it; both updated settings
+and mobile calendars were verified. Acceptance containers and the cache proxy
+are removed after verification; retained manual instances stay running. No push,
+publication or production deployment was requested.
+
 ## CRUD SDK and gradient accents (2026-11-06)
 
 Base: `181328c`; implementation began on `tasks/crud-sdk-gradient` and was

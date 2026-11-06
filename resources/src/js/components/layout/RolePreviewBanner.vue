@@ -82,7 +82,7 @@ async function change(roleId: number) {
     <button
       v-if="preview.active"
       type="button"
-      class="inline-flex max-w-48 items-center gap-2 rounded-lg border border-warning bg-surface-variant px-2.5 py-1.5 text-xs font-medium"
+      class="inline-flex max-w-48 items-center gap-2 rounded-[var(--goadmin-control-radius,4px)] border border-warning bg-surface-variant px-2.5 py-1.5 text-xs font-medium"
       :title="t('Только чтение. Ваша учётная запись и её роли не меняются.')"
       @click="open = true"
     >

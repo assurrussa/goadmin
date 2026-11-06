@@ -1,33 +1,15 @@
 <script setup lang="ts">
-import { appearance } from '@/appearance/state'
 import AdminBrand from './AdminBrand.vue'
-import { t } from '@/i18n'
 import { usePresentation } from '@/presentation/context'
 import LocaleSelect from './LocaleSelect.vue'
-import AppButton from '@/components/ui/AppButton.vue'
-import { Moon, Sun } from 'lucide-vue-next'
-import { useThemeStore } from '@/stores/theme'
+import ThemeSelect from './ThemeSelect.vue'
 const { authShell } = usePresentation()
-const themeStore = useThemeStore()
 </script>
 <template>
   <component :is="authShell">
     <template #utilities>
       <LocaleSelect />
-      <AppButton
-        variant="ghost"
-        size="icon-sm"
-        :disabled="appearance.readOnly || appearance.resolving"
-        :aria-label="
-          themeStore.isDark ? t('Переключить на светлую тему') : t('Переключить на темную тему')
-        "
-        :title="
-          themeStore.isDark ? t('Переключить на светлую тему') : t('Переключить на темную тему')
-        "
-        @click="themeStore.toggle()"
-      >
-        <Sun v-if="themeStore.isDark" class="h-5 w-5" /><Moon v-else class="h-5 w-5" />
-      </AppButton>
+      <ThemeSelect />
     </template>
     <template #brand><AdminBrand /></template>
     <template #title><slot name="title" /></template>

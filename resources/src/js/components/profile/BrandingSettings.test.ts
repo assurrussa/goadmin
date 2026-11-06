@@ -136,6 +136,13 @@ it('keeps name and accent preview isolated until explicit successful Apply', asy
     reset: false,
   })
 })
+
+it('labels the accent mode without including its option text', async () => {
+  fetch.mockResolvedValueOnce(result(brand()))
+  const root = await mount()
+  const select = root.querySelector('select')!
+  expect([...select.labels!].map((label) => label.textContent?.trim())).toEqual(['Тип акцента'])
+})
 it('retains conflicting draft and merges untouched fresh fields before explicit reapply', async () => {
   const root = await mount()
   input(root, 0, 'Draft')
@@ -700,6 +707,11 @@ it('does not restore until the identity probe succeeds, and never follows redire
 it('previews a gradient without publishing and color reset preserves the name draft', async () => {
   const root = await mount()
   input(root, 0, 'Keep name')
+  expect(root.querySelectorAll('input[type=color]')).toHaveLength(1)
+  const mode = root.querySelector('select')!
+  mode.value = 'gradient'
+  mode.dispatchEvent(new Event('change', { bubbles: true }))
+  await flush()
   const end = root.querySelectorAll<HTMLInputElement>('input:not([type])')[2]!
   end.value = '#fefefe'
   end.dispatchEvent(new Event('input', { bubbles: true }))
@@ -754,5 +766,34 @@ it('rebases and recovers the gradient pair atomically when only the end changed'
     name: 'Fresh',
     accentColor: '#123456',
     accentColorEnd: '#abcdef',
+  })
+})
+
+it('retains a temporarily empty gradient field for correction and serializes Solid as an empty endpoint', async () => {
+  const root = await mount()
+  const mode = root.querySelector('select')!
+  mode.value = 'gradient'
+  mode.dispatchEvent(new Event('change', { bubbles: true }))
+  await flush()
+  const end = root.querySelectorAll<HTMLInputElement>('input:not([type])')[2]!
+  end.value = ''
+  end.dispatchEvent(new Event('input', { bubbles: true }))
+  await flush()
+  expect(mode.value).toBe('gradient')
+  expect(root.querySelectorAll('input[type=color]')).toHaveLength(2)
+  click(root, 'Применить')
+  await flush()
+  expect(fetch).toHaveBeenCalledTimes(1)
+  expect(root.querySelector('[role=alert]')!.textContent).toContain('#RRGGBB')
+  mode.value = 'solid'
+  mode.dispatchEvent(new Event('change', { bubbles: true }))
+  await flush()
+  expect(root.querySelectorAll('input[type=color]')).toHaveLength(1)
+  fetch.mockResolvedValueOnce(result(brand('Live', '#2563eb', 2)))
+  click(root, 'Применить')
+  await flush()
+  expect(JSON.parse(fetch.mock.calls[1]![1].body)).toMatchObject({
+    accentColor: '#2563eb',
+    accentColorEnd: '',
   })
 })

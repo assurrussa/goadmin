@@ -19,26 +19,49 @@ export async function appearanceGeometry(page) {
       return [...drawing.getImageData(0, 0, 1, 1).data]
     }
     const over = (a, b) => a.slice(0, 3).map((v, i) => v * a[3] / 255 + b[i] * (1 - a[3] / 255))
+    const corners = samples => {
+      if (samples.length === 1) return samples
+      const min = [0, 1, 2].map(channel => Math.min(...samples.map(rgb => rgb[channel])))
+      const max = [0, 1, 2].map(channel => Math.max(...samples.map(rgb => rgb[channel])))
+      return Array.from({ length: 8 }, (_, mask) => min.map((value, channel) => mask & 1 << channel ? max[channel] : value))
+    }
+    const layers = image => {
+      const result = []; let depth = 0, start = 0
+      for (let index = 0; index < image.length; index++) {
+        if (image[index] === '(') depth++
+        if (image[index] === ')') depth--
+        if (image[index] === ',' && depth === 0) { result.push(image.slice(start, index)); start = index + 1 }
+      }
+      result.push(image.slice(start)); return result
+    }
     const background = node => {
-      if (!node) return [255, 255, 255]
-      return over(rgba(getComputedStyle(node).backgroundColor), background(node.parentElement))
+      if (!node) return [[255, 255, 255]]
+      const style = getComputedStyle(node)
+      let samples = background(node.parentElement).map(rgb => over(rgba(style.backgroundColor), rgb))
+      for (const image of layers(style.backgroundImage).reverse()) {
+        const stops = [...image.matchAll(/(?:rgba?|color)\([^)]*\)/g)].map(match => rgba(match[0]))
+        if (!image.includes('linear-gradient') || stops.length !== 2) continue
+        // Bounding corners conservatively include every ancestor gradient position,
+        // even when a child occupies a different part of its own gradient.
+        const under = corners(samples)
+        samples = Array.from({ length: 101 }, (_, index) => stops[0].map((v, channel) => v + (stops[1][channel] - v) * index / 100))
+          .flatMap(stop => under.map(rgb => over(stop, rgb)))
+      }
+      return samples
     }
     const luminance = rgb => rgb.map(v => {
       v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
     }).reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0)
     const paint = node => {
-      const bg = background(node), text = rgba(getComputedStyle(node).color), fg = over(text, bg)
+      const samples = background(node), bg = samples[0], text = rgba(getComputedStyle(node).color)
+      text[3] *= Number(getComputedStyle(node).opacity)
+      const fg = over(text, bg)
       const image = getComputedStyle(node).backgroundImage
-      const stops = [...image.matchAll(/(?:rgba?|color)\([^)]*\)/g)].map(match => rgba(match[0]))
-      const samples = stops.length === 2 && image.includes('linear-gradient')
-        ? Array.from({ length: 101 }, (_, index) => over(stops[0].map((v, channel) => v + (stops[1][channel] - v) * index / 100), bg))
-        : [bg]
       const contrast = Math.min(...samples.map(sample => {
         const l = luminance(sample), b = luminance(over(text, sample))
         return (Math.max(l, b) + .05) / (Math.min(l, b) + .05)
       }))
       return { background: bg, foreground: fg, contrast, image, samples: samples.length }
-
     }
     const visible = node => {
       const rect = node.getBoundingClientRect()
@@ -50,7 +73,7 @@ export async function appearanceGeometry(page) {
         return { label: node.getAttribute('aria-label') || node.textContent?.trim().slice(0, 60) || node.id || node.tagName,
           width: rect.width, height: rect.height }
       })
-    const preview = document.querySelector('[aria-labelledby="branding-title"] [aria-label]')
+    const preview = document.querySelector('[aria-labelledby="branding-title"] [data-part="branding-preview"]')
     const panels = preview ? [...preview.children].map(panel => ({
       dark: panel.classList.contains('dark'),
       link: paint(panel.querySelector('a')),
@@ -69,6 +92,8 @@ export async function appearanceGeometry(page) {
       locale: document.documentElement.lang, heading: heading ? paint(heading) : null,
       targets, panels, accent,
       selections: [...document.querySelectorAll('.goadmin-selection-fill')].filter(visible).map(paint),
+      decorations: [...document.querySelectorAll('[data-brand-paint-probe]')].filter(visible).map(paint),
+      calendar: [...document.querySelectorAll('.date-control-day')].filter(visible).filter(node => !node.hasAttribute('data-disabled')).map(paint),
       frames: window.__appearanceFrames || [] }
   })
 }

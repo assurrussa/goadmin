@@ -117,6 +117,58 @@ describe('settings section navigation', () => {
     expect(content.style.display).not.toBe('none')
   })
 
+  it('uses matching personal/general groups in the sidebar and compact mobile select', async () => {
+    enableSections()
+    const { root } = mountSettings()
+    await nextTick()
+    const nav = root.querySelector('nav')!
+    expect([...nav.querySelectorAll('optgroup')].map((group) => group.label)).toEqual([
+      'Личные',
+      'Общие',
+    ])
+    expect([...nav.querySelectorAll('option')].map((option) => option.value)).toEqual([
+      'interface',
+      'account',
+      'security',
+      'branding',
+    ])
+    expect(nav.querySelector('label')!.classList.contains('lg:hidden')).toBe(true)
+    expect(nav.querySelector('div.hidden')!.classList.contains('lg:block')).toBe(true)
+    const select = nav.querySelector('select')!
+    const changed = new Promise<void>((resolve) =>
+      window.addEventListener('hashchange', () => resolve(), { once: true }),
+    )
+    select.value = 'security'
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+    await changed
+    await nextTick()
+    expect(window.location.pathname).toBe('/auth/profile/settings')
+    expect(window.location.hash).toBe('#security')
+    expect(nav.querySelector('a[aria-current="page"]')?.getAttribute('href')).toBe('#security')
+    expect(
+      root.querySelector<HTMLElement>('section[aria-labelledby="security-settings-title"]')!.style
+        .display,
+    ).not.toBe('none')
+  })
+
+  it('gates the General group and branding section by permission, including live revocation', async () => {
+    enableSections()
+    window.history.replaceState(null, '', '/auth/profile/settings#branding')
+    const { root } = mountSettings()
+    await nextTick()
+    expect(root.querySelector('nav a[href="#branding"]')).not.toBeNull()
+    appearance.brandingRead = false
+    await nextTick()
+    expect(root.querySelector('nav a[href="#branding"]')).toBeNull()
+    expect(root.querySelector('nav option[value="branding"]')).toBeNull()
+    expect(root.querySelectorAll('nav optgroup')).toHaveLength(1)
+    expect(root.querySelector('#branding-title')).toBeNull()
+    expect(root.querySelector('nav a[aria-current="page"]')?.getAttribute('href')).toBe(
+      '#interface',
+    )
+    expect(root.querySelector<HTMLSelectElement>('nav select')!.value).toBe('interface')
+  })
+
   it('restores legacy and new sections through real Back/Forward hash navigation', async () => {
     enableSections()
     window.history.replaceState(null, '', '/auth/profile/settings#sso-settings-title')

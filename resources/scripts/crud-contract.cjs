@@ -1,11 +1,11 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const crypto = require('node:crypto')
-const roots = ['src/js/crud', 'src/js/Pages/crud']
-function crudFingerprint() {
+const roots = ['src/js/crud', 'src/js/Pages/crud', 'src/js/components/date']
+function crudFingerprint(resourceRoot = path.resolve(__dirname, '..')) {
   const hash = crypto.createHash('sha256')
   for (const root of roots) {
-    const dir = path.join(__dirname, '..', root)
+    const dir = path.join(resourceRoot, root)
     for (const name of fs.readdirSync(dir).sort()) {
       if (/\.(test|spec)\./.test(name)) continue
       hash.update(root + '/' + name + '\0')

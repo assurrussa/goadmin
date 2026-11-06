@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, useId, watch } from 'vue'
 import { adminFetch } from '@/http'
 import { appearance, paintAppearance } from '@/appearance/state'
 import {
@@ -27,6 +27,8 @@ const draft = reactive({
   logoLight: undefined as string | undefined,
   logoDark: undefined as string | undefined,
 })
+const accentMode = ref<'solid' | 'gradient'>('solid')
+const accentModeId = useId()
 const urls = reactive({ light: '', dark: '' })
 const decoding = reactive({ light: false, dark: false })
 const logoSequence = { light: 0, dark: 0 }
@@ -49,10 +51,12 @@ function setPickerColor(event: Event) {
   draft.accentColor = (event.target as HTMLInputElement).value
 }
 function resetColors() {
+  accentMode.value = 'solid'
   draft.accentColor = ''
   draft.accentColorEnd = ''
 }
 function setAccentMode(event: Event) {
+  accentMode.value = (event.target as HTMLSelectElement).value === 'gradient' ? 'gradient' : 'solid'
   draft.accentColorEnd =
     (event.target as HTMLSelectElement).value === 'gradient'
       ? draft.accentColor || pickerColor.value || '#2563eb'
@@ -90,6 +94,7 @@ watch(
     urls.light = ''
     urls.dark = ''
     resetOpen.value = false
+    accentMode.value = 'solid'
     loaded.value = false
     pending.value = false
     error.value = ''
@@ -127,6 +132,7 @@ onUnmounted(() => {
   controller?.abort()
 })
 function hydrate(brand: ReturnType<typeof readBrand>) {
+  accentMode.value = brand.accentColorEnd ? 'gradient' : 'solid'
   baseline = {
     name: brand.name,
     accentColor: brand.accentColor,
@@ -242,6 +248,7 @@ async function load(keep = false) {
         }
       }
     }
+    accentMode.value = draft.accentColorEnd ? 'gradient' : 'solid'
     loaded.value = true
     status.value = recoveryConflict ? 'conflict' : 'ready'
     error.value = ''
@@ -310,7 +317,8 @@ async function apply(reset = false) {
     return
   if (
     !reset &&
-    ((draft.accentColor && !/^#[\da-f]{6}$/i.test(draft.accentColor)) ||
+    ((accentMode.value === 'gradient' && !draft.accentColorEnd) ||
+      (draft.accentColor && !/^#[\da-f]{6}$/i.test(draft.accentColor)) ||
       (draft.accentColorEnd &&
         (!draft.accentColor || !/^#[\da-f]{6}$/i.test(draft.accentColorEnd))))
   ) {
@@ -375,118 +383,136 @@ async function apply(reset = false) {
       </p>
     </div>
     <p v-if="status === 'loading'" role="status">{{ t('Загружаем...') }}</p>
-    <fieldset
-      :disabled="!loaded || !permission || ['loading', 'saving', 'unavailable'].includes(status)"
-      class="min-w-0 space-y-4"
-    >
-      <label class="flex flex-col gap-2 text-sm font-medium"
-        >{{ t('Название админки')
-        }}<input
-          v-model="draft.name"
-          maxlength="80"
-          class="appearance-select rounded-lg border border-border-primary bg-card px-3"
-      /></label>
-      <label class="flex flex-col gap-2 text-sm font-medium"
-        >{{ t('Акцентный цвет')
-        }}<input
-          v-model="draft.accentColor"
-          placeholder="#RRGGBB"
-          maxlength="7"
-          class="appearance-select rounded-lg border border-border-primary bg-card px-3"
-      /></label>
-      <div class="flex flex-wrap items-center gap-3">
-        <label class="flex items-center gap-2 text-sm font-medium">
-          {{ t('Выбрать акцентный цвет') }}
-          <input type="color" :value="pickerColor" @input="setPickerColor" />
-        </label>
-        <AppButton variant="secondary" size="sm" @click="resetColors">{{
-          t('Сбросить цвет')
-        }}</AppButton>
-      </div>
-      <label class="flex flex-col gap-2 text-sm font-medium"
-        >{{ t('Тип акцента') }}
-        <select
-          :value="draft.accentColorEnd ? 'gradient' : 'solid'"
-          class="appearance-select rounded-lg border border-border-primary bg-card px-3"
-          @change="setAccentMode"
-        >
-          <option value="solid">{{ t('Сплошной цвет') }}</option>
-          <option value="gradient">{{ t('Градиент') }}</option>
-        </select>
-      </label>
-      <label class="flex flex-col gap-2 text-sm font-medium"
-        >{{ t('Конечный цвет градиента') }}
-        <input
-          v-model="draft.accentColorEnd"
-          placeholder="#RRGGBB"
-          maxlength="7"
-          class="appearance-select rounded-lg border border-border-primary bg-card px-3"
-        />
-      </label>
-      <label class="flex items-center gap-2 text-sm font-medium"
-        >{{ t('Выбрать конечный цвет') }}
-        <input
-          type="color"
-          :value="
-            /^#[\da-f]{6}$/i.test(draft.accentColorEnd)
-              ? draft.accentColorEnd
-              : pickerColor || '#2563eb'
-          "
-          @input="setEndPickerColor"
-        />
-      </label>
-      <p class="text-sm text-text-secondary">
-        {{ t('Градиент 135°. Цвета заливки адаптируются для читаемости.') }}
-      </p>
-      <div v-for="variant in ['light', 'dark'] as const" :key="variant" class="space-y-2">
-        <label class="flex flex-col gap-2 text-sm font-medium"
-          >{{ t(variant === 'light' ? 'Логотип для светлой темы' : 'Логотип для тёмной темы')
-          }}<input
-            type="file"
-            accept="image/png,image/jpeg"
-            @change="logo(variant, $event)" /></label
-        ><AppButton variant="secondary" size="sm" @click="clearLogo(variant)">{{
-          t('Удалить логотип')
-        }}</AppButton>
-      </div>
-      <p class="text-sm text-text-secondary">PNG / JPEG · ≤512 {{ t('КиБ') }} · ≤1024×1024</p>
-    </fieldset>
-    <div class="grid min-w-0 gap-4 sm:grid-cols-2" :aria-label="t('Предпросмотр')">
-      <div
-        v-for="variant in ['light', 'dark'] as const"
-        :key="variant"
-        :class="variant === 'dark' ? 'dark bg-[#20242b] text-white' : 'bg-white text-[#20242b]'"
-        :style="deriveBrandPalette(draft.accentColor, variant === 'dark', draft.accentColorEnd)"
-        class="min-w-0 space-y-4 rounded-xl border border-border-primary p-4"
+    <div class="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(16rem,1fr)]">
+      <fieldset
+        :disabled="!loaded || !permission || ['loading', 'saving', 'unavailable'].includes(status)"
+        class="min-w-0 space-y-6"
       >
-        <span class="text-xs">{{ t(variant === 'dark' ? 'Тёмная' : 'Светлая') }}</span>
-        <div class="flex min-w-0 items-center gap-3">
-          <img
-            v-if="urls[variant]"
-            :src="urls[variant]"
-            alt=""
-            class="h-10 w-10 shrink-0 object-contain"
-          /><span class="min-w-0 [overflow-wrap:anywhere] font-semibold">{{
-            draft.name || t('Админка')
-          }}</span>
+        <div class="space-y-3">
+          <h3 class="font-semibold">{{ t('Название') }}</h3>
+          <label class="flex flex-col gap-2 text-sm font-medium"
+            >{{ t('Название админки')
+            }}<input
+              v-model="draft.name"
+              maxlength="80"
+              class="appearance-select min-w-0 w-full rounded-lg border border-border-primary bg-card px-3"
+          /></label>
         </div>
-        <span
-          class="goadmin-primary-fill inline-flex rounded-lg bg-primary px-3 py-2 text-sm text-primary-contrast"
-          >{{ t('Пример кнопки') }}</span
+        <div class="space-y-4 border-t border-border-secondary pt-5">
+          <h3 class="font-semibold">{{ t('Цвета') }}</h3>
+          <div class="flex flex-col gap-2 text-sm font-medium">
+            <label :for="accentModeId">{{ t('Тип акцента') }}</label>
+            <select
+              :id="accentModeId"
+              :value="accentMode"
+              class="appearance-select min-w-0 w-full rounded-lg border border-border-primary bg-card px-3"
+              @change="setAccentMode"
+            >
+              <option value="solid">{{ t('Сплошной цвет') }}</option>
+              <option value="gradient">{{ t('Градиент') }}</option>
+            </select>
+          </div>
+          <div class="flex items-end gap-3">
+            <label class="flex min-w-0 flex-1 flex-col gap-2 text-sm font-medium"
+              >{{ t('Акцентный цвет')
+              }}<input
+                v-model="draft.accentColor"
+                placeholder="#RRGGBB"
+                maxlength="7"
+                class="appearance-select min-w-0 w-full rounded-lg border border-border-primary bg-card px-3"
+            /></label>
+            <input
+              type="color"
+              :aria-label="t('Выбрать акцентный цвет')"
+              :value="pickerColor"
+              class="h-11 w-11 shrink-0 cursor-pointer rounded border border-border-primary bg-card p-1"
+              @input="setPickerColor"
+            />
+          </div>
+          <div v-if="accentMode === 'gradient'" class="flex items-end gap-3">
+            <label class="flex min-w-0 flex-1 flex-col gap-2 text-sm font-medium"
+              >{{ t('Конечный цвет градиента') }}
+              <input
+                v-model="draft.accentColorEnd"
+                placeholder="#RRGGBB"
+                maxlength="7"
+                class="appearance-select min-w-0 w-full rounded-lg border border-border-primary bg-card px-3"
+              />
+            </label>
+            <input
+              type="color"
+              :aria-label="t('Выбрать конечный цвет')"
+              :value="
+                /^#[\da-f]{6}$/i.test(draft.accentColorEnd)
+                  ? draft.accentColorEnd
+                  : pickerColor || '#2563eb'
+              "
+              class="h-11 w-11 shrink-0 cursor-pointer rounded border border-border-primary bg-card p-1"
+              @input="setEndPickerColor"
+            />
+          </div>
+          <p v-if="accentMode === 'gradient'" class="text-sm text-text-secondary">
+            {{ t('Градиент 135°. Цвета заливки адаптируются для читаемости.') }}
+          </p>
+          <AppButton variant="secondary" size="sm" @click="resetColors">{{
+            t('Сбросить цвет')
+          }}</AppButton>
+        </div>
+        <div class="space-y-4 border-t border-border-secondary pt-5">
+          <h3 class="font-semibold">{{ t('Логотипы') }}</h3>
+          <div v-for="variant in ['light', 'dark'] as const" :key="variant" class="space-y-2">
+            <label class="flex flex-col gap-2 text-sm font-medium"
+              >{{ t(variant === 'light' ? 'Логотип для светлой темы' : 'Логотип для тёмной темы')
+              }}<input
+                type="file"
+                accept="image/png,image/jpeg"
+                class="min-w-0 max-w-full text-sm"
+                @change="logo(variant, $event)" /></label
+            ><AppButton variant="secondary" size="sm" @click="clearLogo(variant)">{{
+              t('Удалить логотип')
+            }}</AppButton>
+          </div>
+          <p class="text-sm text-text-secondary">PNG / JPEG · ≤512 {{ t('КиБ') }} · ≤1024×1024</p>
+        </div>
+      </fieldset>
+      <div
+        data-part="branding-preview"
+        class="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-1"
+        :aria-label="t('Предпросмотр')"
+      >
+        <div
+          v-for="variant in ['light', 'dark'] as const"
+          :key="variant"
+          :class="variant === 'dark' ? 'dark bg-[#20242b] text-white' : 'bg-white text-[#20242b]'"
+          :style="deriveBrandPalette(draft.accentColor, variant === 'dark', draft.accentColorEnd)"
+          class="min-w-0 space-y-4 rounded-xl border border-border-primary p-4"
         >
-        <label class="flex flex-col gap-2 text-sm"
-          >{{ t('Пример поля')
-          }}<input
-            :value="t('Пример значения')"
-            readonly
-            class="appearance-select rounded-lg border border-current/30 bg-transparent px-3 text-inherit"
-        /></label>
-        <a
-          href="#branding"
-          class="inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-2"
-          @click.prevent
-          >{{ t('Пример ссылки') }}</a
-        >
+          <span class="text-xs">{{ t(variant === 'dark' ? 'Тёмная' : 'Светлая') }}</span>
+          <div class="flex min-w-0 items-center gap-3">
+            <img
+              v-if="urls[variant]"
+              :src="urls[variant]"
+              alt=""
+              class="h-10 w-10 shrink-0 object-contain"
+            /><span class="min-w-0 [overflow-wrap:anywhere] font-semibold">{{
+              draft.name || t('Админка')
+            }}</span>
+          </div>
+          <AppButton>{{ t('Пример кнопки') }}</AppButton>
+          <label class="flex flex-col gap-2 text-sm"
+            >{{ t('Пример поля')
+            }}<input
+              :value="t('Пример значения')"
+              readonly
+              class="appearance-select rounded-lg border border-current/30 bg-transparent px-3 text-inherit"
+          /></label>
+          <a
+            href="#branding"
+            class="inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-2"
+            @click.prevent
+            >{{ t('Пример ссылки') }}</a
+          >
+        </div>
       </div>
     </div>
     <p v-if="decodingLogo" role="status">{{ t('Проверяем логотип...') }}</p>

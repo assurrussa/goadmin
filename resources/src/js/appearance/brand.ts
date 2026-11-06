@@ -194,6 +194,8 @@ export function deriveBrandPalette(hex: string, dark: boolean, end = ''): Record
       ...palette,
       '--goadmin-primary-image': 'none',
       '--goadmin-selection-image': 'none',
+      '--goadmin-brand-surface-image': 'none',
+      '--goadmin-brand-auth-image': 'none',
       '--goadmin-selection-foreground': rgb
         ? selectionForeground(rgb, dark)
         : palette['--color-primary']!,
@@ -222,7 +224,15 @@ export function deriveBrandPalette(hex: string, dark: boolean, end = ''): Record
   const endChannels = gradient ? fill(end) : rgb
   const startFill = `rgb(${startChannels.join(' ')})`
   const endFill = `rgb(${endChannels.join(' ')})`
+  const surface = gradient
+    ? `linear-gradient(135deg in srgb, color-mix(in srgb, ${hex} ${dark ? 8 : 6}%, transparent), color-mix(in srgb, ${end} ${dark ? 8 : 6}%, transparent))`
+    : 'none'
   return {
+    '--goadmin-brand-surface-image': surface,
+    '--goadmin-brand-auth-image': gradient
+      ? `linear-gradient(to bottom, transparent, var(--color-background) 28rem), ${surface}`
+      : 'none',
+    '--goadmin-row-accent': gradient ? `color-mix(in srgb, ${color} 50%, ${endFill})` : color,
     '--goadmin-primary-image': gradient
       ? `linear-gradient(135deg in srgb, ${startFill}, ${endFill})`
       : 'none',

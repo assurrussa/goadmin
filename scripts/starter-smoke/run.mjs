@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { selectTheme, assertSystemTheme } from './appearance-controls.mjs'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
@@ -133,6 +134,13 @@ async function runCase(name, config) {
     const authShell = page.locator('[data-ui="auth-shell"]')
     await expect(authShell).toHaveCount(1)
     assert.equal(await authShell.getAttribute('data-part'), name === 'topbar' ? 'split' : null)
+    await selectTheme(page, expect, 'dark')
+    await page.reload()
+    await expect(page.locator('html')).toHaveAttribute('data-theme-mode', 'dark')
+    await selectTheme(page, expect, 'light')
+    await selectTheme(page, expect, 'system')
+    await assertSystemTheme(page, expect)
+    result.themeMenu = { auth: ['system', 'light', 'dark'], liveSystemAndReload: true, keyboardRadio: true }
     await page.goto('/auth/register')
     await fill(page, { name: 'Smoke Owner', lastName: 'Initial', email: credentials.email,
       username: `smoke-${name}`, password: credentials.password, passwordConfirm: credentials.password,
@@ -262,7 +270,7 @@ async function runCase(name, config) {
     const lightPaint = await waitForPaint(page, name, 'light', undefined,
       (measured) => { result.paint.light = measured })
     await page.screenshot({ path: path.join(folder, `${name}-desktop-light-en.png`), fullPage: true })
-    await page.getByRole('button', { name: /Switch to dark theme|Переключить на темную тему/i }).click()
+    await selectTheme(page, expect, 'dark')
     await expect(page.locator('html')).toHaveAttribute('data-theme-mode', 'dark')
     await page.reload()
     await expect(page.locator('html')).toHaveAttribute('data-theme-mode', 'dark')
@@ -294,7 +302,7 @@ async function runCase(name, config) {
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'mobile document must fit viewport')
     await page.setViewportSize({ width: 1440, height: 1000 })
     await language(page, 'English', 'en')
-    await page.getByRole('button', { name: /Switch to light theme|Переключить на светлую тему/i }).click()
+    await selectTheme(page, expect, 'light')
     await expect(page.locator('html')).toHaveAttribute('data-theme-mode', 'light')
     await waitForPaint(page, name, 'light', undefined,
       (measured) => { result.paint.returnedLight = measured })
@@ -319,7 +327,7 @@ async function runCase(name, config) {
       const editURL = page.url()
       await page.reload()
       await page.screenshot({ path: path.join(folder, `${name}-${resource}-edit-light-en.png`), fullPage: true })
-      await page.getByRole('button', { name: /Switch to dark theme|Переключить на темную тему/i }).click()
+      await selectTheme(page, expect, 'dark')
       await language(page, 'Русский', 'ru')
       await expect(page.getByRole('link', { name: 'К списку', exact: true })).toBeVisible()
       await page.setViewportSize({ width: 390, height: 844 })
@@ -327,7 +335,7 @@ async function runCase(name, config) {
       await page.screenshot({ path: path.join(folder, `${name}-${resource}-edit-dark-mobile-ru.png`), fullPage: true })
       await page.setViewportSize({ width: 1440, height: 1000 })
       await language(page, 'English', 'en')
-      await page.getByRole('button', { name: /Switch to light theme|Переключить на светлую тему/i }).click()
+      await selectTheme(page, expect, 'light')
       await page.locator('input[name="name"]').fill(`Workflow ${resource} ${name}`)
       page.once('dialog', (dialog) => dialog.dismiss())
       await page.getByRole('link', { name: /^(Отмена|Cancel)$/ }).click()

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp, h, nextTick, reactive } from 'vue'
 import AdminForm from './AdminForm.vue'
+import LocalizedDatePicker from '@/components/date/LocalizedDatePicker.vue'
 
 const mocks = vi.hoisted(() => ({
   on: vi.fn(),
@@ -91,6 +92,39 @@ it('scopes error focus to its own form when another form has the same field name
   await nextTick()
   await nextTick()
   expect(document.activeElement).toBe(second.input)
+})
+
+it('focuses the visible date segment for a server field error after unlocking', async () => {
+  const form = reactive({ errors: {} as Record<string, string>, processing: true })
+  const root = document.createElement('div')
+  document.body.append(root)
+  const app = createApp({
+    render: () =>
+      h(
+        AdminForm,
+        { form, fields: ['available'] },
+        {
+          default: () =>
+            h(LocalizedDatePicker, {
+              name: 'available',
+              label: 'Available',
+              modelValue: '2026-11-07',
+              disabled: form.processing,
+              error: form.errors.available,
+            }),
+        },
+      ),
+  })
+  apps.push(app)
+  app.mount(root)
+  form.errors = { available: 'Invalid date' }
+  await nextTick()
+  form.processing = false
+  await nextTick()
+  await nextTick()
+  expect(document.activeElement).toBe(root.querySelector('[data-date-part="day"]'))
+  expect(root.querySelectorAll('[name="available"]')).toHaveLength(1)
+  expect(root.querySelector('[name="available"]')?.getAttribute('type')).toBe('hidden')
 })
 
 it('honors focusOnError=false when errors arrive before processing ends', async () => {

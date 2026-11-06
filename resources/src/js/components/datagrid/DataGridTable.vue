@@ -72,7 +72,7 @@
             v-for="item in items"
             :key="getItemId(item, config)"
             :class="{ 'goadmin-selected-row': selectedItems.includes(getItemId(item, config)) }"
-            class="hover:bg-surface transition-colors duration-200 border-border-primary"
+            class="goadmin-data-row transition-colors duration-200 border-border-primary"
           >
             <TableCell
               v-if="config.behaviour?.selectable"

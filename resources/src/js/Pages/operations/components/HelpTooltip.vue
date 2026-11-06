@@ -3,7 +3,7 @@
     <TooltipTrigger as-child>
       <button
         type="button"
-        class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border-secondary text-text-tertiary transition-colors hover:border-border-primary hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[var(--goadmin-control-radius,4px)] border border-border-secondary text-text-tertiary transition-colors hover:border-border-primary hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
         :aria-label="t('Показать описание')"
       >
         <CircleHelp class="h-3.5 w-3.5" />

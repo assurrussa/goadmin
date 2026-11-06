@@ -26,7 +26,7 @@ const {
   <DropdownMenu>
     <DropdownMenuTrigger
       data-profile-menu-trigger
-      class="menu-trigger flex items-center cursor-pointer gap-3 rounded-[var(--goadmin-menu-radius,1rem)] px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
+      class="menu-trigger flex items-center cursor-pointer gap-3 rounded-[var(--goadmin-menu-radius,var(--goadmin-control-radius,4px))] px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
     >
       <div
         class="h-8 w-8 rounded-full bg-primary-dark dark:bg-primary flex items-center justify-center overflow-hidden"

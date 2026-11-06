@@ -18,7 +18,7 @@ function selectLocale(value: unknown) {
   <DropdownMenu>
     <DropdownMenuTrigger
       :disabled="appearance.readOnly || appearance.resolving"
-      class="appearance-select inline-flex shrink-0 items-center gap-2 rounded-xl border border-border-primary bg-card px-3 text-sm text-text-primary hover:bg-surface-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      class="appearance-select inline-flex shrink-0 items-center gap-2 rounded-[var(--goadmin-control-radius,4px)] border border-border-primary bg-card px-3 text-sm text-text-primary hover:bg-surface-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       :aria-label="t('Язык')"
       :title="locale === 'ru' ? 'Русский' : 'English'"
     >
