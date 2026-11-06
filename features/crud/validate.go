@@ -129,9 +129,11 @@ func validate[R, C, U any](d Definition[R, C, U]) error {
 		if !ok || !f.Read || columns[c.Key] {
 			return fail("columns must name unique readable fields")
 		}
-		// Keep filter names separate from shared datagrid request controls and
-		// its synthetic search metadata. These keys remain valid display fields.
-		if c.Filterable && slices.Contains([]string{"page", "limit", "search", "sortBy", "sortOrder", "_search"}, c.Key) {
+		// Keep filter names separate from shared datagrid request/export controls
+		// and synthetic search metadata. These keys remain valid display fields.
+		if c.Filterable && slices.Contains([]string{
+			"page", "limit", "search", "sortBy", "sortOrder", "_search", "scope", "columns",
+		}, c.Key) {
 			return fail("filterable column key is reserved by datagrid")
 		}
 		columns[c.Key] = true
