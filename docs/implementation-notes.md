@@ -1,5 +1,31 @@
 # Implementation Notes
 
+## PR 85 third review (2026-11-06)
+
+Review head `ea5e755`, same PR and checkout. Two SDK edge cases were confirmed:
+legal field names inherited from `Object.prototype` could crash the form's error
+rendering, and filterable columns could reuse the shared grid's query-control
+names, silently losing their filters. Keep supported field names, read errors
+as own properties, and reject only filterable columns whose names collide with
+the grid transport. The additional `hasOwnProperty` key is rejected explicitly:
+Vue's reactive proxy intercepts that key even when the DTO supplies a value.
+Other inherited names such as `toString` and `valueOf` remain supported.
+No storage, dependency or application permission changes.
+
+Whole-form regressions reproduce the failure before the fix and verify error
+updates/clearing in create and edit forms with the actual Inertia form model.
+Constructor tests preserve usable query-control display columns and inherited
+field names while rejecting the colliding configurations. Removing only the new
+`hasOwnProperty` guard through a temporary Go overlay makes its regression fail.
+
+Final `make check` passes Go race/coverage, 144 resource contract checks,
+1,204 UI tests in 101 files, types, lint and the rebuilt embedded assets.
+The renderer contract is regenerated, and `make externalconsumer-local` passes.
+Final diff review found no further actionable issues in these corrections.
+The full browser matrix and PostgreSQL integration test were not repeated for
+these field-key checks; their preceding results remain scoped to the prior head.
+The existing manual test applications and their data remain untouched.
+
 ## PR 85 second review (2026-11-06)
 
 Review head `b2801aa`, same PR and checkout. A required write-only select with
