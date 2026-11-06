@@ -9,6 +9,7 @@ import {
   type App,
   type Component,
 } from 'vue'
+import { applyLocale } from '@/i18n'
 import DataGrid from './DataGrid.vue'
 import DataGridHeader from './DataGridHeader.vue'
 import DataGridFilters from './DataGridFilters.vue'
@@ -905,4 +906,53 @@ describe('DataGrid repaired regression guards: normal passing assertions', () =>
     const { element } = table([row('a'), row('b', { actions: [] })])
     expect(element.querySelectorAll('tbody tr')[1].querySelectorAll('td')).toHaveLength(3)
   })
+})
+
+it('translates server default create and empty labels in both locales while preserving host labels', async () => {
+  const defaults = grid(
+    fixture({
+      data: [],
+      config: config({
+        ui: { createButtonText: 'Создать', emptyMessage: 'Нет данных для отображения' },
+      }),
+      meta: { title: 'Данные', description: '', pagination: page({ total: 0, totalPages: 0 }) },
+    }),
+  ).element
+  const custom = grid(
+    fixture({
+      data: [],
+      config: config({
+        ui: { createButtonText: 'Register host widget', emptyMessage: 'No host widgets yet' },
+      }),
+      meta: {
+        title: 'Host inventory',
+        description: '',
+        pagination: page({ total: 0, totalPages: 0 }),
+      },
+    }),
+  ).element
+  try {
+    for (const [locale, create, empty, title] of [
+      ['en', 'Create', 'No data to display', 'Data'],
+      ['ru', 'Создать', 'Нет данных для отображения', 'Данные'],
+    ]) {
+      applyLocale(locale!)
+      await settle()
+      // Both the header and the empty state expose the configured create label.
+      expect(
+        buttons(defaults).filter((candidate) => candidate.textContent?.trim() === create),
+      ).toHaveLength(2)
+      expect(defaults.querySelector('[role="status"]')?.textContent).toContain(empty)
+      expect(defaults.querySelector('h1')?.textContent?.trim()).toBe(title)
+      expect(
+        buttons(custom).filter(
+          (candidate) => candidate.textContent?.trim() === 'Register host widget',
+        ),
+      ).toHaveLength(2)
+      expect(custom.querySelector('[role="status"]')?.textContent).toContain('No host widgets yet')
+      expect(custom.querySelector('h1')?.textContent?.trim()).toBe('Host inventory')
+    }
+  } finally {
+    applyLocale('ru')
+  }
 })

@@ -1,0 +1,12 @@
+const fs = require('node:fs')
+const path = require('node:path')
+const assert = require('node:assert/strict')
+const test = require('node:test')
+const { crudFingerprint } = require('./crud-contract.cjs')
+test('CRUD renderer fingerprint is deterministic and matches the Go requirement when server source is present', () => {
+ const fingerprint=crudFingerprint()
+ assert.match(fingerprint,/^sha256:[a-f0-9]{64}$/)
+ assert.equal(fingerprint,crudFingerprint())
+ const source=path.join(__dirname,'../../features/crud/client_generated.go')
+ if(fs.existsSync(source)) assert.ok(fs.readFileSync(source,'utf8').includes(JSON.stringify(fingerprint)))
+})

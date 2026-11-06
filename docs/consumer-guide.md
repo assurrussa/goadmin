@@ -162,10 +162,10 @@ authorize mutations or implement business behavior.
 
 The built-in users CRUD implementation is internal. The supported
 `features/users` package mounts GoAdmin's existing users feature; it is not a
-generic custom-entity factory. There is currently no complete public custom
-Vue CRUD example or declarative CRUD framework. Own your forms, validation,
-mutation routes, persistence and permission policy in the host rather than
-copying internal handlers.
+generic custom-entity factory. For a declarative section, use the supported `features/crud` package and its
+embedded pages. The opt-in Products starter is the runnable PostgreSQL example;
+see [CRUD resources](crud.md). The lower-level DataGrid remains a list toolkit
+for applications that own their page and mutation flows.
 
 ## Check the whole connection
 

@@ -23,6 +23,7 @@ import {
 const draft = reactive({
   name: '',
   accentColor: '',
+  accentColorEnd: '',
   logoLight: undefined as string | undefined,
   logoDark: undefined as string | undefined,
 })
@@ -42,13 +43,28 @@ const resetOpen = ref(false)
 const pickerColor = computed(() => {
   if (/^#[\da-f]{6}$/i.test(draft.accentColor)) return draft.accentColor
   // Read the host pack, not the currently applied brand override.
-  return themePrimaryHex(appearance.dark)
+  return themePrimaryHex(appearance.dark) || '#2563eb'
 })
 function setPickerColor(event: Event) {
   draft.accentColor = (event.target as HTMLInputElement).value
 }
+function resetColors() {
+  draft.accentColor = ''
+  draft.accentColorEnd = ''
+}
+function setAccentMode(event: Event) {
+  draft.accentColorEnd =
+    (event.target as HTMLSelectElement).value === 'gradient'
+      ? draft.accentColor || pickerColor.value || '#2563eb'
+      : ''
+  if (draft.accentColorEnd && !draft.accentColor) draft.accentColor = draft.accentColorEnd
+}
+function setEndPickerColor(event: Event) {
+  draft.accentColorEnd = (event.target as HTMLInputElement).value
+  if (!draft.accentColor) draft.accentColor = pickerColor.value || draft.accentColorEnd
+}
 
-let baseline = { name: '', accentColor: '' }
+let baseline = { name: '', accentColor: '', accentColorEnd: '' }
 const status = ref('loading')
 const error = ref('')
 const pending = ref(false)
@@ -67,6 +83,7 @@ watch(
     Object.assign(draft, {
       name: '',
       accentColor: '',
+      accentColorEnd: '',
       logoLight: undefined,
       logoDark: undefined,
     })
@@ -95,6 +112,8 @@ const unregisterRecovery = registerBrandingRecovery(() => {
     version: version.value,
     name: draft.name,
     accentColor: draft.accentColor,
+    accentColorEnd: draft.accentColorEnd,
+    conflict: status.value === 'conflict',
     baseline: { ...baseline },
     ...(draft.logoLight === '' ? { logoLight: '' as const } : {}),
     ...(draft.logoDark === '' ? { logoDark: '' as const } : {}),
@@ -108,11 +127,16 @@ onUnmounted(() => {
   controller?.abort()
 })
 function hydrate(brand: ReturnType<typeof readBrand>) {
-  baseline = { name: brand.name, accentColor: brand.accentColor }
+  baseline = {
+    name: brand.name,
+    accentColor: brand.accentColor,
+    accentColorEnd: brand.accentColorEnd || '',
+  }
   version.value = brand.version
   Object.assign(draft, {
     name: brand.name,
     accentColor: brand.accentColor,
+    accentColorEnd: brand.accentColorEnd || '',
     logoLight: undefined,
     logoDark: undefined,
   })
@@ -179,20 +203,35 @@ async function load(keep = false) {
     if (keep) {
       version.value = brand.version
       if (draft.name === baseline.name) draft.name = brand.name
-      if (draft.accentColor === baseline.accentColor) draft.accentColor = brand.accentColor
+      if (
+        draft.accentColor === baseline.accentColor &&
+        draft.accentColorEnd === baseline.accentColorEnd
+      ) {
+        draft.accentColor = brand.accentColor
+        draft.accentColorEnd = brand.accentColorEnd || ''
+      }
       if (draft.logoLight === undefined) urls.light = brand.logoLightUrl
       if (draft.logoDark === undefined) urls.dark = brand.logoDarkUrl
-      baseline = { name: brand.name, accentColor: brand.accentColor }
+      baseline = {
+        name: brand.name,
+        accentColor: brand.accentColor,
+        accentColorEnd: brand.accentColorEnd || '',
+      }
     } else {
       hydrate(brand)
       const recovery = permission.value ? takeBrandingRecovery(appearance.owner) : undefined
       if (recovery) {
-        recoveryConflict = recovery.version !== brand.version
+        recoveryConflict = recovery.conflict === true || recovery.version !== brand.version
         // Keep the rejected version until the user explicitly accepts a fresh one.
         if (recoveryConflict) version.value = recovery.version
         if (recovery.name !== recovery.baseline.name) draft.name = recovery.name
-        if (recovery.accentColor !== recovery.baseline.accentColor)
+        if (
+          recovery.accentColor !== recovery.baseline.accentColor ||
+          recovery.accentColorEnd !== recovery.baseline.accentColorEnd
+        ) {
           draft.accentColor = recovery.accentColor
+          draft.accentColorEnd = recovery.accentColorEnd || ''
+        }
         if (recovery.logoLight === '') {
           draft.logoLight = ''
           urls.light = ''
@@ -269,7 +308,12 @@ async function apply(reset = false) {
     ['saving', 'conflict', 'loading', 'unavailable'].includes(status.value)
   )
     return
-  if (!reset && draft.accentColor && !/^#[\da-f]{6}$/i.test(draft.accentColor)) {
+  if (
+    !reset &&
+    ((draft.accentColor && !/^#[\da-f]{6}$/i.test(draft.accentColor)) ||
+      (draft.accentColorEnd &&
+        (!draft.accentColor || !/^#[\da-f]{6}$/i.test(draft.accentColorEnd))))
+  ) {
     error.value = 'Укажите HEX-цвет в формате #RRGGBB.'
     return
   }
@@ -351,14 +395,49 @@ async function apply(reset = false) {
           class="appearance-select rounded-lg border border-border-primary bg-card px-3"
       /></label>
       <div class="flex flex-wrap items-center gap-3">
-        <label v-if="pickerColor" class="flex items-center gap-2 text-sm font-medium">
+        <label class="flex items-center gap-2 text-sm font-medium">
           {{ t('Выбрать акцентный цвет') }}
           <input type="color" :value="pickerColor" @input="setPickerColor" />
         </label>
-        <AppButton variant="secondary" size="sm" @click="draft.accentColor = ''">{{
+        <AppButton variant="secondary" size="sm" @click="resetColors">{{
           t('Сбросить цвет')
         }}</AppButton>
       </div>
+      <label class="flex flex-col gap-2 text-sm font-medium"
+        >{{ t('Тип акцента') }}
+        <select
+          :value="draft.accentColorEnd ? 'gradient' : 'solid'"
+          class="appearance-select rounded-lg border border-border-primary bg-card px-3"
+          @change="setAccentMode"
+        >
+          <option value="solid">{{ t('Сплошной цвет') }}</option>
+          <option value="gradient">{{ t('Градиент') }}</option>
+        </select>
+      </label>
+      <label class="flex flex-col gap-2 text-sm font-medium"
+        >{{ t('Конечный цвет градиента') }}
+        <input
+          v-model="draft.accentColorEnd"
+          placeholder="#RRGGBB"
+          maxlength="7"
+          class="appearance-select rounded-lg border border-border-primary bg-card px-3"
+        />
+      </label>
+      <label class="flex items-center gap-2 text-sm font-medium"
+        >{{ t('Выбрать конечный цвет') }}
+        <input
+          type="color"
+          :value="
+            /^#[\da-f]{6}$/i.test(draft.accentColorEnd)
+              ? draft.accentColorEnd
+              : pickerColor || '#2563eb'
+          "
+          @input="setEndPickerColor"
+        />
+      </label>
+      <p class="text-sm text-text-secondary">
+        {{ t('Градиент 135°. Цвета заливки адаптируются для читаемости.') }}
+      </p>
       <div v-for="variant in ['light', 'dark'] as const" :key="variant" class="space-y-2">
         <label class="flex flex-col gap-2 text-sm font-medium"
           >{{ t(variant === 'light' ? 'Логотип для светлой темы' : 'Логотип для тёмной темы')
@@ -377,7 +456,7 @@ async function apply(reset = false) {
         v-for="variant in ['light', 'dark'] as const"
         :key="variant"
         :class="variant === 'dark' ? 'dark bg-[#20242b] text-white' : 'bg-white text-[#20242b]'"
-        :style="deriveBrandPalette(draft.accentColor, variant === 'dark')"
+        :style="deriveBrandPalette(draft.accentColor, variant === 'dark', draft.accentColorEnd)"
         class="min-w-0 space-y-4 rounded-xl border border-border-primary p-4"
       >
         <span class="text-xs">{{ t(variant === 'dark' ? 'Тёмная' : 'Светлая') }}</span>
@@ -391,9 +470,10 @@ async function apply(reset = false) {
             draft.name || t('Админка')
           }}</span>
         </div>
-        <span class="inline-flex rounded-lg bg-primary px-3 py-2 text-sm text-primary-contrast">{{
-          t('Пример кнопки')
-        }}</span>
+        <span
+          class="goadmin-primary-fill inline-flex rounded-lg bg-primary px-3 py-2 text-sm text-primary-contrast"
+          >{{ t('Пример кнопки') }}</span
+        >
         <label class="flex flex-col gap-2 text-sm"
           >{{ t('Пример поля')
           }}<input

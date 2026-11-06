@@ -26,6 +26,7 @@ var FeaturePackages = [...]string{
 	"github.com/assurrussa/goadmin/features/notifications",
 	"github.com/assurrussa/goadmin/features/realtime",
 	"github.com/assurrussa/goadmin/features/authmail",
+	"github.com/assurrussa/goadmin/features/crud",
 	"github.com/assurrussa/goadmin/features/users",
 }
 

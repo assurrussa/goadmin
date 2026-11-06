@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -42,7 +43,7 @@ func run() error {
 			continue
 		}
 		switch key {
-		case "users", "access", "jobs", "uploads", "queues", "notifications", "realtime", "authmail":
+		case "users", "access", "jobs", "uploads", "queues", "notifications", "realtime", "authmail", "products":
 			selected[key] = true
 		default:
 			return fmt.Errorf("unknown admin module %q", key)
@@ -90,12 +91,19 @@ func run() error {
 		return err
 	}
 
-	if os.Getenv("STARTER_MIGRATE") == "1" {
+	migrationOnly := len(os.Args) > 1 && os.Args[1] == "migrate"
+	migrate := os.Getenv("STARTER_MIGRATE") == "1" || migrationOnly
+	if migrate {
 		if err := migrations.Migrate(ctx, migrations.DatabaseConfig{DSN: pgDSN}, nil); err != nil {
 			return fmt.Errorf("migrate: %w", err)
 		}
 	}
-	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+	if selected["products"] && migrate {
+		if err := migrateProducts(ctx, pgDSN); err != nil {
+			return fmt.Errorf("products migrate: %w", err)
+		}
+	}
+	if migrationOnly {
 		return nil
 	}
 
@@ -183,6 +191,18 @@ func run() error {
 	}
 	if selected["authmail"] {
 		modules = append(modules, host.AuthMailModule(host.AuthMailConfig{Sender: mail.auth}))
+	}
+	if selected["products"] {
+		productDB, openErr := sql.Open("pgx", pgDSN)
+		if openErr != nil {
+			return openErr
+		}
+		defer productDB.Close()
+		products, moduleErr := productsModule(productDB)
+		if moduleErr != nil {
+			return moduleErr
+		}
+		modules = append(modules, products)
 	}
 	modules = append(modules, starterDashboardModules()...)
 	var runtime *host.Runtime

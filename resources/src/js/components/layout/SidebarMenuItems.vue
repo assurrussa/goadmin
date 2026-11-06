@@ -16,7 +16,7 @@
           :class="[
             collapsed ? 'justify-center' : '',
             isActive(item.href)
-              ? 'bg-primary/10 text-primary font-semibold'
+              ? 'goadmin-selection-fill bg-primary/10 text-primary font-semibold'
               : isGroupActive(item)
                 ? 'text-primary font-medium hover:bg-surface-variant'
                 : 'text-text-secondary hover:bg-surface-variant',

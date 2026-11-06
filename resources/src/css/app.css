@@ -658,3 +658,19 @@
     min-height: 44px;
   }
 }
+
+/* Branding fills are independent of solid text, focus and semantic status tokens. */
+.goadmin-primary-fill:not(.goadmin-semantic-fill) {
+  background-image: var(--goadmin-primary-image, none);
+  color: var(--goadmin-primary-fill-foreground, var(--color-primary-foreground));
+}
+.goadmin-selection-fill,
+.goadmin-selected-row > td {
+  background-image: var(--goadmin-selection-image, none);
+}
+.goadmin-selection-fill {
+  color: var(--goadmin-selection-foreground, var(--color-primary));
+}
+.goadmin-selected-row > td {
+  background-color: color-mix(in srgb, var(--color-primary) 10%, var(--color-card));
+}

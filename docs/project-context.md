@@ -1,6 +1,6 @@
 # goadmin Project Context
 
-Last updated: 2026-10-29.
+Last updated: 2026-11-06.
 
 ## Current Role
 
@@ -56,6 +56,7 @@ Stable reusable feature packages:
 - `github.com/assurrussa/goadmin/features/notifications`
 - `github.com/assurrussa/goadmin/features/realtime`
 - `github.com/assurrussa/goadmin/features/authmail`
+- `github.com/assurrussa/goadmin/features/crud`
 - `github.com/assurrussa/goadmin/features/users`
 
 Stable host-support toolkits:
@@ -149,8 +150,11 @@ email/reset routes and controls are absent, password/profile flows retain audit.
 
 The typed SDK exposes canonical Actor, guards, rendering, logger and extensions;
 `Command[T]` binds typed commands after current authorization. Business services
-belong to feature constructors. Declarative CRUD remains a TODO in the current
-implementation notes.
+belong to feature constructors. Declarative CRUD is available through `features/crud`; see [CRUD resources](crud.md).
+Its fields require matching scalar DTO types, and its list/data responses retain
+current creation authorization and typed errors. Shared client dependencies use
+`FeatureDescriptor.ClientReferences`; unique ownership remains in
+`ClientRequirements`.
 
 ## Dashboard summaries
 
@@ -291,6 +295,10 @@ verified account before paint; logout discards private drafts and pending work.
 The legacy shared browser choices are not imported into an account automatically.
 
 Core branding adds installation-wide name, accent and light/dark PNG logos.
+An optional second HEX stop creates a fixed 135-degree sRGB gradient. Both stops
+are one draft value during conflict resolution and short-lived branding recovery.
+Primary fills and soft selected surfaces use image tokens; text, borders and focus
+retain solid colors. Original stops are persisted, with contrast-adapted fills.
 The editor requires `branding:read`/`branding:update`, uses explicit Apply and
 isolated preview, and commits configuration, images and audit atomically under
 CAS. Logos accept bounded PNG/JPEG input, normalized to PNG in PostgreSQL; no

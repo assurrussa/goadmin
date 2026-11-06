@@ -95,9 +95,10 @@ export async function tableSecurityMatrix({ page, context, config, credentials, 
     for (const mutation of mutations) {
       const response = await send(mutation.method, mutation.url, mutation.body,
         mode !== 'missing-csrf', mode === 'foreign-origin' ? 'https://foreign.example.test' : config.url)
-      // The native Inertia error listener returns an error redirect; a valid command returns JSON 200.
-      assert.equal(response.status(), 302, `${mode}: ${mutation.url}`)
-      assert.equal(response.headers().location, `${config.url}/users`)
+      // JSON API errors retain their native refusal status and never redirect a mutation.
+      assert.equal(response.status(), 419, `${mode}: ${mutation.url}`)
+      assert.match(response.headers()['content-type'], /application\/json/)
+      assert.equal(response.headers().location, undefined)
     }
     await assertUnchanged()
   }
@@ -149,14 +150,14 @@ export async function tableSecurityMatrix({ page, context, config, credentials, 
   await logout(page)
   await login(page, credentials.restrictedEmail, credentials.password)
   const deniedMutation = async response => {
-    assert.equal(response.status(), 302, 'native mutation guard uses the Inertia error redirect')
-    assert.equal(response.headers().location, `${config.url}/users`)
-    const landing = await context.request.get('/queues/jobs', { headers: { 'X-Inertia': 'true' } })
-    assert.equal(landing.status(), 200)
-    const { props } = await landing.json()
-    assert.equal(props.flash?.error, 'Permission denied',
+    assert.equal(response.status(), 403, 'native JSON mutation guard retains RBAC refusal')
+    assert.match(response.headers()['content-type'], /application\/json/)
+    assert.equal(response.headers().location, undefined)
+    const body = await response.json()
+    assert.equal(body.message, 'Permission denied',
       'must be an RBAC denial, not a CSRF/session failure or a successful mutation redirect')
   }
+
   for (const resource of tableResources.filter(resource => !resource.startsWith('/queues/'))) {
     for (const suffix of ['table-preferences', 'table-export?columns=id']) {
       const response = await context.request.get(`${resource}/${suffix}`, { maxRedirects: 0 })

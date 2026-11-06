@@ -69,7 +69,7 @@ test('materializes deterministic multi-root module and path-free bundle manifest
   assert.match(generated, /export const selectedThemeModuleKey: string \| null = null/)
   assert.deepEqual(
     result.bundleManifest.extensions.map((extension) => extension.key),
-    ['gocms', 'host.settings'],
+    ['gocms', 'host.settings', 'goadmin.crud'],
   )
 
   const emitted = fs.readFileSync(result.bundleManifestPath, 'utf8')
@@ -279,7 +279,7 @@ test('materializes the opt-in CSS-only shell theme with its verified fingerprint
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')).extensions[0]
   assert.equal(manifest.fingerprint, fingerprintSource(path.join(exampleRoot, 'src')))
   const result = materializeAdminExtensions({ generatedRoot, manifestPaths: [manifestPath] })
-  assert.equal(result.bundleManifest.extensions.length, 1)
+  assert.equal(result.bundleManifest.extensions.length, 2)
   assert.equal(result.bundleManifest.extensions[0].key, 'example.shell-theme')
   assert.match(fs.readFileSync(result.generatedModulePath, 'utf8'), /import \* as extension0.*extensions\/theme\.ts/)
   const source = fs.readFileSync(path.join(exampleRoot, 'src/extensions/theme.ts'), 'utf8')

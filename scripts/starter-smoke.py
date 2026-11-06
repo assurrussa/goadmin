@@ -19,7 +19,7 @@ import urllib.request
 REPO = Path(__file__).resolve().parent.parent
 ARTIFACTS = REPO / 'output/playwright/starter-smoke'
 RUN_ID = re.compile(r'^\d{8}t\d{6}z-[a-f0-9]{8}$')
-MODULES = 'users,access,jobs,uploads,queues,notifications,realtime'
+MODULES = 'users,access,jobs,uploads,queues,notifications,realtime,products'
 MARKER = 'goadmin-starter-smoke-v1'
 
 

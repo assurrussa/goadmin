@@ -23,7 +23,8 @@ devices retain 44px shared interaction targets. Existing explicit component
 classes remain authoritative. A user's density choice does not switch sidebar
 and topbar: presentation packs are still selected at build time.
 
-Admin Branding supports a name, a custom six-digit HEX accent and two optional
+Admin Branding supports a name, a custom six-digit HEX accent and an optional
+second HEX stop for a 135-degree gradient, plus two optional
 logos for light/dark backgrounds. An accent is converted to readable theme
 variants; status/error colors and fonts retain their existing semantics.
 Preview is local until Apply. Reset restores the original presentation. Input
@@ -335,3 +336,24 @@ not certify a custom theme's accessibility.
 Standalone HTML errors deliberately keep their shared neutral light/dark styling
 and remain readable without the Vue bundle or pack CSS. Public-site components,
 arbitrary page replacement and a runtime component registry are outside this API.
+
+### Two-color accent
+
+The branding editor switches between solid and gradient mode. Each stop has a
+native color picker and HEX input. Apply publishes both original colors in one
+CAS/audited update. Reset color clears both without discarding name/logo edits.
+Primary buttons and active pagination use the gradient; active navigation and
+selected rows use its soft form. Semantic status colors, links, borders and
+keyboard focus keep solid colors. Light/dark previews use the same contrast
+adaptation as the applied interface.
+Active navigation and settings tabs use a separate solid foreground that accounts
+for the final translucent background and hover surface. This also applies to the
+built-in palette when no custom accent is saved; primary and focus tokens remain
+independent. After building resources, `node scripts/starter-smoke/selection-contrast.mjs`
+checks actual Chromium paint in both packs and themes, including opposing hues.
+
+`accentColorEnd` is empty for solid mode. A legacy PUT omitting it retains the
+current end; an explicit empty string disables the gradient. An empty start
+clears both. Both stops are validated as six-digit HEX. Recovery stores the pair
+and baseline atomically under the existing 30-minute, same-owner checks. A
+newer server version still requires explicit conflict resolution and manual Apply.

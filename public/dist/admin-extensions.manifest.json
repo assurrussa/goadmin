@@ -1,4 +1,10 @@
 {
   "formatVersion": 1,
-  "extensions": []
+  "extensions": [
+    {
+      "key": "goadmin.crud",
+      "apiVersion": 1,
+      "fingerprint": "sha256:5b439272df00e82029e4f7b0bba3141aae05dc3df274c8c81483e76e7d91e831"
+    }
+  ]
 }

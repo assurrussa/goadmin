@@ -18,7 +18,11 @@
       :href="'#' + item.key"
       :aria-current="section === item.key ? 'page' : undefined"
       class="inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-medium hover:bg-surface-variant"
-      :class="section === item.key ? 'bg-primary/10 text-primary' : 'text-text-secondary'"
+      :class="
+        section === item.key
+          ? 'goadmin-selection-fill bg-primary/10 text-primary'
+          : 'text-text-secondary'
+      "
       @click="section = item.key"
       >{{ t(item.label) }}</a
     >

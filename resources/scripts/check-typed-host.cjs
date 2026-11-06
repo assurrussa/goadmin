@@ -114,6 +114,17 @@ export default {
   }),
 }
 `)
+  fs.writeFileSync(path.join(components, 'CrudEditor.vue'), `<script setup lang="ts">
+import type { CrudFieldProps, CrudValue } from '@admin-core/crud'
+defineProps<CrudFieldProps>()
+defineEmits<{ 'update:modelValue': [value: CrudValue] }>()
+</script>
+<template><input :value="String(modelValue ?? '')" :disabled="disabled" :readonly="readonly" /></template>
+`)
+  fs.writeFileSync(path.join(sourceRoot, 'extensions/crud.ts'), `import { registerCrudField } from '@admin-core/crud'
+import CrudEditor from '../components/CrudEditor.vue'
+export default { install() { registerCrudField('host.typed/editor', CrudEditor) } }
+`)
   writeManifest()
 
   const generated = run([path.join(fixture, 'scripts/generate-tsconfig-paths.cjs')])
@@ -181,6 +192,17 @@ export const invalid = defineAdminTheme({ id: 'invalid.shell', apiVersion: 1, ad
   assert.match(invalidThemes.output, /hostOnlyRequired/)
   const themeDiagnostics = invalidThemes.output.split('\n').filter((line) => /error TS\d+:/.test(line))
   assert.equal(themeDiagnostics.length, 2, invalidThemes.output)
+  fs.rmSync(path.join(sourceRoot, 'extensions/invalid-theme-api.ts'))
+  fs.rmSync(path.join(sourceRoot, 'extensions/invalid-theme-shell.ts'))
+  fs.writeFileSync(path.join(sourceRoot, 'extensions/invalid-crud.ts'), `import { registerCrudField } from '@admin-core/crud'
+registerCrudField('host.typed/invalid', 42)
+`)
+  writeManifest()
+  const crudGenerated = run([path.join(fixture, 'scripts/generate-tsconfig-paths.cjs')])
+  assert.equal(crudGenerated.status, 0, crudGenerated.output)
+  const invalidCRUD = check()
+  assert.notEqual(invalidCRUD.status, 0, 'Invalid CRUD component unexpectedly passed')
+  assert.match(invalidCRUD.output, /invalid-crud\.ts.*error TS\d+:/)
   console.log(
     'Typed-host full resource graph and theme facade pass; three page errors and two theme errors are rejected.',
   )

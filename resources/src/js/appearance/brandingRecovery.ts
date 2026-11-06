@@ -10,7 +10,9 @@ export type BrandingRecovery = {
   version: number
   name: string
   accentColor: string
-  baseline: { name: string; accentColor: string }
+  accentColorEnd?: string
+  conflict?: boolean
+  baseline: { name: string; accentColor: string; accentColorEnd?: string }
   logoLight?: ''
   logoDark?: ''
 }
@@ -97,6 +99,18 @@ export function takeBrandingRecovery(owner: string): BrandingRecovery | undefine
       typeof item.accentColor !== 'string' ||
       typeof item.baseline?.name !== 'string' ||
       typeof item.baseline?.accentColor !== 'string'
+    )
+      return
+    // Old drafts have a solid accent. Reject malformed pairs as a whole.
+    item.accentColorEnd ??= ''
+    item.baseline.accentColorEnd ??= ''
+    const validPair = (start: string, end: unknown) =>
+      typeof end === 'string' &&
+      (start === '' || /^#[\da-f]{6}$/i.test(start)) &&
+      (end === '' || (start !== '' && /^#[\da-f]{6}$/i.test(end)))
+    if (
+      !validPair(item.accentColor, item.accentColorEnd) ||
+      !validPair(item.baseline.accentColor, item.baseline.accentColorEnd)
     )
       return
     return item

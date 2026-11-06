@@ -144,6 +144,7 @@ import (
 	_ "github.com/assurrussa/goadmin/features/realtime"
 	_ "github.com/assurrussa/goadmin/features/operations"
 	_ "github.com/assurrussa/goadmin/features/users"
+ _ "github.com/assurrussa/goadmin/features/crud"
 	adminhost "github.com/assurrussa/goadmin/host"
 	adminhosttest "github.com/assurrussa/goadmin/hosttest"
 	adminmigrations "github.com/assurrussa/goadmin/migrations"

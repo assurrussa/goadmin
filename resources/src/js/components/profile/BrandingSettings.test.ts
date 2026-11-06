@@ -132,6 +132,7 @@ it('keeps name and accent preview isolated until explicit successful Apply', asy
     version: 1,
     name: 'Preview',
     accentColor: '#eeddff',
+    accentColorEnd: '',
     reset: false,
   })
 })
@@ -496,7 +497,13 @@ it('resets only the accent draft and preserves name and logos on save', async ()
   click(root, 'Применить')
   await flush()
   const payload = JSON.parse(fetch.mock.calls[1]![1].body)
-  expect(payload).toEqual({ version: 1, name: 'Keep title', accentColor: '', reset: false })
+  expect(payload).toEqual({
+    version: 1,
+    name: 'Keep title',
+    accentColor: '',
+    accentColorEnd: '',
+    reset: false,
+  })
   expect(appearance.brand.accentColor).toBe('')
 })
 
@@ -688,4 +695,64 @@ it('does not restore until the identity probe succeeds, and never follows redire
   click(restored, 'Повторить')
   await flush()
   expect(restored.querySelectorAll<HTMLInputElement>('input')[1]!.value).toBe('#123456')
+})
+
+it('previews a gradient without publishing and color reset preserves the name draft', async () => {
+  const root = await mount()
+  input(root, 0, 'Keep name')
+  const end = root.querySelectorAll<HTMLInputElement>('input:not([type])')[2]!
+  end.value = '#fefefe'
+  end.dispatchEvent(new Event('input', { bubbles: true }))
+  await flush()
+  expect(root.querySelectorAll('input[type="color"]')).toHaveLength(2)
+  expect(root.querySelector('[aria-label="Предпросмотр"] > div')!.getAttribute('style')).toContain(
+    'linear-gradient(135deg in srgb',
+  )
+  expect(appearance.brand.accentColorEnd).toBe('')
+  expect(fetch.mock.calls).toHaveLength(1)
+  click(root, 'Сбросить цвет')
+  await flush()
+  fetch.mockResolvedValueOnce(result(brand('Keep name', '', 2)))
+  click(root, 'Применить')
+  await flush()
+  expect(JSON.parse(fetch.mock.calls.at(-1)![1].body)).toMatchObject({
+    name: 'Keep name',
+    accentColor: '',
+    accentColorEnd: '',
+  })
+})
+it('rebases and recovers the gradient pair atomically when only the end changed', async () => {
+  const initial = brand('Live', '#123456', 1)
+  Object.assign(initial.payload, { accentColorEnd: '#654321' })
+  fetch.mockReset()
+  fetch.mockResolvedValueOnce(result(initial))
+  const root = await mount()
+  const end = root.querySelectorAll<HTMLInputElement>('input:not([type])')[2]!
+  end.value = '#abcdef'
+  end.dispatchEvent(new Event('input', { bubbles: true }))
+  await flush()
+  fetch.mockResolvedValueOnce(result({}, 409))
+  click(root, 'Применить')
+  await flush()
+  const fresh = brand('Fresh', '#aabbcc', 9)
+  Object.assign(fresh.payload, { accentColorEnd: '#ddeeff' })
+  fetch.mockResolvedValueOnce(result(fresh))
+  click(root, 'Получить новую версию для применения черновика')
+  await flush()
+  pauseAppearance()
+  unmountApp()
+  root.remove()
+  restoreActor('1')
+  fetch.mockResolvedValueOnce(verified())
+  fetch.mockResolvedValueOnce(result(fresh))
+  const restored = await mount()
+  fetch.mockResolvedValueOnce(result(brand('Fresh', '#123456', 10)))
+  click(restored, 'Применить')
+  await flush()
+  expect(JSON.parse(fetch.mock.calls.at(-1)![1].body)).toMatchObject({
+    version: 9,
+    name: 'Fresh',
+    accentColor: '#123456',
+    accentColorEnd: '#abcdef',
+  })
 })

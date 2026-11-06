@@ -1,5 +1,75 @@
 # Implementation Notes
 
+## CRUD SDK and gradient accents (2026-11-06)
+
+Base: `181328c`; implementation began on `tasks/crud-sdk-gradient` and is
+checkpointed on `tasks/crud-sdk-gradient-review-20261106` in the same checkout,
+without a worktree. The post-checkpoint audit checks the accepted scope below;
+any confirmed defects receive separate fixes and matching validation.
+Accepted: declarative Go resources with embedded list/show/create/edit pages,
+typed application callbacks, exact string IDs and mandatory revision fencing,
+record authorization, single-record commands, existing personal table workflows
+and CSV limits. Simple fields only; Products is an explicit starter module.
+Application storage, transactions and business audit remain application-owned.
+Custom fields use a supported client facade and matched extension bundle.
+
+Branding adds an optional second HEX stop, fixed 135-degree gradient, adaptive
+light/dark contrast, primary fills and soft active highlights. Preserve the
+solid accent contract, CAS/audit/cache lifecycle, and recover both stops as one
+value through existing owner-checked 30-minute branding recovery. No automatic
+mutation replay or generic CRUD draft persistence.
+
+Validation: targeted Go/UI tests, PostgreSQL race integration, public consumer,
+both presentation packs in starter smoke, then the full repository gate.
+
+Completion audits repaired Create visibility, DTO/scalar validation, optional
+select blanks, delete return queries, shared custom extensions, typed data errors
+and the Products publication boundary. Products has separate writable DTOs,
+optional Category, read-only Status and a v2 migration preserving legacy rows.
+Explicit migrate runs core and selected Products without the startup flag.
+Custom component keys match in Go/TypeScript; references merge without hiding
+duplicate owners. Native-session tests cover numeric/null drafts, sanitized
+unknown outcomes and flash storage failures. Draft revisions remain pinned.
+
+The second audit also repaired literal detail text and nullable boolean display.
+Only option/boolean labels are translated. A dedicated solid selection foreground
+accounts for stacked transparency and hover surfaces, including unset theme
+presets; primary/ring/status tokens and saved HEX stops are unchanged. Active
+settings tabs share the navigation treatment. Independent final review is clear.
+The renderer fingerprint and embedded assets were regenerated together.
+
+Final verification: the Go portion of `make check` passed tidy/format/vet/lint
+and full race/coverage. Its resource stage encountered one HTTP parser failure
+in the unchanged Vite image-assets test. The isolated test rerun passed; the
+subsequent complete `make resources` passed 143 manifest checks, 1,104 UI tests,
+types, lint, formatting, build and embedded asset verification.
+`make externalconsumer-local`, `make starter-smoke-test` and expanded opaque-ID
+HTTP regressions passed. Native Chromium paint passed all 64 cases across both
+packs/modes, hover, presets and opposing gradients; minimum contrast 5.343:1.
+`selection-contrast.mjs` records the exact compiled CSS hash and browser version.
+
+PostgreSQL race integration previously passed on the unchanged storage code:
+CAS winner/conflict, owner isolation, audit rollback, publication-preserving
+ordinary edits, deletion, explicit migrate and v1-to-v2 row preservation.
+Core dependency versions are unchanged; the starter marks its already pinned
+pgx version as a direct dependency.
+
+Fresh full browser run `20261106t034605z-1554fc86` passed all 12 scenario groups
+for each presentation pack, with zero page/console or diagnostic errors. It
+covers real Products CRUD/commands/views/CSV, repeated conflicts/reload, optional
+select blanks, read-only publication status, Create navigation, delete query
+preservation, RU mobile forms, table security/bulk flows and gradient theme/
+locale/density/contrast/touch/zoom acceptance. Screenshots were visually inspected.
+Every returned query key/value is checked independently of parameter ordering.
+
+Source builds used a temporary loopback read-only proxy for the shared Go download
+cache; checksum verification remained enabled. The report records this build
+choice. The proxy and owned smoke containers/volumes were removed after acceptance.
+Earlier failed attempts remain separate diagnostics. No accepted implementation
+item remains deferred beyond explicit v1 exclusions. Source, documentation and
+embedded assets are included in the checkpoint; local browser artifacts remain
+outside Git. No publication or deployment was performed.
+
 ## Appearance and personalization (2026-10-31)
 
 PR review follow-up: preserve the existing `sso-settings-title`,

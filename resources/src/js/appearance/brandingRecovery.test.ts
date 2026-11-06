@@ -56,3 +56,30 @@ it('does not throw when tab storage is unavailable', () => {
   expect(() => pauseBrandingRecovery()).not.toThrow()
   expect(takeBrandingRecovery('1')).toBeUndefined()
 })
+
+it('recovers both gradient endpoints and preserves an explicit unresolved conflict', () => {
+  registerBrandingRecovery(() => ({
+    ...snapshot(),
+    accentColorEnd: '#abcdef',
+    conflict: true,
+    baseline: { name: '', accentColor: '#234567', accentColorEnd: '#345678' },
+  }))
+  pauseBrandingRecovery()
+  expect(takeBrandingRecovery('1')).toMatchObject({
+    accentColor: '#123456',
+    accentColorEnd: '#abcdef',
+    conflict: true,
+    baseline: { accentColorEnd: '#345678' },
+  })
+})
+it('normalizes legacy recovery to solid and rejects malformed pairs atomically', () => {
+  registerBrandingRecovery(snapshot)
+  pauseBrandingRecovery()
+  expect(takeBrandingRecovery('1')).toMatchObject({
+    accentColorEnd: '',
+    baseline: { accentColorEnd: '' },
+  })
+  registerBrandingRecovery(() => ({ ...snapshot(), accentColor: '', accentColorEnd: '#abcdef' }))
+  pauseBrandingRecovery()
+  expect(takeBrandingRecovery('1')).toBeUndefined()
+})

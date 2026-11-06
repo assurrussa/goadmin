@@ -27,9 +27,18 @@ export async function appearanceGeometry(page) {
       v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
     }).reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0)
     const paint = node => {
-      const bg = background(node), fg = over(rgba(getComputedStyle(node).color), bg)
-      const a = luminance(bg), b = luminance(fg)
-      return { background: bg, foreground: fg, contrast: (Math.max(a, b) + .05) / (Math.min(a, b) + .05) }
+      const bg = background(node), text = rgba(getComputedStyle(node).color), fg = over(text, bg)
+      const image = getComputedStyle(node).backgroundImage
+      const stops = [...image.matchAll(/(?:rgba?|color)\([^)]*\)/g)].map(match => rgba(match[0]))
+      const samples = stops.length === 2 && image.includes('linear-gradient')
+        ? Array.from({ length: 101 }, (_, index) => over(stops[0].map((v, channel) => v + (stops[1][channel] - v) * index / 100), bg))
+        : [bg]
+      const contrast = Math.min(...samples.map(sample => {
+        const l = luminance(sample), b = luminance(over(text, sample))
+        return (Math.max(l, b) + .05) / (Math.min(l, b) + .05)
+      }))
+      return { background: bg, foreground: fg, contrast, image, samples: samples.length }
+
     }
     const visible = node => {
       const rect = node.getBoundingClientRect()
@@ -58,7 +67,9 @@ export async function appearanceGeometry(page) {
       dpr: devicePixelRatio, fontSize: getComputedStyle(document.documentElement).fontSize,
       theme: document.documentElement.dataset.themeMode, density: document.documentElement.dataset.density,
       locale: document.documentElement.lang, heading: heading ? paint(heading) : null,
-      targets, panels, accent, frames: window.__appearanceFrames || [] }
+      targets, panels, accent,
+      selections: [...document.querySelectorAll('.goadmin-selection-fill')].filter(visible).map(paint),
+      frames: window.__appearanceFrames || [] }
   })
 }
 

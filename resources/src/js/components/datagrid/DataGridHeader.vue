@@ -55,7 +55,7 @@
         <!-- Кнопка создания -->
         <AppButton v-if="config.behaviour?.creatable" @click="$emit('create')" size="sm">
           <Plus class="-ml-1 mr-2 h-4 w-4" />
-          {{ config.ui?.createButtonText || t('Создать') }}
+          {{ t(config.ui?.createButtonText || 'Создать') }}
         </AppButton>
       </div>
     </div>

@@ -4,7 +4,7 @@
     :class="[
       'group relative flex w-full items-center px-3 py-2 text-sm font-medium rounded-lg border border-transparent transition duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
       active
-        ? 'bg-primary/10 text-primary-dark dark:text-primary-light'
+        ? 'goadmin-selection-fill bg-primary/10 text-primary-dark dark:text-primary-light'
         : 'text-text-secondary hover:text-text-primary hover:bg-surface-variant',
     ]"
   >
@@ -13,9 +13,7 @@
       :is="icon"
       :class="[
         'mr-3 flex-shrink-0 h-5 w-5 transition duration-150',
-        active
-          ? 'text-primary-dark dark:text-primary-light'
-          : 'text-text-tertiary group-hover:text-text-primary',
+        active ? 'text-inherit' : 'text-text-tertiary group-hover:text-text-primary',
       ]"
     />
     <slot />
