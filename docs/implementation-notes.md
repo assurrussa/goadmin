@@ -2,6 +2,28 @@
 
 ## UI consistency follow-up (2026-11-06)
 
+Recheck after `50c3a2f`: opening Products anonymously and signing in exposed an
+uncovered ordering defect in both packs. The accepted page mounted its grid
+before the auth store changed; the later success handler then invalidated the
+fresh grid as if it belonged to the previous actor. A reload hid the defect.
+Identity/avatar synchronization now shares the existing synchronous page-props
+fence with appearance; realtime still reconciles after capabilities/session
+configuration. Auth-failure fences and old-owner grid invalidation stay active.
+A real Inertia/Vue setup-order regression failed before the fix and now passes;
+late page props after an auth-failure login redirect remain fenced. `make resources`
+passed all 144 contract checks and 1,143 UI tests, types, lint, formatting, build
+and asset verification. Clean local consumer and smoke helper checks passed.
+Go code and the native-paint CSS are unchanged; their previous checks still apply.
+Full browser run `20261106t094051z-cc854600` passed all 12 groups per pack without
+page, console or diagnostic errors, including the direct anonymous Products ->
+login -> Products transition without a reload. It uses immutable source images
+from `20261106t093541z-3ed1f026` on fresh databases after narrowing a browser-only
+heading locator; the report records source-image provenance.
+Both retained apps were replaced without changing their databases or volumes.
+New private backups and before/after whole-table checksums confirm unchanged
+Products, branding and preferences; pre-upgrade sessions still authenticate.
+No schema, dependency, permission or persisted-data contract changed.
+
 Base: `29e4250`, current branch `tasks/crud-sdk-gradient-review-20261106`, no
 worktree. Accepted: grouped settings sidebar/mobile selector, compact branding
 blocks with isolated previews, explicit system/light/dark menus, soft gradient

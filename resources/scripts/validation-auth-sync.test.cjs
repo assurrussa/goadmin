@@ -80,8 +80,10 @@ test('validation and navigation synchronize auth from the live Inertia page', as
   let mountedApp
   let bootstrap
   const mountedGenerations = []
+  const setupIdentities = []
   const component = {
     setup() {
+      setupIdentities.push(authStore.authUser?.id ?? null)
       vue.onMounted(() => mountedGenerations.push(calls.cancellations))
       return () => vue.h('input', { name: 'draft' })
     },
@@ -257,16 +259,18 @@ test('validation and navigation synchronize auth from the live Inertia page', as
     },
   )
 
-  await t.test('real Vue page swap cancels old commands before destination mount, including client-side visits', async () => {
+  await t.test('real Vue page swap fences identity and old commands before destination mount', async () => {
     const generation = calls.cancellations
     const mounts = mountedGenerations.length
     await new Promise((resolve) => inertia.router.push({
-      component: 'auth/next', url: '/next-page', preserveState: false, onFinish: resolve,
+      component: 'auth/next', url: '/next-page', props: { authuser: { ...initialUser, id: '8' }, errors: {} },
+      preserveState: false, onFinish: resolve,
     }))
     await vue.nextTick()
     assert.ok(calls.cancellations > generation)
     assert.ok(mountedGenerations.length > mounts)
     assert.equal(mountedGenerations.at(-1), calls.cancellations)
+    assert.equal(setupIdentities.at(-1), '8')
   })
 
   await t.test(
@@ -320,6 +324,7 @@ test('validation and navigation synchronize auth from the live Inertia page', as
       assert.equal(calls.paused, 1)
       assert.equal(calls.login, 1)
       assert.equal(calls.disconnected, 3)
+      await setPage({ authuser: initialUser, errors: {} })
       dispatch('error', { errors: { title: 'Required' } })
       dispatch('success', { page: inertia.usePage() })
       assertUser(null)
