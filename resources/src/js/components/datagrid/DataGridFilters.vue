@@ -95,14 +95,20 @@ const handleFilterChange = (key: string, value: AcceptableValue): void => {
   emit('filter-change', { [key]: value })
 }
 
-const getSelectValue = (key: string): AcceptableValue | undefined => {
+const getFilterValue = (key: string): unknown => {
+  // Track the key before checking ownership so newly added filters stay reactive.
   const value = props.filters[key]
+  return Object.hasOwn(props.filters, key) ? value : undefined
+}
+
+const getSelectValue = (key: string): AcceptableValue | undefined => {
+  const value = getFilterValue(key)
   if (value === '' || value === null || value === undefined) return undefined
   return value as AcceptableValue
 }
 
 const getInputValue = (key: string): string | number | null => {
-  const value = props.filters[key]
+  const value = getFilterValue(key)
   if (value === null || value === undefined) return ''
   if (typeof value === 'string' || typeof value === 'number') return value
   return String(value)
