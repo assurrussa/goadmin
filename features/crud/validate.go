@@ -67,6 +67,7 @@ func validate[R, C, U any](d Definition[R, C, U]) error {
 			f.Key == "__proto__" ||
 			f.Key == "constructor" ||
 			f.Key == "prototype" ||
+			f.Key == "hasOwnProperty" ||
 			f.Label == "" {
 			return fail("invalid or reserved field key or label")
 		}
@@ -127,6 +128,11 @@ func validate[R, C, U any](d Definition[R, C, U]) error {
 		f, ok := fields[c.Key]
 		if !ok || !f.Read || columns[c.Key] {
 			return fail("columns must name unique readable fields")
+		}
+		// Keep filter names separate from shared datagrid request controls and
+		// its synthetic search metadata. These keys remain valid display fields.
+		if c.Filterable && slices.Contains([]string{"page", "limit", "search", "sortBy", "sortOrder", "_search"}, c.Key) {
+			return fail("filterable column key is reserved by datagrid")
 		}
 		columns[c.Key] = true
 		if c.Sortable && (d.DefaultSort == "" || d.DefaultSort == c.Key) {

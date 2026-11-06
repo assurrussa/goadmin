@@ -41,6 +41,9 @@ finite JavaScript-safe magnitude. Supported kinds are text, textarea, number,
 boolean, date (YYYY-MM-DD), fixed string select and custom scalar fields. Only
 readable declared fields are serialized or exported. Undeclared/read-only input
 is rejected. Keep secrets out of readable fields, including hidden table columns.
+Field keys start with an ASCII letter and contain up to 64 letters, digits or
+underscores. `id`, `constructor`, `prototype` and `hasOwnProperty` are reserved;
+the last key is intercepted by Vue's reactive model even when it holds a value.
 Optional selects accept the blank option; nullable pointer fields also accept
 null. The server applies these checks to requests and readable callback output.
 Optional write-only update fields (`Read: false`, `Update: true`, `Required: false`)
@@ -104,6 +107,9 @@ CAS, 20-view/64-KiB limits, column reconciliation and URL precedence. Selection
 holds up to 100 exact IDs, never persists, and follows existing query/owner reset
 rules. CSV exports visible columns, either selected records (100) or filtered
 records (10,000 with truncation feedback). Generic bulk actions are not included.
+Filterable columns cannot use `page`, `limit`, `search`, `sortBy` or `sortOrder`:
+these query names control pagination, search and sorting. The constructor rejects
+such columns; the same keys remain valid for fields and non-filterable columns.
 
 ## Custom fields and bundle compatibility
 

@@ -44,6 +44,11 @@ function initial(): Record<string, CrudValue> {
 const form = useForm({ values: initial() })
 const draftRevision = ref(props.record?.revision)
 const errors = computed(() => form.errors as Record<string, string>)
+function fieldError(key: string): string | undefined {
+  // Track absent keys too, so later setError calls update the field.
+  const error = errors.value[key]
+  return Object.hasOwn(errors.value, key) && typeof error === 'string' ? error : undefined
+}
 const fieldValidity = ref<Record<string, boolean>>({})
 const editedFields = ref(new Set<string>())
 const formState = computed(() => ({
@@ -123,7 +128,7 @@ onUnmounted(() => form.cancel())
       :key="`${resource.key}:${record?.id ?? ''}:${field.key}`"
       :field="field"
       v-model="form.values[field.key]"
-      :error="errors[field.key]"
+      :error="fieldError(field.key)"
       :disabled="form.processing"
       @update:model-value="editedFields.add(field.key)"
       @update:valid="fieldValidity[field.key] = $event"
