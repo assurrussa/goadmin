@@ -27,15 +27,17 @@ function initial(): Record<string, CrudValue> {
   return Object.fromEntries(
     activeFields.value.map((field) => [
       field.key,
-      Object.hasOwn(props.values, field.key)
-        ? crudValue(props.values[field.key])
-        : field.type === 'boolean'
-          ? false
-          : field.type === 'number'
-            ? 0
-            : field.type === 'select' && field.required
-              ? (field.options?.[0]?.value ?? '')
-              : '',
+      props.mode === 'update' && !field.read
+        ? null
+        : Object.hasOwn(props.values, field.key)
+          ? crudValue(props.values[field.key])
+          : field.type === 'boolean'
+            ? false
+            : field.type === 'number'
+              ? 0
+              : field.type === 'select' && field.required
+                ? (field.options?.[0]?.value ?? '')
+                : '',
     ]),
   )
 }

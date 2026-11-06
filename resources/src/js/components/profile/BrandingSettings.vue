@@ -118,6 +118,7 @@ const unregisterRecovery = registerBrandingRecovery(() => {
     name: draft.name,
     accentColor: draft.accentColor,
     accentColorEnd: draft.accentColorEnd,
+    accentMode: accentMode.value,
     conflict: status.value === 'conflict',
     baseline: { ...baseline },
     ...(draft.logoLight === '' ? { logoLight: '' as const } : {}),
@@ -211,10 +212,12 @@ async function load(keep = false) {
       if (draft.name === baseline.name) draft.name = brand.name
       if (
         draft.accentColor === baseline.accentColor &&
-        draft.accentColorEnd === baseline.accentColorEnd
+        draft.accentColorEnd === baseline.accentColorEnd &&
+        accentMode.value === (baseline.accentColorEnd ? 'gradient' : 'solid')
       ) {
         draft.accentColor = brand.accentColor
         draft.accentColorEnd = brand.accentColorEnd || ''
+        accentMode.value = brand.accentColorEnd ? 'gradient' : 'solid'
       }
       if (draft.logoLight === undefined) urls.light = brand.logoLightUrl
       if (draft.logoDark === undefined) urls.dark = brand.logoDarkUrl
@@ -233,10 +236,12 @@ async function load(keep = false) {
         if (recovery.name !== recovery.baseline.name) draft.name = recovery.name
         if (
           recovery.accentColor !== recovery.baseline.accentColor ||
-          recovery.accentColorEnd !== recovery.baseline.accentColorEnd
+          recovery.accentColorEnd !== recovery.baseline.accentColorEnd ||
+          recovery.accentMode !== (recovery.baseline.accentColorEnd ? 'gradient' : 'solid')
         ) {
           draft.accentColor = recovery.accentColor
           draft.accentColorEnd = recovery.accentColorEnd || ''
+          accentMode.value = recovery.accentMode || (recovery.accentColorEnd ? 'gradient' : 'solid')
         }
         if (recovery.logoLight === '') {
           draft.logoLight = ''
@@ -248,7 +253,6 @@ async function load(keep = false) {
         }
       }
     }
-    accentMode.value = draft.accentColorEnd ? 'gradient' : 'solid'
     loaded.value = true
     status.value = recoveryConflict ? 'conflict' : 'ready'
     error.value = ''

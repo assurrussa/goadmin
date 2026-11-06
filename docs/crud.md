@@ -51,6 +51,8 @@ nonnil pointer, including an empty string, zero or false, as an explicit
 replacement. Required write-only fields must be explicitly edited on every update;
 the server rejects an omitted required field instead of accepting an invented
 empty/zero default.
+Write-only edit controls start without a value. A required select offers a blank
+placeholder until an explicit choice, including when only one option is available.
 Unreadable values are never returned to populate the edit form.
 `FieldErrors` contains safe messages only; other errors are sanitized and logged.
 Detail pages preserve record text literally. Only declared option labels and

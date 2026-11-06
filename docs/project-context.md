@@ -321,9 +321,9 @@ The host continues selecting the build-time presentation pack. See
 [theme customization](theme-customization.md#account-settings-and-installation-branding).
 
 The default UI uses neutral white/gray light surfaces, graphite dark surfaces,
-a restrained blue accent and system fonts. Shared controls have an 8px radius;
-cards have a 12px radius. Shell shadows default to none. Existing `--goadmin-*`
-geometry, control/card overrides, explicit component classes and optional density
+a restrained blue accent and system fonts. Built-in buttons default to a 4px radius;
+other shared controls use 8px and cards use 12px. Shell shadows default to none.
+Existing `--goadmin-*` geometry, control/card overrides, explicit component classes and optional density
 and branding manifests remain supported; see [theme customization](theme-customization.md).
 Categorical DataGrid and built-in state indicators use an internal dot-and-text
 `AppStatus`; counts and role/category badges remain distinct. This does not add a

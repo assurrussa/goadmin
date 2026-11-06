@@ -77,8 +77,17 @@ it('normalizes legacy recovery to solid', () => {
   pauseBrandingRecovery()
   expect(takeBrandingRecovery('1')).toMatchObject({
     accentColorEnd: '',
+    accentMode: 'solid',
     baseline: { accentColorEnd: '' },
   })
+})
+it('preserves explicit gradient mode with an empty endpoint and infers it in legacy drafts', () => {
+  registerBrandingRecovery(() => ({ ...snapshot(), accentMode: 'gradient', accentColorEnd: '' }))
+  pauseBrandingRecovery()
+  expect(takeBrandingRecovery('1')).toMatchObject({ accentMode: 'gradient', accentColorEnd: '' })
+  registerBrandingRecovery(() => ({ ...snapshot(), accentColorEnd: '#abcdef' }))
+  pauseBrandingRecovery()
+  expect(takeBrandingRecovery('1')?.accentMode).toBe('gradient')
 })
 it.each([
   ['#12', '#abcdef'],

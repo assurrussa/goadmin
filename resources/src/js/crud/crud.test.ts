@@ -277,7 +277,7 @@ it.each(['number', 'boolean'] as const)(
         ],
       },
       mode: 'update',
-      values: { name: 'A', active: false },
+      values: { name: 'A', active: false, secret: type === 'number' ? 99 : true },
       record: { id: 'a', revision: '1', data: {} },
     })
     const submit = () =>
@@ -286,9 +286,11 @@ it.each(['number', 'boolean'] as const)(
     expect(mocks.put.mock.calls.at(-1)?.[1]).not.toHaveProperty('secret')
     const input = root.querySelector<HTMLInputElement>('[name=secret]')!
     if (type === 'number') {
+      expect(input.value).toBe('')
       input.value = '0'
       input.dispatchEvent(new Event('input'))
     } else {
+      expect(input.checked).toBe(false)
       input.checked = false
       input.dispatchEvent(new Event('change'))
     }
@@ -298,6 +300,74 @@ it.each(['number', 'boolean'] as const)(
     const event = new Event('beforeunload', { cancelable: true })
     window.dispatchEvent(event)
     expect(event.defaultPrevented).toBe(true)
+  },
+)
+it('requires an explicit choice for a single-option write-only update select', async () => {
+  const root = mount(Form, {
+    resource: {
+      ...resource,
+      fields: [
+        {
+          key: 'secret',
+          label: 'Secret',
+          type: 'select',
+          read: false,
+          create: true,
+          update: true,
+          required: true,
+          options: [{ value: 'only', label: 'Only option' }],
+        },
+      ],
+    },
+    mode: 'update',
+    values: {},
+    record: { id: 'a', revision: '1', data: {} },
+  })
+  const select = root.querySelector<HTMLSelectElement>('[name=secret]')!
+  expect(select.value).toBe('')
+  expect(select.options[0]!.disabled).toBe(true)
+  expect(select.checkValidity()).toBe(false)
+  const submit = () =>
+    root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }))
+  submit()
+  expect(mocks.put.mock.calls.at(-1)?.[1]).not.toHaveProperty('secret')
+  select.value = 'only'
+  select.dispatchEvent(new Event('change'))
+  await nextTick()
+  expect(select.checkValidity()).toBe(true)
+  submit()
+  expect(mocks.put.mock.calls.at(-1)?.[1]).toEqual({ secret: 'only', _revision: '1' })
+  const event = new Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(event)
+  expect(event.defaultPrevented).toBe(true)
+})
+it.each(['create', 'update'] as const)(
+  'preserves populated required select values in %s forms',
+  (mode) => {
+    const root = mount(Form, {
+      resource: {
+        ...resource,
+        fields: [
+          {
+            key: 'choice',
+            label: 'Choice',
+            type: 'select',
+            read: true,
+            create: true,
+            update: true,
+            required: true,
+            options: [{ value: 'only', label: 'Only option' }],
+          },
+        ],
+      },
+      mode,
+      values: mode === 'create' ? {} : { choice: 'only' },
+      record: mode === 'update' ? { id: 'a', revision: '1', data: {} } : undefined,
+    })
+    const select = root.querySelector<HTMLSelectElement>('[name=choice]')!
+    expect(select.value).toBe('only')
+    expect(select.checkValidity()).toBe(true)
+    expect(select.options).toHaveLength(1)
   },
 )
 it('binds localized dates to scalar ISO values with accessible server errors', async () => {

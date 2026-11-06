@@ -11,6 +11,7 @@ export type BrandingRecovery = {
   name: string
   accentColor: string
   accentColorEnd?: string
+  accentMode?: 'solid' | 'gradient'
   conflict?: boolean
   baseline: { name: string; accentColor: string; accentColorEnd?: string }
   logoLight?: ''
@@ -104,6 +105,7 @@ export function takeBrandingRecovery(owner: string): BrandingRecovery | undefine
     // Old drafts have a solid accent. Draft text may be incomplete; validate it
     // on Apply, preserving both endpoints and unrelated edits during recovery.
     item.accentColorEnd ??= ''
+    item.accentMode ??= item.accentColorEnd ? 'gradient' : 'solid'
     item.baseline.accentColorEnd ??= ''
     const validPair = (start: string, end: unknown) =>
       typeof end === 'string' &&
@@ -111,6 +113,8 @@ export function takeBrandingRecovery(owner: string): BrandingRecovery | undefine
       (end === '' || (start !== '' && /^#[\da-f]{6}$/i.test(end)))
     if (
       typeof item.accentColorEnd !== 'string' ||
+      !['solid', 'gradient'].includes(item.accentMode) ||
+      (item.accentMode === 'solid' && item.accentColorEnd !== '') ||
       !validPair(item.baseline.accentColor, item.baseline.accentColorEnd)
     )
       return
