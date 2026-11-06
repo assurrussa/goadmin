@@ -334,6 +334,87 @@ describe('DataGridFilters passing contracts', () => {
     await input(count, '0')
     expect(onFilterChange.mock.calls).toEqual([[{ name: 'Ada' }], [{ count: 0 }]])
   })
+  it.each(['toString', 'valueOf'])(
+    'keeps the %s text filter empty after initial and cleared server responses',
+    async (key) => {
+      vi.useFakeTimers()
+      const data = (filters: Record<string, string>) =>
+        fixture({
+          data: [row('r', { item: { id: 'r', [key]: 'Record value' }, actions: [] })],
+          config: config({ columns: [column(key, { type: 'text', filterable: true })] }),
+          meta: {
+            title: 'Audit title',
+            description: 'Audit description',
+            pagination: page(),
+            filters,
+          },
+        })
+      const { element, warnings } = grid(data({}))
+      await settle()
+      const control = element.querySelector<HTMLInputElement>(`#filter-${key}`)!
+      expect(control.value).toBe('')
+      fetchMock.mockResolvedValueOnce(response(data({ [key]: 'Chosen value' })))
+      await input(control, 'Chosen value')
+      await vi.advanceTimersByTimeAsync(300)
+      await settle()
+      expect(query().get(key)).toBe('Chosen value')
+      expect(control.value).toBe('Chosen value')
+
+      fetchMock.mockResolvedValueOnce(response(data({})))
+      button(element, 'Очистить все').click()
+      await vi.advanceTimersByTimeAsync(300)
+      await settle()
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(query(1).has(key)).toBe(false)
+      expect(control.value).toBe('')
+      expect(warnings).toEqual([])
+    },
+  )
+  it.each(['toString', 'valueOf'])(
+    'keeps the %s select filter reactive without inherited values',
+    async (key) => {
+      const filters = reactive<Record<string, unknown>>(Object.create({ [key]: 'chosen' }))
+      const onFilterChange = vi.fn((patch: Record<string, unknown>) =>
+        Object.assign(filters, patch),
+      )
+      const { element, props, warnings } = mount(DataGridFilters, {
+        filterableColumns: [
+          column(key, {
+            type: 'select',
+            placeholder: 'Choose value',
+            options: [
+              { value: 'chosen', label: 'Chosen value' },
+              { value: 0, label: 'Zero value' },
+            ],
+          }),
+        ],
+        filters,
+        onFilterChange,
+      })
+      await settle()
+      const trigger = element.querySelector<HTMLElement>('[role="combobox"]')!
+      expect(text(trigger)).toBe('Choose value')
+      trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      await settle()
+      const option = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]')).find(
+        (item) => text(item) === 'Chosen value',
+      )!
+      option.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      await settle()
+      expect(onFilterChange.mock.calls).toEqual([[{ [key]: 'chosen' }]])
+      expect(text(trigger)).toBe('Chosen value')
+      filters[key] = 0
+      await settle()
+      expect(text(trigger)).toBe('Zero value')
+      button(element, 'Очистить все').click()
+      await settle()
+      expect(text(trigger)).toBe('Choose value')
+      props.filters = {}
+      await settle()
+      expect(text(trigger)).toBe('Choose value')
+      expect(warnings).toEqual([])
+    },
+  )
   it('displays 0 and false as active filters and clears configured columns with empty strings', () => {
     const onFilterChange = vi.fn()
     const { element } = mount(DataGridFilters, {

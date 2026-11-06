@@ -1,5 +1,29 @@
 # Implementation Notes
 
+## PR 85 inherited filter values (2026-11-06)
+
+Base `7d4a500`, same branch and checkout. Empty text filters with legal field
+names such as `toString` and `valueOf` rendered inherited function source.
+Select filters also accepted inherited values rather than only the filters
+owned by the current query. Share an own-property value reader across both
+controls, retaining reactive key tracking before the ownership check.
+No field-name restrictions or public API, schema or dependency changes.
+
+Regressions reproduce both control failures before the fix. Text tests exercise
+the actual grid request and clear/empty-server-response cycle; select tests
+exercise the real menu, in-place updates, zero and clearing. The 113 focused
+tests pass, and independent source review found no actionable issue.
+
+All `make check` component gates pass: its Go stages completed tidy/format,
+vet, lint and full race/coverage; final `make resources` passed 144 contract
+checks, 1,208 UI tests, types, lint/format and the embedded asset build.
+The initial full invocation caught missing required metadata in the new test
+fixture; after fixing its type, the complete resource gate passed. Embedded
+assets are rebuilt; the CRUD renderer fingerprint is unchanged.
+`make externalconsumer-local` passes. The full browser matrix and PostgreSQL
+integration test were not repeated for this filter correction. Retained test
+applications and their data are unchanged.
+
 ## PR 85 export-filter collision correction (2026-11-06)
 
 Base `048fb87`, same branch and checkout. Filterable fields named `scope` or
