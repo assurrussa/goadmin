@@ -213,6 +213,16 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   // to Show, Edit, successful saves and the explicit conflict reload.
   await page.goto(list)
   await ready()
+  const rowActions = page.locator('[data-part="table"] tbody')
+  await language(page, 'Русский', 'ru')
+  for (const label of ['Просмотр', 'Редактировать', 'Удалить']) {
+    await expect(rowActions.getByRole('button', { name: label, exact: true })).toHaveAttribute('title', label)
+  }
+  await language(page, 'English', 'en')
+  for (const label of ['View', 'Edit', 'Delete']) {
+    await expect(rowActions.getByRole('button', { name: label, exact: true })).toHaveAttribute('title', label)
+  }
+  report.rowActionLocales = ['ru', 'en']
   const listURL = new URL(page.url())
   const returnTo = listURL.pathname + listURL.search
   await page.locator('[data-part="table"] tbody').getByRole('button', { name: 'View', exact: true }).click()

@@ -43,7 +43,9 @@ Optional selects accept the blank option; nullable pointer fields also accept
 null. The server applies these checks to requests and readable callback output.
 `FieldErrors` contains safe messages only; other errors are sanitized and logged.
 Detail pages preserve record text literally. Only declared option labels and
-boolean UI labels are translated; a nullable boolean remains distinct from false.
+boolean UI labels are translated. Lists and detail pages display an absent boolean
+as an em dash, distinct from false. Standard row actions and their tooltips follow
+the current UI language; custom labels without a registered translation stay literal.
 
 Single-record `Actions` declare a key, permission, confirmation and callback.
 They receive ID and expected revision, with no additional input body. `Authorize`

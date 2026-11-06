@@ -2,10 +2,10 @@
 
 ## CRUD SDK and gradient accents (2026-11-06)
 
-Base: `181328c`; implementation began on `tasks/crud-sdk-gradient` and is
-checkpointed on `tasks/crud-sdk-gradient-review-20261106` in the same checkout,
-without a worktree. The post-checkpoint audit checks the accepted scope below;
-any confirmed defects receive separate fixes and matching validation.
+Base: `181328c`; implementation began on `tasks/crud-sdk-gradient` and was
+checkpointed as `102310e` on `tasks/crud-sdk-gradient-review-20261106` in the same
+checkout, without a worktree. The post-checkpoint audit is complete; confirmed
+defects were repaired separately and the final validation below passed.
 Accepted: declarative Go resources with embedded list/show/create/edit pages,
 typed application callbacks, exact string IDs and mandatory revision fencing,
 record authorization, single-record commands, existing personal table workflows
@@ -38,7 +38,7 @@ presets; primary/ring/status tokens and saved HEX stops are unchanged. Active
 settings tabs share the navigation treatment. Independent final review is clear.
 The renderer fingerprint and embedded assets were regenerated together.
 
-Final verification: the Go portion of `make check` passed tidy/format/vet/lint
+Before the checkpoint, the Go portion of `make check` passed tidy/format/vet/lint
 and full race/coverage. Its resource stage encountered one HTTP parser failure
 in the unchanged Vite image-assets test. The isolated test rerun passed; the
 subsequent complete `make resources` passed 143 manifest checks, 1,104 UI tests,
@@ -69,6 +69,35 @@ Earlier failed attempts remain separate diagnostics. No accepted implementation
 item remains deferred beyond explicit v1 exclusions. Source, documentation and
 embedded assets are included in the checkpoint; local browser artifacts remain
 outside Git. No publication or deployment was performed.
+
+Post-checkpoint audit: nullable boolean table cells now show an em dash without
+a false status icon, including an explicit computed null overriding the row value.
+Standard CRUD row actions use the existing translation keys and their tooltips/
+accessible names follow RU/EN. Unregistered custom labels remain literal. Four
+mounted locale regressions cover these cases; native CRUD acceptance switches
+locales and checks the actual row action names and tooltips in both packs.
+
+The earlier Vite test failure was reproduced by delaying a file stream's EOF:
+the client had received Content-Length bytes, but an in-place fixture rewrite
+could feed extra bytes into the previous response. The fixture now atomically
+replaces the file. The controlled delayed-stream check failed before this fix
+and passed afterward; all eight ordinary image-assets tests also passed.
+Production Vite serving behavior is unchanged.
+
+Final post-checkpoint verification: complete `make check` passed, including Go
+race/coverage, 143 manifest checks, 1,108 UI tests, lint, types and asset build.
+`make externalconsumer-local` and `make starter-smoke-test` passed. Native
+Chromium contrast again passed all 64 cases at a minimum of 5.343:1; its recorded
+CSS hash matches the final bundle. Independent review of the SDK and the focused
+follow-up diff found no remaining issues.
+
+Fresh full browser run `20261106t045813z-0660a0e6` passed all 12 scenario groups
+for each pack, including the new RU/EN action assertions, with no page/console
+or diagnostic errors. This run used the same checksum-preserving read-only cache
+proxy described above; both source builds and screenshots were checked. Owned
+containers/volumes and the temporary proxy were removed. The unchanged storage
+code retains the PostgreSQL race evidence recorded above. No push, publication
+or deployment was performed.
 
 ## Appearance and personalization (2026-10-31)
 
