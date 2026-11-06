@@ -1,5 +1,46 @@
 # Implementation Notes
 
+## Shared confirmation viewport and accessibility (2026-11-06)
+
+Base: `34af3a1`, same branch and checkout. Restrict this follow-up to the shared
+action confirmation: viewport-bounded height with internal scrolling and 8px
+button spacing on mobile. Keep the current unsaved-navigation/browser-unload
+contract. No public API, dependency, permission or storage changes.
+
+Add close-button/ARIA and sequential-focus regressions; verify the actual shipped
+dialog in both packs, RU/EN, light/dark, narrow/short viewports and real browser
+zoom 200%. Long confirmation prose is a test-only alteration of a genuine
+Inertia action descriptor, not a production hook or a real command result.
+Regenerate the CRUD renderer fingerprint and assets, run the repository gate,
+clean consumer and full browser acceptance, and independently review the diff.
+Upgrade only retained application images after backups and verify data/session
+preservation; keep their PostgreSQL services and volumes.
+
+The new ARIA regression and compiled-browser checks reproduced an existing
+wrapper defect: non-prop attributes were lost at DialogPortal/Teleport. Explicit
+attribute forwarding to the inner Reka DialogContent now carries the shared
+dialog's `aria-modal` while preserving declared props/emits and class merging.
+The amended independent review and all 23 focused confirmation/CRUD tests pass.
+Sequential-dialog focus already passes; no controller behavior change is needed.
+
+Complete. Final `make check` passes the Go race/coverage gate, 144 resource
+contract checks, 1,186 UI tests, types, lint, formatting and embedded asset build.
+Clean local consumer and smoke-tool tests pass. Native CSS paint passes 64 cases
+with minimum contrast 5.072:1. Full acceptance `20261106t122907z-fcc85983` passes
+all 12 groups per pack on fresh databases using the immutable source images from
+`20261106t122139z-ddbb2d39`. Exact image-ID diagnostics are clean. Each pack also
+passes the final 20-case confirmation matrix with RU/EN, light/dark, four viewport
+sizes and actual browser zoom 200%; no page/console errors or command requests.
+Outside-click tests wait for the real entry animation and paint, with a rejecting
+five-second deadline. Native-zoom screenshots use the compositor without a clip
+because Playwright's normal capture crops zoomed output. Mobile/zoom screenshots
+were inspected. Independent review findings are resolved.
+
+Retained run `20261106t060043z-395904ab` is upgraded with fresh private backups;
+Products, branding and preference table hashes are unchanged. Existing native
+sessions still authenticate and open Products, settings and the mobile calendar.
+Only application images were replaced; PostgreSQL services and volumes remain.
+
 ## Theme/confirmation completion audit (2026-11-06)
 
 Base: `7226909`, same branch and checkout. Recheck the three-state theme button

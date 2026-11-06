@@ -3,9 +3,11 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { parseCSV } from './table-workflow.mjs'
 import { appearanceGeometry } from './appearance-visual.mjs'
+import { confirmationAcceptance } from './confirmation.mjs'
 
 // Runs only inside run.mjs's authenticated, isolated starter case. All records
-// are created through the public host resource; no fixture SQL or route mocks.
+// are created through the public host resource. The confirmation matrix only
+// transforms prose in a real Show response; CRUD writes remain genuine.
 export async function crudAcceptance({ page, context, config, folder, name, expect, language, result }) {
   await language(page, 'English', 'en')
   const prefix = `crud-smoke-${name}-${Date.now()}`
@@ -140,6 +142,7 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
     await dialog.locator('[data-confirmation-accept]').click()
     await expect(dialog).toHaveCount(0)
   }
+  await confirmationAcceptance({ page, context, config, folder, name, expect, language, result, recordPath, prefix })
   const [published] = await Promise.all([
     page.waitForResponse(response => new URL(response.url()).pathname === `${recordPath}/actions/publish` && response.request().method() === 'POST'),
     confirmCommand('Publish', 'Publish this product?'),
