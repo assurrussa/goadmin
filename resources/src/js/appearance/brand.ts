@@ -1,6 +1,7 @@
 export interface Brand {
   version: number
   name: string
+  accentColorEnd?: string
   accentColor: string
   logoLightUrl: string
   logoDarkUrl: string
@@ -9,6 +10,7 @@ export const emptyBrand: Brand = {
   version: 0,
   name: '',
   accentColor: '',
+  accentColorEnd: '',
   logoLightUrl: '',
   logoDarkUrl: '',
 }
@@ -30,6 +32,10 @@ export function readBrand(value: unknown): Brand {
     version: Number.isSafeInteger(item.version) ? item.version : 0,
     name: typeof item.name === 'string' ? item.name : '',
     accentColor: /^#[\da-f]{6}$/i.test(item.accentColor) ? item.accentColor : '',
+    accentColorEnd:
+      /^#[\da-f]{6}$/i.test(item.accentColor) && /^#[\da-f]{6}$/i.test(item.accentColorEnd || '')
+        ? item.accentColorEnd
+        : '',
     logoLightUrl: safeLogo(item.logoLightUrl),
     logoDarkUrl: safeLogo(item.logoDarkUrl),
   }
@@ -112,6 +118,22 @@ function packPalette(dark: boolean, fallback = true): Record<string, string> {
 export function themePrimaryHex(dark: boolean): string | undefined {
   const color = packPalette(dark, false)['--color-primary']
   if (!color) return undefined
+  const rgb = resolveRGB(color)
+  return rgb
+    ? `#${rgb.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`
+    : undefined
+}
+function resolveRGB(color: string): number[] | undefined {
+  // Computed style resolves ordinary HEX/HSL without requiring canvas (also in
+  // DOM-only tests). Canvas is the fallback for modern color spaces.
+  const probe = document.createElement('span')
+  probe.style.color = color
+  if (!probe.style.color) return undefined
+  document.body.append(probe)
+  const computed = getComputedStyle(probe).color
+  probe.remove()
+  const rgb = computed.match(/^rgb\(\s*([\d.]+)[, ]+([\d.]+)[, ]+([\d.]+)\s*\)$/)
+  if (rgb) return rgb.slice(1).map(Number)
   const canvas = document.createElement('canvas')
   canvas.width = canvas.height = 1
   const context = canvas.getContext('2d', { willReadFrequently: true })
@@ -128,11 +150,56 @@ export function themePrimaryHex(dark: boolean): string | undefined {
   context.fillRect(0, 0, 1, 1)
   const [r, g, b, a] = context.getImageData(0, 0, 1, 1).data
   if (a !== 255) return undefined
-  return `#${[r, g, b].map((v) => v!.toString(16).padStart(2, '0')).join('')}`
+  return [r!, g!, b!]
+}
+function selectionForeground(rgb: number[], dark: boolean, endChannels?: number[]): string {
+  // Navigation already has a 10% primary background; the gradient adds another
+  // 10% layer; hover can replace the base tint with a plain surface. Bound the
+  // final sRGB background with two intensity levels of rounding slack. The
+  // built-in card, page and hover surfaces have light channels >=230 and dark
+  // channels <=60. Dark luminance is convex along the gradient,
+  // so its maximum is at an endpoint. For light mode the componentwise minimum
+  // gives a conservative lower bound even for opposing-hue interior minima.
+  const surface = dark ? 60 : 230
+  const selectionBases = [
+    rgb.map((channel) => channel * 0.1 + surface * 0.9),
+    [surface, surface, surface],
+  ]
+  const selectionStops = endChannels
+    ? [rgb, endChannels].flatMap((stop) =>
+        selectionBases.map((base) => stop.map((channel, i) => channel * 0.1 + base[i]! * 0.9)),
+      )
+    : selectionBases
+  const selectionBackground = dark
+    ? Math.max(...selectionStops.map((stop) => luminance(stop.map((v) => Math.min(255, v + 2)))))
+    : luminance(
+        rgb.map((_, i) => Math.max(0, Math.min(...selectionStops.map((stop) => stop[i]!)) - 2)),
+      )
+  let selectionText = [...rgb]
+  while (
+    (Math.max(luminance(selectionText), selectionBackground) + 0.05) /
+      (Math.min(luminance(selectionText), selectionBackground) + 0.05) <
+    4.55
+  ) {
+    selectionText = selectionText.map((v) => (dark ? Math.min(255, v + 1) : Math.max(0, v - 1)))
+  }
+  return `rgb(${selectionText.map(Math.round).join(' ')})`
 }
 /** Maintain AA contrast for accent text and filled controls, including pale custom accents. */
-export function deriveBrandPalette(hex: string, dark: boolean): Record<string, string> {
-  if (!/^#[\da-f]{6}$/i.test(hex)) return packPalette(dark)
+export function deriveBrandPalette(hex: string, dark: boolean, end = ''): Record<string, string> {
+  if (!/^#[\da-f]{6}$/i.test(hex)) {
+    const palette = packPalette(dark)
+    const rgb = resolveRGB(palette['--color-primary']!)
+    return {
+      ...palette,
+      '--goadmin-primary-image': 'none',
+      '--goadmin-selection-image': 'none',
+      '--goadmin-selection-foreground': rgb
+        ? selectionForeground(rgb, dark)
+        : palette['--color-primary']!,
+      '--goadmin-primary-fill-foreground': palette['--color-primary-contrast']!,
+    }
+  }
   let rgb = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
   const background = dark ? 0.033 : 1
   for (let i = 0; i < 100; i++) {
@@ -142,7 +209,34 @@ export function deriveBrandPalette(hex: string, dark: boolean): Record<string, s
   }
   const color = `rgb(${rgb.map(Math.round).join(' ')})`
   const foreground = luminance(rgb) > 0.179 ? '#000000' : '#ffffff'
+  // sRGB luminance is convex: every interpolated point is at most the
+  // brighter endpoint. White therefore meets the target across the whole fill,
+  // including opposing hues whose midpoint is easy to miss with endpoint tests.
+  const fill = (value: string) => {
+    let channels = [1, 3, 5].map((i) => parseInt(value.slice(i, i + 2), 16))
+    while (luminance(channels) > 0.16) channels = channels.map((v) => Math.max(0, v - 1))
+    return channels
+  }
+  const gradient = /^#[\da-f]{6}$/i.test(end)
+  const startChannels = gradient ? fill(hex) : rgb
+  const endChannels = gradient ? fill(end) : rgb
+  const startFill = `rgb(${startChannels.join(' ')})`
+  const endFill = `rgb(${endChannels.join(' ')})`
   return {
+    '--goadmin-primary-image': gradient
+      ? `linear-gradient(135deg in srgb, ${startFill}, ${endFill})`
+      : 'none',
+    '--goadmin-primary-fill-start': startFill,
+    '--goadmin-primary-fill-end': endFill,
+    '--goadmin-primary-fill-foreground': gradient ? '#ffffff' : foreground,
+    '--goadmin-selection-image': gradient
+      ? `linear-gradient(135deg in srgb, color-mix(in srgb, ${color} 10%, transparent), color-mix(in srgb, ${endFill} 10%, transparent))`
+      : 'none',
+    '--goadmin-selection-foreground': selectionForeground(
+      rgb,
+      dark,
+      gradient ? endChannels : undefined,
+    ),
     '--color-primary': color,
     '--color-primary-dark': color,
     '--color-primary-light': color,
@@ -162,7 +256,13 @@ let applied: string[] = []
 export function applyBrand(brand: Brand, dark: boolean) {
   applied.forEach((key) => document.documentElement.style.removeProperty(key))
   // An unset live accent must retain the selected CSS theme pack.
-  const palette = brand.accentColor ? deriveBrandPalette(brand.accentColor, dark) : {}
+  const palette = brand.accentColor
+    ? deriveBrandPalette(brand.accentColor, dark, brand.accentColorEnd)
+    : {
+        '--goadmin-selection-foreground': deriveBrandPalette('', dark)[
+          '--goadmin-selection-foreground'
+        ]!,
+      }
   applied = Object.keys(palette)
   Object.entries(palette).forEach(([key, value]) =>
     document.documentElement.style.setProperty(key, value),

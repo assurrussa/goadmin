@@ -142,7 +142,7 @@ class IsolationTests(unittest.TestCase):
         config = smoke.spec('goadmin-smoke-test', '18768', '', Path('/candidate-snapshot'))
         self.assertEqual(set(config['services']), {'admin', 'postgres'})
         admin = config['services']['admin']
-        self.assertEqual(admin['environment']['ADMIN_MODULES'], 'users,access,jobs,uploads,queues,notifications,realtime')
+        self.assertEqual(admin['environment']['ADMIN_MODULES'], 'users,access,jobs,uploads,queues,notifications,realtime,products')
         self.assertEqual(admin['build']['args']['STARTER_BUILD_TAGS'], 'starter_smoke')
         self.assertEqual(admin['ports'], ['127.0.0.1:18768:8080'])
         self.assertEqual(config['volumes'], {'postgres_data': {}, 'uploads': {}})

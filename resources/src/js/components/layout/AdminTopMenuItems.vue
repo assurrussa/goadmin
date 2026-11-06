@@ -20,7 +20,9 @@ const { isActive } = useAdminNavigation()
         <DropdownMenuItem v-if="item.href" as-child>
           <Link
             :href="item.href"
-            :class="isActive(item.href) ? 'bg-primary/10 text-primary' : undefined"
+            :class="
+              isActive(item.href) ? 'goadmin-selection-fill bg-primary/10 text-primary' : undefined
+            "
             :aria-current="isActive(item.href) ? 'page' : undefined"
             >{{ t(item.name) }}</Link
           >
@@ -31,7 +33,9 @@ const { isActive } = useAdminNavigation()
     <DropdownMenuItem v-else-if="item.href" as-child>
       <Link
         :href="item.href"
-        :class="isActive(item.href) ? 'bg-primary/10 text-primary' : undefined"
+        :class="
+          isActive(item.href) ? 'goadmin-selection-fill bg-primary/10 text-primary' : undefined
+        "
         :aria-current="isActive(item.href) ? 'page' : undefined"
         >{{ t(item.name) }}</Link
       >

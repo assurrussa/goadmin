@@ -16,3 +16,4 @@ cover.html
 __pycache__/
 *.py[cod]
 output/playwright/starter-smoke/
+output/playwright/selection-contrast*.json

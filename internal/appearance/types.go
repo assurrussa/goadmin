@@ -53,17 +53,19 @@ func (p PersonalPayload) Validate() error {
 }
 
 type PublicBranding struct {
-	Version      int64  `json:"version"`
-	Name         string `json:"name"`
-	AccentColor  string `json:"accentColor"`
-	LogoLightURL string `json:"logoLightUrl"`
-	LogoDarkURL  string `json:"logoDarkUrl"`
+	Version        int64  `json:"version"`
+	Name           string `json:"name"`
+	AccentColor    string `json:"accentColor"`
+	AccentColorEnd string `json:"accentColorEnd"`
+	LogoLightURL   string `json:"logoLightUrl"`
+	LogoDarkURL    string `json:"logoDarkUrl"`
 }
 type BrandingPayload struct {
-	Name         string `json:"name"`
-	AccentColor  string `json:"accentColor"`
-	LogoLightURL string `json:"logoLightUrl"`
-	LogoDarkURL  string `json:"logoDarkUrl"`
+	Name           string `json:"name"`
+	AccentColor    string `json:"accentColor"`
+	AccentColorEnd string `json:"accentColorEnd"`
+	LogoLightURL   string `json:"logoLightUrl"`
+	LogoDarkURL    string `json:"logoDarkUrl"`
 }
 type BrandingDocument struct {
 	Version int64           `json:"version"`
@@ -71,25 +73,27 @@ type BrandingDocument struct {
 	Pending bool            `json:"pending,omitempty"`
 }
 type SaveBrandingRequest struct {
-	Version     int64   `json:"version"`
-	Name        string  `json:"name"`
-	AccentColor string  `json:"accentColor"`
-	LogoLight   *string `json:"logoLight,omitempty"`
-	LogoDark    *string `json:"logoDark,omitempty"`
-	Reset       bool    `json:"reset,omitempty"`
+	Version        int64   `json:"version"`
+	Name           string  `json:"name"`
+	AccentColor    string  `json:"accentColor"`
+	AccentColorEnd *string `json:"accentColorEnd,omitempty"`
+	LogoLight      *string `json:"logoLight,omitempty"`
+	LogoDark       *string `json:"logoDark,omitempty"`
+	Reset          bool    `json:"reset,omitempty"`
 }
 
 // Snapshot stores image bytes as immutable strings, safe across shallow RCU copies.
 type Snapshot struct {
-	Version     int64  `db:"version"`
-	Name        string `db:"name"`
-	AccentColor string `db:"accent_color"`
-	LogoLight   string `db:"logo_light"`
-	LogoDark    string `db:"logo_dark"`
+	Version        int64  `db:"version"`
+	Name           string `db:"name"`
+	AccentColor    string `db:"accent_color"`
+	AccentColorEnd string `db:"accent_color_end"`
+	LogoLight      string `db:"logo_light"`
+	LogoDark       string `db:"logo_dark"`
 }
 
 func (s Snapshot) Public() PublicBranding {
-	p := PublicBranding{Version: s.Version, Name: s.Name, AccentColor: s.AccentColor}
+	p := PublicBranding{Version: s.Version, Name: s.Name, AccentColor: s.AccentColor, AccentColorEnd: s.AccentColorEnd}
 	if s.LogoLight != "" {
 		p.LogoLightURL = fmt.Sprintf("/public/branding/light?v=%d", s.Version)
 	}
@@ -101,7 +105,10 @@ func (s Snapshot) Public() PublicBranding {
 
 func (s Snapshot) Document() BrandingDocument {
 	p := s.Public()
-	return BrandingDocument{Version: p.Version, Payload: BrandingPayload{p.Name, p.AccentColor, p.LogoLightURL, p.LogoDarkURL}}
+	return BrandingDocument{Version: p.Version, Payload: BrandingPayload{
+		Name: p.Name, AccentColor: p.AccentColor, AccentColorEnd: p.AccentColorEnd,
+		LogoLightURL: p.LogoLightURL, LogoDarkURL: p.LogoDarkURL,
+	}}
 }
 
 var accentPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
@@ -119,6 +126,15 @@ func (r SaveBrandingRequest) apply(old Snapshot) (Snapshot, error) {
 		strings.IndexFunc(r.Name, unicode.IsControl) >= 0 ||
 		(r.AccentColor != "" && !accentPattern.MatchString(r.AccentColor)) {
 		return Snapshot{}, ErrInvalid
+	}
+	if r.AccentColorEnd != nil {
+		if *r.AccentColorEnd != "" && (!accentPattern.MatchString(*r.AccentColorEnd) || r.AccentColor == "") {
+			return Snapshot{}, ErrInvalid
+		}
+		old.AccentColorEnd = strings.ToUpper(*r.AccentColorEnd)
+	}
+	if r.AccentColor == "" {
+		old.AccentColorEnd = ""
 	}
 	old.Name = strings.TrimSpace(r.Name)
 	old.AccentColor = strings.ToUpper(r.AccentColor)

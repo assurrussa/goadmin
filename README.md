@@ -186,6 +186,7 @@ must not rewrite another namespace into `/public` after compression selection.
 - `github.com/assurrussa/goadmin/features/notifications`
 - `github.com/assurrussa/goadmin/features/realtime`
 - `github.com/assurrussa/goadmin/features/authmail`
+- `github.com/assurrussa/goadmin/features/crud`
 - `github.com/assurrussa/goadmin/features/users`
 - `github.com/assurrussa/goadmin/toolkit/datagrid` ([guide and runnable example](toolkit/datagrid/README.md))
 - `github.com/assurrussa/goadmin/toolkit/formvalidator`

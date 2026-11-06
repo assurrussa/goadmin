@@ -76,7 +76,7 @@
         {{
           searchQuery || hasActiveFilters
             ? t('Измените поиск или фильтры и попробуйте снова.')
-            : config.ui?.emptyMessage || t('Нет данных для отображения')
+            : t(config.ui?.emptyMessage || 'Нет данных для отображения')
         }}
       </p>
       <AppButton
@@ -84,7 +84,7 @@
         @click="handleCreate"
       >
         <Plus class="-ml-1 mr-2 h-4 w-4" />
-        {{ config.ui?.createButtonText || t('Создать') }}
+        {{ t(config.ui?.createButtonText || 'Создать') }}
       </AppButton>
     </div>
 

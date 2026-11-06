@@ -9,6 +9,7 @@ import { waitForPaint } from './paint.mjs'
 import { dashboardAcceptance } from './dashboard.mjs'
 import { tableWorkflowAcceptance } from './table-workflow.mjs'
 import { appearanceAcceptance } from './appearance.mjs'
+import { crudAcceptance } from './crud.mjs'
 
 const expect = baseExpect.configure({ timeout: 20000 })
 
@@ -431,6 +432,8 @@ async function runCase(name, config) {
     await logout(page)
     await login(page, credentials.email, credentials.password)
     check('UI-created admin and queues:read role assignment; real restricted login, menu filtering, server 403 and logout protection')
+    await crudAcceptance({ page, context, config, folder, name, expect, language, result })
+    check('declarative CRUD: Products create/edit/show/delete, command, views/CSV, real CAS, repeated UI conflict/reload, return state and RU mobile')
     await tableWorkflowAcceptance({ page, context, config, credentials, ownedSQL, folder, name, expect, language, login, logout, result })
     check('table workflows: view CRUD/dirty/relogin, native CSRF/RBAC/preview/owner isolation, both CSV modes on six grids, cross-page cap100, real conflict, bulk results and server queue counters')
     await appearanceAcceptance({ page, context, browser, config, credentials, folder, name, expect, login, logout, result })

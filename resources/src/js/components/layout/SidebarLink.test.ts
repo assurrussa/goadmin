@@ -27,11 +27,14 @@ it.each([true, false])('keeps readable navigation and icon colors with active=%s
   const icon = root.querySelector('svg')!
   expect(link.getAttribute('href')).toBe('/students')
   if (active) {
-    for (const element of [link, icon]) {
-      expect(element.classList.contains('text-primary-dark')).toBe(true)
-      expect(element.classList.contains('dark:text-primary-light')).toBe(true)
-      expect(element.classList.contains('text-primary')).toBe(false)
-    }
+    expect(link.classList.contains('goadmin-selection-fill')).toBe(true)
+    expect(link.classList.contains('text-primary-dark')).toBe(true)
+    expect(link.classList.contains('dark:text-primary-light')).toBe(true)
+    // The icon shares the contrast-adjusted active foreground instead of
+    // overriding it with the bare accent that assumes an untinted surface.
+    expect(icon.classList.contains('text-inherit')).toBe(true)
+    expect(icon.classList.contains('text-primary-dark')).toBe(false)
+    expect(icon.classList.contains('dark:text-primary-light')).toBe(false)
   } else {
     expect(link.classList.contains('text-text-secondary')).toBe(true)
     expect(icon.classList.contains('text-text-tertiary')).toBe(true)

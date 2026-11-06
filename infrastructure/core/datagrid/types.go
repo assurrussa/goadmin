@@ -144,13 +144,19 @@ type FilterConfig[T any] struct {
 	IDKey            string
 
 	// Функциональность
-	Creatable   bool // показывать кнопку создания
+	Creatable bool // показывать кнопку создания
+	// CanCreate is an optional request-local creation gate. It is ANDed with
+	// Creatable and the existing preview policy; nil preserves legacy behavior.
+	CanCreate   func(context.Context) bool
 	Exportable  bool // показывать кнопку экспорта
 	Refreshable bool // показывать кнопку обновления
 
 	// GoTempl шаблоны (опционально)
 	PageComponent  TemplateComponent[T]   // Функция для создания шаблона
 	ErrorComponent ErrorTemplateComponent // Функция для создания ошибки
+	// APIErrorComponent optionally handles data-load/decorator errors. The
+	// callback owns safe status/message serialization; nil retains generic 500.
+	APIErrorComponent func(fiber.Ctx, error) error
 }
 
 type (

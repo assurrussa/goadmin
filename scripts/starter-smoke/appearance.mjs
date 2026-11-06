@@ -122,6 +122,17 @@ export async function appearanceAcceptance({ page, context, browser, config, cre
     customPreviews = geometry.panels
     customContrast.push({ accent, panels: geometry.panels })
   }
+  await expect(page.locator('[aria-labelledby="branding-title"] input[type="color"]')).toHaveCount(2)
+  await page.getByLabel('Конечный цвет градиента', { exact: true }).fill('#fefefe')
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  const gradientPreview = await appearanceGeometry(page)
+  assert.deepEqual(gradientPreview.accent, baselineAccent, 'Gradient preview must remain isolated')
+  for (const panel of gradientPreview.panels) {
+    assert.ok(panel.button.image.includes('linear-gradient(135deg'), 'Preview must render a fixed-angle gradient')
+    assert.equal(panel.button.samples, 101)
+    assert.ok(panel.button.contrast >= 4.5, 'Every sampled point of the actual gradient must meet AA')
+  }
+  customPreviews = gradientPreview.panels
   const png = Buffer.from(await page.evaluate(() => {
     const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 32
     const c = canvas.getContext('2d'); c.fillStyle = '#7c3aed'; c.fillRect(0, 0, 64, 32)
@@ -141,6 +152,9 @@ export async function appearanceAcceptance({ page, context, browser, config, cre
   assert.notDeepEqual(expectedAccent(true), baselineAccent, 'Successful Apply must change the live palette')
   const branding = await get('/auth/branding')
   assert.equal(branding.payload.name, brandTitle)
+  assert.equal(branding.payload.accentColor, '#7C3AED')
+  assert.equal(branding.payload.accentColorEnd, '#FEFEFE')
+  assert.ok(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--goadmin-primary-image').includes('linear-gradient(135deg')), 'Apply must publish gradient fill tokens')
   await page.locator('[data-profile-menu-trigger]').click()
   await page.locator('[role="menu"] a[href="/auth/profile"]').click()
   await expect(page).toHaveURL(/\/auth\/profile$/)
@@ -238,7 +252,9 @@ export async function appearanceAcceptance({ page, context, browser, config, cre
     page.keyboard.press('Enter'),
   ])
   assert.equal(reset.status(), 200)
-  assert.equal((await get('/auth/branding')).payload.name, '')
+  const resetBrand = await get('/auth/branding')
+  assert.equal(resetBrand.payload.name, '')
+  assert.equal(resetBrand.payload.accentColorEnd, '')
   await appearanceVisualAcceptance({ browser, context, page, config, folder, name, expect, result, get, send })
   result.appearance = { crossBrowser: true, relogin: true, autosave: true, ownerIsolation: true,
     history: { appearance: true, branding: true }, longBrandMobile: true,

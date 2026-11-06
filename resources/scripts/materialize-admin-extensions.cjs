@@ -1,6 +1,7 @@
 const crypto = require('node:crypto')
 const fs = require('node:fs')
 const path = require('node:path')
+const { crudFingerprint } = require('./crud-contract.cjs')
 
 const CLIENT_BUNDLE_FORMAT_VERSION = 1
 const CLIENT_EXTENSION_API_VERSION = 1
@@ -69,7 +70,7 @@ const parseManifest = (manifestPath) => {
   }
 
   return manifest.extensions.map((raw) => {
-    if (!raw || typeof raw !== 'object' || !validKey(raw.key)) {
+    if (!raw || typeof raw !== 'object' || !validKey(raw.key) || raw.key === 'goadmin.crud') {
       throw new Error(`admin extension manifest ${absoluteManifestPath} contains an invalid key`)
     }
     if (raw.apiVersion !== CLIENT_EXTENSION_API_VERSION) {
@@ -229,6 +230,7 @@ const buildGeneratedModule = (entries, generatedRoot) => {
     const pageRoot = path.join(entry.sourceRoot, 'Pages')
     for (const file of listFiles(pageRoot).filter((value) => value.endsWith('.vue'))) {
       const pageKey = toPosix(path.relative(pageRoot, file)).replace(/\.vue$/, '')
+      if (pageKey.startsWith('crud/')) throw new Error('CRUD renderer pages are core-owned')
       if (pageOwners.has(pageKey)) {
         throw new Error(
           `duplicate admin page key ${pageKey}: ${pageOwners.get(pageKey)} and ${entry.key}`,
@@ -254,12 +256,12 @@ const buildGeneratedModule = (entries, generatedRoot) => {
 
   const bundleManifest = {
     formatVersion: CLIENT_BUNDLE_FORMAT_VERSION,
-    extensions: entries.map(({ key, apiVersion, fingerprint, requires }) => ({
+    extensions: [...entries.map(({ key, apiVersion, fingerprint, requires }) => ({
       key,
       apiVersion,
       fingerprint,
       ...(requires.length > 0 ? { requires } : {}),
-    })),
+    })), { key: 'goadmin.crud', apiVersion: 1, fingerprint: crudFingerprint() }],
   }
   const themeEntry = entries.find((entry) => entry.themeModule !== undefined)
   const selectedThemeModuleKey = themeEntry

@@ -60,6 +60,15 @@ INSERT INTO files (original_filename, filename, slug) VALUES ('sentinel.png', 's
 		requireTable(t, ctx, db, table)
 	}
 
+	// Additive gradient storage keeps existing installations solid by default.
+	var accentEnd string
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT accent_color_end FROM goadmin_branding WHERE singleton=true`).Scan(&accentEnd))
+	require.Empty(t, accentEnd)
+	var nullable, columnDefault string
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT is_nullable,column_default FROM information_schema.columns WHERE table_name='goadmin_branding' AND column_name='accent_color_end'`).Scan(&nullable, &columnDefault))
+	require.Equal(t, "NO", nullable)
+	require.Contains(t, columnDefault, "''")
+
 	var foreignKeys int
 	require.NoError(t, db.QueryRowContext(ctx, `
 SELECT count(*)

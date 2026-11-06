@@ -33,6 +33,15 @@ Use `app.Listen` in your application when you want a listening server.
   `PageComponent`, `ErrorComponent`, and flat flags such as `Creatable`,
   `Exportable`, `Refreshable` and `Selectable`. There is no `Behaviour`, `UI`
   or `InlineCreatable` configuration.
+- Optional `CanCreate(context.Context) bool` narrows `Creatable` for the current
+  request. Both must allow creation, alongside the existing role preview policy.
+  A nil callback preserves the static flag; the handler never mutates shared
+  configuration while evaluating a request. This controls metadata only: keep
+  create endpoints protected by current authorization.
+- Optional `APIErrorComponent(fiber.Ctx, error) error` handles repository and row
+  decoration failures from `HandleData`. The callback owns sanitized status and
+  message serialization. A nil callback retains the generic HTTP 500 response.
+  Query/body validation and page `ErrorComponent` behavior stay separate.
 - `RegisterRoutes(router, "/users")` registers `GET /users`, `GET /users/data`
   and `POST /users/data`. Use the same externally visible path in `RoutePath`
   for generated pagination URLs, accounting for any router-group prefix.

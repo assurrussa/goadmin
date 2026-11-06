@@ -39,6 +39,6 @@ test('branding composes with compact through verified opt-in manifests', (t) => 
   const generatedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'goadmin-brand-'))
   t.after(() => fs.rmSync(generatedRoot, { recursive: true, force: true }))
   const result = materializeAdminExtensions({ generatedRoot, manifestPaths: [path.resolve(root, '../theme-compact/extension.json'), manifestPath] })
-  assert.deepEqual(result.bundleManifest.extensions.map(e => e.key), ['example.brand-theme', 'example.compact-theme'])
-  assert.equal(materializeAdminExtensions({ generatedRoot, manifestPaths: [], legacyRoot: path.join(generatedRoot, 'absent') }).bundleManifest.extensions.length, 0)
+  assert.deepEqual(result.bundleManifest.extensions.map(e => e.key), ['example.brand-theme', 'example.compact-theme', 'goadmin.crud'])
+  assert.equal(materializeAdminExtensions({ generatedRoot, manifestPaths: [], legacyRoot: path.join(generatedRoot, 'absent') }).bundleManifest.extensions.length, 1)
 })

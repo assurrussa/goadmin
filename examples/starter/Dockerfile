@@ -6,6 +6,7 @@ COPY resources/ ./
 COPY views/ /src/views/
 # Resource contract tests inspect the matching server recovery implementation.
 COPY host/assisted_recovery.go /src/host/
+COPY features/crud/client_generated.go /src/features/crud/
 COPY bootstrap/server.go /src/bootstrap/
 COPY infrastructure/core/middlewares/browser-recovery.js /src/infrastructure/core/middlewares/
 COPY infrastructure/core/middlewares/browser-recovery.go /src/infrastructure/core/middlewares/

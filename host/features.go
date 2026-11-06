@@ -22,7 +22,9 @@ type FeatureDescriptor struct {
 	PermissionDefinitions []PermissionDefinition
 	ClientExtensions      []string
 	ClientRequirements    []ClientExtensionRequirement
-	Rebuild               RebuildBehavior
+	// ClientReferences require a shared extension without claiming unique ownership.
+	ClientReferences []ClientExtensionRequirement
+	Rebuild          RebuildBehavior
 }
 
 // Feature represents a host-mounted admin plugin that contributes menu and routes.
@@ -64,16 +66,17 @@ func (r Registry) Descriptors() []FeatureDescriptor {
 		descriptor.PermissionDefinitions = integrationroles.ClonePermissionDefinitions(descriptor.PermissionDefinitions)
 		descriptor.ClientExtensions = slices.Clone(descriptor.ClientExtensions)
 		descriptor.ClientRequirements = slices.Clone(descriptor.ClientRequirements)
+		descriptor.ClientReferences = slices.Clone(descriptor.ClientReferences)
 		descriptors = append(descriptors, descriptor)
 	}
 
 	return descriptors
 }
 
-// ClientExtensionRequirements returns validated, uniquely owned client modules.
+// ClientExtensionRequirements merges unique owners and compatible shared references.
 func (r Registry) ClientExtensionRequirements() ([]ClientExtensionRequirement, error) {
 	requirements := make([]ClientExtensionRequirement, 0, len(r.features))
-	seen := make(map[string]struct{})
+	seen := make(map[string]ClientExtensionRequirement)
 
 	for _, feature := range r.features {
 		for _, requirement := range feature.Descriptor().ClientRequirements {
@@ -91,11 +94,27 @@ func (r Registry) ClientExtensionRequirements() ([]ClientExtensionRequirement, e
 					requirement.Key,
 				)
 			}
-			seen[requirement.Key] = struct{}{}
+			seen[requirement.Key] = requirement
 			requirements = append(requirements, requirement)
 		}
 	}
 
+	// Resolve ownership first so references cannot hide duplicate owners.
+	for _, feature := range r.features {
+		for _, reference := range feature.Descriptor().ClientReferences {
+			if err := validateClientExtension(reference.Key, reference.APIVersion, reference.Fingerprint); err != nil {
+				return nil, err
+			}
+			if previous, exists := seen[reference.Key]; exists {
+				if previous != reference {
+					return nil, fmt.Errorf("%w: incompatible shared extension %q", ErrInvalidClientBundle, reference.Key)
+				}
+				continue
+			}
+			seen[reference.Key] = reference
+			requirements = append(requirements, reference)
+		}
+	}
 	return requirements, nil
 }
 

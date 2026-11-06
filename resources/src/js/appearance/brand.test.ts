@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest'
-import { deriveBrandPalette, themePrimaryHex } from './brand'
+import { applyBrand, deriveBrandPalette, emptyBrand, themePrimaryHex } from './brand'
 
 function luminance(color: string) {
   const element = document.createElement('span')
@@ -30,6 +30,75 @@ it.each([false, true])(
   },
 )
 
+it.each([
+  ['default', 'hsl(217 69% 46%)', 'hsl(217 69% 74%)'],
+  ['topbar', 'hsl(174 78% 26%)', 'hsl(174 66% 70%)'],
+])(
+  'keeps unset %s pack highlights readable without overriding host colors',
+  (pack, light, dark) => {
+    const root = document.documentElement
+    const attributes = ['style', 'class', 'data-admin-theme', 'data-theme-mode'].map(
+      (name) => [name, root.getAttribute(name)] as const,
+    )
+    const sheet = document.createElement('style')
+    sheet.textContent = `
+    :root[data-admin-theme='test.${pack}'] { --color-primary: ${light}; --color-ring: ${light}; }
+    :root[data-admin-theme='test.${pack}'].dark { --color-primary: ${dark}; --color-ring: ${dark}; }
+  `
+    document.head.append(sheet)
+    try {
+      root.dataset.adminTheme = `test.${pack}`
+      for (const isDark of [false, true]) {
+        root.classList.toggle('dark', isDark)
+        const palette = deriveBrandPalette('', isDark)
+        const primary = document.createElement('span')
+        primary.style.color = palette['--color-primary']!
+        document.body.append(primary)
+        const rgb = getComputedStyle(primary)
+          .color.match(/[\d.]+/g)!
+          .map(Number)
+        primary.remove()
+        for (const surface of isDark
+          ? [
+              [32, 36, 43],
+              [45, 49, 57],
+            ]
+          : [
+              [255, 255, 255],
+              [246, 247, 249],
+              [232, 234, 238],
+            ]) {
+          const background = rgb.map((channel, i) => Math.round(channel * 0.1 + surface[i]! * 0.9))
+          expect(
+            contrast(palette['--goadmin-selection-foreground']!, `rgb(${background.join(' ')})`),
+            `${pack}/${isDark ? 'dark' : 'light'} over ${surface.join(',')}`,
+          ).toBeGreaterThanOrEqual(4.5)
+        }
+        applyBrand({ ...emptyBrand, accentColor: '#ff0000', accentColorEnd: '#00ff00' }, isDark)
+        applyBrand(emptyBrand, isDark)
+        expect(root.style.getPropertyValue('--color-primary')).toBe('')
+        expect(root.style.getPropertyValue('--color-ring')).toBe('')
+        expect(getComputedStyle(root).getPropertyValue('--color-primary').trim()).toBe(
+          isDark ? dark : light,
+        )
+        expect(getComputedStyle(root).getPropertyValue('--color-ring').trim()).toBe(
+          isDark ? dark : light,
+        )
+        expect(root.style.getPropertyValue('--goadmin-selection-foreground')).toBe(
+          palette['--goadmin-selection-foreground'],
+        )
+      }
+    } finally {
+      applyBrand(emptyBrand, false)
+      sheet.remove()
+      for (const [name, value] of attributes) {
+        if (value === null) root.removeAttribute(name)
+        else root.setAttribute(name, value)
+      }
+    }
+  },
+)
+
 it('resolves both host pack palettes without inheriting the applied live custom accent', () => {
   const root = document.documentElement
   const before = root.outerHTML.slice(0, root.outerHTML.indexOf('>') + 1)
@@ -56,11 +125,11 @@ it('resolves both host pack palettes without inheriting the applied live custom 
     root.style.setProperty('--color-primary', '#ff00ff')
     root.style.setProperty('--color-primary-contrast', '#000000')
     const live = root.style.cssText
-    expect(deriveBrandPalette('', false)).toEqual({
+    expect(deriveBrandPalette('', false)).toMatchObject({
       '--color-primary': '#0f766e',
       '--color-primary-contrast': '#ffffff',
     })
-    expect(deriveBrandPalette('', true)).toEqual({
+    expect(deriveBrandPalette('', true)).toMatchObject({
       '--color-primary': '#80e5db',
       '--color-primary-contrast': '#0e2522',
     })
@@ -119,3 +188,87 @@ it('resolves an oklch theme token through canvas without using the live override
     else root.setAttribute('style', oldStyle)
   }
 })
+
+it.each([false, true])('keeps whole gradient contrast and solid text tokens in dark=%s', (dark) => {
+  for (const [start, end] of [
+    ['#000000', '#ffffff'],
+    ['#ff0000', '#00ff00'],
+    ['#0000ff', '#ffff00'],
+    ['#ffffff', '#ffffff'],
+    ['#010101', '#020202'],
+  ]) {
+    const palette = deriveBrandPalette(start!, dark, end!)
+    expect(palette['--color-primary']).toBe(deriveBrandPalette(start!, dark)['--color-primary'])
+    expect(palette['--goadmin-primary-image']).toContain('135deg in srgb')
+    const channels = (key: string) => palette[key]!.match(/\d+/g)!.map(Number)
+    const a = channels('--goadmin-primary-fill-start')
+    const b = channels('--goadmin-primary-fill-end')
+    for (let step = 0; step <= 100; step++) {
+      const color = `rgb(${a.map((channel, i) => channel + ((b[i]! - channel) * step) / 100).join(' ')})`
+      expect(contrast(color, palette['--goadmin-primary-fill-foreground']!)).toBeGreaterThanOrEqual(
+        4.99,
+      )
+    }
+  }
+})
+it('overrides inherited gradient fills in an unset preview and uses none for a solid', () => {
+  expect(deriveBrandPalette('', false)['--goadmin-primary-image']).toBe('none')
+  expect(deriveBrandPalette('#123456', false)['--goadmin-primary-image']).toBe('none')
+})
+
+it.each([false, true])(
+  'keeps selection text readable over the final tinted backgrounds in dark=%s',
+  (dark) => {
+    const channels = (color: string) => color.match(/[\d.]+/g)!.map(Number)
+    const blend = (front: number[], back: number[]) =>
+      front.map((channel, i) => Math.round(channel * 0.1 + back[i]! * 0.9))
+    const surfaces = dark
+      ? [
+          [0, 0, 0],
+          [32, 36, 43],
+          [51, 51, 51],
+          [45, 49, 57],
+        ]
+      : [
+          [255, 255, 255],
+          [246, 247, 249],
+          [232, 234, 238],
+        ]
+    for (const [start, end] of [
+      ['#ff0000', ''],
+      ['#ffffff', ''],
+      ['#000000', ''],
+      ['#ff0000', '#ff0000'],
+      ['#ff0000', '#00ff00'],
+      ['#0000ff', '#ffff00'],
+      ['#00ffff', '#ff00ff'],
+      ['#000000', '#ffffff'],
+      ['#ffffff', '#000000'],
+    ]) {
+      const palette = deriveBrandPalette(start!, dark, end!)
+      const primary = channels(palette['--color-primary']!)
+      const foreground = palette['--goadmin-selection-foreground'] || palette['--color-primary']!
+      // These are the actual alpha-image endpoints, not the opaque button fill.
+      const stops = [...palette['--goadmin-selection-image']!.matchAll(/rgb\(([^)]+)\)/g)].map(
+        (match) => channels(match[1]!),
+      )
+      for (const surface of surfaces) {
+        // Hover may replace bg-primary/10 with a plain surface-variant color.
+        for (const base of [blend(primary, surface), surface]) {
+          for (let step = 0; step <= 100; step++) {
+            const background = end
+              ? blend(
+                  stops[0]!.map((channel, i) => channel + ((stops[1]![i]! - channel) * step) / 100),
+                  base,
+                )
+              : base
+            expect(
+              contrast(foreground, `rgb(${background.join(' ')})`),
+              `${start}/${end || 'solid'} at ${step}% over ${base.join(',')}`,
+            ).toBeGreaterThanOrEqual(4.5)
+          }
+        }
+      }
+    }
+  },
+)

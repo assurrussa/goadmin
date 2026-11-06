@@ -814,5 +814,12 @@
   "Сеанс завершён или доступ закрыт. Войдите снова; несохранённые данные могут быть потеряны.": "Your session expired or access was denied. Sign in again; unsaved data may be lost.",
   "Не удалось восстановить доступ. Войдите снова; несохранённые данные могут быть потеряны.": "Access could not be restored. Sign in again; unsaved data may be lost.",
   "Восстанавливаем доступ. Несохранённые данные могут быть потеряны.": "Restoring access. Unsaved data may be lost.",
-  "Доступ восстановлен. Проверьте данные формы и сохраните вручную.": "Access restored. Check the form and save manually."
+  "Доступ восстановлен. Проверьте данные формы и сохраните вручную.": "Access restored. Check the form and save manually.",
+  "Тип акцента": "Accent style",
+  "Сплошной цвет": "Solid color",
+  "Градиент": "Gradient",
+  "Конечный цвет градиента": "Gradient end color",
+  "Градиент 135°. Цвета заливки адаптируются для читаемости.": "135° gradient. Fill colors adapt for readability.",
+  "Выбрать конечный цвет": "Choose end color",
+  "Загрузить актуальную запись": "Reload current record"
 }

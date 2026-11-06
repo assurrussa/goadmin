@@ -91,9 +91,10 @@ func TestPostgresAppearanceCASAuditRollbackAndReplicaConvergence(t *testing.T) {
 	}
 	lightA, darkA := logo(color.RGBA{R: 220, A: 255}), logo(color.RGBA{B: 220, A: 255})
 	lightB, darkB := logo(color.RGBA{G: 220, A: 255}), logo(color.RGBA{R: 100, G: 100, A: 255})
+	endA, endB := "#112233", "#445566"
 	requests := []appearance.SaveBrandingRequest{
-		{Name: "  First  ", AccentColor: "#aabbcc", LogoLight: &lightA, LogoDark: &darkA},
-		{Name: "  Second  ", AccentColor: "#ddeeff", LogoLight: &lightB, LogoDark: &darkB},
+		{Name: "  First  ", AccentColor: "#aabbcc", AccentColorEnd: &endA, LogoLight: &lightA, LogoDark: &darkA},
+		{Name: "  Second  ", AccentColor: "#ddeeff", AccentColorEnd: &endB, LogoLight: &lightB, LogoDark: &darkB},
 	}
 	type result struct {
 		index int
@@ -133,8 +134,9 @@ func TestPostgresAppearanceCASAuditRollbackAndReplicaConvergence(t *testing.T) {
 	}
 	expected := appearance.Snapshot{
 		Version: 1, Name: []string{"First", "Second"}[winner.index],
-		AccentColor: []string{"#AABBCC", "#DDEEFF"}[winner.index],
-		LogoLight:   string(expectedLight), LogoDark: string(expectedDark),
+		AccentColor:    []string{"#AABBCC", "#DDEEFF"}[winner.index],
+		AccentColorEnd: []string{endA, endB}[winner.index],
+		LogoLight:      string(expectedLight), LogoDark: string(expectedDark),
 	}
 	store := appearance.NewBrandStore(db.DB())
 	persisted, err := store.Load(ctx)

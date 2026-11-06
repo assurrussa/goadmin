@@ -16,7 +16,7 @@ for (const name of ['compact', 'comfortable']) {
     const generatedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'goadmin-density-'))
     t.after(() => fs.rmSync(generatedRoot, { recursive: true, force: true }))
     const result = materializeAdminExtensions({ generatedRoot, manifestPaths: [manifestPath] })
-    assert.equal(result.bundleManifest.extensions.length, 1)
+    assert.equal(result.bundleManifest.extensions.length, 2)
     assert.equal(result.bundleManifest.extensions[0].key, `example.${name}-theme`)
     assert.equal(
       fs.readFileSync(path.join(root, 'src/extensions/theme.ts'), 'utf8'),
@@ -28,7 +28,7 @@ for (const name of ['compact', 'comfortable']) {
         manifestPaths: [],
         legacyRoot: path.join(generatedRoot, 'absent'),
       }).bundleManifest.extensions.length,
-      0,
+      1,
     )
   })
   test(`${name} density preserves semantic styling and supplies touch dimensions`, () => {

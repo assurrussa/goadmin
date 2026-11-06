@@ -48,7 +48,11 @@ function revealFocusedTrigger(event: FocusEvent) {
           variant="ghost"
           class="shrink-0 whitespace-nowrap"
           :data-active="section.items.some(isBranchActive) ? '' : undefined"
-          :class="section.items.some(isBranchActive) ? 'bg-primary/10 text-primary' : undefined"
+          :class="
+            section.items.some(isBranchActive)
+              ? 'goadmin-selection-fill bg-primary/10 text-primary'
+              : undefined
+          "
           >{{ t(section.title || section.items[0]?.name || 'Разделы') }}<ChevronDown class="size-4"
         /></AppButton>
       </DropdownMenuTrigger>

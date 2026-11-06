@@ -138,3 +138,16 @@ are available separately through `make starter-smoke-test` and do not start
 Docker. The source Docker build accepts `VITE_ADMIN_EXTENSION_MANIFESTS`; an
 empty value retains the standard presentation. Custom packs use the normal
 manifest validation and the same pinned client/backend sources.
+
+## Declarative Products example
+
+Add `products` to `ADMIN_MODULES` to enable the host-owned example at `/products`.
+`STARTER_MIGRATE=1` or the explicit `migrate` command installs its own Products
+schema/ledger after the core migrations. Disabling the module retains its data.
+The example defines six simple fields, scoped PostgreSQL queries, per-record
+revision checks and transactional domain audit, plus a guarded Publish command.
+Each administrator sees their own records. Category is an optional editable
+select; publication Status is read-only in normal CRUD and changes only through
+the separately authorized Publish command. The versioned Products ledger upgrades
+existing example tables without resetting records. Standard pages use the embedded
+renderer without a Vue extension. See [CRUD resources](../../docs/crud.md).

@@ -182,6 +182,9 @@ func (h *Handler[T]) HandleData(c fiber.Ctx) error {
 	internalResponse, err := h.loadDataInternal(c, filters)
 	if err != nil {
 		h.logger.ErrorContext(c, "failed to load data for API", logger.Error(err))
+		if h.config.APIErrorComponent != nil {
+			return h.config.APIErrorComponent(c, err)
+		}
 		return fiber.NewError(fiber.StatusInternalServerError)
 	}
 
@@ -232,7 +235,7 @@ func (h *Handler[T]) loadDataInternal(c fiber.Ctx, filters Filters) (Response[T]
 		IDKey:             h.config.IDKey,
 		Loading:           false,
 
-		Creatable:   h.config.Creatable && h.previewActionAllowed(c, "create"),
+		Creatable:   h.config.Creatable && (h.config.CanCreate == nil || h.config.CanCreate(c)) && h.previewActionAllowed(c, "create"),
 		Exportable:  h.config.Exportable,
 		Refreshable: h.config.Refreshable,
 
