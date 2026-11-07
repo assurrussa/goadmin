@@ -154,3 +154,21 @@ and later overlapping heavy fixture processes exited without a numeric status;
 those diagnostics were retained, the isolated checkout context was completed,
 and manifest/type checks passed when rerun sequentially. No failed or incomplete
 attempt is counted as a pass.
+
+## 2026-11-07 reassessment — Vite and minimatch
+
+Vite 6.4.4 allowed a denied file inside the dev server's allowed roots to be
+retrieved with an import query. This affects exposed development servers, not
+the built static assets by itself. The lockfile now selects Vite 6.4.5 and the
+direct version range starts at that patch. The affected and fixed versions were
+checked with a synthetic `.crt` file; the fixed version returned HTTP 403.
+See [GHSA-8g5g-mxqh-grgj](https://github.com/vitejs/vite/security/advisories/GHSA-8g5g-mxqh-grgj).
+
+The audit also reported [GHSA-g3hv-75wg-m249](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249)
+in development-only minimatch 10.2.6. At this review, the first fixed version
+is 11.0.1; no fixed 10.x release is available. Scoped npm overrides select
+11.0.1 for ESLint, its config array and typescript-estree. This crosses those
+packages' declared major-version ranges and must be reassessed when upstream
+releases compatible dependencies. The project frontend checks must pass with
+the override; those checks cannot prove compatibility with arbitrary host
+configurations. No advisory is suppressed.
