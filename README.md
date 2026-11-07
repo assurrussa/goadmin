@@ -30,13 +30,13 @@ Deployed dependency versions and binary sizes were not verified. Frontend asset
 sizes are not whole-application footprints; these observations do not establish
 minimum requirements or performance guarantees.
 
-The latest published baseline, verified on 2026-11-06, is
-[v0.25.1](https://github.com/assurrussa/goadmin/releases/tag/v0.25.1):
-`go get github.com/assurrussa/goadmin@v0.25.1`.
-This PR #85 candidate selects GoAuth v0.17.0, gossoclient v0.6.1,
+The published baseline is
+[v0.26.1](https://github.com/assurrussa/goadmin/releases/tag/v0.26.1):
+`go get github.com/assurrussa/goadmin@v0.26.1`.
+It selects GoAuth v0.17.0, gossoclient v0.6.1,
 GoNotify v0.6.0, GoUploads v0.13.0 and GoWebSocket v0.2.1 without sibling
-replacements. No new GoAdmin release version has been selected or published;
-see [release preparation](RELEASING.md).
+replacements. See the [release notes](RELEASING.md) for verification and
+consumer responsibilities.
 
 ## Before integrating
 
