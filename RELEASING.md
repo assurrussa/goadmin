@@ -5,10 +5,9 @@ This module is published as `github.com/assurrussa/goadmin`.
 ## Current Baseline
 
 - The published baseline is
-  [v0.26.0](https://github.com/assurrussa/goadmin/releases/tag/v0.26.0).
-  The security patch candidate is `v0.26.1`; its selection does not imply
-  publication or downstream deployment. Historical proposals below are
-  retained as records, not unused release tags or readiness claims.
+  [v0.26.1](https://github.com/assurrussa/goadmin/releases/tag/v0.26.1).
+  Publication does not imply downstream deployment. Historical proposals below
+  are retained as records, not unused release tags or readiness claims.
 
 - Go 1.27.3 is the minimum. Modular host assembly is a breaking source API:
   migrate hosts to `host.New`, explicit modules and `host.AdminConfig`.
@@ -49,16 +48,16 @@ This module is published as `github.com/assurrussa/goadmin`.
 - The frontend advisory gate and its current zero-finding result are reviewed
   in [docs/dependency-advisory-review.md](docs/dependency-advisory-review.md).
 
-## v0.26.1 security patch candidate
+## v0.26.1 security patch
 
 - Updates the embedded admin build to Vite 6.4.5 and scopes a temporary
   minimatch 11.0.1 override to its three development-tool consumers. See the
   [advisory review](docs/dependency-advisory-review.md) for compatibility and
   exposure limits. Hosts need to update their GoAdmin module and rebuild their
   own bundles to consume the patch; publishing alone changes no running service.
-- Run `make publish-readiness VERSION=v0.26.1` against the committed candidate;
-  after the tag is available, run `make release-readiness VERSION=v0.26.1` and
-  the published clean-consumer check. Do not rewrite an existing tag.
+- The committed candidate passed `make publish-readiness VERSION=v0.26.1`;
+  the published tag passed `make release-readiness VERSION=v0.26.1`, including
+  its anonymous published clean-consumer check. Do not rewrite existing tags.
 
 ## PR #85 dependency upgrade preparation — historical
 
