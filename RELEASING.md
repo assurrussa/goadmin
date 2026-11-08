@@ -5,7 +5,7 @@ This module is published as `github.com/assurrussa/goadmin`.
 ## Current Baseline
 
 - The published baseline is
-  [v0.26.1](https://github.com/assurrussa/goadmin/releases/tag/v0.26.1).
+  [v0.26.2](https://github.com/assurrussa/goadmin/releases/tag/v0.26.2).
   Publication does not imply downstream deployment. Historical proposals below
   are retained as records, not unused release tags or readiness claims.
 
@@ -30,7 +30,7 @@ This module is published as `github.com/assurrussa/goadmin`.
   or rewrite them. Verify the new remote tag and public module independently.
 - Current `go.mod` pins GoAuth v0.17.0, GoNotify v0.6.0 and gossoclient v0.6.1.
   GoInertia v0.11.1 retains protocol v2 by default, matching the embedded v2 frontend. GoCache
-  resolves v0.2.2. GoDI and GoLogger retain their existing compatible pins.
+  resolves v0.2.2. GoDI resolves v0.11.1; GoLogger retains its existing compatible pin.
 - `VERSION` is intentionally unset by default. Pass the exact planned or
   published tag for release gates; do not rewrite existing tags.
 - Resource verification requires Node.js 22.13+ on the 22.x line or Node.js
@@ -47,6 +47,13 @@ This module is published as `github.com/assurrussa/goadmin`.
   Published verification rejects every replacement and legacy shared/Redis module.
 - The frontend advisory gate and its current zero-finding result are reviewed
   in [docs/dependency-advisory-review.md](docs/dependency-advisory-review.md).
+
+## v0.26.2 dependency patch
+
+- Updates GoDI to v0.11.1 across root and `examples/starter` (deterministic module
+  ordering, eager matching validation, nested `dig.In` cycle guards).
+- The committed candidate passed `make check` and clean consumer verification.
+  Do not rewrite existing tags.
 
 ## v0.26.1 security patch
 
