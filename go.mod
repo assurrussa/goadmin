@@ -8,7 +8,7 @@ require (
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/assurrussa/goauth v0.17.0
 	github.com/assurrussa/gocache v0.2.2
-	github.com/assurrussa/godi v0.11.0
+	github.com/assurrussa/godi v0.11.1
 	github.com/assurrussa/goinertia v0.11.2
 	github.com/assurrussa/gologger v0.1.0
 	github.com/assurrussa/gonotify v0.6.0
