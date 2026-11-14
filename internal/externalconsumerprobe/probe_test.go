@@ -48,6 +48,7 @@ func TestBuildProbeTestImportsSupportedPackages(t *testing.T) {
 	}
 	require.Contains(t, got, "func TestHostAuthAdapterAndMigrationContract")
 	require.Contains(t, got, "adminhost.NewAuthAdapter")
+	require.Contains(t, got, "adapter.RequireActiveAdmin")
 	require.Contains(t, got, "adminmigrations.Migrate")
 	require.Contains(t, got, "func TestHostActorCommandContract")
 	require.Contains(t, got, "adminhosttest.WithActor")

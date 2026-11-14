@@ -768,3 +768,17 @@ It uses gossoclient without adding admin concepts to that SDK. No SSO feature
 means no provider discovery, SSO routes, new required configuration or migrations.
 Local membership and canonical links remain authoritative; email never auto-links.
 See `docs/sso-adapter.md` for the integration and verification contract.
+
+## Transactional admin membership guard
+
+`AuthAdapter.RequireActiveAdmin` validates active canonical identity and admin
+membership through the public host facade. `ErrAdminMembershipUnavailable` is a
+non-enumerating denial; database/context errors remain infrastructure errors.
+This narrow auth-policy guard joins the canonical auth transaction and locks the
+identity and membership until commit. Outside that transaction its result is
+point-in-time only. It grants no identity, role, credential, or session.
+
+Unlike ordinary RBAC snapshot reads, this mutation/recovery guard deliberately
+uses SQL, including when authorization snapshots are enabled. Hosts must not put
+it on ordinary client requests: customer recovery has its own policy and must
+route before this administrative guard. No schema or default cache mode changes.
