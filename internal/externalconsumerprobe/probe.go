@@ -228,6 +228,11 @@ func TestMenuAnyPermissionKeysContract(t *testing.T) {
 }
 
 func TestHostAuthAdapterAndMigrationContract(t *testing.T) {
+	var adapter *adminhost.AuthAdapter
+	membershipErr := adapter.RequireActiveAdmin(context.Background(), goauth.SubjectID{})
+	if !errors.Is(membershipErr, adminhost.ErrAdminMembershipUnavailable) {
+		t.Fatal("uninitialized membership guard must fail closed")
+	}
 	_, err := adminhost.NewAuthAdapter(adminhost.AuthAdapterConfig{
 		Runtime: goauth.Config{}, NotificationSender: goauth.NotificationSenderFunc(nil),
 		NotificationWorker: postgres.NotificationWorkerConfig{},
