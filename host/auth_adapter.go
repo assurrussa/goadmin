@@ -15,6 +15,7 @@ import (
 // AuthAdapterConfig is the single host-facing DI contract for goauth Runtime,
 // admin memberships, and RBAC.
 type AuthAdapterConfig struct {
+	AuthorizationCache *AuthorizationCacheConfig
 	Database           StoragePgsqlClient
 	TxManager          StoragePgsqlTxManager
 	Runtime            goauth.Config
@@ -47,7 +48,8 @@ func NewAuthAdapter(config AuthAdapterConfig) (*AuthAdapter, error) {
 	}
 	inner, err := internalauth.New(internalauth.Config{
 		Database: config.Database, Runtime: config.Runtime,
-		Memberships: admins, AutoMigrate: config.AutoMigrate,
+		AuthorizationCache: config.AuthorizationCache,
+		Memberships:        admins, AutoMigrate: config.AutoMigrate,
 		NotificationSender: config.NotificationSender, NotificationWorker: config.NotificationWorker,
 	})
 	if err != nil {
@@ -82,3 +84,7 @@ func (a *AuthAdapter) Close() error {
 func (a *AuthAdapter) valid() bool {
 	return a != nil && a.inner != nil && a.admins != nil && a.Runtime() != nil
 }
+
+// AuthorizationCacheConfig opts into bounded admin membership and RBAC snapshots.
+// Nil configuration leaves the current database-backed behavior unchanged.
+type AuthorizationCacheConfig = internalauth.AuthorizationCacheConfig

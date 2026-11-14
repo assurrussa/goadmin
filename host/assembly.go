@@ -20,6 +20,7 @@ type ServerConfig = bootstrap.ServerConfig
 
 // Config describes the core. Optional infrastructure is configured by modules.
 type Config struct {
+	AuthorizationCache   *AuthorizationCacheConfig
 	Admin                AdminConfig
 	Server               ServerConfig
 	Auth                 goauth.Config
@@ -78,7 +79,7 @@ type Runtime struct {
 
 // New assembles an admin core with exactly the requested modules.
 func New(ctx context.Context, cfg Config, deps Dependencies, modules ...Module) (_ *Runtime, err error) {
-	if err := validateBorrowedAuthPolicy(cfg.Auth.MFAMode, deps.Auth); err != nil {
+	if err := validateBorrowedAuthPolicy(cfg.Auth.MFAMode, deps.Auth, cfg.AuthorizationCache); err != nil {
 		return nil, err
 	}
 	capabilities, ordered, err := validateModules(modules)
@@ -130,14 +131,17 @@ func New(ctx context.Context, cfg Config, deps Dependencies, modules ...Module) 
 		}
 	}()
 	if r.Auth == nil {
-		authCfg := AuthAdapterConfig{Database: deps.Database, TxManager: deps.TxManager, Runtime: cfg.Auth}
+		authCfg := AuthAdapterConfig{
+			Database: deps.Database, TxManager: deps.TxManager, Runtime: cfg.Auth,
+			AuthorizationCache: cfg.AuthorizationCache,
+		}
 		authCfg.Runtime.NotificationDelivery = goauth.NotificationDeliveryDisabled
 		if a.mail != nil {
 			authCfg.Runtime.NotificationDelivery = goauth.NotificationDeliveryRequired
 			authCfg.NotificationSender = a.mail.Sender
 			authCfg.NotificationWorker = a.mail.Worker
 		}
-		r.Auth, err = NewAuthAdapter(authCfg)
+		r.Auth, err = NewAuthAdapter(authCfg) //nolint:contextcheck // adapter owns cache worker until Close, not request lifetime
 		if err != nil {
 			return nil, err
 		}
@@ -356,7 +360,10 @@ func validateBorrowedMFAMode(requested, actual goauth.MFAMode) error {
 	return nil
 }
 
-func validateBorrowedAuthPolicy(requested goauth.MFAMode, auth *AuthAdapter) error {
+func validateBorrowedAuthPolicy(requested goauth.MFAMode, auth *AuthAdapter, cache ...*AuthorizationCacheConfig) error {
+	if auth != nil && len(cache) > 0 && cache[0] != nil {
+		return errors.New("configure AuthorizationCache on the supplied AuthAdapter, not host Config")
+	}
 	if auth == nil || requested == "" {
 		return nil
 	}

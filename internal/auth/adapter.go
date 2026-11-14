@@ -8,12 +8,14 @@ import (
 
 	"github.com/assurrussa/goauth"
 	"github.com/assurrussa/goauth/postgres"
+	"github.com/assurrussa/goauth/rbac"
 	"github.com/jackc/pgx/v5/stdlib"
 	redis "github.com/redis/go-redis/v9"
 
 	outbox "github.com/assurrussa/goadmin/infrastructure/outbox"
 	"github.com/assurrussa/goadmin/internal/admintx"
 	"github.com/assurrussa/goadmin/internal/auth/browserstate"
+	"github.com/assurrussa/goadmin/internal/authsnapshot"
 	identity "github.com/assurrussa/goadmin/internal/identity"
 )
 
@@ -27,6 +29,7 @@ type AdminMemberships interface {
 }
 
 type Config struct {
+	AuthorizationCache *AuthorizationCacheConfig
 	Database           outbox.StoragePgsqlClient
 	Runtime            goauth.Config
 	Memberships        AdminMemberships
@@ -39,12 +42,13 @@ type Config struct {
 // Runtime and RBAC APIs. Host DTOs are mapped in this package and never enter
 // goauth's canonical models.
 type Adapter struct {
-	runtime     *postgres.Runtime
-	roles       *RoleService
-	memberships AdminMemberships
-	db          *sql.DB
-	database    outbox.StoragePgsqlClient
-	stateKeys   goauth.KeyRing
+	authorization *authsnapshot.Cache
+	runtime       *postgres.Runtime
+	roles         *RoleService
+	memberships   AdminMemberships
+	db            *sql.DB
+	database      outbox.StoragePgsqlClient
+	stateKeys     goauth.KeyRing
 }
 
 func New(config Config) (*Adapter, error) {
@@ -54,7 +58,16 @@ func New(config Config) (*Adapter, error) {
 	if config.Memberships == nil {
 		return nil, errors.New("goadmin auth: admin memberships are required")
 	}
-	config.Runtime.MembershipGate = adminMembershipGate(config.Runtime.MembershipGate, config.Memberships)
+	memberships := config.Memberships
+	var cached *cachedMemberships
+	if config.AuthorizationCache != nil {
+		if _, ok := memberships.(membershipMutationConfigurer); !ok {
+			return nil, errors.New("admin authorization cache requires membership mutation hooks")
+		}
+		cached = &cachedMemberships{AdminMemberships: memberships, pool: config.Database.DB().Pool()}
+		memberships = cached
+	}
+	config.Runtime.MembershipGate = adminMembershipGate(config.Runtime.MembershipGate, memberships)
 
 	db := stdlib.OpenDBFromPool(config.Database.DB().Pool())
 	runtime, err := postgres.NewRuntime(postgres.Config{
@@ -68,22 +81,51 @@ func New(config Config) (*Adapter, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("goadmin auth: create Runtime: %w", err)
 	}
-	roles, err := runtime.RBAC(nil)
+	var authorization *authsnapshot.Cache
+	if cached != nil {
+		authorization, err = authsnapshot.New(context.Background(), loadAuthorization(runtime), *config.AuthorizationCache)
+		if err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("initialize admin authorization cache: %w", err)
+		}
+		cached.cache = authorization
+		cached.runtime = runtime
+	}
+	var rolesCache rbac.Cache
+	if authorization != nil {
+		rolesCache = authorizationInvalidator{cache: authorization}
+	}
+	roles, err := runtime.RBAC(rolesCache)
 	if err != nil {
+		if authorization != nil {
+			authorization.Close()
+		}
 		_ = db.Close()
 		return nil, fmt.Errorf("goadmin auth: create RBAC: %w", err)
 	}
 
 	roleService := NewRoleService(roles)
+	roleService.authorization = authorization
+	roleService.transactionActive = runtime.AuthTransactionActive
 	if err := configureRoleTransaction(roleService, runtime, config.Database.DB().Pool()); err != nil {
+		if authorization != nil {
+			authorization.Close()
+		}
 		_ = db.Close()
 		return nil, fmt.Errorf("goadmin auth: create role transaction: %w", err)
 	}
 
-	return &Adapter{
-		runtime: runtime, roles: roleService, memberships: config.Memberships, db: db,
+	adapter := &Adapter{
+		authorization: authorization,
+		runtime:       runtime, roles: roleService, memberships: config.Memberships, db: db,
 		stateKeys: config.Runtime.OutboxAEADKeys, database: config.Database,
-	}, nil
+	}
+	if authorization != nil {
+		if target, ok := config.Memberships.(membershipMutationConfigurer); ok {
+			adapter.configureMembershipInvalidation(target)
+		}
+	}
+	return adapter, nil
 }
 
 func adminMembershipGate(upstream goauth.MembershipGate, memberships AdminMemberships) goauth.MembershipGate {
@@ -186,5 +228,8 @@ func (a *Adapter) Close() error {
 		return nil
 	}
 
+	if a.authorization != nil {
+		a.authorization.Close()
+	}
 	return a.db.Close()
 }
