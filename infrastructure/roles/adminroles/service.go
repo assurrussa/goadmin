@@ -142,6 +142,9 @@ func (s *Service) subjectIDForAdmin(ctx context.Context, adminID int64) string {
 		return ""
 	}
 
+	if subject, active := s.subjectGuard.CachedAdminSubject(ctx, adminID); active {
+		return subject
+	}
 	admin, err := s.admins.GetByID(ctx, adminID)
 	if err != nil {
 		return ""

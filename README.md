@@ -33,7 +33,7 @@ minimum requirements or performance guarantees.
 The published baseline is
 [v0.26.2](https://github.com/assurrussa/goadmin/releases/tag/v0.26.2):
 `go get github.com/assurrussa/goadmin@v0.26.2`.
-It selects GoAuth v0.17.0, gossoclient v0.6.1,
+It selects GoAuth v0.18.0, gossoclient v0.6.1,
 GoNotify v0.6.0, GoUploads v0.13.0 and GoWebSocket v0.2.1 without sibling
 replacements. See the [release notes](RELEASING.md) for verification and
 consumer responsibilities.
@@ -278,7 +278,7 @@ Verification is local by default. Hosted CI is manual-only, with no automatic
 push or pull-request runs. See [local checks and manual CI](docs/ci.md) for
 tool versions, disposable PostgreSQL/Redis setup, and the proven CI baseline.
 
-This checkout pins published `goauth v0.17.0`, `gossoclient v0.6.1` and
+This checkout pins published `goauth v0.18.0`, `gossoclient v0.6.1` and
 `gonotify v0.6.0`, including
 the shared transaction and optional-delivery API. Uploads resolve
 `gouploads v0.13.0` and WebSockets resolve `gowebsocket v0.2.1`. Outbox core and

@@ -9,11 +9,16 @@ import (
 	"github.com/assurrussa/goauth"
 	"github.com/assurrussa/goauth/rbac"
 	logger "github.com/assurrussa/gologger"
+
+	"github.com/assurrussa/goadmin/internal/admintx"
+	"github.com/assurrussa/goadmin/internal/authsnapshot"
 )
 
 type RoleService struct {
-	service         *rbac.Service
-	roleTransaction func(context.Context, []goauth.SubjectID, func(context.Context) error) error
+	authorization     *authsnapshot.Cache
+	transactionActive func(context.Context) (bool, error)
+	service           *rbac.Service
+	roleTransaction   func(context.Context, []goauth.SubjectID, func(context.Context) error) error
 }
 
 // Service is retained as a host-local name while goadmin handlers migrate;
@@ -329,6 +334,8 @@ func NewGuardServiceOptions(
 }
 
 type GuardService struct {
+	transactionActive func(context.Context) (bool, error)
+	authorization     *authsnapshot.Cache
 	rolesUseCase      guardRolesUseCase
 	permissionUseCase guardPermissions
 	cache             guardCache
@@ -340,7 +347,12 @@ func NewGuardService(
 	roles *RoleService,
 	log logger.Logger,
 ) (*GuardService, error) {
-	return NewGuardServiceWithOptions(NewGuardServiceOptions(rolesUseCase, roles, disabledRoleCache{}, log))
+	guard, err := NewGuardServiceWithOptions(NewGuardServiceOptions(rolesUseCase, roles, disabledRoleCache{}, log))
+	if err == nil && roles != nil {
+		guard.authorization = roles.authorization
+		guard.transactionActive = roles.transactionActive
+	}
+	return guard, err
 }
 
 func NewGuardServiceWithOptions(options GuardServiceOptions) (*GuardService, error) {
@@ -365,6 +377,10 @@ func (s *GuardService) SubjectGuardCheck(
 ) bool {
 	if !RolePreviewAllows(ctx, key) {
 		return false
+	}
+
+	if s.useAuthorizationCache(ctx) {
+		return s.snapshotGuardCheck(ctx, subjectID, key, options...)
 	}
 	roles, err := s.GetRolesSubject(ctx, subjectID)
 	if err != nil {
@@ -420,6 +436,28 @@ func (s *GuardService) GetRolesSubject(ctx context.Context, subjectID string) ([
 	if strings.TrimSpace(subjectID) == "" {
 		return nil, ErrInvalidSubjectID
 	}
+	if s.useAuthorizationCache(ctx) {
+		v, err := s.authorizationView(ctx)
+		if err != nil {
+			return nil, err
+		}
+		id, err := goauth.ParseSubjectID(subjectID)
+		if err != nil {
+			return nil, ErrInvalidSubjectID
+		}
+		if !v.Member(id) {
+			return nil, ErrRoleNotFound
+		}
+		values := v.Roles(id)
+		if len(values) == 0 {
+			return nil, ErrRoleNotFound
+		}
+		roles := make([]Role, 0, len(values))
+		for _, r := range values {
+			roles = append(roles, roleFromRBAC(r))
+		}
+		return roles, nil
+	}
 	if s.cache.Enabled(ctx) {
 		roles := s.cache.SubjectRoles(subjectID)
 		if len(roles) == 0 {
@@ -440,6 +478,24 @@ func (s *GuardService) GetPermissions(
 	ctx context.Context,
 	roles []Role,
 ) (map[int64]map[int64]Permission, error) {
+	if s.useAuthorizationCache(ctx) {
+		v, err := s.authorizationView(ctx)
+		if err != nil {
+			return nil, err
+		}
+		result := make(map[int64]map[int64]Permission)
+		for _, role := range roles {
+			result[role.ID] = make(map[int64]Permission)
+			for _, p := range v.RolePermissions(role.ID) {
+				converted, e := permissionFromRBAC(p)
+				if e != nil {
+					return nil, e
+				}
+				result[role.ID][p.ID] = converted
+			}
+		}
+		return result, nil
+	}
 	if s.cache.Enabled(ctx) {
 		return s.cache.AllRolePermissions(roles), nil
 	}
@@ -468,4 +524,69 @@ func (disabledRoleCache) Enabled(context.Context) bool { return false }
 func (disabledRoleCache) SubjectRoles(string) []Role   { return nil }
 func (disabledRoleCache) AllRolePermissions([]Role) map[int64]map[int64]Permission {
 	return nil
+}
+
+func (s *GuardService) useAuthorizationCache(ctx context.Context) bool {
+	_, managed := admintx.Executor(ctx)
+	if s.authorization == nil || managed {
+		return false
+	}
+	if s.transactionActive != nil {
+		active, err := s.transactionActive(ctx)
+		if err == nil && active {
+			return false
+		}
+	}
+	return true
+}
+
+// CachedAdminSubject avoids per-check admin ID resolution in snapshot mode.
+// active=true with an empty subject is an authoritative denial, never a DB miss.
+func (s *GuardService) CachedAdminSubject(ctx context.Context, id int64) (subject string, active bool) {
+	if !s.useAuthorizationCache(ctx) {
+		return "", false
+	}
+	v, err := s.authorizationView(ctx)
+	if err != nil {
+		return "", true
+	}
+	value, ok := v.AdminSubject(id)
+	if !ok {
+		return "", true
+	}
+	return value.String(), true
+}
+
+func (s *RoleService) AuthorizationCacheEnabled() bool { return s != nil && s.authorization != nil }
+
+func (s *GuardService) snapshotGuardCheck(
+	ctx context.Context, subjectID string, key PermissionKey, options ...PermissionGuardOption,
+) bool {
+	v, err := s.authorizationView(ctx)
+	if err != nil {
+		return false
+	}
+	id, err := goauth.ParseSubjectID(subjectID)
+	if err != nil || !v.Member(id) {
+		return false
+	}
+	for _, role := range v.Roles(id) {
+		for _, bypass := range CreateRoles(options...) {
+			if strings.EqualFold(role.Slug, bypass) {
+				return true
+			}
+		}
+	}
+	parsed, err := rbac.NewPermissionKey(string(key.Domain), string(key.Action))
+	return err == nil && v.Allows(id, parsed)
+}
+
+func (s *GuardService) authorizationView(ctx context.Context) (authsnapshot.View, error) {
+	if s.transactionActive != nil {
+		_, err := s.transactionActive(ctx)
+		if err != nil {
+			return authsnapshot.View{}, err
+		}
+	}
+	return s.authorization.View(ctx)
 }

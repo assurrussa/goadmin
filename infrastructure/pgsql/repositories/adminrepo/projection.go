@@ -44,6 +44,15 @@ func (r *Repo) ProvisionAdminMembership(
 	account goauth.Account,
 	publicID identity.UserID,
 ) (int64, error) {
+	if r.membershipMutation != nil {
+		var id int64
+		err := r.mutateMembership(ctx, func(txCtx context.Context) error {
+			var err error
+			id, err = r.provisionLockedMembership(txCtx, account, publicID)
+			return err
+		})
+		return id, err
+	}
 	var id int64
 	provision := func(txCtx context.Context) error {
 		var err error

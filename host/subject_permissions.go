@@ -107,6 +107,9 @@ func buildAdminRoleGuards(
 	roles *integrationroles.RoleService, supplied *SubjectPermissionChecker,
 	admins adminrolesfacade.AdminRepository, lg Logger,
 ) (actions, canonical *adminrolesfacade.Service, err error) {
+	if roles.AuthorizationCacheEnabled() && supplied != nil && supplied.rolesService != roles {
+		return nil, nil, errors.New("snapshot-enabled adapter requires its own SubjectPermissionChecker")
+	}
 	if supplied != nil && !supplied.validForInstall() {
 		return nil, nil, errors.New("host install: subject permission checker is invalid")
 	}
@@ -126,4 +129,13 @@ func buildAdminRoleGuards(
 		return nil, nil, fmt.Errorf("host install: build admin roles facade: %w", err)
 	}
 	return actions, canonical, nil
+}
+
+// SubjectPermissionChecker shares this adapter's authorization policy and lifecycle.
+// Use it instead of a standalone checker when enabling AuthorizationCache.
+func (a *AuthAdapter) SubjectPermissionChecker(lg Logger) (*SubjectPermissionChecker, error) {
+	if !a.valid() {
+		return nil, errors.New("auth adapter is not initialized")
+	}
+	return subjectPermissionCheckerFromRoles(a.inner.Roles(), lg)
 }

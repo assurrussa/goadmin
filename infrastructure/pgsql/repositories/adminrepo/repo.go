@@ -36,6 +36,7 @@ func (r *Repo) HasAdminMembership(ctx context.Context, subjectID goauth.SubjectI
 }
 
 type Repo struct {
+	membershipMutation func(context.Context, func(context.Context) error) error
 	Options
 }
 
@@ -54,4 +55,17 @@ func New(opts Options) (*Repo, error) {
 	}
 
 	return &Repo{Options: opts}, nil
+}
+
+// ConfigureMembershipMutation installs canonical transaction ownership during startup.
+// It must be called before serving requests, never concurrently with repository use.
+func (r *Repo) ConfigureMembershipMutation(fn func(context.Context, func(context.Context) error) error) {
+	r.membershipMutation = fn
+}
+
+func (r *Repo) mutateMembership(ctx context.Context, fn func(context.Context) error) error {
+	if r.membershipMutation != nil {
+		return r.membershipMutation(ctx, fn)
+	}
+	return fn(ctx)
 }
