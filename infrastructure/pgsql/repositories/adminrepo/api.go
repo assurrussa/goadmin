@@ -268,6 +268,10 @@ func (r *Repo) GetBySubjectID(ctx context.Context, subjectID authcore.SubjectID)
 }
 
 func (r *Repo) DeleteByID(ctx context.Context, id int64) error {
+	return r.mutateMembership(ctx, func(txCtx context.Context) error { return r.deleteByID(txCtx, id) })
+}
+
+func (r *Repo) deleteByID(ctx context.Context, id int64) error {
 	const op = "admin.repo.DeleteByID"
 
 	if id <= 0 {
@@ -286,6 +290,10 @@ func (r *Repo) DeleteByID(ctx context.Context, id int64) error {
 }
 
 func (r *Repo) SoftDeleteByID(ctx context.Context, id int64) error {
+	return r.mutateMembership(ctx, func(txCtx context.Context) error { return r.softDeleteByID(txCtx, id) })
+}
+
+func (r *Repo) softDeleteByID(ctx context.Context, id int64) error {
 	const op = "admin.repo.SoftDeleteByID"
 
 	if id <= 0 {

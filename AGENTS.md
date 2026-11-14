@@ -136,7 +136,7 @@ batch; do not repeat `test`, `test-race`, or `cover-html` on the same tree.
 Do not rewrite existing tags. If `make` changes generated Go files, admin UI
 outputs, `go.mod`, or `go.sum`, commit those changes and publish a new semver
 tag. The clean-history baseline is `v0.7.0`; old tags remain in the private
-history archive. The root `go.mod` pins GoAuth v0.17.0, GoNotify v0.6.0 and
+history archive. The root `go.mod` pins GoAuth v0.18.0, GoNotify v0.6.0 and
 gossoclient v0.6.1 without local replacements. The nested starter's overrides belong to explicit source mode.
 Verify remote tags and dependency availability before claiming public readiness.
 
