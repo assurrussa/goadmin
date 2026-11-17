@@ -95,9 +95,9 @@ import {syncAppearance} from '/src/js/appearance/state.ts';
 import AdminRuntimeFrame from '/src/js/components/layout/AdminRuntimeFrame.vue';`
     : ''
 }
-const page=window.__DESIGN_PAGE__;initLocale();${!baseline ? 'syncAppearance(page);' : ''}setAdminCapabilities(page);const pages={${components}};
+const page=window.__DESIGN_PAGE__;initLocale();setAdminCapabilities(page);const pages={${components}};
 for(const [name,component] of Object.entries(pages)){if(!name.startsWith('auth/'))component.layout=(render,page)=>render(AdminLayout,null,{default:()=>page})}
-await createInertiaApp({page,resolve:(name)=>toInertiaPage(pages[name]),setup({el,App,props,plugin}){const pinia=createPinia();const app=createApp({render:()=>${!baseline ? 'h(AdminRuntimeFrame,null,{default:()=>h(App,props)})' : 'h(App,props)'}}).use(plugin).use(pinia);${!baseline ? 'extensions.install(app);installPresentation(app,extensions.theme);' : ''}useAuthUserStore(pinia).setAuthUser(page.props.authuser);router.on('success',event=>{setAdminCapabilities(event.detail.page);${!baseline ? 'syncAppearance(event.detail.page);' : ''}useAuthUserStore(pinia).setAuthUser(event.detail.page.props.authuser)});useThemeStore(pinia).init();app.mount(el)}});`
+await createInertiaApp({page,resolve:(name)=>toInertiaPage(pages[name]),setup({el,App,props,plugin}){const pinia=createPinia();const app=createApp({render:()=>${!baseline ? 'h(AdminRuntimeFrame,null,{default:()=>h(App,props)})' : 'h(App,props)'}}).use(plugin).use(pinia);${!baseline ? 'extensions.install(app);installPresentation(app,extensions.theme);syncAppearance(page);' : ''}useAuthUserStore(pinia).setAuthUser(page.props.authuser);router.on('success',event=>{setAdminCapabilities(event.detail.page);${!baseline ? 'syncAppearance(event.detail.page);' : ''}useAuthUserStore(pinia).setAuthUser(event.detail.page.props.authuser)});useThemeStore(pinia).init();app.mount(el)}});`
 const requests = new Map()
 const json = (res, data, status = 200) => {
   res.statusCode = status

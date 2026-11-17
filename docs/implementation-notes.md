@@ -1,5 +1,28 @@
 # Implementation Notes
 
+## Ocean and compact table filters (2026-11-18)
+
+The default accent follows the host palette rather than the extension list.
+Functional extensions can use Ocean while a host can keep its own brand CSS.
+The shared DataGrid owns responsive filter placement and resets an empty query
+through its existing request lifecycle. Saved table views remain user-owned.
+The extension catalog and future navigation improvements are separate work.
+
+The initial `make check` passed. After correcting the host-palette probe for
+strict CSP, viewport media queries and minified color syntax, `make resources`
+passed all 144 resource contract checks and 1,222 UI tests, type and style
+checks, and rebuilt the embedded assets. A Chromium run against the resulting
+`public/dist` exercised login, brand preview, media-query changes in both
+directions and table reset. The native selection-contrast check passed 64
+cases with a minimum of 5.072:1 for selection text. The UI fixtures also
+verified keyboard reset, a single request, restored focus and URL, and both
+themes with the compact, topbar and CSS-only branding examples.
+
+PR review identified two additional cases. The host palette cache now tracks
+changes made through the CSS Object Model, including edits to adopted sheets.
+The filter button counts only the fields the panel can clear. Regression tests
+cover updates to an existing stylesheet and a retained hidden filter.
+
 ## PR 85 inherited filter values (2026-11-06)
 
 Base `7d4a500`, same branch and checkout. Empty text filters with legal field

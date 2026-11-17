@@ -1,10 +1,12 @@
 <template>
   <div
+    ref="header"
     data-ui="datagrid"
     data-part="header"
-    class="flex flex-col gap-4 px-0 py-4 xl:flex-row xl:items-center xl:justify-between"
+    tabindex="-1"
+    class="flex flex-col gap-4 px-0 py-4 xl:flex-row xl:items-start xl:justify-between"
   >
-    <div class="mb-4 sm:mb-0">
+    <div>
       <h1 class="text-2xl font-semibold tracking-tight text-text-primary">
         {{ (props.meta?.title ? t(props.meta.title) : '') || t('Данные') }}
       </h1>
@@ -13,7 +15,10 @@
       </p>
     </div>
 
-    <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+    <div
+      ref="toolbar"
+      class="flex min-w-0 flex-col gap-3 empty:hidden sm:flex-row sm:flex-wrap sm:items-center"
+    >
       <!-- Поиск -->
       <div v-if="searchable" class="relative">
         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -23,12 +28,23 @@
           :model-value="searchQuery"
           @update:modelValue="$emit('search', String($event))"
           :placeholder="t('Поиск...')"
+          :aria-label="t('Поиск')"
+          data-grid-search
           class="pl-9"
         />
       </div>
 
+      <slot />
+
       <!-- Дополнительные действия -->
-      <div class="flex flex-wrap items-center gap-2">
+      <div
+        v-if="
+          config.behaviour?.refreshable ||
+          config.behaviour?.exportable ||
+          config.behaviour?.creatable
+        "
+        class="flex flex-wrap items-center gap-2"
+      >
         <!-- Кнопка обновления -->
         <AppButton
           v-if="config.behaviour?.refreshable"
@@ -64,7 +80,7 @@
 
 <script setup lang="ts">
 import { t } from '@/i18n'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 import type { Config, Meta } from '@/composables/useDataGrid.ts'
 import { Download, Plus, RefreshCcw, Search } from 'lucide-vue-next'
@@ -94,6 +110,20 @@ const searchable = computed(
     props.config.behaviour?.searchable ??
     ['server', 'client'].includes(props.config.behaviour?.searchMode ?? ''),
 )
+
+const header = ref<HTMLElement | null>(null)
+const toolbar = ref<HTMLElement | null>(null)
+function focusControls(): void {
+  if (!toolbar.value) return
+  for (const control of toolbar.value.querySelectorAll<HTMLElement>(
+    'input:not([disabled]), button:not([disabled])',
+  )) {
+    control.focus()
+    if (control.ownerDocument.activeElement === control) return
+  }
+  header.value?.focus()
+}
+defineExpose({ focusControls })
 
 // Define emits
 defineEmits<{

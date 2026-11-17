@@ -8,7 +8,7 @@ import {
   registerBrandingRecovery,
   takeBrandingRecovery,
 } from '@/appearance/brandingRecovery'
-import { deriveBrandPalette, readBrand, themePrimaryHex } from '@/appearance/brand'
+import { deriveBrandPalette, oceanAccent, readBrand, themePrimaryHex } from '@/appearance/brand'
 import { AppearanceSaveError, notifySaveFailure } from '@/appearance/saveFeedback'
 import { t } from '@/i18n'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -27,7 +27,11 @@ const draft = reactive({
   logoLight: undefined as string | undefined,
   logoDark: undefined as string | undefined,
 })
-const accentMode = ref<'solid' | 'gradient'>('solid')
+type AccentMode = 'project' | 'solid' | 'gradient'
+const accentMode = ref<AccentMode>('project')
+const accentModeOf = (brand: { accentColor: string; accentColorEnd?: string }): AccentMode =>
+  brand.accentColorEnd ? 'gradient' : brand.accentColor ? 'solid' : 'project'
+const validHex = (value: string) => /^#[\da-f]{6}$/i.test(value)
 const accentModeId = useId()
 const urls = reactive({ light: '', dark: '' })
 const decoding = reactive({ light: false, dark: false })
@@ -42,30 +46,51 @@ function invalidateLogos() {
 const version = ref(0)
 const loaded = ref(false)
 const resetOpen = ref(false)
-const pickerColor = computed(() => {
-  if (/^#[\da-f]{6}$/i.test(draft.accentColor)) return draft.accentColor
-  // Read the host pack, not the currently applied brand override.
-  return themePrimaryHex(appearance.dark) || '#2563eb'
+const projectPalette = computed(() => {
+  // Project colors can change when a host stylesheet crosses a media query.
+  void appearance.brandPaletteRevision
+  return {
+    light: deriveBrandPalette('', false),
+    dark: deriveBrandPalette('', true),
+    picker: themePrimaryHex(appearance.dark) || oceanAccent.start,
+  }
 })
+const pickerColor = computed(() =>
+  validHex(draft.accentColor) ? draft.accentColor : projectPalette.value.picker,
+)
+const defaultEnd = computed(() =>
+  pickerColor.value.toUpperCase() === oceanAccent.end ? oceanAccent.start : oceanAccent.end,
+)
+const previewPalettes = computed(() =>
+  validHex(draft.accentColor)
+    ? {
+        light: deriveBrandPalette(draft.accentColor, false, draft.accentColorEnd),
+        dark: deriveBrandPalette(draft.accentColor, true, draft.accentColorEnd),
+      }
+    : projectPalette.value,
+)
 function setPickerColor(event: Event) {
   draft.accentColor = (event.target as HTMLInputElement).value
 }
 function resetColors() {
-  accentMode.value = 'solid'
+  accentMode.value = 'project'
   draft.accentColor = ''
   draft.accentColorEnd = ''
 }
 function setAccentMode(event: Event) {
-  accentMode.value = (event.target as HTMLSelectElement).value === 'gradient' ? 'gradient' : 'solid'
-  draft.accentColorEnd =
-    (event.target as HTMLSelectElement).value === 'gradient'
-      ? draft.accentColor || pickerColor.value || '#2563eb'
-      : ''
-  if (draft.accentColorEnd && !draft.accentColor) draft.accentColor = draft.accentColorEnd
+  const mode = (event.target as HTMLSelectElement).value
+  if (mode === 'project') {
+    resetColors()
+    return
+  }
+  if (mode !== 'solid' && mode !== 'gradient') return
+  accentMode.value = mode
+  if (!draft.accentColor) draft.accentColor = pickerColor.value
+  draft.accentColorEnd = mode === 'gradient' ? defaultEnd.value : ''
 }
 function setEndPickerColor(event: Event) {
   draft.accentColorEnd = (event.target as HTMLInputElement).value
-  if (!draft.accentColor) draft.accentColor = pickerColor.value || draft.accentColorEnd
+  if (!draft.accentColor) draft.accentColor = pickerColor.value
 }
 
 let baseline = { name: '', accentColor: '', accentColorEnd: '' }
@@ -94,7 +119,7 @@ watch(
     urls.light = ''
     urls.dark = ''
     resetOpen.value = false
-    accentMode.value = 'solid'
+    accentMode.value = 'project'
     loaded.value = false
     pending.value = false
     error.value = ''
@@ -118,7 +143,7 @@ const unregisterRecovery = registerBrandingRecovery(() => {
     name: draft.name,
     accentColor: draft.accentColor,
     accentColorEnd: draft.accentColorEnd,
-    accentMode: accentMode.value,
+    accentMode: accentMode.value === 'solid' ? 'custom-solid' : accentMode.value,
     conflict: status.value === 'conflict',
     baseline: { ...baseline },
     ...(draft.logoLight === '' ? { logoLight: '' as const } : {}),
@@ -133,7 +158,7 @@ onUnmounted(() => {
   controller?.abort()
 })
 function hydrate(brand: ReturnType<typeof readBrand>) {
-  accentMode.value = brand.accentColorEnd ? 'gradient' : 'solid'
+  accentMode.value = accentModeOf(brand)
   baseline = {
     name: brand.name,
     accentColor: brand.accentColor,
@@ -213,11 +238,11 @@ async function load(keep = false) {
       if (
         draft.accentColor === baseline.accentColor &&
         draft.accentColorEnd === baseline.accentColorEnd &&
-        accentMode.value === (baseline.accentColorEnd ? 'gradient' : 'solid')
+        accentMode.value === accentModeOf(baseline)
       ) {
         draft.accentColor = brand.accentColor
         draft.accentColorEnd = brand.accentColorEnd || ''
-        accentMode.value = brand.accentColorEnd ? 'gradient' : 'solid'
+        accentMode.value = accentModeOf(brand)
       }
       if (draft.logoLight === undefined) urls.light = brand.logoLightUrl
       if (draft.logoDark === undefined) urls.dark = brand.logoDarkUrl
@@ -230,6 +255,10 @@ async function load(keep = false) {
       hydrate(brand)
       const recovery = permission.value ? takeBrandingRecovery(appearance.owner) : undefined
       if (recovery) {
+        const mode =
+          recovery.accentMode === 'custom-solid'
+            ? 'solid'
+            : (recovery.accentMode ?? accentModeOf(recovery))
         recoveryConflict = recovery.conflict === true || recovery.version !== brand.version
         // Keep the rejected version until the user explicitly accepts a fresh one.
         if (recoveryConflict) version.value = recovery.version
@@ -237,11 +266,11 @@ async function load(keep = false) {
         if (
           recovery.accentColor !== recovery.baseline.accentColor ||
           recovery.accentColorEnd !== recovery.baseline.accentColorEnd ||
-          recovery.accentMode !== (recovery.baseline.accentColorEnd ? 'gradient' : 'solid')
+          mode !== accentModeOf(recovery.baseline)
         ) {
           draft.accentColor = recovery.accentColor
           draft.accentColorEnd = recovery.accentColorEnd || ''
-          accentMode.value = recovery.accentMode || (recovery.accentColorEnd ? 'gradient' : 'solid')
+          accentMode.value = mode
         }
         if (recovery.logoLight === '') {
           draft.logoLight = ''
@@ -321,10 +350,8 @@ async function apply(reset = false) {
     return
   if (
     !reset &&
-    ((accentMode.value === 'gradient' && !draft.accentColorEnd) ||
-      (draft.accentColor && !/^#[\da-f]{6}$/i.test(draft.accentColor)) ||
-      (draft.accentColorEnd &&
-        (!draft.accentColor || !/^#[\da-f]{6}$/i.test(draft.accentColorEnd))))
+    ((accentMode.value !== 'project' && !validHex(draft.accentColor)) ||
+      (accentMode.value === 'gradient' && !validHex(draft.accentColorEnd)))
   ) {
     error.value = 'Укажите HEX-цвет в формате #RRGGBB.'
     return
@@ -412,11 +439,12 @@ async function apply(reset = false) {
               class="appearance-select min-w-0 w-full rounded-lg border border-border-primary bg-card px-3"
               @change="setAccentMode"
             >
-              <option value="solid">{{ t('Сплошной цвет') }}</option>
-              <option value="gradient">{{ t('Градиент') }}</option>
+              <option value="project">{{ t('По настройкам проекта') }}</option>
+              <option value="solid">{{ t('Свой сплошной цвет') }}</option>
+              <option value="gradient">{{ t('Свой градиент') }}</option>
             </select>
           </div>
-          <div class="flex items-end gap-3">
+          <div v-if="accentMode !== 'project'" class="flex items-end gap-3">
             <label class="flex min-w-0 flex-1 flex-col gap-2 text-sm font-medium"
               >{{ t('Акцентный цвет')
               }}<input
@@ -446,11 +474,7 @@ async function apply(reset = false) {
             <input
               type="color"
               :aria-label="t('Выбрать конечный цвет')"
-              :value="
-                /^#[\da-f]{6}$/i.test(draft.accentColorEnd)
-                  ? draft.accentColorEnd
-                  : pickerColor || '#2563eb'
-              "
+              :value="validHex(draft.accentColorEnd) ? draft.accentColorEnd : defaultEnd"
               class="h-11 w-11 shrink-0 cursor-pointer rounded border border-border-primary bg-card p-1"
               @input="setEndPickerColor"
             />
@@ -458,9 +482,13 @@ async function apply(reset = false) {
           <p v-if="accentMode === 'gradient'" class="text-sm text-text-secondary">
             {{ t('Градиент 135°. Цвета заливки адаптируются для читаемости.') }}
           </p>
-          <AppButton variant="secondary" size="sm" @click="resetColors">{{
-            t('Сбросить цвет')
-          }}</AppButton>
+          <AppButton
+            v-if="accentMode !== 'project'"
+            variant="secondary"
+            size="sm"
+            @click="resetColors"
+            >{{ t('Сбросить цвет') }}</AppButton
+          >
         </div>
         <div class="space-y-4 border-t border-border-secondary pt-5">
           <h3 class="font-semibold">{{ t('Логотипы') }}</h3>
@@ -488,7 +516,7 @@ async function apply(reset = false) {
           v-for="variant in ['light', 'dark'] as const"
           :key="variant"
           :class="variant === 'dark' ? 'dark bg-[#20242b] text-white' : 'bg-white text-[#20242b]'"
-          :style="deriveBrandPalette(draft.accentColor, variant === 'dark', draft.accentColorEnd)"
+          :style="previewPalettes[variant]"
           class="min-w-0 space-y-4 rounded-xl border border-border-primary p-4"
         >
           <span class="text-xs">{{ t(variant === 'dark' ? 'Тёмная' : 'Светлая') }}</span>

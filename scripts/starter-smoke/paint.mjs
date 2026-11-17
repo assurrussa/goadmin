@@ -1,8 +1,8 @@
 import { expect } from 'playwright/test'
 
-// Published presentation examples intentionally use different accent palettes.
+// The shell background color and its overlaid primary fill are separate tokens.
 const primary = {
-  default: { light: [36, 98, 198], dark: [143, 178, 234] },
+  default: { light: [0, 117, 176], dark: [56, 189, 248] },
   topbar: { light: [15, 118, 108], dark: [128, 229, 219] },
 }
 
@@ -22,6 +22,12 @@ export function paintViolations(paint, pack, mode, light) {
   if (actual[3] !== 255 || expected.some((channel, index) => Math.abs(channel - actual[index]) > 2)) {
     errors.push(`Edit accent: expected RGB ${expected.join(',')}, painted ${paint.edit.background.css}`)
   }
+  const fill = paint.edit.image
+  if (pack === 'default' && !(fill?.startsWith('linear-gradient(135deg') &&
+    fill.includes('rgb(0, 117, 176)') && fill.includes('rgb(30, 58, 138)'))) {
+    errors.push('Edit fill: expected the Ocean gradient')
+  }
+  if (pack === 'topbar' && fill !== 'none') errors.push('Edit fill: expected the solid host accent')
   for (const part of ['card', 'shell']) {
     const background = luminance(paint[part].background.rgba)
     const foreground = luminance(paint[part].foreground.rgba)
@@ -58,7 +64,7 @@ export async function capturePaint(page) {
     }
     const read = (element) => {
       const computed = getComputedStyle(element)
-      return { background: color(computed.backgroundColor), foreground: color(computed.color) }
+      return { background: color(computed.backgroundColor), foreground: color(computed.color), image: computed.backgroundImage }
     }
     return { edit: read(edit), card: read(card), shell: read(shell) }
   })

@@ -196,6 +196,12 @@ export function useDataGridWorkflow(
     ]
     void grid.loadData({ ...view.state, page: 1 })
   }
+  const resetQuery = () => {
+    if (grid.navigationSuspended.value) return
+    defaultEligible = false
+    grid.selectedItems.value = []
+    void grid.loadData({ page: 1, search: '', filters: {} })
+  }
   const loadPreferences = async () => {
     const url = workflow.value?.preferencesUrl
     if (!url) return
@@ -550,6 +556,7 @@ export function useDataGridWorkflow(
     results,
     pendingAction,
     applyView,
+    resetQuery,
     savePreferences,
     saveView,
     deleteView,

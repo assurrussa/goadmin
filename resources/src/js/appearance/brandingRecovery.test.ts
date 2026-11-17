@@ -81,6 +81,15 @@ it('normalizes legacy recovery to solid', () => {
     baseline: { accentColorEnd: '' },
   })
 })
+it.each([
+  ['solid', 'project'],
+  ['project', 'project'],
+  ['custom-solid', 'custom-solid'],
+] as const)('recovers empty %s as %s', (value, expected) => {
+  registerBrandingRecovery(() => ({ ...snapshot(), accentColor: '', accentMode: value }))
+  pauseBrandingRecovery()
+  expect(takeBrandingRecovery('1')?.accentMode).toBe(expected)
+})
 it('preserves explicit gradient mode with an empty endpoint and infers it in legacy drafts', () => {
   registerBrandingRecovery(() => ({ ...snapshot(), accentMode: 'gradient', accentColorEnd: '' }))
   pauseBrandingRecovery()

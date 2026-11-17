@@ -317,7 +317,42 @@ describe('DataGridPagination passing contracts: enabled versus no-op controls', 
 
 describe('DataGridFilters passing contracts', () => {
   it('renders nothing when there are no filterable columns', () => {
-    expect(text(mount(DataGridFilters, { filterableColumns: [], filters: {} }).element)).toBe('')
+    const { element } = mount(DataGridFilters, { filterableColumns: [], filters: {} })
+    expect(element.firstElementChild).toBeNull()
+  })
+  it('links the mobile disclosure and single inline controls to distinct IDs per grid', async () => {
+    const props = { filterableColumns: [column('status')], filters: { status: false } }
+    const { element } = mount(
+      defineComponent({
+        setup: () => () => [h(DataGridFilters, props), h(DataGridFilters, props)],
+      }),
+      {},
+    )
+    applyLocale('en')
+    try {
+      await settle()
+      const toggles = Array.from(
+        element.querySelectorAll<HTMLButtonElement>('button[aria-controls]'),
+      )
+      expect(toggles).toHaveLength(2)
+      expect(new Set(toggles.map((toggle) => toggle.getAttribute('aria-controls'))).size).toBe(2)
+      for (const toggle of toggles) {
+        expect(text(toggle)).toBe('Filters (1)')
+        expect(toggle.classList.contains('sm:hidden')).toBe(true)
+        const panel = element.querySelector(`#${toggle.getAttribute('aria-controls')}`)!
+        expect(panel.classList.contains('hidden')).toBe(true)
+        expect(panel.classList.contains('sm:flex')).toBe(true)
+        toggle.click()
+        await settle()
+        expect(toggle.getAttribute('aria-expanded')).toBe('true')
+        expect(panel.classList.contains('hidden')).toBe(false)
+      }
+      const fieldIds = Array.from(element.querySelectorAll('input'), (control) => control.id)
+      expect(fieldIds).toHaveLength(2)
+      expect(new Set(fieldIds).size).toBe(2)
+    } finally {
+      applyLocale('ru')
+    }
   })
   it('renders text and numeric inputs with labels and emits one-key patches', async () => {
     const onFilterChange = vi.fn()
@@ -326,11 +361,20 @@ describe('DataGridFilters passing contracts', () => {
       filters: {},
       onFilterChange,
     })
-    expect(element.querySelector('label[for="filter-name"]')).not.toBeNull()
-    const count = element.querySelector<HTMLInputElement>('#filter-count')!
+    const toggle = button(element, 'Фильтры')
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    const panel = element.querySelector(`#${toggle.getAttribute('aria-controls')}`)!
+    expect(panel.classList.contains('hidden')).toBe(true)
+    toggle.click()
+    await settle()
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(panel.classList.contains('hidden')).toBe(false)
+    const [name, count] = panel.querySelectorAll('input')
+    expect(panel.querySelector(`label[for="${name.id}"]`)?.textContent?.trim()).toBe('name')
+    expect(panel.querySelector(`label[for="${count.id}"]`)?.textContent?.trim()).toBe('count')
     expect(count.type).toBe('number')
     expect(count.getAttribute('inputmode')).toBe('numeric')
-    await input(element.querySelector('#filter-name')!, 'Ada')
+    await input(name, 'Ada')
     await input(count, '0')
     expect(onFilterChange.mock.calls).toEqual([[{ name: 'Ada' }], [{ count: 0 }]])
   })
@@ -351,7 +395,7 @@ describe('DataGridFilters passing contracts', () => {
         })
       const { element, warnings } = grid(data({}))
       await settle()
-      const control = element.querySelector<HTMLInputElement>(`#filter-${key}`)!
+      const control = element.querySelector<HTMLInputElement>('[data-part="filter-panel"] input')!
       expect(control.value).toBe('')
       fetchMock.mockResolvedValueOnce(response(data({ [key]: 'Chosen value' })))
       await input(control, 'Chosen value')
@@ -403,7 +447,7 @@ describe('DataGridFilters passing contracts', () => {
       await settle()
       expect(onFilterChange.mock.calls).toEqual([[{ [key]: 'chosen' }]])
       expect(text(trigger)).toBe('Chosen value')
-      filters[key] = 0
+      filters[key] = '0'
       await settle()
       expect(text(trigger)).toBe('Zero value')
       button(element, 'Очистить все').click()
@@ -415,15 +459,18 @@ describe('DataGridFilters passing contracts', () => {
       expect(warnings).toEqual([])
     },
   )
-  it('displays 0 and false as active filters and clears configured columns with empty strings', () => {
+  it('displays 0 and false as active filters and clears configured columns with empty strings', async () => {
     const onFilterChange = vi.fn()
     const { element } = mount(DataGridFilters, {
       filterableColumns: [column('count'), column('flag')],
       filters: { count: 0, flag: false },
       onFilterChange,
     })
-    expect(element.querySelector<HTMLInputElement>('#filter-count')?.value).toBe('0')
-    expect(element.querySelector<HTMLInputElement>('#filter-flag')?.value).toBe('false')
+    button(element, 'Фильтры (2)').click()
+    await settle()
+    const [count, flag] = element.querySelectorAll('input')
+    expect(count.value).toBe('0')
+    expect(flag.value).toBe('false')
     button(element, 'Очистить все').click()
     expect(onFilterChange.mock.calls).toEqual([[{ count: '', flag: '' }]])
   })
@@ -432,7 +479,7 @@ describe('DataGridFilters passing contracts', () => {
       filterableColumns: [column('name')],
       filters: { name: '', a: null, b: undefined },
     })
-    expect(buttons(element)).toHaveLength(0)
+    expect(buttons(element)).toEqual([button(element, 'Фильтры')])
   })
   it('renders select with label, placeholder and configured selected option', async () => {
     const { element } = mount(DataGridFilters, {
@@ -448,7 +495,8 @@ describe('DataGridFilters passing contracts', () => {
     await settle()
     expect(element.querySelector('[role="combobox"]')).not.toBeNull()
     expect(text(element)).toContain('Active')
-    expect(element.querySelector('label')?.getAttribute('for')).toBe('filter-status')
+    const trigger = element.querySelector('[role="combobox"]')!
+    expect(element.querySelector('label')?.getAttribute('for')).toBe(trigger.id)
   })
 })
 
@@ -668,7 +716,7 @@ describe('DataGrid passing contracts: empty, loading, error and URL state', () =
     expect(query().get('search')).toBe('missing')
     const status = element.querySelector('[role="status"]')!
     expect(text(status)).toContain('Ничего не найдено')
-    expect(status.querySelector('button')).toBeNull()
+    expect(button(element, 'Сбросить поиск и фильтры')).toBeTruthy()
   })
   it('with syncWithUrl false neither reads nor rewrites the page query', async () => {
     window.history.replaceState({}, '', '/admin?search=preserve#anchor')
@@ -744,15 +792,20 @@ describe('DataGrid regression fixes and remaining behavior boundaries', () => {
     expect(onActionCreate).not.toHaveBeenCalled()
     // Capability boundary only, not a promised feature regression.
   })
-  it('clear-all only clears configured filter keys and leaves extra active keys untouched', () => {
+  it('only counts and clears active filters that the panel can edit', async () => {
     const onFilterChange = vi.fn()
-    const { element } = mount(DataGridFilters, {
+    const { element, props } = mount(DataGridFilters, {
       filterableColumns: [column('name')],
-      filters: { hidden: 'retained' },
+      filters: { name: 'Ada', hidden: 'retained' },
       onFilterChange,
     })
+    button(element, 'Фильтры (1)').click()
+    await settle()
     button(element, 'Очистить все').click()
     expect(onFilterChange.mock.calls).toEqual([[{ name: '' }]])
+    props.filters = { hidden: 'retained' }
+    await settle()
+    expect(buttons(element)).toEqual([button(element, 'Фильтры')])
   })
   it('treats a zero-valued filter as a filtered empty-state condition', async () => {
     const { element } = grid(
@@ -760,7 +813,7 @@ describe('DataGrid regression fixes and remaining behavior boundaries', () => {
     )
     await settle()
     expect(text(element.querySelector('[role="status"]')!)).toContain('Ничего не найдено')
-    expect(element.querySelector('[role="status"] button')).toBeNull()
+    expect(button(element, 'Сбросить поиск и фильтры')).toBeTruthy()
   })
   it('loads URL limit when it is the only query parameter', async () => {
     window.history.replaceState({}, '', '/admin?limit=50')

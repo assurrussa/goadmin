@@ -64,6 +64,111 @@ afterEach(() => {
 })
 
 describe('opt-in workflow lifecycle', () => {
+  it('retains the selected view and visible columns as an unsaved edit after resetting conditions', async () => {
+    const saved = {
+      id: 'view',
+      name: 'Saved',
+      state: {
+        search: 'missing',
+        filters: { count: '0' },
+        sortBy: 'name',
+        sortOrder: 'asc' as const,
+        limit: 25,
+        columns: ['name'],
+      },
+    }
+    fetchMock.mockResolvedValueOnce(prefs({ ...payload(), views: [saved] }))
+    const { grid, model } = mount()
+    await settle()
+    const filtered = page([])
+    filtered.pagination!.perPage = 25
+    filtered.meta = { title: '', description: '', filters: { count: 0, _search: 'missing' } }
+    fetchMock.mockResolvedValueOnce(response(filtered))
+    model.applyView(saved.id)
+    await settle()
+    expect(model.viewDirty.value).toBe(false)
+    fetchMock.mockReturnValueOnce(new Promise<Response>(() => {}))
+    model.resetQuery()
+    expect(model.activeViewId.value).toBe(saved.id)
+    expect(model.columns.value).toEqual(['name'])
+    expect(model.viewDirty.value).toBe(true)
+    expect(model.preferences.value.views[0].state.search).toBe('missing')
+    expect(grid.filters.value).toEqual({})
+    expect(fetchMock.mock.calls).toHaveLength(3)
+    expect(fetchMock.mock.calls[2][0]).toBe(
+      '/users/data?page=1&limit=25&sortBy=name&sortOrder=asc&search=',
+    )
+    expect(fetchMock.mock.calls.some(([, options]) => options?.method === 'PUT')).toBe(false)
+  })
+
+  it.each(['debounce', 'request'])(
+    'supersedes a pending %s and a late default view on reset',
+    async (pending) => {
+      vi.useFakeTimers()
+      try {
+        let finishPreferences!: (value: Response) => void
+        fetchMock.mockImplementationOnce(
+          () =>
+            new Promise((done) => {
+              finishPreferences = done
+            }),
+        )
+        const { grid, model } = mount(true)
+        await settle()
+        let finishObsolete!: (value: Response) => void
+        const staleJson = vi.fn().mockResolvedValue(page(['obsolete']))
+        if (pending === 'debounce') {
+          grid.handleSearch('pending search')
+        } else {
+          fetchMock.mockImplementationOnce(
+            () =>
+              new Promise((done) => {
+                finishObsolete = done
+              }),
+          )
+          void grid.loadData({ search: 'pending search' })
+        }
+        fetchMock.mockResolvedValueOnce(response(page(['reset'])))
+        model.resetQuery()
+        await settle()
+        if (pending === 'request') {
+          expect(fetchMock.mock.calls[1][1]?.signal?.aborted).toBe(true)
+          finishObsolete({ ok: true, json: staleJson } as unknown as Response)
+        }
+        finishPreferences(
+          prefs({
+            ...payload(),
+            defaultViewId: 'mine',
+            views: [
+              {
+                id: 'mine',
+                name: 'Default',
+                state: {
+                  search: 'late default',
+                  filters: {},
+                  sortBy: '',
+                  sortOrder: 'desc',
+                  limit: 10,
+                  columns: ['id', 'name'],
+                },
+              },
+            ],
+          }),
+        )
+        await vi.advanceTimersByTimeAsync(500)
+        await settle()
+        expect(grid.searchQuery.value).toBe('')
+        expect(grid.items.value[0]?.selectionId).toBe('reset')
+        expect(model.ready.value).toBe(true)
+        expect(model.activeViewId.value).toBe('')
+        expect(fetchMock.mock.calls).toHaveLength(pending === 'debounce' ? 2 : 3)
+        expect(staleJson).not.toHaveBeenCalled()
+      } finally {
+        vi.useRealTimers()
+      }
+    },
+  )
+
   it('does not fetch preferences or retain session subscriptions during server rendering', async () => {
     const subscribe = vi.spyOn(sessionCoordinator, 'subscribe')
     const app = createSSRApp(

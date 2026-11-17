@@ -1,7 +1,7 @@
 import { reactive } from 'vue'
 import { applyLocale, installLocalePreferenceHandler } from '@/i18n'
 import { adminFetch } from '@/http'
-import { applyBrand, emptyBrand, readBrand } from './brand'
+import { applyBrand, emptyBrand, observeBrandMedia, readBrand } from './brand'
 import {
   clearBrandingRecovery,
   pauseBrandingRecovery,
@@ -49,6 +49,7 @@ export const appearance = reactive({
   brandingRead: false,
   brandingUpdate: false,
   brand: { ...emptyBrand },
+  brandPaletteRevision: 0,
   dark: false,
   resolving: false,
   error: '',
@@ -57,6 +58,7 @@ let generation = 0
 let controller: AbortController | undefined
 let initialized = false
 let media: MediaQueryList | undefined
+let stopBrandMedia: (() => void) | undefined
 let pending = false
 const changed = () =>
   (['theme', 'locale', 'density'] as const).filter(
@@ -76,13 +78,17 @@ export function paintAppearance() {
   document.documentElement.dataset.themeMode = appearance.dark ? 'dark' : 'light'
   document.documentElement.dataset.density = appearance.draft.density
   applyLocale(appearance.draft.locale)
-  applyBrand(appearance.brand, appearance.dark)
+  paintBrand()
+}
+function paintBrand() {
+  appearance.brandPaletteRevision = applyBrand(appearance.brand, appearance.dark)
 }
 export function initAppearance() {
   if (initialized) return
   initialized = true
   media = window.matchMedia?.('(prefers-color-scheme: dark)')
   media?.addEventListener('change', paintAppearance)
+  stopBrandMedia = observeBrandMedia(paintBrand)
   const root = document.documentElement
   // Validated head attributes seed paint only; server props still own identity.
   appearance.draft = root.dataset.appearanceOwner
@@ -180,6 +186,8 @@ export function pauseAppearance() {
   discardAppearance(true)
 }
 export function disposeAppearance() {
+  stopBrandMedia?.()
+  stopBrandMedia = undefined
   discardAppearance(true)
   media?.removeEventListener('change', paintAppearance)
   initialized = false

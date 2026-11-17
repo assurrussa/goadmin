@@ -1,6 +1,7 @@
 <template>
   <div data-ui="datagrid" data-part="root" class="data-grid space-y-6">
     <DataGridHeader
+      ref="header"
       :meta="metaInfo"
       :config="headerConfig"
       :search-query="searchQuery"
@@ -9,7 +10,13 @@
       @create="handleCreate"
       @refresh="handleRefresh"
       @export="handleExport"
-    />
+    >
+      <DataGridFilters
+        :filterable-columns="filterableColumns"
+        :filters="filters"
+        @filter-change="handleFilterChange"
+      />
+    </DataGridHeader>
 
     <DataGridWorkflow
       v-if="config.workflow"
@@ -17,12 +24,6 @@
       :selected-count="selectedItems.length"
       :loading="loading || !!loadError"
       @clear-selection="selectedItems = []"
-    />
-
-    <DataGridFilters
-      :filterable-columns="filterableColumns"
-      :filters="filters"
-      @filter-change="handleFilterChange"
     />
 
     <div
@@ -61,28 +62,26 @@
     />
 
     <!-- Пустое состояние -->
-    <div
-      v-if="!loading && !loadError && hasLoaded && items.length === 0"
-      class="text-center py-16"
-      role="status"
-    >
+    <div v-if="!loading && !loadError && hasLoaded && items.length === 0" class="text-center py-16">
       <div class="mx-auto h-24 w-24 text-text-tertiary mb-4">
         <Inbox class="h-24 w-24" />
       </div>
-      <h3 class="text-lg font-medium text-text-primary mb-2">
-        {{ searchQuery || hasActiveFilters ? t('Ничего не найдено') : t('Нет данных') }}
-      </h3>
-      <p class="text-text-secondary mb-6">
-        {{
-          searchQuery || hasActiveFilters
-            ? t('Измените поиск или фильтры и попробуйте снова.')
-            : t(config.ui?.emptyMessage || 'Нет данных для отображения')
-        }}
-      </p>
-      <AppButton
-        v-if="config.behaviour?.creatable && !searchQuery && !hasActiveFilters"
-        @click="handleCreate"
-      >
+      <div role="status">
+        <h3 class="text-lg font-medium text-text-primary mb-2">
+          {{ queryActive ? t('Ничего не найдено') : t('Нет данных') }}
+        </h3>
+        <p class="text-text-secondary mb-6">
+          {{
+            queryActive
+              ? t('Измените поиск или фильтры и попробуйте снова.')
+              : t(config.ui?.emptyMessage || 'Нет данных для отображения')
+          }}
+        </p>
+      </div>
+      <AppButton v-if="queryActive" variant="outline" @click="resetEmptyQuery">
+        {{ t('Сбросить поиск и фильтры') }}
+      </AppButton>
+      <AppButton v-else-if="config.behaviour?.creatable" @click="handleCreate">
         <Plus class="-ml-1 mr-2 h-4 w-4" />
         {{ t(config.ui?.createButtonText || 'Создать') }}
       </AppButton>
@@ -105,10 +104,11 @@ import { useAuthUserStore } from '@/stores/authUser'
 import { useDataGridWorkflow, type BulkResult } from '@/composables/useDataGridWorkflow'
 import DataGridWorkflow from './DataGridWorkflow.vue'
 import { isGridHistoryRestoration } from './historyRestoration'
-import { computed, getCurrentInstance, onMounted, onUnmounted, watch } from 'vue'
+import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   type ApiResponse,
   type DataItemValue,
+  isActiveDataGridFilter,
   isDataGridFilterKey,
   parseDataGridQuery,
   useDataGrid,
@@ -213,11 +213,16 @@ const {
   suspendForNavigation,
 } = grid
 
-const hasActiveFilters = computed(() =>
-  Object.values(filters.value).some(
-    (value) => value !== '' && value !== null && value !== undefined,
-  ),
+const queryActive = computed(
+  () => !!searchQuery.value || Object.values(filters.value).some(isActiveDataGridFilter),
 )
+
+const header = ref<InstanceType<typeof DataGridHeader> | null>(null)
+async function resetEmptyQuery(): Promise<void> {
+  workflowModel.resetQuery()
+  await nextTick()
+  header.value?.focusControls()
+}
 
 let synchronizedLocation =
   typeof window === 'undefined' ? '' : window.location.pathname + window.location.search
@@ -243,7 +248,7 @@ const updateURL = (): void => {
   params.set('sortOrder', sortOrder.value)
   if (searchQuery.value) params.set('search', searchQuery.value)
   Object.entries(filters.value).forEach(([key, value]) => {
-    if (isDataGridFilterKey(key) && value !== null && value !== undefined && value !== '') {
+    if (isDataGridFilterKey(key) && isActiveDataGridFilter(value)) {
       params.set(key, String(value))
     }
   })

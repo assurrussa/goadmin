@@ -4,7 +4,7 @@
 projects integrate it through the stable `github.com/assurrussa/goadmin/host`
 facade instead of copying admin internals.
 
-![GoAdmin default light theme: real users page with synthetic accounts and dot-and-text statuses](docs/screenshots/design-refresh/users-after-light.png)
+![GoAdmin Ocean theme on the users page with a status filter next to search](docs/screenshots/ocean-users-light.png)
 
 [Compare the default light/dark themes and run the local UI demos](docs/presentation-demo.md).
 
@@ -30,10 +30,9 @@ Deployed dependency versions and binary sizes were not verified. Frontend asset
 sizes are not whole-application footprints; these observations do not establish
 minimum requirements or performance guarantees.
 
-The published baseline is
-[v0.26.2](https://github.com/assurrussa/goadmin/releases/tag/v0.26.2):
-`go get github.com/assurrussa/goadmin@v0.26.2`.
-It selects GoAuth v0.18.0, gossoclient v0.6.1,
+Choose a version from the [published releases](https://github.com/assurrussa/goadmin/releases/latest)
+and run `go get github.com/assurrussa/goadmin@<tag>`.
+The current module selects GoAuth v0.18.0, gossoclient v0.6.1,
 GoNotify v0.6.0, GoUploads v0.13.0 and GoWebSocket v0.2.1 without sibling
 replacements. See the [release notes](RELEASING.md) for verification and
 consumer responsibilities.

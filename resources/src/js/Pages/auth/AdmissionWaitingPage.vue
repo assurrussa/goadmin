@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import AuthLayout from '@/components/layout/AuthLayout.vue'
 import AppHead from '@/components/layout/AppHead.vue'
+import { Button } from '@/components/ui/button'
 import { t, registerTranslations } from '@/i18n'
 registerTranslations({
   ru: {
@@ -41,11 +42,8 @@ const safePath = computed(() =>
     <AppHead :title="t('Admission waiting title')" />
     <template #title>{{ t('Admission waiting title') }}</template>
     <p role="status">{{ t('Admission waiting ' + known) }}</p>
-    <a
-      :href="safePath"
-      class="mt-4 inline-block rounded-[var(--goadmin-control-radius,4px)] bg-primary px-4 py-2 text-primary-foreground"
-    >
+    <Button as="a" :href="safePath" class="mt-4">
       {{ t('Admission retry') }}
-    </a>
+    </Button>
   </AuthLayout>
 </template>
