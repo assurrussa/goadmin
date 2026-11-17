@@ -99,9 +99,6 @@ const emit = defineEmits<{
 const panelId = `grid-filters-${useId()}`
 const expanded = ref(false)
 const inline = computed(() => props.filterableColumns.length === 1)
-const activeCount = computed(
-  () => Object.values(props.filters).filter(isActiveDataGridFilter).length,
-)
 
 const handleFilterChange = (key: string, value: AcceptableValue): void => {
   emit('filter-change', { [key]: value })
@@ -112,6 +109,11 @@ const getFilterValue = (key: string): unknown => {
   const value = props.filters[key]
   return Object.hasOwn(props.filters, key) ? value : undefined
 }
+
+const activeCount = computed(
+  () =>
+    props.filterableColumns.filter(({ key }) => isActiveDataGridFilter(getFilterValue(key))).length,
+)
 
 const getSelectValue = (column: Column): AcceptableValue | undefined => {
   const value = getFilterValue(column.key)

@@ -184,6 +184,31 @@ it('repaints both directions when a host stylesheet media condition changes', ()
   }
 })
 
+it('rechecks an attached stylesheet after in-place CSSOM edits', () => {
+  const style = document.createElement('style')
+  document.head.append(style)
+  const sheet = style.sheet!
+  const root = document.documentElement
+  try {
+    applyBrand(emptyBrand, false)
+    expect(root.style.getPropertyValue('--goadmin-primary-image')).toContain('135deg')
+    sheet.insertRule('html:not(.dark) { --color-primary: #008844 }', 0)
+    applyBrand(emptyBrand, false)
+    expect(root.style.getPropertyValue('--color-primary')).toBe('')
+    expect(deriveBrandPalette('', false)['--color-primary']).toBe('#008844')
+
+    sheet.deleteRule(0)
+    sheet.insertRule('html:not(.dark) { --color-primary: #143789 }', 0)
+    expect(deriveBrandPalette('', false)['--color-primary']).toBe('#143789')
+    const rule = sheet.cssRules[0] as CSSStyleRule
+    rule.style.removeProperty('--color-primary')
+    applyBrand(emptyBrand, false)
+    expect(root.style.getPropertyValue('--goadmin-primary-image')).toContain('135deg')
+  } finally {
+    style.remove()
+  }
+})
+
 it('leaves the live palette alone when an active stylesheet is unreadable', () => {
   const root = document.documentElement
   const unreadableSheet = {

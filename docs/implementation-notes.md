@@ -18,6 +18,11 @@ cases with a minimum of 5.072:1 for selection text. The UI fixtures also
 verified keyboard reset, a single request, restored focus and URL, and both
 themes with the compact, topbar and CSS-only branding examples.
 
+PR review identified two additional cases. The host palette cache now tracks
+changes made through the CSS Object Model, including edits to adopted sheets.
+The filter button counts only the fields the panel can clear. Regression tests
+cover updates to an existing stylesheet and a retained hidden filter.
+
 ## PR 85 inherited filter values (2026-11-06)
 
 Base `7d4a500`, same branch and checkout. Empty text filters with legal field

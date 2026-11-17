@@ -4,10 +4,9 @@ This module is published as `github.com/assurrussa/goadmin`.
 
 ## Current Baseline
 
-- The published baseline is
-  [v0.26.2](https://github.com/assurrussa/goadmin/releases/tag/v0.26.2).
-  Publication does not imply downstream deployment. Historical proposals below
-  are retained as records, not unused release tags or readiness claims.
+- The [latest GitHub release](https://github.com/assurrussa/goadmin/releases/latest)
+  identifies the current published version. Hosts upgrade their module pin and
+  rebuild their own application to deploy it.
 
 - Go 1.27.3 is the minimum. Modular host assembly is a breaking source API:
   migrate hosts to `host.New`, explicit modules and `host.AdminConfig`.
@@ -47,6 +46,16 @@ This module is published as `github.com/assurrussa/goadmin`.
   Published verification rejects every replacement and legacy shared/Redis module.
 - The frontend advisory gate and its current zero-finding result are reviewed
   in [docs/dependency-advisory-review.md](docs/dependency-advisory-review.md).
+
+## v0.28.0 Ocean and compact filters
+
+- The embedded admin defaults to the Ocean gradient for primary actions in
+  light and dark modes. Host branding and saved accent choices take precedence.
+- Tables keep one filter beside search on wider screens and group multiple
+  filters or narrow layouts behind the filters button. An empty search can
+  clear search and filters together while preserving sort, page size and columns.
+- Hosts receive these changes when rebuilding with the updated Go module.
+  The release uses the existing host API and database schema.
 
 ## v0.26.2 dependency patch
 

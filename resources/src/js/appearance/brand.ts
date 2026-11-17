@@ -108,12 +108,13 @@ function hostDeclaration(style: CSSStyleDeclaration, name: string): InlineDeclar
   return override?.value === current.value && !current.priority ? override.previous : current
 }
 type MediaState = Map<string, { query: MediaQueryList; matches: boolean }>
+type HostSheet = { css: string; media: string; complete: boolean }
 let onMediaChange: (() => void) | undefined
 let revision = 0
 let packCache:
   | {
       signature: string
-      sheets: CSSStyleSheet[]
+      css: string[]
       media: MediaState
       light: HostAccent
       dark: HostAccent
@@ -165,7 +166,25 @@ function copyStyle(target: Document, css: string): CSSStyleSheet | null {
   return style.sheet
 }
 
-function copyHostStyles(target: Document, sheets: CSSStyleSheet[], media: MediaState) {
+function snapshotHostSheet(sheet: CSSStyleSheet): HostSheet {
+  const media = sheet.media?.mediaText || ''
+  try {
+    // CSSOM edits can replace or mutate rules without changing the sheet
+    // object, its rule count, or the owning style element's text.
+    const rules = [...sheet.cssRules]
+    // Constructable sheets cannot preserve imports that may carry host branding.
+    const localRules = rules.filter((rule) => rule.type !== CSSRule.IMPORT_RULE)
+    return {
+      css: localRules.map((rule) => rule.cssText).join('\n'),
+      media,
+      complete: localRules.length === rules.length,
+    }
+  } catch {
+    return { css: '', media, complete: false }
+  }
+}
+
+function copyHostStyles(target: Document, sheets: HostSheet[], media: MediaState) {
   const anchorMedia = (rules: CSSRuleList) => {
     for (const rule of rules) {
       if (rule.type === CSSRule.MEDIA_RULE) {
@@ -179,14 +198,11 @@ function copyHostStyles(target: Document, sheets: CSSStyleSheet[], media: MediaS
   }
   let complete = true
   for (const sheet of sheets) {
-    if (sheet.disabled || !mediaMatches(media, sheet.media?.mediaText || '')) continue
+    if (!mediaMatches(media, sheet.media)) continue
+    complete &&= sheet.complete
+    if (!sheet.css) continue
     try {
-      const rules = [...sheet.cssRules]
-      // Constructable sheets cannot preserve CSS imports; unreadable imports
-      // may carry host branding, so do not infer the default in their presence.
-      const localRules = rules.filter((rule) => rule.type !== CSSRule.IMPORT_RULE)
-      complete &&= localRules.length === rules.length
-      const copy = copyStyle(target, localRules.map((rule) => rule.cssText).join('\n'))
+      const copy = copyStyle(target, sheet.css)
       if (copy) anchorMedia(copy.cssRules)
       else complete = false
     } catch {
@@ -237,6 +253,8 @@ function hostAccents() {
   )
   const classes = [...root.classList].filter((name) => name !== 'dark').join(' ')
   const sheets = [...document.styleSheets, ...(document.adoptedStyleSheets || [])]
+    .filter((sheet) => !sheet.disabled)
+    .map(snapshotHostSheet)
   const inline = Array.from(root.style, (name) => ({ name, ...hostDeclaration(root.style, name) }))
     .filter(({ value }) => value)
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -244,12 +262,11 @@ function hostAccents() {
     attributes.map(({ name, value }) => [name, value]),
     classes,
     inline,
-    sheets.map((sheet) => [sheet.disabled, sheet.media?.mediaText]),
+    sheets.map(({ media, complete }) => [media, complete]),
   ])
   if (
     packCache?.signature !== signature ||
-    sheets.length !== packCache.sheets.length ||
-    sheets.some((sheet, index) => sheet !== packCache!.sheets[index]) ||
+    sheets.some((sheet, index) => sheet.css !== packCache!.css[index]) ||
     [...packCache.media.values()].some(({ query, matches }) => query.matches !== matches)
   ) {
     const frame = document.createElement('iframe')
@@ -292,7 +309,7 @@ function hostAccents() {
       updateMediaListeners(packCache?.media, false)
       packCache = {
         signature,
-        sheets,
+        css: sheets.map((sheet) => sheet.css),
         media,
         light,
         dark,

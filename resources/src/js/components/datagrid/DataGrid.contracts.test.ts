@@ -792,15 +792,20 @@ describe('DataGrid regression fixes and remaining behavior boundaries', () => {
     expect(onActionCreate).not.toHaveBeenCalled()
     // Capability boundary only, not a promised feature regression.
   })
-  it('clear-all only clears configured filter keys and leaves extra active keys untouched', () => {
+  it('only counts and clears active filters that the panel can edit', async () => {
     const onFilterChange = vi.fn()
-    const { element } = mount(DataGridFilters, {
+    const { element, props } = mount(DataGridFilters, {
       filterableColumns: [column('name')],
-      filters: { hidden: 'retained' },
+      filters: { name: 'Ada', hidden: 'retained' },
       onFilterChange,
     })
+    button(element, 'Фильтры (1)').click()
+    await settle()
     button(element, 'Очистить все').click()
     expect(onFilterChange.mock.calls).toEqual([[{ name: '' }]])
+    props.filters = { hidden: 'retained' }
+    await settle()
+    expect(buttons(element)).toEqual([button(element, 'Фильтры')])
   })
   it('treats a zero-valued filter as a filtered empty-state condition', async () => {
     const { element } = grid(
