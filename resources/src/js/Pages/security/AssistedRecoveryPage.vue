@@ -5,6 +5,7 @@ import { router } from '@inertiajs/vue3'
 import { useI18n, registerTranslations } from '@/i18n'
 import { bindEphemeralAuthPage } from '@/lib/ephemeral-auth'
 import AppHead from '@/components/layout/AppHead.vue'
+import AppButton from '@/components/ui/AppButton.vue'
 registerTranslations({
   ru: {},
   en: {
@@ -198,13 +199,9 @@ async function submit(event: Event) {
             autocomplete="off"
             class="block w-full rounded border p-2"
         /></label>
-        <button
-          type="submit"
-          :disabled="!subject"
-          class="rounded-[var(--goadmin-control-radius,4px)] bg-primary px-4 py-2 text-primary-foreground"
-        >
+        <AppButton type="submit" :disabled="!subject">
           {{ t('Отправить приглашение') }}
-        </button>
+        </AppButton>
       </fieldset>
       <p role="status">{{ message?.() }}</p>
     </form>

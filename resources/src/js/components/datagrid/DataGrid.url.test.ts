@@ -248,4 +248,47 @@ describe('DataGrid URL and endpoint regressions', () => {
     expect(element.textContent).toContain('Ничего не найдено')
     expect(fetchMock).not.toHaveBeenCalled()
   })
+  it('resets a restored filtered empty grid, retries the reset query once, and preserves URL state', async () => {
+    const restoredQuery =
+      'page=3&limit=25&sortBy=name&sortOrder=asc&search=missing&flag=false&count=0'
+    window.history.replaceState({ host: 'kept' }, '', `/admin?${restoredQuery}#anchor`)
+    const initial = data()
+    initial.data = []
+    initial.meta!.requestQuery = restoredQuery
+    initial.meta!.filters = { _search: 'missing', flag: false, count: 0 }
+    initial.meta!.sorting = { sortBy: 'name', sortOrder: 'asc' }
+    initial.meta!.pagination!.currentPage = 3
+    const unfiltered = data(25, 'unfiltered')
+    unfiltered.meta!.sorting = initial.meta!.sorting
+    fetchMock
+      .mockResolvedValueOnce({ ok: false, status: 500 } as Response)
+      .mockResolvedValueOnce(response(unfiltered))
+    const { element } = mount(initial)
+    await settle()
+    expect(fetchMock).not.toHaveBeenCalled()
+    const reset = Array.from(element.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Сбросить поиск и фильтры',
+    )!
+    reset.focus()
+    reset.click()
+    await settle()
+    expect(fetchMock).toHaveBeenCalledOnce()
+    const resetParams = { page: '1', limit: '25', sortBy: 'name', sortOrder: 'asc', search: '' }
+    expect(Object.fromEntries(query())).toEqual(resetParams)
+    expect(element.querySelector('input[data-grid-search]')).toBe(document.activeElement)
+    expect(element.querySelector('[role="alert"]')).not.toBeNull()
+    expect(reset.isConnected).toBe(false)
+    element.querySelector<HTMLButtonElement>('[role="alert"] button')!.click()
+    await settle()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(Object.fromEntries(query(1))).toEqual(resetParams)
+    expect(element.textContent).toContain('unfiltered')
+    expect(Object.fromEntries(new URLSearchParams(window.location.search))).toEqual({
+      limit: '25',
+      sortBy: 'name',
+      sortOrder: 'asc',
+    })
+    expect(window.history.state).toEqual({ host: 'kept' })
+    expect(window.location.hash).toBe('#anchor')
+  })
 })

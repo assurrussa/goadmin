@@ -4,7 +4,7 @@
 projects integrate it through the stable `github.com/assurrussa/goadmin/host`
 facade instead of copying admin internals.
 
-![GoAdmin default light theme: real users page with synthetic accounts and dot-and-text statuses](docs/screenshots/design-refresh/users-after-light.png)
+![GoAdmin Ocean theme on the users page with a status filter next to search](docs/screenshots/ocean-users-light.png)
 
 [Compare the default light/dark themes and run the local UI demos](docs/presentation-demo.md).
 

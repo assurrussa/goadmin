@@ -34,17 +34,17 @@ refresh; they are not the theme-pack acceptance matrix.
 
 ## Default light and dark themes
 
-The default theme uses neutral light surfaces, graphite dark surfaces and a
-restrained blue accent. State indicators use a colored dot with a readable label;
-counts and role/category labels retain badges. The existing layout, information
-density, light/dark preference and host CSS overrides remain in place.
+The default Ocean theme pairs a sky-blue to navy primary action with a subtle
+tint in the header. The users page puts its single status filter alongside search
+on desktop. On mobile, the Filters button opens the same control. Status dots
+and their labels keep their semantic colors.
 
 These screenshots show the real users page and shared components with synthetic
 accounts, captured at **1440 × 1024**, 1× device scale:
 
-![Default light theme, users table](screenshots/design-refresh/users-after-light.png)
+![Ocean light theme, users table](screenshots/ocean-users-light.png)
 
-![Default dark theme, users table](screenshots/design-refresh/users-after-dark.png)
+![Ocean dark theme, users table](screenshots/ocean-users-dark.png)
 
 Run the read-only visual fixture from the repository root. It requires the
 repository's Go toolchain as well as Node: Go renders the real standalone error

@@ -11,7 +11,7 @@ export type BrandingRecovery = {
   name: string
   accentColor: string
   accentColorEnd?: string
-  accentMode?: 'solid' | 'gradient'
+  accentMode?: 'project' | 'custom-solid' | 'solid' | 'gradient'
   conflict?: boolean
   baseline: { name: string; accentColor: string; accentColorEnd?: string }
   logoLight?: ''
@@ -102,10 +102,13 @@ export function takeBrandingRecovery(owner: string): BrandingRecovery | undefine
       typeof item.baseline?.accentColor !== 'string'
     )
       return
-    // Old drafts have a solid accent. Draft text may be incomplete; validate it
-    // on Apply, preserving both endpoints and unrelated edits during recovery.
+    // An empty legacy solid draft meant project colors. The custom-solid value
+    // keeps an empty new solid field in editing mode until the user corrects it.
+    // Validate incomplete custom HEX text on Apply.
     item.accentColorEnd ??= ''
-    item.accentMode ??= item.accentColorEnd ? 'gradient' : 'solid'
+    item.accentMode ??= item.accentColorEnd ? 'gradient' : item.accentColor ? 'solid' : 'project'
+    if (item.accentMode === 'solid' && !item.accentColor && !item.accentColorEnd)
+      item.accentMode = 'project'
     item.baseline.accentColorEnd ??= ''
     const validPair = (start: string, end: unknown) =>
       typeof end === 'string' &&
@@ -113,8 +116,9 @@ export function takeBrandingRecovery(owner: string): BrandingRecovery | undefine
       (end === '' || (start !== '' && /^#[\da-f]{6}$/i.test(end)))
     if (
       typeof item.accentColorEnd !== 'string' ||
-      !['solid', 'gradient'].includes(item.accentMode) ||
-      (item.accentMode === 'solid' && item.accentColorEnd !== '') ||
+      !['project', 'custom-solid', 'solid', 'gradient'].includes(item.accentMode) ||
+      (item.accentMode !== 'gradient' && item.accentColorEnd !== '') ||
+      (item.accentMode === 'project' && item.accentColor !== '') ||
       !validPair(item.baseline.accentColor, item.baseline.accentColorEnd)
     )
       return

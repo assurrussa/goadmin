@@ -320,8 +320,10 @@ operations and the cache before the runtime closes its auth dependencies.
 The host continues selecting the build-time presentation pack. See
 [theme customization](theme-customization.md#account-settings-and-installation-branding).
 
-The default UI uses neutral white/gray light surfaces, graphite dark surfaces,
-a restrained blue accent and system fonts. Built-in buttons default to a 4px radius;
+The default UI uses neutral light surfaces, graphite dark surfaces and the Ocean
+gradient for primary actions. An installation inheriting the stock accent gets
+Ocean even when it adds functional extensions. A custom host palette or saved
+installation accent takes precedence. Built-in buttons default to a 4px radius;
 other shared controls use 8px and cards use 12px. Shell shadows default to none.
 Existing `--goadmin-*` geometry, control/card overrides, explicit component classes and optional density
 and branding manifests remain supported; see [theme customization](theme-customization.md).
@@ -379,6 +381,12 @@ restoration, including endpoint changes and new search/sort/page interaction.
 The request/debounce boundary and URL synchronization both enforce suspension. Generic grids keep native popstate loading. Grid supersession and
 unmount abort browser fetches and discard obsolete responses before JSON decoding.
 The public GET page-size cap remains 100; abort does not imply database cancellation.
+
+The shared DataGrid puts a single filter beside search on wide screens and groups
+multiple filters behind a button with the active count. Narrow screens group even
+a single filter. An empty filtered result offers to clear the search and filters
+together. This loads page one with the current sort, page size and columns, and
+preserves the saved view for later use.
 
 The browser entrypoint uses the client `createInertiaApp` contract and mounts
 the Vue application directly. An SSR `render` callback belongs only in a

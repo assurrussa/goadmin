@@ -3,8 +3,9 @@
 The default presentation and build-time packs share page logic and interaction
 behavior. Packs can replace the admin/auth shells and style documented component
 parts; they do not replace business pages, authorization or runtime services.
-The earlier shell/control CSS stages remain supported. Without a theme file, the default appearance uses neutral light and graphite dark
-surfaces, a system font stack, restrained blue accents and semantic status colors.
+The default Ocean accent runs from sky blue (`#38BDF8`) to navy (`#1E3A8A`).
+Light surfaces stay neutral and dark surfaces stay graphite. Primary actions use
+the gradient, while links and focus rings use a single readable accent.
 The shell, shared controls and static cards have no shadows; floating menus retain
 subtle elevation. Auth, permissions, CSRF and navigation semantics are unchanged.
 
@@ -37,11 +38,15 @@ Admin Branding supports a name, a custom six-digit HEX accent and an optional
 second HEX stop for a 135-degree gradient, plus two optional
 logos for light/dark backgrounds. An accent is converted to readable theme
 variants; status/error colors and fonts retain their existing semantics.
-Preview is local until Apply. Reset restores the original presentation. Input
-logos must be PNG/JPEG, at most 512 KiB and 1024x1024 each; published images are
+Preview is local until Apply. Project appearance restores the host's palette.
+When the project uses the stock light and dark accent tokens, this selects
+Ocean, including in hosts that add their own pages or fields. A host that
+supplies its own accent or fill keeps its styling. A saved solid or two-color
+accent overrides the project choice. Resetting the color stores empty stops.
+Input logos must be PNG/JPEG, at most 512 KiB and 1024x1024 each; published images are
 normalized PNG. The brand appears in the existing admin/auth brand slots.
 Custom packs should render that slot to receive the configured content.
-When both gradient stops are present, built-in headers and auth shells also use a
+With Ocean or a saved two-color gradient, built-in headers and auth shells also use a
 restrained decorative background. Working surfaces stay neutral. DataGrid rows
 use uniform opaque brand tints for hover and selection, including sticky cells;
 selection takes priority over hover. Their cells do not repeat the gradient.
@@ -53,8 +58,9 @@ preview restrictions remain in effect. These routes require no optional module
 and introduce no supported Go package. Their storage is installed by the normal
 `migrations.Migrate` call.
 
-Compiled CSS extensions continue supplying the fallback when an account uses
-default density or the installation has no accent override. Host CSS can still
+Project appearance follows the compiled light and dark host accent tokens, including
+active media queries. If an active stylesheet cannot be inspected, the host CSS
+keeps control of the live accent. Host CSS can still
 override explicit component classes; arbitrary host overrides need their own
 contrast and responsive checks. Standalone error documents retain their
 independent neutral fallback and anonymous device theme.
@@ -353,7 +359,8 @@ arbitrary page replacement and a runtime component registry are outside this API
 
 ### Two-color accent
 
-The branding editor switches between solid and gradient mode. Each stop has a
+The branding editor offers project appearance, a solid color and a gradient.
+Selecting gradient starts with two distinct stops. Each stop has a
 native color picker and HEX input. Apply publishes both original colors in one
 CAS/audited update. Reset color clears both without discarding name/logo edits.
 Primary buttons and active pagination use the gradient; active navigation and

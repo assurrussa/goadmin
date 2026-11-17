@@ -144,6 +144,9 @@ const reservedQueryKeys = new Set(['page', 'limit', 'sortBy', 'sortOrder', 'sear
 
 export const isDataGridFilterKey = (key: string): boolean => !reservedQueryKeys.has(key)
 
+export const isActiveDataGridFilter = (value: unknown): boolean =>
+  value !== null && value !== undefined && value !== ''
+
 const positiveInteger = (value: unknown, fallback: number): number => {
   const number = Number(value)
   return Number.isSafeInteger(number) && number > 0 ? number : fallback
@@ -335,7 +338,7 @@ export function useDataGrid({
         }
       }
       Object.entries(filters.value).forEach(([key, value]) => {
-        if (isDataGridFilterKey(key) && value !== null && value !== undefined && value !== '') {
+        if (isDataGridFilterKey(key) && isActiveDataGridFilter(value)) {
           searchParams.set(key, String(value))
         }
       })

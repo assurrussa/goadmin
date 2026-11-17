@@ -20,6 +20,29 @@ const browser = await chromium.launch({ headless: true,
   ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : {}) })
 const report = { result: 'running', browser: await browser.version(),
   cssSHA256: createHash('sha256').update(css).digest('hex'), cases: [], minimumContrast: Infinity }
+
+async function checkResponsiveHost(page) {
+  const origin = 'http://goadmin.test'
+  const hostCSS = "@media (min-width: 768px) { :root { --color-primary: hotpink; --goadmin-primary-image: linear-gradient(red, blue); } }"
+  await page.route(origin + '/**', async route => {
+    if (new URL(route.request().url()).pathname === '/theme.css') {
+      return route.fulfill({ contentType: 'text/css', body: css + '\n' + hostCSS })
+    }
+    await route.fulfill({ contentType: 'text/html',
+      headers: { 'Content-Security-Policy': "style-src 'self'" },
+      body: '<!doctype html><link rel="stylesheet" href="/theme.css"><button class="goadmin-primary-fill">Save</button>' })
+  })
+  await page.goto(origin)
+  await page.addScriptTag({ content: compiled.outputFiles[0].text })
+  const button = page.getByRole('button', { name: 'Save' })
+  for (const [width, expected] of [[1200, 'rgb(255, 0, 0)'], [390, 'rgb(0, 117, 176)'], [1200, 'rgb(255, 0, 0)']]) {
+    await page.setViewportSize({ width, height: 800 })
+    await page.evaluate(() => BrandPalette.applyBrand(BrandPalette.emptyBrand, false))
+    const image = await button.evaluate(node => getComputedStyle(node).backgroundImage)
+    assert.ok(image.includes(expected), `Embedded CSS with style-src 'self' at ${width}px: ${image}`)
+  }
+}
+
 try {
   const page = await browser.newPage()
   for (const pack of ['default', 'topbar']) {
@@ -63,7 +86,7 @@ try {
         assert.ok(minimum >= 4.5, `${identity}: composited text contrast ${minimum}`)
         assert.equal(await page.locator('.goadmin-semantic-fill').evaluate(node => getComputedStyle(node).backgroundImage), 'none')
         for (const decoration of geometry.decorations) assert.ok(decoration.contrast >= 4.5, `${identity}: decorative background contrast ${decoration.contrast}`)
-        const gradient = !!start && !!end
+        const gradient = (!start && pack === 'default') || (!!start && !!end)
         for (const selector of ['[data-ui="admin-header"]', '[data-ui="auth-shell"]']) {
           assert.equal((await page.locator(selector).evaluate(node => getComputedStyle(node).backgroundImage)) !== 'none', gradient)
         }
@@ -85,6 +108,8 @@ try {
       }
     }
   }
+  await checkResponsiveHost(page)
+  report.responsiveHostUnderCSP = true
   report.result = 'passed'
   console.log(`PASS native selection contrast: ${report.cases.length} cases, minimum ${report.minimumContrast.toFixed(3)}:1`)
 } catch (error) {

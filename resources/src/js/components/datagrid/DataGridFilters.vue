@@ -1,95 +1,107 @@
 <template>
-  <Card
+  <div
+    v-if="filterableColumns.length"
     data-ui="datagrid"
     data-part="filters"
-    v-if="filterableColumns.length > 0"
-    class="border-transparent"
+    class="min-w-0"
+    :class="{ 'w-full sm:basis-full': expanded && !inline }"
   >
-    <CardContent class="p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-base font-semibold text-text-primary">{{ t('Фильтры') }}</h3>
-        <AppButton
-          v-if="hasActiveFilters"
-          @click="clearFilters"
-          variant="ghost"
-          size="sm"
-          class="text-text-tertiary hover:text-text-secondary"
+    <AppButton
+      :class="{ 'sm:hidden': inline }"
+      variant="outline"
+      size="sm"
+      :aria-expanded="expanded"
+      :aria-controls="panelId"
+      @click="expanded = !expanded"
+    >
+      <SlidersHorizontal aria-hidden="true" />
+      {{ activeCount ? t('Фильтры ({count})', undefined, { count: activeCount }) : t('Фильтры') }}
+    </AppButton>
+
+    <div
+      :id="panelId"
+      data-part="filter-panel"
+      :class="[
+        inline ? 'items-end gap-2' : 'gap-3 sm:grid-cols-2 lg:grid-cols-3',
+        inline ? (expanded ? 'flex' : 'hidden sm:flex') : expanded ? 'grid' : 'hidden',
+        inline ? 'mt-2 sm:mt-0 sm:items-center' : 'mt-2',
+      ]"
+    >
+      <div
+        v-for="(column, index) in filterableColumns"
+        :key="column.key"
+        :class="inline ? 'min-w-0 flex-1 sm:w-44' : 'min-w-0'"
+      >
+        <label
+          :for="`${panelId}-field-${index}`"
+          class="mb-1 block text-sm font-medium text-text-primary"
+          :class="{ 'sm:sr-only': inline }"
         >
-          {{ t('Очистить все') }}
-        </AppButton>
+          {{ t(column.label) }}
+        </label>
+
+        <AppSelect
+          v-if="column.type === 'select'"
+          :id="`${panelId}-field-${index}`"
+          :model-value="getSelectValue(column)"
+          :placeholder="
+            column.placeholder ? t(column.placeholder) : t(inline ? column.label : 'Не выбрано')
+          "
+          :options="column.options || []"
+          @update:modelValue="handleFilterChange(column.key, $event)"
+        />
+
+        <AppInput
+          v-else
+          :id="`${panelId}-field-${index}`"
+          :type="column.type === 'number' ? 'number' : 'text'"
+          :inputmode="column.type === 'number' ? 'numeric' : undefined"
+          :model-value="getInputValue(column.key)"
+          :placeholder="column.placeholder ? t(column.placeholder) : t(column.label)"
+          @update:modelValue="handleFilterChange(column.key, $event)"
+        />
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        <div v-for="column in filterableColumns" :key="column.key" class="flex flex-col">
-          <label
-            :for="`filter-${column.key}`"
-            class="block text-sm font-medium text-text-primary mb-2"
-          >
-            {{ t(column.label) }}
-          </label>
-
-          <!-- Select фильтр -->
-          <AppSelect
-            v-if="column.type === 'select'"
-            :id="`filter-${column.key}`"
-            :model-value="getSelectValue(column.key)"
-            :placeholder="(column.placeholder ? t(column.placeholder) : '') || t('Не выбрано')"
-            :options="column.options || []"
-            @update:modelValue="handleFilterChange(column.key, $event)"
-          />
-
-          <!-- Text фильтр -->
-          <AppInput
-            v-else
-            :id="`filter-${column.key}`"
-            :type="column.type === 'number' ? 'number' : 'text'"
-            :inputmode="column.type === 'number' ? 'numeric' : undefined"
-            :model-value="getInputValue(column.key)"
-            @update:modelValue="handleFilterChange(column.key, $event)"
-            :placeholder="
-              (column.placeholder ? t(column.placeholder) : '') ||
-              t('Фильтр по {label}', undefined, { label: t(column.label) })
-            "
-          />
-        </div>
-      </div>
-    </CardContent>
-  </Card>
+      <AppButton
+        v-if="activeCount"
+        :variant="inline ? 'ghost' : 'outline'"
+        :size="inline ? 'icon' : 'sm'"
+        :class="inline ? 'shrink-0' : 'justify-self-start self-end'"
+        :title="inline ? t('Очистить все') : undefined"
+        @click="clearFilters"
+      >
+        <X v-if="inline" aria-hidden="true" />
+        <span :class="{ 'sr-only': inline }">{{ t('Очистить все') }}</span>
+      </AppButton>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { t } from '@/i18n'
-
-import { computed } from 'vue'
+import { computed, ref, useId } from 'vue'
+import { SlidersHorizontal, X } from 'lucide-vue-next'
 import type { AcceptableValue } from 'reka-ui'
-import { Card, CardContent } from '@/components/ui/card'
+import { t } from '@/i18n'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
-import type { Column } from '../../composables/useDataGrid.ts'
+import { isActiveDataGridFilter, type Column } from '@/composables/useDataGrid'
 
-// Props interface
-interface Props {
+const props = defineProps<{
   filterableColumns: Column[]
   filters: Record<string, unknown>
-}
+}>()
 
-// Define props with defaults
-const props = withDefaults(defineProps<Props>(), {
-  filterableColumns: () => [],
-  filters: () => ({}),
-})
-
-// Define emits
 const emit = defineEmits<{
   'filter-change': [filters: Record<string, unknown>]
 }>()
 
-const hasActiveFilters = computed((): boolean => {
-  return Object.values(props.filters).some(
-    (value) => value !== null && value !== undefined && value !== '',
-  )
-})
+const panelId = `grid-filters-${useId()}`
+const expanded = ref(false)
+const inline = computed(() => props.filterableColumns.length === 1)
+const activeCount = computed(
+  () => Object.values(props.filters).filter(isActiveDataGridFilter).length,
+)
 
 const handleFilterChange = (key: string, value: AcceptableValue): void => {
   emit('filter-change', { [key]: value })
@@ -101,13 +113,18 @@ const getFilterValue = (key: string): unknown => {
   return Object.hasOwn(props.filters, key) ? value : undefined
 }
 
-const getSelectValue = (key: string): AcceptableValue | undefined => {
-  const value = getFilterValue(key)
-  if (value === '' || value === null || value === undefined) return undefined
-  return value as AcceptableValue
+const getSelectValue = (column: Column): AcceptableValue | undefined => {
+  const value = getFilterValue(column.key)
+  if (!isActiveDataGridFilter(value)) return undefined
+  // URL values are strings even when the configured option has a numeric value.
+  const options = column.options ?? []
+  const option =
+    options.find((option) => option.value === value) ??
+    options.find((option) => String(option.value) === String(value))
+  return option?.value ?? (value as AcceptableValue)
 }
 
-const getInputValue = (key: string): string | number | null => {
+const getInputValue = (key: string): string | number => {
   const value = getFilterValue(key)
   if (value === null || value === undefined) return ''
   if (typeof value === 'string' || typeof value === 'number') return value
@@ -115,10 +132,6 @@ const getInputValue = (key: string): string | number | null => {
 }
 
 const clearFilters = (): void => {
-  const clearedFilters: Record<string, string> = {}
-  props.filterableColumns.forEach((column) => {
-    clearedFilters[column.key] = ''
-  })
-  emit('filter-change', clearedFilters)
+  emit('filter-change', Object.fromEntries(props.filterableColumns.map(({ key }) => [key, ''])))
 }
 </script>

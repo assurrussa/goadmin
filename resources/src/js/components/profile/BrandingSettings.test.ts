@@ -2,7 +2,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createApp, nextTick } from 'vue'
 import BrandingSettings from './BrandingSettings.vue'
 import { appearance, syncAppearance, disposeAppearance, pauseAppearance } from '@/appearance/state'
-import { emptyBrand } from '@/appearance/brand'
+import { deriveBrandPalette, emptyBrand } from '@/appearance/brand'
+import { installStockBrandStyles } from '@/appearance/brand.fixture'
 const fetch = vi.hoisted(() => vi.fn())
 const notifyError = vi.hoisted(() => vi.fn())
 vi.mock('@/appearance/brand', async (importOriginal) => ({
@@ -65,6 +66,11 @@ function click(root: HTMLElement, text: string) {
     (button) => button.textContent?.trim() === text,
   )!
   button.click()
+}
+function selectMode(root: HTMLElement, value: string) {
+  const select = root.querySelector('select')!
+  select.value = value
+  select.dispatchEvent(new Event('change', { bubbles: true }))
 }
 beforeEach(() => {
   fetch.mockReset()
@@ -369,21 +375,29 @@ it('retains applied branding across stale history props and accepts a newer publ
   syncAppearance(shared(3, 'New publication'))
   expect(appearance.brand.name).toBe('New publication')
 })
-it('isolates default preview accents by theme and leaves unset live accents to the CSS theme pack', async () => {
+it('previews Ocean by theme and applies it live when switching to project colors', async ({
+  onTestFinished,
+}) => {
+  onTestFinished(installStockBrandStyles())
   const root = await mount()
-  input(root, 1, '')
+  selectMode(root, 'project')
   await nextTick()
   const panels = root.querySelector('[aria-label="Предпросмотр"]')!.children
-  expect((panels[0] as HTMLElement).style.getPropertyValue('--color-primary')).toBe(
-    'hsl(217 69% 46%)',
-  )
-  expect((panels[1] as HTMLElement).style.getPropertyValue('--color-primary')).toBe(
-    'hsl(217 69% 74%)',
-  )
+  for (const dark of [false, true]) {
+    const panel = panels[Number(dark)] as HTMLElement
+    const expected = deriveBrandPalette('#38BDF8', dark, '#1E3A8A')
+    expect(panel.style.getPropertyValue('--color-primary')).toBe(expected['--color-primary'])
+    expect(panel.style.getPropertyValue('--goadmin-primary-image')).toBe(
+      expected['--goadmin-primary-image'],
+    )
+  }
+  expect(root.querySelector('input[type=color]')).toBeNull()
   fetch.mockResolvedValueOnce(result(brand('Live', '', 2)))
   click(root, 'Применить')
   await flush()
-  expect(document.documentElement.style.getPropertyValue('--color-primary')).toBe('')
+  expect(document.documentElement.style.getPropertyValue('--color-primary')).toBe(
+    deriveBrandPalette('#38BDF8', false, '#1E3A8A')['--color-primary'],
+  )
 })
 
 it('does not replace a newer shared brand when an older successful PUT body resolves late', async () => {
@@ -465,16 +479,19 @@ it('fences late branding GET bodies across an owner transition while reloading t
   expect(root.textContent).not.toContain('Old private response')
 })
 
-it('shows the theme primary without saving it, tracks theme changes and syncs picker and HEX', async () => {
+it('initializes an explicit solid color from the current theme and syncs picker and HEX', async () => {
   fetch.mockReset()
   fetch.mockResolvedValueOnce(result(brand('Live', '')))
   const root = await mount()
-  const hex = root.querySelectorAll<HTMLInputElement>('input')[1]!
-  const picker = root.querySelector<HTMLInputElement>('input[type=color]')!
-  expect(hex.value).toBe('')
-  expect(picker.value).toBe('#112233')
+  expect(root.querySelector('select')!.value).toBe('project')
+  expect(root.querySelector('input[type=color]')).toBeNull()
   appearance.dark = true
   await nextTick()
+  selectMode(root, 'solid')
+  await nextTick()
+  const hex = root.querySelectorAll<HTMLInputElement>('input')[1]!
+  const picker = root.querySelector<HTMLInputElement>('input[type=color]')!
+  expect(hex.value).toBe('#aabbcc')
   expect(picker.value).toBe('#aabbcc')
   picker.value = '#123456'
   picker.dispatchEvent(new Event('input', { bubbles: true }))
@@ -498,8 +515,8 @@ it('resets only the accent draft and preserves name and logos on save', async ()
   input(root, 0, 'Keep title')
   click(root, 'Сбросить цвет')
   await nextTick()
-  expect(root.querySelectorAll<HTMLInputElement>('input')[1]!.value).toBe('')
-  expect(root.querySelector<HTMLInputElement>('input[type=color]')!.value).toBe('#112233')
+  expect(root.querySelector('select')!.value).toBe('project')
+  expect(root.querySelector('input[type=color]')).toBeNull()
   fetch.mockResolvedValueOnce(result(brand('Keep title', '', 2)))
   click(root, 'Применить')
   await flush()
@@ -804,6 +821,9 @@ it('previews a gradient without publishing and color reset preserves the name dr
   mode.dispatchEvent(new Event('change', { bubbles: true }))
   await flush()
   const end = root.querySelectorAll<HTMLInputElement>('input:not([type])')[2]!
+  expect(end.value.toLowerCase()).not.toBe(
+    root.querySelectorAll<HTMLInputElement>('input:not([type])')[1]!.value.toLowerCase(),
+  )
   end.value = '#fefefe'
   end.dispatchEvent(new Event('input', { bubbles: true }))
   await flush()

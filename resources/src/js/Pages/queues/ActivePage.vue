@@ -11,7 +11,7 @@
         class="px-3 py-2 rounded-[var(--goadmin-control-radius,4px)] text-sm font-medium border transition-colors"
         :class="
           isActive(tab.href)
-            ? 'bg-primary text-primary-contrast border-primary'
+            ? 'goadmin-selection-fill bg-primary/10 text-primary border-primary/30'
             : 'bg-card text-text-secondary border-border-primary hover:text-text-primary'
         "
       >

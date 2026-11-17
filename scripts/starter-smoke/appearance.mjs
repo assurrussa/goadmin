@@ -164,6 +164,7 @@ export async function appearanceAcceptance({ page, context, browser, config, cre
   const brandTitle = 'M'.repeat(80)
   await page.getByLabel('Название админки', { exact: true }).fill(brandTitle)
   const baselineAccent = (await appearanceGeometry(page)).accent
+  await page.getByLabel('Тип акцента', { exact: true }).selectOption('solid')
   let customPreviews
   const customContrast = []
   for (const accent of ['#ffffff', '#000000', '#7c3aed']) {
