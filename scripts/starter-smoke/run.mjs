@@ -337,6 +337,10 @@ async function runCase(name, config) {
       await page.goto(`/${resource}?page=2&limit=2&sortBy=id&sortOrder=asc&search=smoke&status=active`)
       const rows = page.getByRole('row').filter({ has: page.getByRole('button', { name: /^(Просмотр|View)$/ }) })
       await expect(rows).toHaveCount(2)
+      await expect(page.getByRole('button', { name: 'Remove filter Status: Active' })).toBeVisible()
+      await language(page, 'Русский', 'ru')
+      await expect(page.getByRole('button', { name: 'Снять фильтр Статус: Активные' })).toBeVisible()
+      await language(page, 'English', 'en')
       const listURL = page.url()
       await rows.first().getByRole('button', { name: /^(Просмотр|View)$/ }).click()
       await expect(page).toHaveURL(new RegExp(`/${resource}/\\d+\\?returnTo=`))
@@ -367,9 +371,30 @@ async function runCase(name, config) {
       await expect(navigationSearch).toBeFocused()
       await navigationSearch.press('Escape')
       await expect(page).toHaveURL(editURL)
-      const mutation = page.waitForResponse((response) => response.request().method() === 'PUT' && new URL(response.url()).pathname === new URL(editURL).pathname.replace(/\/edit$/, ''))
-      await page.locator('input[name="name"]').press('Enter')
-      assert.ok((await mutation).status() < 400)
+      const updateURL = new URL(new URL(editURL).pathname.replace(/\/edit$/, ''), editURL).href
+      const releaseSave = deferred()
+      await page.route(updateURL, async route => {
+        await releaseSave.promise
+        await route.continue()
+      }, { times: 1 })
+      try {
+        await page.locator('input[name="name"]').press('Enter')
+        await expect(page.locator('form')).toHaveAttribute('aria-busy', 'true')
+        await page.getByRole('button', { name: 'Go to section' }).click()
+        await navigationSearch.fill('/auth/profile/settings')
+        await Promise.all([
+          page.waitForEvent('dialog').then(dialog => dialog.dismiss()),
+          navigationSearch.press('Enter'),
+        ])
+        await expect(navigationSearch).toBeFocused()
+        await navigationSearch.press('Escape')
+        await expect(page).toHaveURL(editURL)
+        const saved = page.waitForResponse(r => r.request().method() === 'PUT' && r.url() === updateURL)
+        releaseSave.resolve()
+        assert.ok((await saved).status() < 400)
+      } finally {
+        releaseSave.resolve()
+      }
       await expect(page.locator('form[aria-busy="true"]')).toHaveCount(0)
       await expect(page).toHaveURL(editURL)
       await expect(page.getByText(resource === 'users' ? 'User updated successfully!' : 'Record updated successfully!', { exact: true })).toHaveCount(1)

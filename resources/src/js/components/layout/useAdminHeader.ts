@@ -25,6 +25,7 @@ export function useAdminHeader() {
       .filter((section) => section.placement === 'account')
       .flatMap((section) => section.items ?? [])
       .filter((item): item is AccountMenuItem & { href: string } => isLocalAdminMenuHref(item.href))
+      .map(({ name, href }) => ({ name, href }))
   })
   const rolePreviewOpen = inject(headerStateKey, ref(false))
   const canPreviewRole = computed(() =>

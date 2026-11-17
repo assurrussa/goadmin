@@ -380,6 +380,33 @@ describe('DataGridFilters passing contracts', () => {
     await settle()
     expect(element.querySelectorAll('button[aria-label^="Снять фильтр"]')).toHaveLength(0)
   })
+  it('localizes configured option labels and URL booleans while preserving entered text', async () => {
+    const { element } = mount(DataGridFilters, {
+      filterableColumns: [
+        column('status', {
+          label: 'Статус',
+          type: 'select',
+          options: [{ value: 'active', label: 'Активные' }],
+        }),
+        column('enabled', { type: 'boolean' }),
+        column('name'),
+      ],
+      filters: { status: 'active', enabled: 'false', name: 'Активные' },
+    })
+    try {
+      expect(button(element, 'Снять фильтр enabled: Нет')).toBeTruthy()
+      applyLocale('en')
+      await settle()
+      expect(button(element, 'Remove filter Status: Active')).toBeTruthy()
+      expect(button(element, 'Remove filter enabled: No')).toBeTruthy()
+      expect(button(element, 'Remove filter name: Активные')).toBeTruthy()
+      button(element, 'Filters (3)').click()
+      await settle()
+      expect(text(element.querySelector('[role="combobox"]')!)).toBe('Active')
+    } finally {
+      applyLocale('ru')
+    }
+  })
   it('renders text and numeric inputs with labels and emits one-key patches', async () => {
     const onFilterChange = vi.fn()
     const { element } = mount(DataGridFilters, {

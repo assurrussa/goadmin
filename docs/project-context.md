@@ -221,8 +221,9 @@ grid query through the optional client-only `returnTo` parameter. Targets must
 be root-relative and match the same resource list exactly. Direct links fall
 back to that list.
 The server never uses this parameter as a redirect target. Internal GET visits
-confirm dirty forms; browser Back/Forward cannot be cancelled and no draft is
-stored. Handled update failures use the non-field `errors.form` bag, retaining
+ask before leaving a dirty form, including while a save is in flight. Browser
+Back/Forward cannot be cancelled and no draft is stored. Handled update
+failures use the non-field `errors.form` bag, retaining
 input/dirty state instead of triggering Inertia success. Unknown outcomes never
 trigger automatic replay. Confirmed success emits one notification.
 
@@ -393,7 +394,8 @@ The public GET page-size cap remains 100; abort does not imply database cancella
 The shared DataGrid puts a single filter beside search on wide screens and groups
 multiple filters behind a button with the active count. Narrow screens group even
 a single filter. When the controls are collapsed, removable labels show each
-active editable filter and its display value. Removing a label returns to page
+active editable filter and its display value. Select options and their labels
+follow the interface language. Removing a label returns to page
 one and preserves the rest of the query. An empty filtered result offers to
 clear the search and filters together. This loads page one with the current
 sort, page size and columns, and preserves the saved view for later use.

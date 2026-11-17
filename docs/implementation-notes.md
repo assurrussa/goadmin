@@ -8,13 +8,15 @@ the mobile header. Record editing keeps the validated list destination with
 the individual save attempt. Filter labels use the existing single-field
 update path and appear only when the editable fields are collapsed.
 
-`make check` passed. After a review fix to reset the highlighted menu item on
-reopening, `make resources` passed 144 resource checks and 1,243 UI tests and
-rebuilt the embedded assets. Chromium covered both shells, RU/EN keyboard
-navigation, mobile filter removal and header layout at 320 and 390 pixels.
-With a local PostgreSQL 17 instance, the starter record-editing scenario
-verified one PUT and one success notification per return for two records on
-page two of each filtered list in both shells.
+The keyboard selection resets on reopening. Account links follow the flat
+profile menu. A dirty form still asks before leaving while an update is in
+flight. Filter controls and chips share the translated option labels.
+
+Chromium covered both shells, RU/EN keyboard navigation, mobile filter removal
+and header layout at 320 and 390 pixels. With PostgreSQL 17, the starter smoke
+test held a real PUT pending, dismissed a navigation prompt and let the update
+finish. It also verified one PUT and one success notification per return for two
+records on page two of each filtered list in both shells.
 
 ## Ocean and compact table filters (2026-11-18)
 

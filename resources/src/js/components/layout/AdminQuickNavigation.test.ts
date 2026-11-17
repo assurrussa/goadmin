@@ -45,7 +45,11 @@ beforeEach(() => {
       key: 'account',
       placement: 'account',
       items: [
-        { name: 'Account connection', href: '/auth/profile/settings#connection' },
+        {
+          name: 'Account connection',
+          href: '/auth/profile/settings#connection',
+          children: [{ name: 'Hidden account child', href: '/child-of-link' }],
+        },
         { name: 'Unlisted member', children: [{ name: 'Nested account', href: '/child' }] },
         { name: 'Outside link', href: '//external.example' },
       ],

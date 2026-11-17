@@ -49,7 +49,7 @@
       ]"
     >
       <div
-        v-for="(column, index) in filterableColumns"
+        v-for="(column, index) in displayColumns"
         :key="column.key"
         :class="inline ? 'min-w-0 flex-1 sm:w-44' : 'min-w-0'"
       >
@@ -121,6 +121,19 @@ const panelId = `grid-filters-${useId()}`
 const summary = ref<HTMLElement | null>(null)
 const expanded = ref(false)
 const inline = computed(() => props.filterableColumns.length === 1)
+const displayColumns = computed(() =>
+  props.filterableColumns.map((column) =>
+    column.type === 'select' && column.options
+      ? {
+          ...column,
+          options: column.options.map((option) => ({
+            ...option,
+            label: option.label ? t(option.label) : String(option.value),
+          })),
+        }
+      : column,
+  ),
+)
 
 const handleFilterChange = (key: string, value: AcceptableValue): void => {
   emit('filter-change', { [key]: value })
@@ -148,12 +161,15 @@ const getSelectValue = (column: Column): AcceptableValue | undefined => {
 }
 
 const activeFilters = computed(() =>
-  props.filterableColumns.flatMap((column) => {
+  displayColumns.value.flatMap((column) => {
     const value = getFilterValue(column.key)
     if (!isActiveDataGridFilter(value)) return []
     const option = column.type === 'select' ? selectedOption(column, value) : undefined
-    const display =
-      option?.label ?? (typeof value === 'boolean' ? t(value ? 'Да' : 'Нет') : String(value))
+    let display = option?.label ?? String(value)
+    if (typeof value === 'boolean' || column.type === 'boolean') {
+      if (display === 'true') display = t('Да')
+      if (display === 'false') display = t('Нет')
+    }
     return [{ key: column.key, label: `${t(column.label)}: ${display}` }]
   }),
 )
