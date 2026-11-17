@@ -213,10 +213,13 @@ the previous values with a stale-data message; session changes discard them.
 
 ## Record editing navigation
 
-Users and administrators share an internal edit-form layout. Save stays on the
-form; explicit list/cancel links restore the originating grid query through the
-optional client-only `returnTo` query parameter. Targets must be root-relative
-and match the same resource list exactly; direct links fall back to that list.
+Users and administrators share an internal edit-form layout. Save and Enter
+keep the form open. “Save and return to list” opens the originating grid after
+a confirmed save if the same actor and record are still active and the draft
+has no newer edits. This action and the explicit list/cancel links restore the
+grid query through the optional client-only `returnTo` parameter. Targets must
+be root-relative and match the same resource list exactly. Direct links fall
+back to that list.
 The server never uses this parameter as a redirect target. Internal GET visits
 confirm dirty forms; browser Back/Forward cannot be cancelled and no draft is
 stored. Handled update failures use the non-field `errors.form` bag, retaining
@@ -346,6 +349,11 @@ Menu sections accept `Placement`: empty or `sidebar` keeps sidebar navigation;
 `account` renders flat root-relative links in the profile dropdown. Both use the
 existing permission-filtered menu. Routes still enforce their own permissions.
 
+The admin header offers quick navigation from its button or Ctrl/Cmd + K.
+Search uses translated labels, menu hierarchy and paths from the current
+navigation and account links, including Profile and Settings. Arrow keys and
+Enter select a destination through the usual Inertia navigation guards.
+
 The sidebar footer shows GoAdmin's version through the shared `adminInfo.version`
 prop. It reads the GoAdmin module's Go build metadata, independently of the
 host application's version. Local source replacements and builds without a
@@ -384,9 +392,11 @@ The public GET page-size cap remains 100; abort does not imply database cancella
 
 The shared DataGrid puts a single filter beside search on wide screens and groups
 multiple filters behind a button with the active count. Narrow screens group even
-a single filter. An empty filtered result offers to clear the search and filters
-together. This loads page one with the current sort, page size and columns, and
-preserves the saved view for later use.
+a single filter. When the controls are collapsed, removable labels show each
+active editable filter and its display value. Removing a label returns to page
+one and preserves the rest of the query. An empty filtered result offers to
+clear the search and filters together. This loads page one with the current
+sort, page size and columns, and preserves the saved view for later use.
 
 The browser entrypoint uses the client `createInertiaApp` contract and mounts
 the Vue application directly. An SSR `render` callback belongs only in a

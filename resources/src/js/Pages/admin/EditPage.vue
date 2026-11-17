@@ -5,6 +5,7 @@
     :fields="['username', 'name', 'lastName', 'email']"
     :return-href="listHref"
     :label="t('Редактирование администратора')"
+    can-save-and-return
     @submit="handleForm"
   >
     <!-- Name -->
@@ -61,6 +62,7 @@ import AppHead from '@/components/layout/AppHead.vue'
 import FormInput from '@/components/form/FormInput.vue'
 import RecordEditForm from '@/components/form/RecordEditForm.vue'
 import { useRecordNavigation } from '@/composables/useRecordNavigation'
+import { useRecordEditSubmission } from '@/composables/useRecordEditSubmission'
 
 const basePath = '/admins'
 const { listHref } = useRecordNavigation(basePath)
@@ -85,15 +87,24 @@ const oldData = (page.props.old as Record<string, string | null> | undefined) ??
 const oldValue = (field: string) =>
   Object.prototype.hasOwnProperty.call(oldData, field) ? oldData[field] : (props.data[field] ?? '')
 
+const canonicalFields = () => ({
+  name: props.data.name ?? '',
+  email: props.data.email ?? '',
+  lastName: props.data.lastName ?? '',
+  username: props.data.username ?? '',
+})
 const form = useForm({
   name: oldValue('name'),
-  email: props.data.email ?? '',
+  email: canonicalFields().email,
   lastName: oldValue('lastName'),
   username: oldValue('username'),
 })
 
-function handleForm() {
-  if (form.processing) return
-  form.put(`${basePath}/${props.data.id}`)
-}
+const handleForm = useRecordEditSubmission(
+  form,
+  basePath,
+  listHref,
+  () => props.data.id,
+  canonicalFields,
+)
 </script>

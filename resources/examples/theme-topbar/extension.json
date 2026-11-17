@@ -5,7 +5,7 @@
       "key": "example.topbar",
       "apiVersion": 1,
       "sourceRoot": "src",
-      "fingerprint": "sha256:2815050edf5ca532e39c4fb70a4bda09bfb245725257d62d442d40d6c24cef28",
+      "fingerprint": "sha256:7365ba23bd11a0bb20c648e901ab5477045724ca66190ae84cdcc0ff9a7ce132",
       "requires": [
         "goadmin.core"
       ],

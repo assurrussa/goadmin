@@ -26,7 +26,7 @@ const {
   <DropdownMenu>
     <DropdownMenuTrigger
       data-profile-menu-trigger
-      class="menu-trigger flex items-center cursor-pointer gap-3 rounded-[var(--goadmin-menu-radius,var(--goadmin-control-radius,4px))] px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
+      class="menu-trigger flex items-center justify-center cursor-pointer gap-3 rounded-[var(--goadmin-menu-radius,var(--goadmin-control-radius,4px))] max-sm:size-11 sm:px-2.5 sm:py-1.5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
     >
       <div
         class="h-8 w-8 rounded-full bg-primary-dark dark:bg-primary flex items-center justify-center overflow-hidden"
@@ -53,7 +53,7 @@ const {
           {{ primaryRoleLabel }}
         </p>
       </div>
-      <ChevronDown class="h-4 w-4 text-text-tertiary" />
+      <ChevronDown class="hidden h-4 w-4 text-text-tertiary sm:block" />
     </DropdownMenuTrigger>
 
     <DropdownMenuContent class="w-56" @close-auto-focus="onMenuCloseAutoFocus">

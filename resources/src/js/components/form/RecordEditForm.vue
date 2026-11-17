@@ -7,13 +7,21 @@ import PageActionBar from '@/components/layout/PageActionBar.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 
-defineProps<{
+const props = defineProps<{
   form: { errors: Record<string, string>; processing: boolean; isDirty?: boolean }
   fields: string[]
   returnHref: string
   label: string
+  canSaveAndReturn?: boolean
 }>()
-const emit = defineEmits<{ submit: [event: Event] }>()
+const emit = defineEmits<{ submit: [event: Event, returnToList?: boolean] }>()
+
+function submit(event: Event) {
+  const submitter = (event as SubmitEvent).submitter
+  if (props.canSaveAndReturn && submitter?.hasAttribute('data-save-and-return'))
+    emit('submit', event, true)
+  else emit('submit', event)
+}
 </script>
 
 <template>
@@ -26,7 +34,7 @@ const emit = defineEmits<{ submit: [event: Event] }>()
     />
   </div>
   <Card class="overflow-hidden">
-    <AdminForm :form="form" :fields="fields" warn-unsaved @submit="emit('submit', $event)">
+    <AdminForm :form="form" :fields="fields" warn-unsaved @submit="submit">
       <CardContent class="pt-6 space-y-6"><slot /></CardContent>
       <template #actions>
         <CardFooter
@@ -43,6 +51,14 @@ const emit = defineEmits<{ submit: [event: Event] }>()
               :loading="form.processing"
               :loading-text="t('Сохранение...')"
               >{{ t('Сохранить') }}</FormButton
+            >
+            <FormButton
+              v-if="canSaveAndReturn"
+              type="submit"
+              variant="secondary"
+              :disabled="form.processing"
+              data-save-and-return
+              >{{ t('Сохранить и вернуться к списку') }}</FormButton
             >
           </slot>
         </CardFooter>

@@ -3,6 +3,7 @@ import type { InjectionKey, Ref } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 import { useAuthUserStore } from '@/stores/authUser'
 import type { AdminAuthUser } from '@/types/models'
+import { isLocalAdminMenuHref } from './useAdminNavigation'
 const headerStateKey: InjectionKey<Ref<boolean>> = Symbol('goadmin.header-preview')
 export function provideAdminHeaderState() {
   const existing = inject(headerStateKey, null)
@@ -23,13 +24,7 @@ export function useAdminHeader() {
     return (menu?.sections ?? [])
       .filter((section) => section.placement === 'account')
       .flatMap((section) => section.items ?? [])
-      .filter(
-        (item): item is AccountMenuItem & { href: string } =>
-          typeof item.href === 'string' &&
-          item.href.startsWith('/') &&
-          !item.href.startsWith('//') &&
-          !/[\\\x00-\x1f\x7f]/.test(item.href),
-      )
+      .filter((item): item is AccountMenuItem & { href: string } => isLocalAdminMenuHref(item.href))
   })
   const rolePreviewOpen = inject(headerStateKey, ref(false))
   const canPreviewRole = computed(() =>

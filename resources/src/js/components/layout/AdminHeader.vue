@@ -15,7 +15,7 @@ provideAdminHeaderState()
     class="box-border h-[var(--goadmin-header-height,68px)] shrink-0 bg-card border-b border-border-primary shadow-[var(--goadmin-header-shadow,var(--goadmin-default-header-shadow))]"
   >
     <div
-      class="flex items-center justify-between px-4 py-1 sm:px-6 lg:px-8 max-w-[var(--goadmin-content-max-width,80rem)] mx-auto w-full h-full min-h-0"
+      class="flex items-center justify-between px-2 py-1 sm:px-6 lg:px-8 max-w-[var(--goadmin-content-max-width,80rem)] mx-auto w-full h-full min-h-0"
     >
       <div class="flex items-center">
         <slot name="navigationToggle">
@@ -31,7 +31,7 @@ provideAdminHeaderState()
           /></AppButton>
         </slot>
       </div>
-      <div class="flex items-center gap-2 sm:gap-3">
+      <div class="flex items-center gap-1 sm:gap-3">
         <AdminHeaderUtilities /><AdminAccountMenu />
       </div>
     </div>

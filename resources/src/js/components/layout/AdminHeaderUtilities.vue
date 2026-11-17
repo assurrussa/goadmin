@@ -9,11 +9,13 @@ import { Bell } from 'lucide-vue-next'
 import ThemeSelect from './ThemeSelect.vue'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 import { useAdminHeader } from './useAdminHeader'
+import AdminQuickNavigation from './AdminQuickNavigation.vue'
 const { rolePreviewOpen, unreadNotifications } = useAdminHeader()
 const { notifications } = useAdminCapabilities()
 </script>
 <template>
   <RolePreviewBanner v-model:open="rolePreviewOpen" />
+  <AdminQuickNavigation />
   <LocaleSelect />
   <ThemeSelect />
 

@@ -3,20 +3,41 @@
     v-if="filterableColumns.length"
     data-ui="datagrid"
     data-part="filters"
-    class="min-w-0"
+    class="min-w-0 max-w-full"
     :class="{ 'w-full sm:basis-full': expanded && !inline }"
   >
-    <AppButton
-      :class="{ 'sm:hidden': inline }"
-      variant="outline"
-      size="sm"
-      :aria-expanded="expanded"
-      :aria-controls="panelId"
-      @click="expanded = !expanded"
-    >
-      <SlidersHorizontal aria-hidden="true" />
-      {{ activeCount ? t('Фильтры ({count})', undefined, { count: activeCount }) : t('Фильтры') }}
-    </AppButton>
+    <div ref="summary" class="flex flex-wrap items-center gap-2" :class="{ 'sm:hidden': inline }">
+      <AppButton
+        variant="outline"
+        size="sm"
+        :aria-expanded="expanded"
+        :aria-controls="panelId"
+        @click="expanded = !expanded"
+      >
+        <SlidersHorizontal aria-hidden="true" />
+        {{
+          activeFilters.length
+            ? t('Фильтры ({count})', undefined, { count: activeFilters.length })
+            : t('Фильтры')
+        }}
+      </AppButton>
+      <template v-if="!expanded">
+        <AppButton
+          v-for="filter in activeFilters"
+          :key="filter.key"
+          variant="secondary"
+          size="sm"
+          rounded
+          class="min-w-0 max-w-full gap-1.5"
+          :aria-label="t('Снять фильтр {filter}', undefined, { filter: filter.label })"
+          :title="filter.label"
+          @click="removeFilter(filter.key)"
+        >
+          <span class="truncate">{{ filter.label }}</span>
+          <X aria-hidden="true" class="size-3.5" />
+        </AppButton>
+      </template>
+    </div>
 
     <div
       :id="panelId"
@@ -63,7 +84,7 @@
       </div>
 
       <AppButton
-        v-if="activeCount"
+        v-if="activeFilters.length"
         :variant="inline ? 'ghost' : 'outline'"
         :size="inline ? 'icon' : 'sm'"
         :class="inline ? 'shrink-0' : 'justify-self-start self-end'"
@@ -97,6 +118,7 @@ const emit = defineEmits<{
 }>()
 
 const panelId = `grid-filters-${useId()}`
+const summary = ref<HTMLElement | null>(null)
 const expanded = ref(false)
 const inline = computed(() => props.filterableColumns.length === 1)
 
@@ -110,20 +132,35 @@ const getFilterValue = (key: string): unknown => {
   return Object.hasOwn(props.filters, key) ? value : undefined
 }
 
-const activeCount = computed(
-  () =>
-    props.filterableColumns.filter(({ key }) => isActiveDataGridFilter(getFilterValue(key))).length,
-)
+const selectedOption = (column: Column, value: unknown) => {
+  // URL values are strings even when the configured option has a numeric value.
+  const options = column.options ?? []
+  return (
+    options.find((option) => option.value === value) ??
+    options.find((option) => String(option.value) === String(value))
+  )
+}
 
 const getSelectValue = (column: Column): AcceptableValue | undefined => {
   const value = getFilterValue(column.key)
   if (!isActiveDataGridFilter(value)) return undefined
-  // URL values are strings even when the configured option has a numeric value.
-  const options = column.options ?? []
-  const option =
-    options.find((option) => option.value === value) ??
-    options.find((option) => String(option.value) === String(value))
-  return option?.value ?? (value as AcceptableValue)
+  return selectedOption(column, value)?.value ?? (value as AcceptableValue)
+}
+
+const activeFilters = computed(() =>
+  props.filterableColumns.flatMap((column) => {
+    const value = getFilterValue(column.key)
+    if (!isActiveDataGridFilter(value)) return []
+    const option = column.type === 'select' ? selectedOption(column, value) : undefined
+    const display =
+      option?.label ?? (typeof value === 'boolean' ? t(value ? 'Да' : 'Нет') : String(value))
+    return [{ key: column.key, label: `${t(column.label)}: ${display}` }]
+  }),
+)
+
+function removeFilter(key: string) {
+  summary.value?.querySelector<HTMLButtonElement>('button[aria-controls]')?.focus()
+  handleFilterChange(key, '')
 }
 
 const getInputValue = (key: string): string | number => {

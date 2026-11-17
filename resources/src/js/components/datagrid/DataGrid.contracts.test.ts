@@ -338,7 +338,7 @@ describe('DataGridFilters passing contracts', () => {
       expect(new Set(toggles.map((toggle) => toggle.getAttribute('aria-controls'))).size).toBe(2)
       for (const toggle of toggles) {
         expect(text(toggle)).toBe('Filters (1)')
-        expect(toggle.classList.contains('sm:hidden')).toBe(true)
+        expect(toggle.parentElement?.classList.contains('sm:hidden')).toBe(true)
         const panel = element.querySelector(`#${toggle.getAttribute('aria-controls')}`)!
         expect(panel.classList.contains('hidden')).toBe(true)
         expect(panel.classList.contains('sm:flex')).toBe(true)
@@ -353,6 +353,32 @@ describe('DataGridFilters passing contracts', () => {
     } finally {
       applyLocale('ru')
     }
+  })
+  it('summarizes only editable filters and hides duplicate labels while the panel is open', async () => {
+    const onFilterChange = vi.fn()
+    const { element } = mount(DataGridFilters, {
+      filterableColumns: [
+        column('status', { type: 'select', options: [{ value: 0, label: 'Pending' }] }),
+        column('count', { type: 'number' }),
+        column('enabled', { type: 'boolean' }),
+        column('name'),
+      ],
+      filters: { status: '0', count: 0, enabled: false, name: 'Ada', internal: 'unlisted' },
+      onFilterChange,
+    })
+    const toggle = button(element, 'Фильтры (4)')
+    expect(button(element, 'Снять фильтр status: Pending').textContent).toContain('Pending')
+    expect(button(element, 'Снять фильтр count: 0')).toBeTruthy()
+    expect(button(element, 'Снять фильтр enabled: Нет')).toBeTruthy()
+    expect(text(element)).not.toContain('unlisted')
+    const remove = button(element, 'Снять фильтр name: Ada')
+    remove.focus()
+    remove.click()
+    expect(onFilterChange.mock.calls).toEqual([[{ name: '' }]])
+    expect(document.activeElement).toBe(toggle)
+    toggle.click()
+    await settle()
+    expect(element.querySelectorAll('button[aria-label^="Снять фильтр"]')).toHaveLength(0)
   })
   it('renders text and numeric inputs with labels and emits one-key patches', async () => {
     const onFilterChange = vi.fn()

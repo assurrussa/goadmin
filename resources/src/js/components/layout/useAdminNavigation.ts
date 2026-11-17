@@ -15,6 +15,16 @@ import {
   Mail,
   RotateCcw,
 } from 'lucide-vue-next'
+
+export function isLocalAdminMenuHref(href: unknown): href is string {
+  return (
+    typeof href === 'string' &&
+    href.startsWith('/') &&
+    !href.startsWith('//') &&
+    !/[\\\x00-\x1f\x7f]/.test(href)
+  )
+}
+
 export function useAdminNavigation() {
   const page = usePage()
   // Navigation items
