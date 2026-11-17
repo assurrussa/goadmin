@@ -56,6 +56,9 @@ This module is published as `github.com/assurrussa/goadmin`.
   clear search and filters together while preserving sort, page size and columns.
 - Hosts receive these changes when rebuilding with the updated Go module.
   The release uses the existing host API and database schema.
+- The frontend toolchain pins a patched picomatch fork for its declared
+  dependencies. See the [advisory review](docs/dependency-advisory-review.md#picomatch-in-the-v0280-frontend-toolchain)
+  for the package origin, compatibility checks and scope.
 
 ## v0.26.2 dependency patch
 

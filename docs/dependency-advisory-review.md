@@ -172,3 +172,28 @@ packages' declared major-version ranges and must be reassessed when upstream
 releases compatible dependencies. The project frontend checks must pass with
 the override; those checks cannot prove compatibility with arbitrary host
 configurations. No advisory is suppressed.
+
+## Picomatch in the v0.28.0 frontend toolchain
+
+On 2026-11-18 the public npm audit reported 18 affected package records for
+one high-severity advisory. The lockfile resolved picomatch 4.0.5. The
+advisory lists upstream versions through 4.0.7 as affected and lists no
+patched version. [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf).
+
+The npm override pins `@ryotsu/picomatch@4.0.7-a` by registry alias. All ten
+files in the integrity-pinned tarball match the fork's Git tag. Its parent
+is upstream commit `9fab7bf`. The only runtime file the fork changes from
+that parent is `lib/parse.js`. The patch simplifies supported repeated
+wildcard groups and treats some more complex forms as literals. Custom build
+globs using those forms may match different paths. [Fork source at the reviewed commit](https://github.com/ryotsu-kankichi/secured-picomatch/tree/3ab5a7627d480259e3d9ca67fbc14c125d374f0e).
+
+After `npm ci`, `npm ls picomatch --all` resolves all six direct consumers
+and both fdir peer paths to the same fork. Checks exercised CommonJS and ESM
+loading, POSIX matching, glob scanning, ignore rules and tinyglobby discovery
+on GoAdmin sources. The full lockfile audit reported zero findings.
+
+Rollup, Prettier and vite-plugin-vue-devtools also ship matcher code inside
+their own distributions. Those copies follow the releases of the containing
+tools and are outside the scope of this override. Reassess the pin when the
+upstream advisory lists a fixed version. Recheck the resolved tree, resource
+build and audit before removing it.
