@@ -77,6 +77,95 @@ For a compact illustration of just the supported Go types, see the
 [external-consumer compile test](../reference/externalconsumer/crud_test.go).
 Its callbacks are stubs, not a persistence or authorization implementation.
 
+### The resource assembly, directly from the runnable starter
+
+The following is the complete `productsModule` function, synchronized from
+[products.go](../examples/starter/products.go). It uses that file's DTOs and
+owner-scoped repository methods, plus `context`, `database/sql`, `errors`,
+`features/crud`, `host` and `toolkit/datagrid`. It is **not a standalone program**:
+run the starter above or keep the surrounding repository/migration code when
+adapting it. In particular, the small `Authorize` callback does not replace the
+owner checks inside `get`, `list`, `create`, `update` and `command`.
+
+<!-- source: examples/starter/products.go#productsModule -->
+```go
+func productsModule(db *sql.DB) (host.Module, error) {
+	r := productRepo{db}
+	permission := func(action host.PermissionAction) host.PermissionKey {
+		return host.NewPermissionKey("products", action)
+	}
+	fields := []crud.Field{
+		{Key: "name", Label: "Name", Type: "text", Read: true, Create: true, Update: true, Required: true},
+		{Key: "description", Label: "Description", Type: "textarea", Read: true, Create: true, Update: true},
+		{Key: "stock", Label: "Stock", Type: "number", Read: true, Create: true, Update: true},
+		{Key: "active", Label: "Active", Type: "boolean", Read: true, Create: true, Update: true},
+		{Key: "available", Label: "Available", Type: "date", Read: true, Create: true, Update: true},
+		{
+			Key: "category", Label: "Category", Type: "select", Read: true, Create: true, Update: true,
+			Options: []crud.Option{{Value: "standard", Label: "Standard"}, {Value: "premium", Label: "Premium"}},
+		},
+		{
+			Key: "status", Label: "Status", Type: "select", Read: true,
+			Options: []crud.Option{{Value: "draft", Label: "Draft"}, {Value: "published", Label: "Published"}},
+		},
+	}
+	return crud.New(crud.Definition[productData, productInput, productInput]{
+		Key: "products", BasePath: "/products", Title: "Products", Fields: fields, PageSize: 20, DefaultSort: "name", DefaultOrder: "asc",
+		Columns: []datagrid.Column{
+			{Key: "name", Label: "Name", Type: "text", Sortable: true},
+			{Key: "stock", Label: "Stock", Type: "number", Sortable: true, Filterable: true},
+			{Key: "active", Label: "Active", Type: "boolean", Filterable: true},
+			{Key: "available", Label: "Available", Type: "date", Sortable: true, Filterable: true},
+			{Key: "category", Label: "Category", Type: "select", Filterable: true, FilterOptions: []map[string]string{{"value": "standard", "label": "Standard"}, {"value": "premium", "label": "Premium"}}},
+			{Key: "status", Label: "Status", Type: "select", Filterable: true, FilterOptions: []map[string]string{{"value": "draft", "label": "Draft"}, {"value": "published", "label": "Published"}}},
+		},
+		Permissions: crud.Permissions{Read: permission("read"), Create: permission("create"), Update: permission("update"), Delete: permission("delete")},
+		Menu:        host.Menu{Sections: []host.Section{{Key: "products", Title: "Products", Items: []host.Item{{Name: "Products", Href: "/products", Icon: "users", PermissionKey: permission("read")}}}}},
+		List:        r.list, Get: r.get, LoadSelected: func(ctx context.Context, a host.Actor, ids []string) ([]crud.Record[productData], error) {
+			records := []crud.Record[productData]{}
+			for _, id := range ids {
+				record, err := r.get(ctx, a, id)
+				if errors.Is(err, crud.ErrNotFound) {
+					continue
+				}
+				if err != nil {
+					return nil, err
+				}
+				records = append(records, record)
+			}
+			return records, nil
+		},
+		Create: r.create, Update: r.update,
+		Delete: func(ctx context.Context, a host.Actor, id, revision string) error {
+			return r.command(ctx, a, id, revision, "deleted")
+		},
+		Authorize: func(_ context.Context, _ host.Actor, op crud.Operation, record crud.Record[productData]) error {
+			if op == "publish" && record.Data.Status != "draft" {
+				return crud.ErrDenied
+			}
+			if op == "unpublish" && record.Data.Status != "published" {
+				return crud.ErrDenied
+			}
+			return nil
+		},
+		Actions: []crud.Action[productData]{
+			{Key: "publish", Label: "Опубликовать", Confirmation: "Опубликовать этот товар?", Permission: permission("publish"), Run: func(ctx context.Context, a host.Actor, id, revision string) error {
+				return r.command(ctx, a, id, revision, "publish")
+			}},
+			{Key: "unpublish", Label: "Снять с публикации", Confirmation: "Снять этот товар с публикации?", Permission: permission("unpublish"), Run: func(ctx context.Context, a host.Actor, id, revision string) error {
+				return r.command(ctx, a, id, revision, "unpublish")
+			}},
+		},
+	})
+}
+```
+<!-- /source: examples/starter/products.go#productsModule -->
+
+Maintainers: `python3 scripts/check-doc-snippets.py` checks this excerpt
+against the existing Go function text. After an intentional source change,
+review it and run the same command with `--write`, then rerun affected Go tests.
+The excerpt checker proves synchronization, not compilation or browser behavior.
+
 ## 4. Verify denied paths too
 
 On an isolated demo with `access` explicitly selected, create a second

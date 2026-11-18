@@ -34,6 +34,8 @@ From the repository root:
 
 ```sh
 python3 scripts/check-context7-config.py
+python3 scripts/check-doc-snippets.py
+python3 -m unittest discover -s scripts -p check_doc_snippets_test.py
 ```
 
 This checks the selection policy against tracked Markdown paths and synthetic
@@ -54,7 +56,8 @@ The test does not access the network, change the dashboard, or trigger refresh.
    effective includes/excludes and source SHA, plus parser warnings/errors.
 4. Query the actual index for core setup, CRUD, permissions, custom pages and
    uploads. Confirm current user-facing examples appear and audit/QA material
-   does not. Compare the fixed question set and benchmark explanations; fewer
+   does not. Use the [fixed question set, rubric and evidence template](context7-evaluation.md).
+   Compare its unchanged before/after questions and benchmark explanations; fewer
    snippets is acceptable when irrelevant snippets were removed.
 
 A refresh is asynchronous and subject to limits. It is not proof of a new

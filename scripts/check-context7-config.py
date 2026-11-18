@@ -52,7 +52,8 @@ blocked = [
     "docs/design/admin-authorization-snapshot.md",
     "docs/admin-ux-verification-20261017.md", "docs/presentation-packs-qa.md",
     "docs/auth-cookie-client-followup.md", "docs/auth-session-hardening-followup.md",
-    "docs/maintainers/context7-index.md", "AGENTS.md", "scripts/README.md",
+    "docs/maintainers/context7-index.md", "docs/maintainers/context7-evaluation.md",
+    "AGENTS.md", "scripts/README.md",
 ]
 for path in required:
     assert (ROOT / path).is_file(), f"Missing consumer page: {path}"
