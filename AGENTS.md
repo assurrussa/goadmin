@@ -146,6 +146,14 @@ real tags resolve from a clean consumer.
 
 ## Documentation Rules
 
+The consumer-documentation mission is a reproducible published starter followed
+by a correctly chosen extension (core, declarative CRUD, DataGrid or custom page).
+Keep module choice explicit and preserve mandatory auth/RBAC/CSRF and host-owned
+data/transactions. Documentation work must not expand runtime scope. Acceptance
+requires the documented browser scenario and denied paths, not compilation alone;
+distinguish published-consumer, source-candidate and browser evidence. Keep the
+starter release pin and public-package documentation aligned with their sources.
+
 Keep `AGENTS.md` concise. Put durable project details, invariants, and boundary
 notes in `docs/project-context.md`. Keep task-specific decisions and tradeoffs
 in `docs/implementation-notes.md`.

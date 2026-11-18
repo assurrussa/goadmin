@@ -10,6 +10,9 @@ only the separately guarded Publish/Unpublish commands change that status.
 Unpublish requires `products:unpublish` and returns a published record to draft;
 both transitions use owner/revision CAS and transactional audit.
 
+New here? Follow [your first CRUD resource](first-crud.md) for the runnable
+setup, code map and browser acceptance. This page is the detailed contract reference.
+
 ## Resource ownership
 
 `Definition` declares a stable key/base path, title/menu, explicit read/create/

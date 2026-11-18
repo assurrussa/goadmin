@@ -10,17 +10,37 @@ Source mode requires Git, Python 3 and Docker Compose. Its GoUploads pin is
 explicit candidate consumer resolves GoUploads v0.13.0 without that override
 when only GoAuth and GoNotify paths are selected.
 
-After GoAdmin v0.20.0 is published, use
-`GOADMIN_VERSION=v0.20.0 docker compose up --build` from this directory.
-That build removes local overrides and resolves libraries anonymously through the public Go proxy. Its embedded UI comes from the selected
-published release, not the current checkout. Run
-`make externalconsumer-published VERSION=v0.20.0` from the repository root first.
+## Start with the published library
 
-For either mode, copy `.env.example` to `.env`. It sets `GOADMIN_VERSION=v0.20.0`
+Prerequisites: Git, Docker Engine with Docker Compose, and OpenSSL for generating
+local secrets. No sibling repositories or Node.js installation are needed for
+this mode. This starter source targets **GoAdmin v0.30.0**. Its Docker build uses
+that release's embedded UI, not a frontend built from the checkout.
+
+```sh
+git clone --branch v0.30.0 --depth 1 https://github.com/assurrussa/goadmin.git
+cd goadmin/examples/starter
+cp .env.example .env
+# Fill the required values below before starting.
+GOADMIN_VERSION=v0.30.0 docker compose up --build
+```
+
+This command pins both the starter source and published library. The release
+snapshot may contain an older `.env.example` version value; the explicit
+`GOADMIN_VERSION=v0.30.0` command overrides it. Set the same value in your private
+`.env` for subsequent runs. This documentation branch also pins it in the template.
+Do not select an arbitrary older
+release with newer starter source: the source may use APIs that did not exist
+in that release. When upgrading, check out the matching starter revision, read
+the release notes and run the published-consumer check from the repository root:
+`make externalconsumer-published VERSION=v0.30.0`. That check needs the repository's
+Go toolchain; it does not replace running this starter in a browser.
+
+For either mode, copy `.env.example` to `.env`. It sets `GOADMIN_VERSION=v0.30.0`
 for the published build. Set PostgreSQL credentials, a unique CSRF secret and
 first-admin setup token of at least 32 bytes, and three distinct 32-byte keys
 encoded with standard base64. Generate each key with `openssl rand -base64 32`.
-Then run the published command above. For source candidates, prepare the four
+Keep `.env` private and untracked. Then run the published command above. For source candidates, prepare the four
 sibling checkouts and run `bash ../../scripts/starter-local.sh up --build`
 instead; this explicit source mode does not use `GOADMIN_VERSION`.
 The default core uses PostgreSQL for browser and canonical auth sessions; it
@@ -28,7 +48,9 @@ needs no Redis or SMTP. The login page offers first-admin registration until an
 administrator exists. Enter the setup token from `.env` in that form.
 
 `ADMIN_MODULES` selects comma-separated modules: `users,access,jobs,uploads,queues,
-notifications,realtime,authmail`. Uploads, queues and notifications require jobs.
+notifications,realtime,authmail,products`. Empty means core only; `products` adds
+the host-owned CRUD tutorial without other optional modules. See
+[your first CRUD resource](../../docs/first-crud.md). Uploads, queues and notifications require jobs.
 For notifications or authmail, set `NOTIFYHUB_URL` and `NOTIFYHUB_PROJECT_KEY`
 for an existing NotifyHub gateway. Both modules reuse one client and project key;
 no second SMTP connection is needed. Use the gateway origin or deployment prefix,
@@ -83,7 +105,9 @@ live under `media/v1` and resolve from `ADMIN_URL/uploads`. Staging and unfinish
 records are never served as admin files or previews. Existing migration history
 is preserved; this starter does not reset host data.
 
-## Compare presentation packs on a real backend
+## Source-candidate acceptance (maintainers)
+
+### Compare presentation packs on a real backend
 
 From the repository root, run the opt-in local acceptance command:
 
