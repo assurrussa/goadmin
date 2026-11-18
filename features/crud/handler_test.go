@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
@@ -21,14 +22,20 @@ import (
 	"github.com/assurrussa/goadmin/host"
 	"github.com/assurrussa/goadmin/hosttest"
 	coreinertia "github.com/assurrussa/goadmin/infrastructure/core/inertia"
+	sessioncore "github.com/assurrussa/goadmin/infrastructure/core/session"
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 	"github.com/assurrussa/goadmin/toolkit/datagrid"
 )
 
 type testRow struct {
-	Name     string `json:"name"`
-	Secret   string `json:"secret"`
-	ReadOnly string `json:"readOnly"`
+	Name     string  `json:"name"`
+	Secret   string  `json:"secret"`
+	ReadOnly string  `json:"readOnly"`
+	Stock    int64   `json:"stock,omitempty"`
+	Active   bool    `json:"active,omitempty"`
+	Nullable *string `json:"nullable"`
+	Note     string  `json:"note,omitempty"`
+	Count    *int64  `json:"count,omitempty"`
 }
 type testCreate struct {
 	Name string `json:"name"`
@@ -38,6 +45,8 @@ type testUpdate struct {
 	Stock    int64   `json:"stock"`
 	Active   bool    `json:"active"`
 	Nullable *string `json:"nullable"`
+	Note     string  `json:"note"`
+	Count    *int64  `json:"count"`
 }
 
 func definition() Definition[testRow, testCreate, testUpdate] {
@@ -80,7 +89,14 @@ func mountedPolicy(t *testing.T, d Definition[testRow, testCreate, testUpdate], 
 		app = fiber.New(fiber.Config{ErrorHandler: fixture.InertiaManager.MiddlewareErrorListener()})
 	}
 	if len(flash) > 0 && flash[0] {
-		goinertia.WithSessionStore(coreinertia.SessionBridge{Store: fixture.SessionStore})(fixture.InertiaManager)
+		bridge := coreinertia.SessionBridge{Store: fixture.SessionStore}
+		goinertia.WithSessionStore(bridge)(fixture.InertiaManager)
+		app.Get("/start-crud-session", func(c fiber.Ctx) error {
+			if err := bridge.Set(c, sessioncore.AuthAdminKey.String(), true); err != nil {
+				return err
+			}
+			return c.SendStatus(http.StatusNoContent)
+		})
 	}
 	actor, err := hosttest.WithActor(host.Actor{AdminID: 9, SubjectID: "11111111-1111-4111-8111-111111111111"})
 	require.NoError(t, err)
@@ -564,7 +580,7 @@ func TestNumericInvalidInputPersistsSafeErrorRedirect(t *testing.T) {
 
 func TestNumericBooleanAndNullDraftPersistAcrossConflict(t *testing.T) {
 	d := definition()
-	d.Fields = append(d.Fields, Field{Key: "stock", Label: "Stock", Type: "number", Update: true}, Field{Key: "active", Label: "Active", Type: "boolean", Update: true}, Field{Key: "nullable", Label: "Nullable", Type: "text", Update: true})
+	d.Fields = append(d.Fields, Field{Key: "stock", Label: "Stock", Type: "number", Read: true, Update: true}, Field{Key: "active", Label: "Active", Type: "boolean", Read: true, Update: true}, Field{Key: "nullable", Label: "Nullable", Type: "text", Read: true, Update: true})
 	d.Update = func(_ context.Context, _ host.Actor, _, _ string, input testUpdate) (Record[testRow], error) {
 		require.Equal(t, int64(28), input.Stock)
 		require.True(t, input.Active)

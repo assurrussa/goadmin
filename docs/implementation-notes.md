@@ -1,5 +1,24 @@
 # Implementation Notes
 
+## Concurrent CRUD edits and return to the list
+
+CRUD edit submissions use the existing per-attempt redirect feedback for
+opaque resource IDs. The receiving page checks the actor, resource, record
+and attempt before using its result. The list fallback carries the original
+record ID in a request header so the grid query retains its meaning.
+
+The editor keeps its starting revision and scalar values in memory. A
+confirmed conflict supplies a fresh permission-checked projection through the
+existing edit GET. This keeps reconciliation and host-owned atomic writes on
+the existing CRUD routes. The Products smoke scenario uses two tabs of one
+owner to exercise both the revision check and returning to a filtered page.
+
+The redirect checks permissions again before returning edit feedback. A
+revoked edit permission or a deleted record sends the administrator back to
+the readable list. If list access was also revoked, the request ends with
+HTTP 403. A host serializer can intentionally omit an editable value. The
+form requires explicit input for that field before saving.
+
 ## Quick navigation, record editing and active filters (2026-11-18)
 
 Quick navigation uses the current menu and account links in both bundled

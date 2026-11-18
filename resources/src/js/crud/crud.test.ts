@@ -12,7 +12,11 @@ const mocks = vi.hoisted(() => ({
   cancel: vi.fn(),
   confirm: vi.fn().mockResolvedValue(true),
   on: vi.fn(),
-  page: { url: '/products/records/a/edit?returnTo=%2Fproducts%3Fpage%3D3', props: {} },
+  page: {
+    component: 'crud/Form',
+    url: '/products/records/a/edit?returnTo=%2Fproducts%3Fpage%3D3',
+    props: {},
+  },
   form: undefined as unknown,
 }))
 vi.mock('@/composables/useConfirmation', () => ({
@@ -24,7 +28,7 @@ vi.mock('@/composables/useConfirmation', () => ({
 }))
 vi.mock('@inertiajs/vue3', () => ({
   usePage: () => mocks.page,
-  router: { on: mocks.on, get: vi.fn(), post: mocks.post, delete: mocks.remove },
+  router: { on: mocks.on, get: vi.fn(), post: mocks.post, put: mocks.put, delete: mocks.remove },
   Link: defineComponent({
     props: ['href'],
     setup:
@@ -44,7 +48,6 @@ vi.mock('@inertiajs/vue3', () => ({
         transform = fn
         return form
       },
-      put: (url: string, options: unknown) => mocks.put(url, transform(values), options),
       post: (url: string, options: unknown) => mocks.post(url, transform(values), options),
       cancel: mocks.cancel,
       defaults: vi.fn(),
@@ -251,7 +254,19 @@ it('omits untouched optional write-only updates but preserves explicit replaceme
   submit()
   expect(mocks.put.mock.calls.at(-1)?.[1].apiKey).toBe('')
   expect(leaving()).toBe(true) // An explicit empty replacement still needs saving.
-  mocks.put.mock.calls.at(-1)![2].onSuccess()
+  const options = mocks.put.mock.calls.at(-1)![2]
+  options.onStart()
+  options.onSuccess({
+    component: mocks.page.component,
+    props: {
+      resource,
+      mode: 'update',
+      record: { id: 'a', revision: '2' },
+      values: { name: 'A', active: false },
+      flash: { success: 'Saved', recordEditAttempt: options.headers['X-GoAdmin-Record-Attempt'] },
+    },
+  })
+  await options.onFinish({ cancelled: false, interrupted: false })
   await nextTick()
   expect(leaving()).toBe(false)
   submit()

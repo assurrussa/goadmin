@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -18,24 +19,105 @@ import (
 
 const (
 	recordEditAttemptHeader = "X-GoAdmin-Record-Attempt"
+	recordEditIDHeader      = "X-GoAdmin-Record-ID"
 	recordEditAttemptProp   = "recordEditAttempt"
+	crudEditConflictProp    = "crudEditConflict"
 	recordEditFlashTTL      = 5 * time.Minute
 )
 
 type recordAttempt struct {
-	key   string
-	token string
+	key             string
+	token           string
+	edit            bool
+	conflict        bool
+	redirectFromGet bool
 }
 
 func (a recordAttempt) valid() bool { return a.key != "" }
 
+type crudFlashScope struct {
+	resource        string
+	id              string
+	page            CRUDRecordPage
+	conflict        bool
+	redirectFromGet bool
+}
+
+// CRUDRecordPage identifies the authorized destination of a CRUD update.
+type CRUDRecordPage string
+
+const (
+	CRUDRecordIndex CRUDRecordPage = "index"
+	CRUDRecordShow  CRUDRecordPage = "show"
+	CRUDRecordEdit  CRUDRecordPage = "edit"
+)
+
+// ScopeCRUDRecordFlash opts a registered CRUD route into attempt-scoped flash.
+// The update and its destination supply the same resource, record, and page.
+// Fallback destinations never acknowledge an edit.
+func ScopeCRUDRecordFlash(c fiber.Ctx, resource, id string, page CRUDRecordPage, conflict bool) {
+	c.Locals(crudFlashScope{}, crudFlashScope{resource: resource, id: id, page: page, conflict: conflict})
+}
+
+// ScopeCRUDRecordAccessFallback allows a denied redirect GET to send an error
+// to the resource list using the original update attempt.
+func ScopeCRUDRecordAccessFallback(c fiber.Ctx, resource, id string) {
+	c.Locals(crudFlashScope{}, crudFlashScope{resource: resource, id: id, page: CRUDRecordIndex, redirectFromGet: true})
+}
+
+// DiscardCRUDRecordFlash consumes feedback for a destination that failed its
+// authorization check without decoding or sharing its fields.
+func (b SessionBridge) DiscardCRUDRecordFlash(c fiber.Ctx, resource, id string, page CRUDRecordPage) error {
+	ScopeCRUDRecordFlash(c, resource, id, page, false)
+	attempt, scoped := recordEditAttempt(c, string(goinertia.ContextKeyProps))
+	if !scoped || !attempt.valid() {
+		return nil
+	}
+	key, err := b.recordEditStorageKey(c, attempt)
+	if err != nil || key == "" {
+		return err
+	}
+	_, err = sessioncore.TakeRecordEditFlash(c.Context(), b.Store.Storage, key)
+	return err
+}
+
+// CRUDRecordFlashIndexID reads the opaque record selector for list fallback.
+// It identifies flash only and is never used for a record lookup.
+func CRUDRecordFlashIndexID(c fiber.Ctx) string {
+	if !HasRecordEditAttempt(c) {
+		return ""
+	}
+	raw := c.Get(recordEditIDHeader)
+	if len(raw) > 3*255 {
+		return ""
+	}
+	id, _ := url.PathUnescape(raw)
+	return id
+}
+
+// HasRecordEditAttempt reports whether the request opts into scoped redirects.
+func HasRecordEditAttempt(c fiber.Ctx) bool {
+	return c.Get(goinertia.HeaderInertia) != "" && c.Get(recordEditAttemptHeader) != ""
+}
+
 func recordEditAttempt(c fiber.Ctx, sessionKey string) (recordAttempt, bool) {
-	if sessionKey != string(goinertia.ContextKeyProps) || c.Get(goinertia.HeaderInertia) == "" {
+	if sessionKey != string(goinertia.ContextKeyProps) || !HasRecordEditAttempt(c) {
 		return recordAttempt{}, false
 	}
 	token := c.Get(recordEditAttemptHeader)
-	if token == "" {
-		return recordAttempt{}, false
+
+	if scope, ok := c.Locals(crudFlashScope{}).(crudFlashScope); ok {
+		if scope.id == "" || len(scope.id) > 255 || strings.ContainsRune(scope.id, '\x00') || !validAttemptToken(token) {
+			return recordAttempt{}, true
+		}
+		key := "crud\x00" + scope.resource + "\x00" + scope.id + "\x00" + string(scope.page) + "\x00" + token
+		return recordAttempt{
+			key:             key,
+			token:           token,
+			edit:            scope.page == CRUDRecordEdit,
+			conflict:        scope.conflict,
+			redirectFromGet: scope.redirectFromGet,
+		}, true
 	}
 
 	path := strings.TrimRight(c.Path(), "/")
@@ -60,11 +142,15 @@ func recordEditAttempt(c fiber.Ctx, sessionKey string) (recordAttempt, bool) {
 	if err != nil || recordID <= 0 {
 		return recordAttempt{}, true
 	}
-	parsed, err := uuid.Parse(token)
-	if err != nil || parsed.Version() != 4 || parsed.Variant() != uuid.RFC4122 || parsed.String() != token {
+	if !validAttemptToken(token) {
 		return recordAttempt{}, true
 	}
-	return recordAttempt{key: resource + "/" + strconv.FormatInt(recordID, 10) + "/" + token, token: token}, true
+	return recordAttempt{key: resource + "/" + strconv.FormatInt(recordID, 10) + "/" + token, token: token, edit: true}, true
+}
+
+func validAttemptToken(token string) bool {
+	parsed, err := uuid.Parse(token)
+	return err == nil && parsed.Version() == 4 && parsed.Variant() == uuid.RFC4122 && parsed.String() == token
 }
 
 func (b SessionBridge) saveRecordEditFlash(c fiber.Ctx, attempt recordAttempt, value any) error {
@@ -75,6 +161,14 @@ func (b SessionBridge) saveRecordEditFlash(c fiber.Ctx, attempt recordAttempt, v
 	key, err := b.recordEditStorageKey(c, attempt)
 	if err != nil || key == "" {
 		return err
+	}
+	if attempt.edit && attempt.conflict {
+		flash, ok := props[goinertia.ContextPropsFlash].(map[string]string)
+		if !ok {
+			flash = map[string]string{}
+			props[goinertia.ContextPropsFlash] = flash
+		}
+		flash[crudEditConflictProp] = "1"
 	}
 
 	// A map[string]any also keeps the payload incompatible with Fiber's browser
@@ -108,7 +202,7 @@ func (b SessionBridge) takeRecordEditFlash(c fiber.Ctx, attempt recordAttempt) (
 	}
 	flash, _ := props[goinertia.ContextPropsFlash].(map[string]string)
 	delete(flash, recordEditAttemptProp)
-	if flash[goinertia.FlashLevelSuccess.String()] != "" {
+	if attempt.edit && (flash[goinertia.FlashLevelSuccess.String()] != "" || flash[crudEditConflictProp] == "1") {
 		flash[recordEditAttemptProp] = attempt.token
 	}
 	return props, nil

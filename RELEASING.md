@@ -47,6 +47,18 @@ This module is published as `github.com/assurrussa/goadmin`.
 - The frontend advisory gate and its current zero-finding result are reviewed
   in [docs/dependency-advisory-review.md](docs/dependency-advisory-review.md).
 
+## v0.30.0 CRUD record editing
+
+- Declarative CRUD edit forms can save and return to the originating list,
+  preserving search, filters, sort order, page size and page. Save and Enter
+  keep the editor open when the user still has edit access.
+- On a revision conflict, the editor combines independent changes and lets the
+  user choose a value for each field changed by both writers. The next explicit
+  save writes the result. Reusing a write-only value requires confirmation.
+- Upgrade the GoAdmin module and rebuild the host to serve the updated embedded
+  assets. Hosts that supply their own client bundle must rebuild it against the
+  matching CRUD renderer. This release uses the existing host API and schema.
+
 ## v0.29.0 navigation and record editing
 
 - Ctrl/Cmd + K opens a searchable list of the signed-in user's sections and

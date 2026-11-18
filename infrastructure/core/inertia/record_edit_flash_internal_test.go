@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"sync"
 	"testing"
 
@@ -20,7 +21,10 @@ import (
 	"github.com/assurrussa/goadmin/views"
 )
 
-const recordEditNameField = "name"
+const (
+	recordEditNameField = "name"
+	crudConflictMessage = "record changed"
+)
 
 type recordEditPage struct {
 	Props struct {
@@ -65,6 +69,28 @@ func newRecordEditFlashFixture(t *testing.T) recordEditFlashFixture {
 		return manager.RedirectBack(c)
 	})
 	app.Get("/:resource/:id/edit", func(c fiber.Ctx) error {
+		return manager.Render(c, "Edit", nil)
+	})
+	app.Put("/catalog/items/records/:id", func(c fiber.Ctx) error {
+		id, err := url.PathUnescape(c.Params("id"))
+		if err != nil {
+			return err
+		}
+		conflict := c.Query("stale") == "1"
+		ScopeCRUDRecordFlash(c, "/catalog/items", id, CRUDRecordEdit, conflict)
+		if conflict {
+			manager.WithFlashError(c, crudConflictMessage)
+			return manager.RedirectBackWithErrors(c, map[string]string{"form": crudConflictMessage})
+		}
+		manager.WithFlashSuccess(c, "saved "+id)
+		return manager.RedirectBack(c)
+	})
+	app.Get("/catalog/items/records/:id/edit", func(c fiber.Ctx) error {
+		id, err := url.PathUnescape(c.Params("id"))
+		if err != nil {
+			return err
+		}
+		ScopeCRUDRecordFlash(c, "/catalog/items", id, CRUDRecordEdit, false)
 		return manager.Render(c, "Edit", nil)
 	})
 
@@ -196,4 +222,59 @@ func TestRecordEditFlashSurvivesConcurrentUpdatesAndStaleSessionSave(t *testing.
 		require.Equal(t, attempt, f.edit(t, "/users/42/edit", attempt).Props.Flash[recordEditAttemptProp])
 		require.Empty(t, f.edit(t, "/users/42/edit", attempt).Props.Flash)
 	}
+}
+
+func TestCRUDRecordFlashIsolatedAcrossConcurrentEdits(t *testing.T) {
+	f := newRecordEditFlashFixture(t)
+	otherSession := f
+	otherSession.cookie = nil
+	response := otherSession.request(t, http.MethodGet, "/start", "")
+	require.NoError(t, response.Body.Close())
+	require.Len(t, response.Cookies(), 1)
+	otherSession.cookie = response.Cookies()[0]
+
+	const path = "/catalog/items/records/one%2Ftwo"
+	write := testRecordEditAttempt(1)
+	stale := testRecordEditAttempt(2)
+	var workers sync.WaitGroup
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for _, attempt := range []string{write, stale} {
+		target := path
+		if attempt == stale {
+			target += "?stale=1"
+		}
+		req := f.newRequest(t.Context(), http.MethodPut, target, attempt)
+		workers.Go(func() {
+			<-start
+			res, err := f.app.Test(req)
+			if err == nil {
+				err = res.Body.Close()
+				if res.StatusCode != http.StatusSeeOther || len(res.Cookies()) != 0 {
+					err = fmt.Errorf("unexpected update status %d or session cookie", res.StatusCode)
+				}
+			}
+			results <- err
+		})
+	}
+	close(start)
+	workers.Wait()
+	close(results)
+	for err := range results {
+		require.NoError(t, err)
+	}
+
+	edit := path + "/edit"
+	require.Empty(t, otherSession.edit(t, edit, stale).Props.Flash)
+	require.Empty(t, f.edit(t, "/catalog/items/records/other/edit", stale).Props.Flash)
+	rejected := f.edit(t, edit, stale).Props
+	require.Equal(t, map[string]string{
+		"error": crudConflictMessage, recordEditAttemptProp: stale, crudEditConflictProp: "1",
+	}, rejected.Flash)
+	require.Equal(t, map[string]string{"form": crudConflictMessage}, rejected.Errors)
+	accepted := f.edit(t, edit, write).Props
+	require.Equal(t, map[string]string{"success": "saved one/two", recordEditAttemptProp: write}, accepted.Flash)
+	require.Empty(t, accepted.Errors)
+	require.Empty(t, f.edit(t, edit, stale).Props.Flash)
+	require.Empty(t, f.edit(t, edit, write).Props.Flash)
 }
