@@ -24,8 +24,11 @@ GOADMIN_VERSION=v0.30.0 docker compose up --build
 Open `http://localhost:8080`. On a fresh database, register the first administrator
 using your configured setup token, then sign in. There is no bundled password.
 The Compose profile runs core migrations and the separate Products ledger before
-serving. Restarting preserves records. Disabling Products hides its routes but
-does not drop its tables. Do not use production data for this tutorial.
+serving. Compose stores PostgreSQL data in a named volume; stopping a container
+is not a database reset. Startup readiness is a separate concern: see the
+[restart and recovery caveat](../examples/starter/README.md#restart-and-recovery).
+Disabling Products hides its routes but does not drop its tables. Do not use
+production data for this tutorial.
 
 Core includes authentication, membership/RBAC, sessions, CSRF, setup, basic profile
 and the shell. Products adds list, detail, create/edit, delete, CSV and guarded
@@ -44,9 +47,12 @@ only when you want to manage administrators, roles and permissions in this demo.
 4. Open the same record in two tabs. Save competing edits; the other save must
    expose a revision conflict rather than silently overwrite the first tab.
 5. Filter the list and export CSV. Only authorized, scoped records may appear.
-6. Delete your sample record after confirmation. Restart the app and verify the
-   remaining data survives. `docker compose down` stops the stack without deleting
-   its named volumes; do not add `-v` unless you intend to discard the demo data.
+6. Delete your sample record after confirmation. When checking persistence after
+   a stop/start, follow the [restart and recovery caveat](../examples/starter/README.md#restart-and-recovery)
+   and verify both application readiness and the remaining records. Do not treat
+   a successful container command as application readiness. `docker compose down`
+   stops the stack without deleting its named volumes; do not add `-v` unless you
+   intend to discard the demo data.
 
 Menu visibility is not authorization. A missing menu/action can mean the module
 is omitted or the administrator lacks a permission. Registering a resource's
@@ -194,7 +200,8 @@ successful compilation as end-to-end acceptance:
 | Symptom | Check / next action |
 | --- | --- |
 | Startup rejects missing configuration | Fill every required `.env` value; use three distinct 32-byte base64 keys. Do not weaken validation. |
-| Products is absent | Confirm `ADMIN_MODULES=products`, restart the selected stack, and check the current actor's permissions. |
+| Products is absent | Confirm `ADMIN_MODULES=products`, apply the configuration with `docker compose up -d --build`, and check the current actor's permissions. Keep the same Compose project name. |
+| App exited during startup while PostgreSQL was restarting | Inspect `docker compose ps -a` and `docker compose logs admin postgres`; use `docker compose up -d` with the same project/configuration to recover, then verify readiness and records. See the [restart caveat](../examples/starter/README.md#restart-and-recovery). |
 | Relation does not exist | Confirm the selected Products migration ran against the same database. Do not reset existing data as a workaround. |
 | A record is not found for another account | Owner scoping is expected; do not remove it to make the demo visible. |
 | Save reports conflict | Review current versus draft values and explicitly save the reconciled edit. Do not retry stale writes automatically. |

@@ -105,6 +105,27 @@ live under `media/v1` and resolve from `ADMIN_URL/uploads`. Staging and unfinish
 records are never served as admin files or previews. Existing migration history
 is preserved; this starter does not reset host data.
 
+## Restart and recovery
+
+PostgreSQL uses a named volume, but persistence does not guarantee that the app
+is ready after a restart. The Compose file gates initial startup on PostgreSQL's
+health check; do not assume a simultaneous `docker compose restart` of the app
+and database waits for the database to become ready again.
+
+In the PR #96 Mac acceptance run, restarting both services together caused the
+app to exit on the migration database ping. Running `docker compose up -d` with
+the **same project name and configuration** recovered the app, and the existing
+records were still present. This confirms recovery and persistence in that run,
+not automatic restart recovery or database-outage resilience.
+
+If you encounter this failure, inspect `docker compose ps -a` and
+`docker compose logs admin postgres`, then run `docker compose up -d` and verify
+application readiness and the saved records. Preserve any `-p` and `-f` options
+used for the original stack in every command: a different project name can use
+different volumes. Do not delete volumes or reset the database to fix readiness.
+For changed `.env` configuration, use `docker compose up -d --build` rather than
+`restart`, which [does not apply changed container configuration](https://docs.docker.com/reference/cli/docker/compose/restart/).
+
 ## Source-candidate acceptance (maintainers)
 
 ### Compare presentation packs on a real backend
