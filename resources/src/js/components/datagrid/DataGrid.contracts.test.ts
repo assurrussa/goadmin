@@ -338,7 +338,7 @@ describe('DataGridFilters passing contracts', () => {
       expect(new Set(toggles.map((toggle) => toggle.getAttribute('aria-controls'))).size).toBe(2)
       for (const toggle of toggles) {
         expect(text(toggle)).toBe('Filters (1)')
-        expect(toggle.classList.contains('sm:hidden')).toBe(true)
+        expect(toggle.parentElement?.classList.contains('sm:hidden')).toBe(true)
         const panel = element.querySelector(`#${toggle.getAttribute('aria-controls')}`)!
         expect(panel.classList.contains('hidden')).toBe(true)
         expect(panel.classList.contains('sm:flex')).toBe(true)
@@ -350,6 +350,59 @@ describe('DataGridFilters passing contracts', () => {
       const fieldIds = Array.from(element.querySelectorAll('input'), (control) => control.id)
       expect(fieldIds).toHaveLength(2)
       expect(new Set(fieldIds).size).toBe(2)
+    } finally {
+      applyLocale('ru')
+    }
+  })
+  it('summarizes only editable filters and hides duplicate labels while the panel is open', async () => {
+    const onFilterChange = vi.fn()
+    const { element } = mount(DataGridFilters, {
+      filterableColumns: [
+        column('status', { type: 'select', options: [{ value: 0, label: 'Pending' }] }),
+        column('count', { type: 'number' }),
+        column('enabled', { type: 'boolean' }),
+        column('name'),
+      ],
+      filters: { status: '0', count: 0, enabled: false, name: 'Ada', internal: 'unlisted' },
+      onFilterChange,
+    })
+    const toggle = button(element, 'Фильтры (4)')
+    expect(button(element, 'Снять фильтр status: Pending').textContent).toContain('Pending')
+    expect(button(element, 'Снять фильтр count: 0')).toBeTruthy()
+    expect(button(element, 'Снять фильтр enabled: Нет')).toBeTruthy()
+    expect(text(element)).not.toContain('unlisted')
+    const remove = button(element, 'Снять фильтр name: Ada')
+    remove.focus()
+    remove.click()
+    expect(onFilterChange.mock.calls).toEqual([[{ name: '' }]])
+    expect(document.activeElement).toBe(toggle)
+    toggle.click()
+    await settle()
+    expect(element.querySelectorAll('button[aria-label^="Снять фильтр"]')).toHaveLength(0)
+  })
+  it('localizes configured option labels and URL booleans while preserving entered text', async () => {
+    const { element } = mount(DataGridFilters, {
+      filterableColumns: [
+        column('status', {
+          label: 'Статус',
+          type: 'select',
+          options: [{ value: 'active', label: 'Активные' }],
+        }),
+        column('enabled', { type: 'boolean' }),
+        column('name'),
+      ],
+      filters: { status: 'active', enabled: 'false', name: 'Активные' },
+    })
+    try {
+      expect(button(element, 'Снять фильтр enabled: Нет')).toBeTruthy()
+      applyLocale('en')
+      await settle()
+      expect(button(element, 'Remove filter Status: Active')).toBeTruthy()
+      expect(button(element, 'Remove filter enabled: No')).toBeTruthy()
+      expect(button(element, 'Remove filter name: Активные')).toBeTruthy()
+      button(element, 'Filters (3)').click()
+      await settle()
+      expect(text(element.querySelector('[role="combobox"]')!)).toBe('Active')
     } finally {
       applyLocale('ru')
     }

@@ -285,6 +285,17 @@ async function runCase(name, config) {
     await expect(page.getByRole('menu')).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(account).toBeFocused()
+    for (const width of [320, 390]) {
+      await page.setViewportSize({ width, height: 844 })
+      const headerItems = await page.locator('[data-ui="admin-header"]').evaluate(header =>
+        [...header.querySelectorAll('button, [data-ui="admin-brand"]')]
+          .map(el => el.getBoundingClientRect())
+          .filter(rect => rect.width && rect.height)
+          .sort((a, b) => a.left - b.left)
+          .map(rect => ({ left: rect.left, right: rect.right })))
+      assert.ok(headerItems.every((item, i) => item.left >= 0 && item.right <= width &&
+        (!i || headerItems[i - 1].right <= item.left + 1)), `header controls must fit without overlap at ${width}px`)
+    }
     await page.setViewportSize({ width: 390, height: 844 })
     const toggle = page.getByRole('button', { name: /^(Открыть меню|Open menu)$/ })
     await toggle.click()
@@ -313,14 +324,25 @@ async function runCase(name, config) {
       username: `queues-${name}`, password: credentials.password, passwordConfirm: credentials.password })
     await submit(page, '/admins/create')
     await expect(page).toHaveURL(/\/admins\/\d+$/)
-    // Only this run's isolated PostgreSQL receives projections for the two
-    // UI-created canonical accounts. No production seed endpoint is added.
+    for (const sequence of [1, 2]) {
+      await page.goto('/admins/create')
+      await fill(page, { name: `Batch ${sequence}`, email: `smoke-batch-${sequence}-${name}@example.test`,
+        username: `batch-${sequence}-${name}`, password: credentials.password, passwordConfirm: credentials.password })
+      await submit(page, '/admins/create')
+      await expect(page).toHaveURL(/\/admins\/\d+$/)
+    }
+    // Project the four UI-created accounts into this run's isolated users table.
     ownedSQL(config, 'INSERT INTO users(subject_id,uuid,created_at,updated_at) SELECT subject_id,gen_random_uuid(),now(),now() FROM administrations ON CONFLICT (subject_id) DO NOTHING')
     for (const resource of ['admins', 'users']) {
-      await page.goto(`/${resource}?page=2&limit=1&sortBy=name&sortOrder=asc&search=smoke&status=active`)
-      await expect(page.getByRole('row').filter({ has: page.getByRole('button', { name: /^(Просмотр|View)$/ }) })).toHaveCount(1)
+      await page.goto(`/${resource}?page=2&limit=2&sortBy=id&sortOrder=asc&search=smoke&status=active`)
+      const rows = page.getByRole('row').filter({ has: page.getByRole('button', { name: /^(Просмотр|View)$/ }) })
+      await expect(rows).toHaveCount(2)
+      await expect(page.getByRole('button', { name: 'Remove filter Status: Active' })).toBeVisible()
+      await language(page, 'Русский', 'ru')
+      await expect(page.getByRole('button', { name: 'Снять фильтр Статус: Активные' })).toBeVisible()
+      await language(page, 'English', 'en')
       const listURL = page.url()
-      await page.getByRole('button', { name: /^(Просмотр|View)$/ }).click()
+      await rows.first().getByRole('button', { name: /^(Просмотр|View)$/ }).click()
       await expect(page).toHaveURL(new RegExp(`/${resource}/\\d+\\?returnTo=`))
       await page.getByRole('link', { name: /^(Редактировать|Edit)$/ }).first().click()
       await expect(page).toHaveURL(new RegExp(`/${resource}/\\d+/edit\\?returnTo=`))
@@ -341,9 +363,49 @@ async function runCase(name, config) {
       await page.getByRole('link', { name: /^(Отмена|Cancel)$/ }).click()
       await expect(page).toHaveURL(editURL)
       await expect(page.locator('input[name="name"]')).toHaveValue(`Workflow ${resource} ${name}`)
-      const mutation = page.waitForResponse((response) => response.request().method() === 'PUT' && new URL(response.url()).pathname === new URL(editURL).pathname.replace(/\/edit$/, ''))
-      await page.getByRole('button', { name: /^(Сохранить|Save)$/ }).click()
-      assert.ok((await mutation).status() < 400)
+      await page.getByRole('button', { name: 'Go to section' }).click()
+      const navigationSearch = page.getByRole('combobox', { name: 'Search sections' })
+      await navigationSearch.fill('/auth/profile/settings')
+      page.once('dialog', dialog => dialog.dismiss())
+      await navigationSearch.press('Enter')
+      await expect(navigationSearch).toBeFocused()
+      await navigationSearch.press('Escape')
+      await expect(page).toHaveURL(editURL)
+      const updateURL = new URL(new URL(editURL).pathname.replace(/\/edit$/, ''), editURL).href
+      const releaseSave = deferred()
+      await page.route(updateURL, async route => {
+        await releaseSave.promise
+        const redirect = await route.fetch({ maxRedirects: 0 })
+        assert.equal(redirect.status(), 303)
+        // Load the same edit page in the same session before the saving tab follows its redirect.
+        const probe = await context.request.get(editURL, { headers: {
+          'X-Inertia': 'true',
+          'X-Inertia-Version': route.request().headers()['x-inertia-version'] ?? '',
+        } })
+        assert.ok(probe.ok())
+        const otherPage = await probe.json()
+        assert.equal(otherPage.component, resource === 'users' ? 'users/EditPage' : 'admin/EditPage')
+        assert.ok(!otherPage.props.flash?.success && !otherPage.props.flash?.recordEditAttempt)
+        await route.fulfill({ response: redirect })
+      }, { times: 1 })
+      try {
+        await page.locator('input[name="name"]').press('Enter')
+        await expect(page.locator('form')).toHaveAttribute('aria-busy', 'true')
+        await page.getByRole('button', { name: 'Go to section' }).click()
+        await navigationSearch.fill('/auth/profile/settings')
+        await Promise.all([
+          page.waitForEvent('dialog').then(dialog => dialog.dismiss()),
+          navigationSearch.press('Enter'),
+        ])
+        await expect(navigationSearch).toBeFocused()
+        await navigationSearch.press('Escape')
+        await expect(page).toHaveURL(editURL)
+        const saved = page.waitForResponse(r => r.request().method() === 'PUT' && r.url() === updateURL)
+        releaseSave.resolve()
+        assert.ok((await saved).status() < 400)
+      } finally {
+        releaseSave.resolve()
+      }
       await expect(page.locator('form[aria-busy="true"]')).toHaveCount(0)
       await expect(page).toHaveURL(editURL)
       await expect(page.getByText(resource === 'users' ? 'User updated successfully!' : 'Record updated successfully!', { exact: true })).toHaveCount(1)
@@ -352,14 +414,38 @@ async function runCase(name, config) {
       await page.getByRole('link', { name: /^(К списку|Back to list)$/ }).click()
       await expect(page).toHaveURL(listURL)
       await expect(page.getByRole('row').filter({ hasText: `Workflow ${resource} ${name}` })).toBeVisible()
-      await page.getByRole('button', { name: /^(Редактировать|Edit)$/ }).click()
+      await rows.first().getByRole('button', { name: /^(Редактировать|Edit)$/ }).click()
       await page.locator('input[name="name"]').fill('Discard this change')
       page.once('dialog', (dialog) => dialog.accept())
       await page.getByRole('link', { name: /^(Отмена|Cancel)$/ }).click()
       await expect(page).toHaveURL(listURL)
+
+      const savedPaths = new Set()
+      for (const index of [0, 1]) {
+        await rows.nth(index).getByRole('button', { name: /^(Редактировать|Edit)$/ }).click()
+        const updatedName = `Workflow returned ${resource} ${name} ${index}`
+        await page.locator('input[name="name"]').fill(updatedName)
+        const mutationPath = new URL(page.url()).pathname.replace(/\/edit$/, '')
+        const returnStart = result.requests.length
+        await page.getByRole('button', { name: 'Save and return to list', exact: true }).click()
+        await expect(page).toHaveURL(listURL)
+        await expect(rows.nth(index)).toContainText(updatedName)
+        const successToast = page.locator('.notification--success').filter({
+          hasText: resource === 'users' ? 'User updated successfully!' : 'Record updated successfully!',
+        })
+        await expect(successToast).toHaveCount(1)
+        await successToast.getByRole('button').click()
+        await expect(successToast).toHaveCount(0)
+        const writes = result.requests.slice(returnStart).filter(request => request.method === 'PUT')
+        assert.equal(writes.length, 1, 'save and return issues exactly one PUT')
+        assert.equal(writes[0].path, mutationPath)
+        assert.ok(writes[0].status < 400)
+        savedPaths.add(mutationPath)
+      }
+      assert.equal(savedPaths.size, 2, 'two distinct records updated from the same filtered page')
       await page.screenshot({ path: path.join(folder, `${name}-${resource}-workflow.png`), fullPage: true })
     }
-    check('users/admins filtered second-page view/edit/save/reload/return and dirty leave confirmation')
+    check('users/admins filtered second-page view/edit, Enter save, dirty leave confirmation and save-and-return with one PUT and one flash')
     if (process.argv.includes('--records-only')) {
       assert.deepEqual(result.pageErrors, [], 'uncaught browser errors')
       assert.deepEqual(result.consoleErrors, [], 'browser console errors')

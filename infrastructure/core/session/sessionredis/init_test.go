@@ -17,6 +17,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/assurrussa/goadmin/config"
+	sessioncore "github.com/assurrussa/goadmin/infrastructure/core/session"
 	"github.com/assurrussa/goadmin/infrastructure/core/session/sessionredis"
 	redismocks "github.com/assurrussa/goadmin/infrastructure/redis/testsupport"
 )
@@ -98,7 +99,63 @@ func TestSessionStorageUsesNamespaceAndBorrowsClient(t *testing.T) {
 	require.NoError(t, storage.Close())
 }
 
-func TestSessionStorageResetOnlyScansSessionNamespace(t *testing.T) {
+type recordEditRedisClient struct {
+	*redismocks.MockClientContract
+	t       *testing.T
+	key     string
+	payload string
+}
+
+func (r *recordEditRedisClient) GetDel(_ context.Context, key string) *redisv9.StringCmd {
+	r.t.Helper()
+	require.Equal(r.t, r.key, key)
+	if r.payload == "" {
+		return redisv9.NewStringResult("", redisv9.Nil)
+	}
+	value := r.payload
+	r.payload = ""
+	return redisv9.NewStringResult(value, nil)
+}
+
+func TestRecordEditFlashUsesRedisGetDelOutsideCookieNamespace(t *testing.T) {
+	key := sessioncore.RecordEditFlashKeyPrefix + "opaque"
+	payload := []byte("receipt")
+	rdb := &recordEditRedisClient{
+		MockClientContract: redismocks.NewMockClientContract(gomock.NewController(t)),
+		t:                  t,
+		key:                key,
+		payload:            string(payload),
+	}
+	_, store := sessionredis.CreateAdminSessionStore(rdb, config.Config{})
+	rdb.EXPECT().Set(gomock.Any(), key, payload, 5*time.Minute).Return(redisv9.NewStatusResult("OK", nil))
+	rdb.EXPECT().Get(gomock.Any(), "goadmin:session:"+key).Return(redisv9.NewStringResult("", redisv9.Nil))
+
+	app := fiber.New()
+	app.Get("/", func(c fiber.Ctx) error {
+		require.NoError(t, sessioncore.SetRecordEditFlash(c, store.Storage, key, payload, 5*time.Minute))
+		data, err := store.Storage.GetWithContext(c, key)
+		require.NoError(t, err)
+		require.Empty(t, data)
+		data, err = sessioncore.TakeRecordEditFlash(c, store.Storage, key)
+		require.NoError(t, err)
+		require.Equal(t, payload, data)
+		data, err = sessioncore.TakeRecordEditFlash(c, store.Storage, key)
+		require.NoError(t, err)
+		require.Empty(t, data)
+		return c.SendStatus(http.StatusNoContent)
+	})
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+	request.AddCookie(&http.Cookie{
+		Name: "session_id_persistent", Value: "1", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode,
+	})
+	response, err := app.Test(request)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNoContent, response.StatusCode)
+	require.Empty(t, response.Cookies())
+	require.NoError(t, response.Body.Close())
+}
+
+func TestSessionStorageResetScansSessionAndRecordFlashNamespaces(t *testing.T) {
 	ctx := t.Context()
 	mockRedis := redismocks.NewMockClientContract(gomock.NewController(t))
 	_, store := sessionredis.CreateAdminSessionStore(mockRedis, config.Config{})
@@ -110,6 +167,10 @@ func TestSessionStorageResetOnlyScansSessionNamespace(t *testing.T) {
 			Return(redisv9.NewIntResult(2, nil)),
 		mockRedis.EXPECT().Scan(ctx, uint64(7), "goadmin:session:*", int64(100)).
 			Return(redisv9.NewScanCmdResult(nil, 0, nil)),
+		mockRedis.EXPECT().Scan(ctx, uint64(0), sessioncore.RecordEditFlashKeyPrefix+"*", int64(100)).
+			Return(redisv9.NewScanCmdResult([]string{sessioncore.RecordEditFlashKeyPrefix + "receipt"}, 0, nil)),
+		mockRedis.EXPECT().Del(ctx, sessioncore.RecordEditFlashKeyPrefix+"receipt").
+			Return(redisv9.NewIntResult(1, nil)),
 	)
 	require.NoError(t, store.Reset(ctx))
 }

@@ -41,6 +41,7 @@ it('shares explicit list links, guards dirty navigation and disables actions dur
       ),
   })
   app.mount(root)
+  expect(root.querySelectorAll('button[type="submit"]')).toHaveLength(1)
   expect([...root.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual([
     '/users?page=3',
     '/users?page=3',
@@ -61,6 +62,29 @@ it('shares explicit list links, guards dirty navigation and disables actions dur
   await nextTick()
   expect(guard({ detail: { visit: { method: 'get' } } })).toBeUndefined()
   expect(confirm).toHaveBeenCalledOnce()
+})
+
+it('allows the caller to supply its own action footer', () => {
+  mocks.before.mockReturnValue(() => {})
+  const root = document.createElement('div')
+  app = createApp({
+    render: () =>
+      h(
+        RecordEditForm,
+        {
+          form: { errors: {}, processing: false },
+          fields: [],
+          returnHref: '/users',
+          label: 'Edit',
+          canSaveAndReturn: true,
+        },
+        { actions: () => h('button', { type: 'submit' }, 'Continue') },
+      ),
+  })
+  app.mount(root)
+  expect(
+    [...root.querySelectorAll('button[type="submit"]')].map((button) => button.textContent),
+  ).toEqual(['Continue'])
 })
 
 it('shows a non-field server error without its technical key and focuses it', async () => {

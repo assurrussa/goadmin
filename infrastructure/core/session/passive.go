@@ -1,6 +1,8 @@
 package session
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/session"
 )
@@ -14,7 +16,11 @@ import (
 // request ID; otherwise login CSRF would remain bound to an unreachable session.
 // Storage idle TTL is still refreshed; browser persistence/expiry remains the
 // policy established by explicit authentication, never a passive sliding lease.
-func SavePassive(c fiber.Ctx, store *session.Store, sess *session.Session) error {
+func SavePassive(ctx context.Context, store *session.Store, sess *session.Session) error {
+	c, ok := ctx.(fiber.Ctx)
+	if !ok {
+		return sess.SaveWithContext(ctx)
+	}
 	name := store.Extractor.Key
 	if name == "" {
 		name = "session_id"
@@ -26,7 +32,7 @@ func SavePassive(c fiber.Ctx, store *session.Store, sess *session.Session) error
 		}
 	}
 	if len(previous) == 0 && sess.Fresh() {
-		return sess.SaveWithContext(c)
+		return sess.SaveWithContext(ctx)
 	}
 	// Fiber queues Set-Cookie before storage succeeds, so restore on errors too.
 	defer func() {
@@ -35,5 +41,5 @@ func SavePassive(c fiber.Ctx, store *session.Store, sess *session.Session) error
 			c.Response().Header.AddBytesV(fiber.HeaderSetCookie, value)
 		}
 	}()
-	return sess.SaveWithContext(c)
+	return sess.SaveWithContext(ctx)
 }

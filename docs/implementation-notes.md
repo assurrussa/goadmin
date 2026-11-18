@@ -1,5 +1,30 @@
 # Implementation Notes
 
+## Quick navigation, record editing and active filters (2026-11-18)
+
+Quick navigation uses the current menu and account links in both bundled
+shells. It includes host-provided pages, works in both locales and opens from
+the mobile header. Record editing keeps the validated list destination with
+the individual save attempt. Filter labels use the existing single-field
+update path and appear only when the editable fields are collapsed.
+
+The keyboard selection resets on reopening. Account links follow the flat
+profile menu. A dirty form still asks before leaving while an update is in
+flight. Filter controls and chips share the translated option labels.
+
+Record edits use the same redirect flow as before. The session bridge stores
+each attempt's feedback in a separate short-lived entry. Its key identifies
+the session, record and attempt, so a parallel session update cannot overwrite
+it. PostgreSQL and Redis consume the entry atomically, and unread entries
+expire after five minutes. An unconfirmed write stays on the form for
+reconciliation.
+
+Chromium covered both shells, RU/EN keyboard navigation, mobile filter removal
+and header layout at 320 and 390 pixels. With PostgreSQL 17, the starter smoke
+test held a real PUT pending, dismissed a navigation prompt and let the update
+finish. It also verified one PUT and one success notification per return for two
+records on page two of each filtered list in both shells.
+
 ## Ocean and compact table filters (2026-11-18)
 
 The default accent follows the host palette rather than the extension list.

@@ -39,8 +39,14 @@ describe('AdminForm unsaved changes guard', () => {
     expect(confirm).toHaveBeenCalledTimes(1)
     expect(guard({ detail: { visit: { method: 'post' } } })).toBeUndefined()
     form.processing = true
+    expect(guard({ detail: { visit: { method: 'get' } } })).toBe(false)
+    expect(confirm).toHaveBeenCalledTimes(2)
+    const unloading = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(unloading)
+    expect(unloading.defaultPrevented).toBe(true)
+    form.isDirty = false
     expect(guard({ detail: { visit: { method: 'get' } } })).toBeUndefined()
-    expect(confirm).toHaveBeenCalledTimes(1)
+    expect(confirm).toHaveBeenCalledTimes(2)
 
     app.unmount()
     expect(mocks.remove).toHaveBeenCalledOnce()

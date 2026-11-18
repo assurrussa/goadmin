@@ -144,7 +144,7 @@ function handleSubmit(e: Event) {
 }
 
 function beforeUnload(event: BeforeUnloadEvent) {
-  if (!props.warnUnsaved || !props.form.isDirty || props.form.processing) return
+  if (!props.warnUnsaved || !props.form.isDirty) return
   event.preventDefault()
   event.returnValue = ''
 }
@@ -154,8 +154,7 @@ onMounted(() => {
   window.addEventListener('beforeunload', beforeUnload)
   if (props.warnUnsaved) {
     removeInertiaGuard = router.on('before', (event) => {
-      if (!props.form.isDirty || props.form.processing || event.detail.visit.method !== 'get')
-        return
+      if (!props.form.isDirty || event.detail.visit.method !== 'get') return
       return window.confirm(t('Есть несохранённые изменения. Покинуть страницу?'))
     })
   }

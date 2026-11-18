@@ -234,7 +234,7 @@ func assertUserUpdateFeedback(t *testing.T, props map[string]any, success, email
 	require.Empty(t, props[goinertia.ContextPropsFlash], "failed updates must not notify success")
 	old, ok := props[goinertia.ContextPropsOld].(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, "Changed", old["name"])
+	require.Subset(t, old, map[string]any{"name": "Changed", "lastName": "", "username": ""})
 	if emailDisabled {
 		require.Equal(t, map[string]string{
 			"email": "Изменение электронной почты отключено",

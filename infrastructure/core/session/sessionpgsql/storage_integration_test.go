@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/assurrussa/goadmin/config"
+	sessioncore "github.com/assurrussa/goadmin/infrastructure/core/session"
 	"github.com/assurrussa/goadmin/infrastructure/core/session/sessionpgsql"
 	"github.com/assurrussa/goadmin/infrastructure/core/session/sessionredis"
 	"github.com/assurrussa/goadmin/infrastructure/outbox"
@@ -47,6 +48,7 @@ func TestPostgresSessionStorageLifecycle(t *testing.T) {
 	got, err := reopened.GetWithContext(ctx, "active")
 	require.NoError(t, err)
 	require.Equal(t, payload, got)
+	checkRecordEditFlashStorage(t, store, reopened)
 
 	require.NoError(t, store.SetWithContext(ctx, "expired", payload, time.Hour))
 	_, err = db.ExecContext(ctx, `UPDATE goadmin_browser_sessions
@@ -129,4 +131,45 @@ SET expires_at = statement_timestamp() - interval '1 second' WHERE id = 'expired
 	}
 	require.NotNil(t, persistentCookie)
 	require.Equal(t, 3600, persistentCookie.MaxAge)
+}
+
+func checkRecordEditFlashStorage(t *testing.T, first, second *sessionpgsql.Storage) {
+	t.Helper()
+	ctx := t.Context()
+	key := sessioncore.RecordEditFlashKeyPrefix + "opaque"
+	payload := []byte("record feedback")
+	require.NoError(t, first.SetRecordEditFlash(ctx, key, payload, time.Minute))
+	if browserSession, err := second.GetWithContext(ctx, key); err != nil || len(browserSession) != 0 {
+		t.Fatalf("receipt exposed through browser session lookup, error %v", err)
+	}
+	require.NoError(t, second.DeleteWithContext(ctx, key))
+
+	var workers sync.WaitGroup
+	taken := make(chan []byte, 2)
+	failures := make(chan error, 2)
+	for _, store := range []*sessionpgsql.Storage{first, second} {
+		workers.Go(func() {
+			value, err := store.TakeRecordEditFlash(ctx, key)
+			taken <- value
+			failures <- err
+		})
+	}
+	workers.Wait()
+	close(taken)
+	close(failures)
+	for err := range failures {
+		require.NoError(t, err)
+	}
+	var found [][]byte
+	for value := range taken {
+		if len(value) > 0 {
+			found = append(found, value)
+		}
+	}
+	require.Equal(t, [][]byte{payload}, found)
+
+	require.NoError(t, first.SetRecordEditFlash(ctx, key, payload, time.Nanosecond))
+	value, err := second.TakeRecordEditFlash(ctx, key)
+	require.NoError(t, err)
+	require.Empty(t, value)
 }

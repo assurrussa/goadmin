@@ -291,4 +291,37 @@ describe('DataGrid URL and endpoint regressions', () => {
     expect(window.history.state).toEqual({ host: 'kept' })
     expect(window.location.hash).toBe('#anchor')
   })
+  it('removes one visible filter, fetching page one with the remaining list query', async () => {
+    vi.useFakeTimers()
+    const restored =
+      'page=2&limit=25&sortBy=name&sortOrder=asc&search=Ada&team=QA&count=0&scope=mine'
+    window.history.replaceState({ host: 'retained' }, '', `/admin?${restored}#table`)
+    const initial = data()
+    initial.config!.columns!.push(
+      { key: 'team', label: 'Team', title: 'Team', filterable: true },
+      { key: 'count', label: 'Count', title: 'Count', type: 'number', filterable: true },
+    )
+    initial.meta!.requestQuery = restored
+    initial.meta!.filters = { _search: 'Ada', team: 'QA', count: 0, scope: 'mine' }
+    initial.meta!.sorting = { sortBy: 'name', sortOrder: 'asc' }
+    initial.meta!.pagination!.currentPage = 2
+    const { element } = mount(initial)
+    await settle()
+    expect(fetchMock).not.toHaveBeenCalled()
+    element.querySelector<HTMLButtonElement>('button[aria-label="Снять фильтр Team: QA"]')!.click()
+    await vi.advanceTimersByTimeAsync(500)
+    await settle()
+    const retained = {
+      limit: '25',
+      sortBy: 'name',
+      sortOrder: 'asc',
+      search: 'Ada',
+      count: '0',
+      scope: 'mine',
+    }
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(Object.fromEntries(query())).toEqual({ page: '1', ...retained })
+    expect(Object.fromEntries(new URLSearchParams(window.location.search))).toEqual(retained)
+    expect(window.location.hash).toBe('#table')
+  })
 })

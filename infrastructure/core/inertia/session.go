@@ -57,9 +57,23 @@ func (b SessionBridge) Delete(c fiber.Ctx, key string) error {
 	return sessioncore.SavePassive(c, b.Store, sess)
 }
 
-func (b SessionBridge) Flash(c fiber.Ctx, key string, value any) error { return b.Set(c, key, value) }
+func (b SessionBridge) Flash(c fiber.Ctx, key string, value any) error {
+	if attempt, scoped := recordEditAttempt(c, key); scoped {
+		if !attempt.valid() || c.Method() != fiber.MethodPut {
+			return nil
+		}
+		return b.saveRecordEditFlash(c, attempt, value)
+	}
+	return b.Set(c, key, value)
+}
 
 func (b SessionBridge) GetFlash(c fiber.Ctx, key string) (any, error) {
+	if attempt, scoped := recordEditAttempt(c, key); scoped {
+		if !attempt.valid() || c.Method() != fiber.MethodGet {
+			return map[string]any{}, nil
+		}
+		return b.takeRecordEditFlash(c, attempt)
+	}
 	sess, err := b.load(c)
 	if err != nil {
 		return nil, err

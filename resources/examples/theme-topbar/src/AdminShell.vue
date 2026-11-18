@@ -13,13 +13,13 @@ defineSlots<AdminShellSlots>()
   >
     <header data-ui="admin-header" class="border-b border-border-primary bg-card">
       <div
-        class="mx-auto flex min-h-16 max-w-[var(--goadmin-content-max-width,80rem)] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8"
+        class="mx-auto flex min-h-16 max-w-[var(--goadmin-content-max-width,80rem)] items-center justify-between gap-1 px-2 sm:gap-4 sm:px-6 lg:px-8"
       >
-        <div class="flex min-w-0 items-center gap-3">
+        <div class="flex min-w-0 items-center gap-1 sm:gap-3">
           <slot name="navigationToggle" />
-          <slot name="brand" />
+          <div class="hidden min-w-0 overflow-hidden min-[360px]:block"><slot name="brand" /></div>
         </div>
-        <div class="flex shrink-0 items-center gap-3">
+        <div class="flex shrink-0 items-center gap-1 sm:gap-3">
           <slot name="utilities" />
           <slot name="account" />
         </div>
