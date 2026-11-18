@@ -1,5 +1,7 @@
 {
   "$schema": "https://context7.com/schema/context7.json",
+  "url": "https://context7.com/assurrussa/goadmin",
+  "public_key": "pk_gNodxGoIvXtQByc3DVvLt",
   "projectTitle": "GoAdmin",
   "description": "Embedded admin subsystem for Go applications with explicit modules, authentication and permissions, declarative CRUD, a DataGrid toolkit, and an extensible Vue client. Host applications retain ownership of domain logic and infrastructure.",
   "folders": [

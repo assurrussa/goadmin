@@ -20,8 +20,8 @@ checked Markdown snippets as well as runnable source.
   2026-11-18. Custom arrays **replace**, not extend, the service defaults. Review
   that snapshot when changing these arrays. Filenames cannot contain paths;
   don't exclude all `README.md` files or use broad `*notes*` filename patterns.
-- The default branch is intentionally inherited. No version tags, ownership
-  keys, redirects, indexing prohibition, extra source extensions or agent rules
+- The default branch is intentionally inherited. No version tags,
+  redirects, indexing prohibition, extra source extensions or agent rules
   are changed by this configuration.
 
 See [configuration](https://context7.com/docs/library-owners),
