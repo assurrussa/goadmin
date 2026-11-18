@@ -13,6 +13,7 @@ const props = defineProps<{
   returnHref: string
   label: string
   canSaveAndReturn?: boolean
+  submitDisabled?: boolean
 }>()
 const emit = defineEmits<{ submit: [event: Event, returnToList?: boolean] }>()
 
@@ -49,6 +50,7 @@ function submit(event: Event) {
               type="submit"
               variant="primary"
               :loading="form.processing"
+              :disabled="submitDisabled"
               :loading-text="t('Сохранение...')"
               >{{ t('Сохранить') }}</FormButton
             >
@@ -56,7 +58,7 @@ function submit(event: Event) {
               v-if="canSaveAndReturn"
               type="submit"
               variant="secondary"
-              :disabled="form.processing"
+              :disabled="form.processing || submitDisabled"
               data-save-and-return
               >{{ t('Сохранить и вернуться к списку') }}</FormButton
             >

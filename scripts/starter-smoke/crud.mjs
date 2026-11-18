@@ -266,7 +266,7 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   report.inputBoundary = { rejectedKeys: ['id', 'owner_admin_id', 'revision', '_actions', 'status'], status: 422, noOverwrite: true }
 
   // Enter through the actual row navigation so its list query remains attached
-  // to Show, Edit, successful saves and the explicit conflict reload.
+  // to Show, Edit and successful saves.
   await page.goto(list)
   await ready()
   const rowActions = page.locator('[data-part="table"] tbody')
@@ -305,50 +305,107 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await expect(page.getByRole('link', { name: 'Back to list', exact: true })).toHaveAttribute('href', returnTo)
   report.returnNavigation = { list: returnTo, show: true, edit: true, successfulSave: true }
 
-  const pinned = (await get(`/products/data?search=${encodeURIComponent(prefix)}`)).data[0].item
-  const localDraft = `${prefix}-local-unsaved`
-  await field('name').fill(localDraft)
-  const canonicalValues = { ...values, name: `${prefix}-canonical-new`, stock: 29 }
-  const externalWrite = await send(recordPath, { ...canonicalValues, _revision: pinned._revision })
-  assert.equal(externalWrite.status(), 303)
-  const canonical = (await get(`/products/data?search=${encodeURIComponent(prefix)}`)).data[0].item
-  assert.notEqual(canonical._revision, pinned._revision)
-  const rejectedRevisions = []
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const [response] = await Promise.all([
-      page.waitForResponse(response => new URL(response.url()).pathname === recordPath && response.request().method() === 'PUT'),
-      page.getByRole('button', { name: 'Save', exact: true }).click(),
-    ])
-    assert.equal(response.status(), 303, 'Inertia errors must use the ordinary error redirect')
-    const submitted = response.request().postDataJSON()
-    rejectedRevisions.push(submitted._revision)
-    assert.equal(submitted._revision, pinned._revision, 'A rejected draft cannot adopt a fresh revision implicitly')
-    assert.equal(submitted.name, localDraft)
-    await expect(page.getByRole('alert')).toContainText('Record changed; reload before saving')
-    const conflictToast = page.locator('.notification--error').filter({ hasText: 'Record changed; reload before saving' })
-    await expect(conflictToast).toHaveCount(1)
-    await conflictToast.getByRole('button', { name: 'Dismiss notification', exact: true }).click()
-    await expect(conflictToast).toHaveCount(0)
-    await expect(field('name')).toHaveValue(localDraft)
-    await expect(field('stock')).toHaveValue('28')
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled()
-    const current = (await get(`/products/data?search=${encodeURIComponent(prefix)}`)).data[0].item
-    assert.deepEqual(current, canonical, 'Repeated rejected UI saves must leave the canonical record intact')
+  // Two qualifying neighbours sort before the existing product; the standard
+  // product would occupy its place on page two if the category filter were lost.
+  const cohort = prefix.slice('crud-'.length)
+  for (const [suffix, category] of [['01', 'premium'], ['02', 'premium'], ['03', 'standard']]) {
+    const created = await send('/products', { ...values, name: `aa-${cohort}-${suffix}`, category }, 'POST')
+    assert.equal(created.status(), 303)
   }
-  let reloadConfirmed = false
-  page.once('dialog', async dialog => {
-    assert.equal(dialog.type(), 'confirm')
-    assert.match(dialog.message(), /unsaved|несохран/i)
-    reloadConfirmed = true
-    await dialog.accept()
-  })
-  await page.getByRole('button', { name: 'Reload current record', exact: true }).click()
-  await expect(field('name')).toHaveValue(canonicalValues.name)
+  const conditions = { search: cohort, category: 'premium', sortBy: 'name', sortOrder: 'asc', page: '2', limit: '2' }
+  const pageTwo = '/products?' + new URLSearchParams(conditions)
+  const productRow = () => rowActions.getByRole('row').filter({ hasText: prefix })
+  const editRow = async () => {
+    await productRow().getByRole('button', { name: 'Edit', exact: true }).click()
+    await expect(field('name')).toBeVisible()
+    const source = new URL(new URL(page.url()).searchParams.get('returnTo'), config.url)
+    assert.equal(source.pathname, '/products')
+    assert.deepEqual(Object.fromEntries(source.searchParams), conditions)
+  }
+  const saveAndReturn = page.getByRole('button', { name: 'Save and return to list', exact: true })
+  const assertReturned = async stock => {
+    await expect(productRow()).toBeVisible()
+    const location = new URL(page.url())
+    assert.equal(location.pathname, '/products')
+    assert.deepEqual(Object.fromEntries(location.searchParams), conditions)
+    await expect(productRow().getByRole('cell', { name: stock, exact: true })).toBeVisible()
+  }
+  const currentProduct = async () => (await get(`/products/data?search=${encodeURIComponent(prefix)}`)).data[0].item
+  const attempts = []
+  const recordWrite = request => {
+    if (request.method() === 'PUT' && new URL(request.url()).pathname === recordPath) {
+      attempts.push(request.postDataJSON())
+    }
+  }
+  page.on('request', recordWrite)
+  await page.goto(pageTwo)
+  await editRow()
+  await field('stock').fill('-1')
+  await saveAndReturn.click()
+  await expect(page.getByText('Stock must be a nonnegative safe integer', { exact: true }).first()).toBeVisible()
+  await expect(field('stock')).toHaveValue('-1')
+  assert.equal(new URL(page.url()).pathname, editPath)
+  await field('stock').fill('30')
+  await saveAndReturn.click()
+  await assertReturned('30')
+  assert.equal(attempts.length, 2, 'One rejected PUT and one confirmed PUT')
+  report.returnNavigation.pageTwo = { conditions, validationRetainedDraft: true, writesAfterCorrection: 1 }
+
+  await editRow()
+  const pinned = await currentProduct()
+  const localDraft = `${prefix}-local-unsaved`
+  const description = 'Description from the second editor'
+  const canonicalValues = { name: `${prefix}-canonical-new`, stock: 29 }
+  await field('name').fill(localDraft)
+  await field('description').fill(description)
+
+  const colleague = await context.newPage()
+  try {
+    await colleague.goto(editPath)
+    await colleague.locator('[name="name"]').fill(canonicalValues.name)
+    await colleague.locator('[name="stock"]').fill(String(canonicalValues.stock))
+    const [returned] = await Promise.all([
+      colleague.waitForRequest(request => request.method() === 'GET' && new URL(request.url()).pathname === '/products'),
+      colleague.locator('button[data-save-and-return]').click(),
+    ])
+    assert.equal(new URL(returned.url()).search, '', 'A direct edit link returns to the bare resource list')
+    await expect(colleague.locator('[data-part="table"]')).toBeVisible()
+  } finally {
+    await colleague.close()
+  }
+  const canonical = await currentProduct()
+  assert.notEqual(canonical._revision, pinned._revision)
+  assert.equal(canonical.name, canonicalValues.name)
+  assert.equal(canonical.stock, canonicalValues.stock)
+
+  await saveAndReturn.click()
+  const nameDispute = page.getByRole('group', { name: 'Name', exact: true })
+  await expect(nameDispute.getByRole('radio', { name: `My value: ${localDraft}` })).toBeVisible()
+  const latestChoice = nameDispute.getByRole('radio', { name: `Latest value: ${canonicalValues.name}` })
+  await expect(latestChoice).toBeVisible()
+  await expect(saveAndReturn).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await expect(field('stock')).toHaveValue('29')
-  await expect(page.getByRole('alert')).toHaveCount(0)
-  assert.equal(reloadConfirmed, true)
-  assert.equal(new URL(page.url()).searchParams.get('returnTo'), returnTo)
-  report.uiConflict = { rejectedRevisions, canonicalRevision: canonical._revision, retainedDraft: true, explicitReloadConfirmed: true, oneToastPerResponse: true }
+  await expect(field('description')).toHaveValue(description)
+  const toast = page.locator('.notification--error').filter({ hasText: 'Record changed; reload before saving' })
+  await expect(toast).toHaveCount(1)
+  await toast.getByRole('button', { name: 'Dismiss notification', exact: true }).click()
+  await latestChoice.check()
+  await expect(saveAndReturn).toBeEnabled()
+  assert.deepEqual(await currentProduct(), canonical, 'Resolving a conflict must not write to the database')
+  assert.equal(attempts.length, 3)
+  assert.equal(attempts[2]._revision, pinned._revision)
+  await saveAndReturn.click()
+  await assertReturned('29')
+  assert.equal(attempts.length, 4)
+  assert.equal(attempts[3]._revision, canonical._revision)
+  page.off('request', recordWrite)
+  const merged = await currentProduct()
+  assert.notEqual(merged._revision, canonical._revision)
+  assert.equal(merged.name, canonicalValues.name)
+  assert.equal(merged.description, description)
+  assert.equal(merged.stock, canonicalValues.stock)
+  report.uiConflict = { twoTabs: true, oneToastPerResponse: true, noImplicitWrite: true, reconciledAtRevision: canonical._revision }
 
   await language(page, 'Русский', 'ru')
   await page.goto(`${recordPath}?${new URLSearchParams({ returnTo })}`)

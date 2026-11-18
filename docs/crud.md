@@ -89,18 +89,26 @@ The module reserves its complete base namespace. It owns list `/`, GET/POST
 `/data`, `/create`, `/records/:id`, `/records/:id/edit`, POST collection,
 PUT/DELETE record and POST `/records/:id/actions/:key`, plus the existing
 `/table-preferences` and `/table-export` endpoints. All paths are relative to the
-resource. Saves stay on the edit page when permitted; safe `returnTo` list state
-survives a save and deletion. The list advertises Create only when the current
+resource. On edit, Save and Enter keep the editor open when permitted. Save and
+return to list restores the originating search, filters, sort, page size and page
+after the server confirms the same edit attempt. Direct edit links return to
+the resource list. Deletion also preserves the validated list location.
+The list advertises Create only when the current
 permission and resource creation policy allow it. Typed errors retain their
 status on both GET and POST `/data`. The module persists redirect flash/errors
 explicitly through `host.PersistFlash`,
 because extension handlers finish before the core Inertia middleware. Input is
 retained on handled Inertia errors. CRUD drafts are
 not persisted through a full sign-in transition.
-Revision conflicts also emit the existing global flash toast while retaining
-the inline error and explicit reload action. One response is consumed once;
-a separate response with the same message remains a new notification. No durable
-notification inbox event or automatic mutation replay is created.
+On a revision conflict, the editor compares its original values and draft with
+the current authorized values. It combines independent edits and asks the
+administrator to choose a value for each field changed differently by both
+writers. A write-only replacement stays in the tab and requires explicit
+confirmation before reuse. Write-only input is excluded from redirect feedback.
+The next explicit save submits the reconciled draft against the current
+revision. A further concurrent update starts the comparison again. If a custom
+JSON marshaler omits a readable edit field, the editor keeps the draft and
+offers a reload because it cannot compare the missing value.
 
 Personal tables use `crud.<key>` under the current administrator, with existing
 CAS, 20-view/64-KiB limits, column reconciliation and URL precedence. Selection

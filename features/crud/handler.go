@@ -14,6 +14,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/assurrussa/goadmin/host"
+	coreinertia "github.com/assurrussa/goadmin/infrastructure/core/inertia"
 	goinertia "github.com/assurrussa/goadmin/infrastructure/inertia"
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 	"github.com/assurrussa/goadmin/internal/gridworkflow"
@@ -102,6 +103,7 @@ func (h *handler[R, C, U]) RegisterGroupRoutes(router fiber.Router, _ ...fiber.H
 		return rows, total, err
 	})
 	cfg.PageComponent = func(c fiber.Ctx, data datagrid.Response[projected]) error {
+		coreinertia.ScopeCRUDRecordFlash(c, h.d.BasePath, coreinertia.CRUDRecordFlashIndexID(c), coreinertia.CRUDRecordIndex, false)
 		props := h.props(c)
 		props["data"] = data.ToAPIResponse()
 		return h.app.Render(c, "crud/Index", props)
@@ -222,7 +224,7 @@ func (h *handler[R, C, U]) RegisterGroupRoutes(router fiber.Router, _ ...fiber.H
 			return h.failure(c, errors.New("invalid update result"), raw)
 		}
 		h.app.WithFlashSuccess(c, "Record updated")
-		return h.redirect(c, h.afterWrite(c, a, updated))
+		return h.redirectUpdate(c, h.afterWrite(c, a, updated), false)
 	})
 	group.Put("/records/:id", update[0], update[1])
 	remove := host.Command(h.app, p.Delete, func(c fiber.Ctx, a host.Actor, raw map[string]json.RawMessage) error {
@@ -275,7 +277,7 @@ func (h *handler[R, C, U]) page(c fiber.Ctx, edit bool) error {
 	if err != nil {
 		return h.failure(c, err, nil)
 	}
-	data, err := h.project(r)
+	data, err := h.project(r, op)
 	if err != nil {
 		return h.failure(c, err, nil)
 	}
@@ -315,10 +317,13 @@ func (h *handler[R, C, U]) page(c fiber.Ctx, edit bool) error {
 	props["record"] = map[string]any{"id": r.ID, "revision": r.Revision, "data": data, "actions": actions}
 	props["values"] = data
 	page := "crud/Show"
+	destination := coreinertia.CRUDRecordShow
 	if edit {
 		page = "crud/Form"
+		destination = coreinertia.CRUDRecordEdit
 		props["mode"] = string(Update)
 	}
+	coreinertia.ScopeCRUDRecordFlash(c, h.d.BasePath, r.ID, destination, false)
 	return h.app.Render(c, page, props)
 }
 
@@ -377,7 +382,7 @@ func (h *handler[R,
 	return h.redirect(c, target)
 }
 
-func (h *handler[R, C, U]) project(r Record[R]) (projected, error) {
+func (h *handler[R, C, U]) project(r Record[R], op Operation) (projected, error) {
 	if !validRecord(r) {
 		return nil, errors.New("crud: invalid record identity or revision")
 	}
@@ -393,18 +398,31 @@ func (h *handler[R, C, U]) project(r Record[R]) (projected, error) {
 	if err != nil {
 		return nil, err
 	}
+	_, customRowJSON := any(r.Data).(json.Marshaler)
+	completeEdit := op == Update && !customRowJSON
 	out := projected{"id": r.ID, revisionKey: r.Revision}
 	for _, f := range h.d.Fields {
-		if f.Read {
-			if v, ok := all[f.Key]; ok {
-				readField := f
-				readField.Required = false
-				if err := validateFieldValue(readField, types[f.Key], v); err != nil {
-					return nil, err
-				}
-				out[f.Key] = v
+		if !f.Read {
+			continue
+		}
+		fieldType := types[f.Key]
+		value, present := all[f.Key]
+		if !present {
+			if !completeEdit || !f.Update || fieldType == nil {
+				continue
+			}
+			// Restore DTO zero values omitted by the standard encoder so an
+			// edit baseline can distinguish null, false, zero and empty text.
+			value, err = json.Marshal(reflect.Zero(fieldType).Interface())
+			if err != nil {
+				return nil, err
 			}
 		}
+		f.Required = false
+		if err := validateFieldValue(f, fieldType, value); err != nil {
+			return nil, err
+		}
+		out[f.Key] = value
 	}
 	return out, nil
 }
@@ -415,7 +433,7 @@ func (h *handler[R, C, U]) projectMany(ctx context.Context, a host.Actor, record
 		if err := h.d.Authorize(ctx, a, Read, r); err != nil {
 			return nil, err
 		}
-		v, err := h.project(r)
+		v, err := h.project(r, Read)
 		if err != nil {
 			return nil, err
 		}
@@ -443,6 +461,20 @@ func validRecord[T any](r Record[T]) bool {
 
 func (h *handler[R, C, U]) recordURL(id string) string {
 	return h.d.BasePath + "/records/" + url.PathEscape(id)
+}
+
+func (h *handler[R, C, U]) redirectUpdate(c fiber.Ctx, target string, conflict bool) error {
+	id := requestID(c)
+	path, _, _ := strings.Cut(target, "?")
+	destination := coreinertia.CRUDRecordIndex
+	switch path {
+	case h.recordURL(id):
+		destination = coreinertia.CRUDRecordShow
+	case h.recordURL(id) + "/edit":
+		destination = coreinertia.CRUDRecordEdit
+	}
+	coreinertia.ScopeCRUDRecordFlash(c, h.d.BasePath, id, destination, conflict)
+	return h.redirect(c, target)
 }
 
 func (h *handler[R, C, U]) redirect(c fiber.Ctx, target string) error {
@@ -547,37 +579,49 @@ func (h *handler[R, C, U]) failure(c fiber.Ctx, err error, raw map[string]json.R
 		if len(safe) == 0 {
 			safe["form"] = []string{message}
 		}
-		// Inertia's form helper preserves current input on error redirects. Only
-		// declared writable values may enter the server flash fallback.
-		old := map[string]any{}
-		for _, f := range h.d.Fields {
-			if f.Create || f.Update {
-				if v, ok := raw[f.Key]; ok {
-					var decoded any
-					decoder := json.NewDecoder(bytes.NewReader(v))
-					if decoder.Decode(&decoded) == nil {
-						old[f.Key] = decoded
-					}
-				}
-			}
-		}
-		h.app.WithFlashOld(c, old)
 		h.app.WithValidationErrors(c, safe)
-		if errors.Is(err, ErrConflict) {
+		conflict := status == fiber.StatusConflict
+		if conflict {
 			h.app.WithFlashError(c, message)
 		}
 		target := h.listURL(c)
 		if c.Method() == fiber.MethodPost && c.Path() == h.d.BasePath {
 			target = h.d.BasePath + "/create"
-		} else if c.Method() == fiber.MethodPut && !errors.Is(err, ErrUnknown) && c.Params("id") != "" {
-			target = h.recordURL(requestID(c)) + "/edit"
+		} else if c.Method() == fiber.MethodPut {
+			lostAccess := coreinertia.HasRecordEditAttempt(c) && (status == fiber.StatusForbidden || status == fiber.StatusNotFound)
+			if status != fiber.StatusServiceUnavailable && !lostAccess && requestID(c) != "" {
+				target = h.withReturn(c, h.recordURL(requestID(c))+"/edit")
+				h.app.WithFlashOld(c, h.readableDraft(raw, Update))
+			}
+			return h.redirectUpdate(c, target, conflict)
 		}
 		if target != h.listURL(c) {
 			target = h.withReturn(c, target)
+			h.app.WithFlashOld(c, h.readableDraft(raw, Create))
 		}
 		return h.redirect(c, target)
 	}
 	return h.sendFailure(c, status, message, fields)
+}
+
+// The form retains its draft in memory. The server fallback carries only
+// scalar values of fields that may be both read and written in this operation.
+func (h *handler[R, C, U]) readableDraft(raw map[string]json.RawMessage, op Operation) map[string]any {
+	draft := map[string]any{}
+	for _, field := range h.d.Fields {
+		writable := op == Create && field.Create || op == Update && field.Update
+		if !field.Read || !writable {
+			continue
+		}
+		var value any
+		if json.Unmarshal(raw[field.Key], &value) == nil {
+			switch value.(type) {
+			case nil, bool, float64, string:
+				draft[field.Key] = value
+			}
+		}
+	}
+	return draft
 }
 
 func sanitizeFields(fields []Field, errs FieldErrors) FieldErrors {

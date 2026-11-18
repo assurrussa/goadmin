@@ -539,7 +539,7 @@ async function runCase(name, config) {
     assert.equal(new URL(page.url()).pathname, '/products')
     result.loginRedirect = { destination: '/products', acceptedProps: true, noReload: true }
     await crudAcceptance({ page, context, config, folder, name, expect, language, result })
-    check('declarative CRUD: direct login redirect, Products create/edit/show/delete, command, views/CSV, real CAS, repeated UI conflict/reload, return state and RU mobile')
+    check('Products CRUD, views/CSV, two-tab conflict resolution and save-and-return to the filtered second page')
     await tableWorkflowAcceptance({ page, context, config, credentials, ownedSQL, folder, name, expect, language, login, logout, result })
     check('table workflows: view CRUD/dirty/relogin, native CSRF/RBAC/preview/owner isolation, both CSV modes on six grids, cross-page cap100, real conflict, bulk results and server queue counters')
     await appearanceAcceptance({ page, context, browser, config, credentials, folder, name, expect, login, logout, result })
