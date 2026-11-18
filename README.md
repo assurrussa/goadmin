@@ -52,14 +52,18 @@ The [dashboard card API](docs/dashboard.md) adds permission-scoped host summarie
 through the existing `host` facade, without a custom frontend build.
 
 New to embedding? Start with [the consumer guide](docs/consumer-guide.md) for
-the visible result, required stack, and path to your own entity page.
+the visible result, required stack, and [choice of extension](docs/consumer-guide.md#choose-the-smallest-extension).
+For a working entity without writing Vue, follow [your first CRUD resource](docs/first-crud.md).
+For appearance, notifications and custom Inertia pages, use the
+[integration recipes](docs/integration-recipes.md) before selecting dependencies.
 
 The [standalone starter](examples/starter/README.md) runs the embedded admin,
 PostgreSQL with Docker Compose. Redis is an optional profile; mail modules use
 NotifyHub when explicitly enabled. Copy
 `examples/starter/.env.example` to `examples/starter/.env`, fill every required
-value, then run `GOADMIN_VERSION=v0.20.0 docker compose up --build` after
-v0.20.0 is published, from `examples/starter`. This builds the starter against the published GoAdmin library
+value, then run `docker compose up --build` from `examples/starter`. The example
+pins GoAdmin v0.30.0 in `.env.example`; keep the starter source and library version
+compatible. This builds the starter against the published GoAdmin library
 and uses the release's embedded UI; it requires no sibling checkouts. Open
 `http://localhost:8080`; the login page offers first-admin registration until
 an administrator exists. No administrator password is bundled.
