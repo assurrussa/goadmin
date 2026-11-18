@@ -106,9 +106,10 @@ administrator to choose a value for each field changed differently by both
 writers. A write-only replacement stays in the tab and requires explicit
 confirmation before reuse. Write-only input is excluded from redirect feedback.
 The next explicit save submits the reconciled draft against the current
-revision. A further concurrent update starts the comparison again. If a custom
-JSON marshaler omits a readable edit field, the editor keeps the draft and
-offers a reload because it cannot compare the missing value.
+revision. A further concurrent update starts the comparison again. If either
+version omits a readable edit field, the editor keeps the draft and offers a
+reload because it cannot compare the missing value. Opening or reloading a
+record with such a field requires an explicit value before the next save.
 
 Personal tables use `crud.<key>` under the current administrator, with existing
 CAS, 20-view/64-KiB limits, column reconciliation and URL precedence. Selection

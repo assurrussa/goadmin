@@ -42,20 +42,26 @@ const listHref = computed(() => crudReturnHref(props.resource.basePath, page.url
 const activeFields = computed(() => props.resource.fields.filter((field) => field[props.mode]))
 
 function editableValues(values = props.values): Values {
+  if (props.mode === 'update') {
+    const draft: Values = {}
+    for (const field of activeFields.value) {
+      if (!field.read) draft[field.key] = null
+      else if (Object.hasOwn(values, field.key)) draft[field.key] = crudValue(values[field.key])
+    }
+    return draft
+  }
   return Object.fromEntries(
     activeFields.value.map((field) => [
       field.key,
-      props.mode === 'update' && !field.read
-        ? null
-        : Object.hasOwn(values, field.key)
-          ? crudValue(values[field.key])
-          : field.type === 'boolean'
-            ? false
-            : field.type === 'number'
-              ? 0
-              : field.type === 'select' && field.required
-                ? (field.options?.[0]?.value ?? '')
-                : '',
+      Object.hasOwn(values, field.key)
+        ? crudValue(values[field.key])
+        : field.type === 'boolean'
+          ? false
+          : field.type === 'number'
+            ? 0
+            : field.type === 'select' && field.required
+              ? (field.options?.[0]?.value ?? '')
+              : '',
     ]),
   )
 }
@@ -70,6 +76,7 @@ function editSnapshot(values = props.values) {
 let baseline = editSnapshot()
 let draftRevision = props.record?.revision
 const form = useForm({ values: baseline.values })
+const presentFields = computed(() => new Set(Object.keys(form.values)))
 const errors = computed(() => form.errors as Record<string, string>)
 function fieldError(key: string): string | undefined {
   // Track absent keys too, so later setError calls update the field.
@@ -105,10 +112,20 @@ const formState = computed(() => ({
 const submitDisabled = computed(
   () =>
     needsReload.value ||
+    activeFields.value.some(needsExplicitValue) ||
     Array.from(heldSecrets.values()).some(({ reapply }) => !reapply) ||
     Array.from(disputedFields.values()).some(({ choice }) => !choice) ||
     activeFields.value.some((field) => fieldValidity.value[field.key] === false),
 )
+
+function needsExplicitValue(field: CrudField) {
+  return props.mode === 'update' && field.read && !presentFields.value.has(field.key)
+}
+
+function editField(field: CrudField, value: CrudValue) {
+  form.values[field.key] = value
+  if (props.mode === 'update' && !field.read) editedSecrets.add(field.key)
+}
 
 function choose(key: string, dispute: Dispute, choice: Choice) {
   dispute.choice = choice
@@ -118,7 +135,9 @@ function choose(key: string, dispute: Dispute, choice: Choice) {
 function displayChoice(field: CrudField, value: CrudValue) {
   if (value === null) return t('Не указано')
   if (value === '') return t('Пустая строка')
-  return crudDisplay(field, value)
+  if (field.type === 'boolean') return t(value ? 'Да' : 'Нет')
+  const display = crudDisplay(field, value)
+  return field.type === 'select' ? t(display) : display
 }
 
 function replaceSecret(key: string) {
@@ -289,7 +308,9 @@ function update(id: string, returnToList: boolean) {
         draftRevision = accepted.revision
         for (const { key, read } of activeFields.value) {
           if (read) {
-            if (form.values[key] === submitted[key]) form.values[key] = baseline.values[key]!
+            if (form.values[key] !== submitted[key]) continue
+            if (Object.hasOwn(baseline.values, key)) form.values[key] = baseline.values[key]!
+            else delete form.values[key]
           } else {
             if (heldSecrets.get(key)?.value === values[key]) heldSecrets.delete(key)
             if (submittedSecrets.has(key) && form.values[key] === submitted[key]) {
@@ -425,12 +446,15 @@ onUnmounted(() => {
       <Field
         v-else
         :field="field"
-        v-model="form.values[field.key]"
+        :model-value="presentFields.has(field.key) ? form.values[field.key] : null"
         :error="fieldError(field.key)"
         :disabled="formState.processing"
-        @update:model-value="mode === 'update' && !field.read && editedSecrets.add(field.key)"
+        @update:model-value="editField(field, $event)"
         @update:valid="fieldValidity[field.key] = $event"
       />
+      <p v-if="needsExplicitValue(field)" class="text-sm text-text-secondary">
+        {{ t('Сервер не передал значение. Введите его перед сохранением.') }}
+      </p>
     </template>
     <AppButton
       v-if="mode === 'update' && errors.form && errors.form !== conflictNotice"

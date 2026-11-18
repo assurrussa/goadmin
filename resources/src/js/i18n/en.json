@@ -863,6 +863,8 @@
   "Опубликовать этот товар?": "Publish this product?",
   "Снять с публикации": "Unpublish",
   "Снять этот товар с публикации?": "Unpublish this product?",
+  "This record has changed. Review your edits.": "This record has changed. Review your edits.",
+  "Сервер не передал значение. Введите его перед сохранением.": "The server did not provide this value. Enter it before saving.",
   "Record changed; reload before saving": "Record changed; reload before saving",
   "Не удалось сравнить все поля. Загрузите актуальную запись.": "Some fields could not be compared. Reload the current record.",
   "Запись изменилась. Проверьте изменения и сохраните запись снова.": "This record has changed. Review the changes and save again.",

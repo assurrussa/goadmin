@@ -26,19 +26,21 @@ const (
 )
 
 type recordAttempt struct {
-	key      string
-	token    string
-	edit     bool
-	conflict bool
+	key             string
+	token           string
+	edit            bool
+	conflict        bool
+	redirectFromGet bool
 }
 
 func (a recordAttempt) valid() bool { return a.key != "" }
 
 type crudFlashScope struct {
-	resource string
-	id       string
-	page     CRUDRecordPage
-	conflict bool
+	resource        string
+	id              string
+	page            CRUDRecordPage
+	conflict        bool
+	redirectFromGet bool
 }
 
 // CRUDRecordPage identifies the authorized destination of a CRUD update.
@@ -55,6 +57,28 @@ const (
 // Fallback destinations never acknowledge an edit.
 func ScopeCRUDRecordFlash(c fiber.Ctx, resource, id string, page CRUDRecordPage, conflict bool) {
 	c.Locals(crudFlashScope{}, crudFlashScope{resource: resource, id: id, page: page, conflict: conflict})
+}
+
+// ScopeCRUDRecordAccessFallback allows a denied redirect GET to send an error
+// to the resource list using the original update attempt.
+func ScopeCRUDRecordAccessFallback(c fiber.Ctx, resource, id string) {
+	c.Locals(crudFlashScope{}, crudFlashScope{resource: resource, id: id, page: CRUDRecordIndex, redirectFromGet: true})
+}
+
+// DiscardCRUDRecordFlash consumes feedback for a destination that failed its
+// authorization check without decoding or sharing its fields.
+func (b SessionBridge) DiscardCRUDRecordFlash(c fiber.Ctx, resource, id string, page CRUDRecordPage) error {
+	ScopeCRUDRecordFlash(c, resource, id, page, false)
+	attempt, scoped := recordEditAttempt(c, string(goinertia.ContextKeyProps))
+	if !scoped || !attempt.valid() {
+		return nil
+	}
+	key, err := b.recordEditStorageKey(c, attempt)
+	if err != nil || key == "" {
+		return err
+	}
+	_, err = sessioncore.TakeRecordEditFlash(c.Context(), b.Store.Storage, key)
+	return err
 }
 
 // CRUDRecordFlashIndexID reads the opaque record selector for list fallback.
@@ -87,7 +111,13 @@ func recordEditAttempt(c fiber.Ctx, sessionKey string) (recordAttempt, bool) {
 			return recordAttempt{}, true
 		}
 		key := "crud\x00" + scope.resource + "\x00" + scope.id + "\x00" + string(scope.page) + "\x00" + token
-		return recordAttempt{key: key, token: token, edit: scope.page == CRUDRecordEdit, conflict: scope.conflict}, true
+		return recordAttempt{
+			key:             key,
+			token:           token,
+			edit:            scope.page == CRUDRecordEdit,
+			conflict:        scope.conflict,
+			redirectFromGet: scope.redirectFromGet,
+		}, true
 	}
 
 	path := strings.TrimRight(c.Path(), "/")

@@ -298,12 +298,17 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await expect(field('name')).toHaveValue(winner.name)
   assert.equal(new URL(page.url()).searchParams.get('returnTo'), returnTo)
   await field('stock').fill('28')
-  await save(recordPath, 'PUT')
+  const [enterSave] = await Promise.all([
+    page.waitForResponse(response => response.request().method() === 'PUT' && new URL(response.url()).pathname === recordPath),
+    field('stock').press('Enter'),
+  ])
+  assert.equal(enterSave.status(), 303)
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled()
   await expect(field('stock')).toHaveValue('28')
   assert.equal(new URL(page.url()).pathname, editPath)
   assert.equal(new URL(page.url()).searchParams.get('returnTo'), returnTo)
   await expect(page.getByRole('link', { name: 'Back to list', exact: true })).toHaveAttribute('href', returnTo)
-  report.returnNavigation = { list: returnTo, show: true, edit: true, successfulSave: true }
+  report.returnNavigation = { list: returnTo, show: true, edit: true, successfulSave: true, enterStaysInEditor: true }
 
   // Two qualifying neighbours sort before the existing product; the standard
   // product would occupy its place on page two if the category filter were lost.
@@ -387,7 +392,7 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await expect(field('stock')).toHaveValue('29')
   await expect(field('description')).toHaveValue(description)
-  const toast = page.locator('.notification--error').filter({ hasText: 'Record changed; reload before saving' })
+  const toast = page.locator('.notification--error').filter({ hasText: 'This record has changed. Review your edits.' })
   await expect(toast).toHaveCount(1)
   await toast.getByRole('button', { name: 'Dismiss notification', exact: true }).click()
   await latestChoice.check()

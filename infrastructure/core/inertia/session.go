@@ -59,7 +59,8 @@ func (b SessionBridge) Delete(c fiber.Ctx, key string) error {
 
 func (b SessionBridge) Flash(c fiber.Ctx, key string, value any) error {
 	if attempt, scoped := recordEditAttempt(c, key); scoped {
-		if !attempt.valid() || c.Method() != fiber.MethodPut {
+		canPersist := c.Method() == fiber.MethodPut || attempt.redirectFromGet && c.Method() == fiber.MethodGet
+		if !attempt.valid() || !canPersist {
 			return nil
 		}
 		return b.saveRecordEditFlash(c, attempt, value)

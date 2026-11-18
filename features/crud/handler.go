@@ -30,7 +30,7 @@ type projected = map[string]any
 //nolint:gocognit // Explicit route and validation branches keep authorization order visible.
 func (h *handler[R, C, U]) RegisterGroupRoutes(router fiber.Router, _ ...fiber.Handler) {
 	p := h.d.Permissions
-	group := router.Group(h.d.BasePath, h.app.Guard(p.Read.Domain, p.Read.Action))
+	group := router.Group(h.d.BasePath, h.recordAttemptGuard(h.app.Guard(p.Read.Domain, p.Read.Action), Read))
 	cfg := datagrid.FilterConfig[projected]{
 		RoutePath:         h.d.BasePath,
 		Entity:            h.d.Key,
@@ -175,8 +175,7 @@ func (h *handler[R, C, U]) RegisterGroupRoutes(router fiber.Router, _ ...fiber.H
 	})
 	group.Get("/records/:id", func(c fiber.Ctx) error { return h.page(c, false) })
 	group.Get("/records/:id/edit",
-		h.app.Guard(p.Update.Domain,
-			p.Update.Action),
+		h.recordAttemptGuard(h.app.Guard(p.Update.Domain, p.Update.Action), Update),
 		func(c fiber.Ctx) error {
 			return h.page(c,
 				true)
@@ -226,7 +225,7 @@ func (h *handler[R, C, U]) RegisterGroupRoutes(router fiber.Router, _ ...fiber.H
 		h.app.WithFlashSuccess(c, "Record updated")
 		return h.redirectUpdate(c, h.afterWrite(c, a, updated), false)
 	})
-	group.Put("/records/:id", update[0], update[1])
+	group.Put("/records/:id", h.recordAttemptGuard(update[0], Update), update[1])
 	remove := host.Command(h.app, p.Delete, func(c fiber.Ctx, a host.Actor, raw map[string]json.RawMessage) error {
 		return h.mutate(c, a, raw, Delete, h.d.Delete, h.d.BasePath)
 	})
@@ -275,6 +274,10 @@ func (h *handler[R, C, U]) page(c fiber.Ctx, edit bool) error {
 	}
 	r, err := h.load(c, a, op)
 	if err != nil {
+		if c.Method() == fiber.MethodGet && coreinertia.HasRecordEditAttempt(c) &&
+			(errors.Is(err, ErrDenied) || errors.Is(err, ErrNotFound)) {
+			return h.redirectRecordAccessFailure(c, err)
+		}
 		return h.failure(c, err, nil)
 	}
 	data, err := h.project(r, op)
@@ -401,30 +404,50 @@ func (h *handler[R, C, U]) project(r Record[R], op Operation) (projected, error)
 	_, customRowJSON := any(r.Data).(json.Marshaler)
 	completeEdit := op == Update && !customRowJSON
 	out := projected{"id": r.ID, revisionKey: r.Revision}
+	var zeroValues map[string]reflect.Value
 	for _, f := range h.d.Fields {
 		if !f.Read {
 			continue
 		}
 		fieldType := types[f.Key]
 		value, present := all[f.Key]
-		if !present {
-			if !completeEdit || !f.Update || fieldType == nil {
-				continue
-			}
-			// Restore DTO zero values omitted by the standard encoder so an
-			// edit baseline can distinguish null, false, zero and empty text.
-			value, err = json.Marshal(reflect.Zero(fieldType).Interface())
-			if err != nil {
+		f.Required = false
+		if present {
+			if err := validateFieldValue(f, fieldType, value); err != nil {
 				return nil, err
 			}
+			out[f.Key] = value
+			continue
 		}
-		f.Required = false
-		if err := validateFieldValue(f, fieldType, value); err != nil {
-			return nil, err
+		if !completeEdit || !f.Update || fieldType == nil {
+			continue
 		}
-		out[f.Key] = value
+		// IsZero methods can make the standard encoder omit nonzero fields.
+		// Restore a zero only when it represents the actual DTO value.
+		if zeroValues == nil {
+			zeroValues = rowZeroValues(r.Data)
+		}
+		if zero := zeroValues[f.Key]; zero.IsValid() {
+			value, err = json.Marshal(zero.Interface())
+			if err == nil && validateFieldValue(f, fieldType, value) == nil {
+				out[f.Key] = value
+			}
+		}
 	}
 	return out, nil
+}
+
+func rowZeroValues[R any](data R) map[string]reflect.Value {
+	row := reflect.ValueOf(data)
+	fields := make(map[string]reflect.Value)
+	for i := range row.NumField() {
+		value := row.Field(i)
+		if field := row.Type().Field(i); field.IsExported() && value.IsZero() {
+			key, _, _ := strings.Cut(field.Tag.Get("json"), ",")
+			fields[key] = value
+		}
+	}
+	return fields
 }
 
 func (h *handler[R, C, U]) projectMany(ctx context.Context, a host.Actor, records []Record[R]) ([]projected, error) {
@@ -463,18 +486,65 @@ func (h *handler[R, C, U]) recordURL(id string) string {
 	return h.d.BasePath + "/records/" + url.PathEscape(id)
 }
 
+func (h *handler[R, C, U]) recordAttemptGuard(guard fiber.Handler, op Operation) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		err := guard(c)
+		if err == nil || !coreinertia.HasRecordEditAttempt(c) || c.Method() != fiber.MethodPut && c.Method() != fiber.MethodGet {
+			return err
+		}
+		var denied *fiber.Error
+		if !errors.As(err, &denied) || denied.Code != fiber.StatusForbidden {
+			return err
+		}
+		if op == Read {
+			// The list shares this guard, so following the referer or returning
+			// to the list would send the browser to another forbidden route.
+			h.discardDeniedRecordFlash(c, coreinertia.CRUDRecordFlashIndexID(c))
+			return h.sendFailure(c, fiber.StatusForbidden, "Record access denied", nil)
+		}
+		return h.redirectRecordAccessFailure(c, ErrDenied)
+	}
+}
+
+func (h *handler[R, C, U]) redirectRecordAccessFailure(c fiber.Ctx, err error) error {
+	_, message, _ := classifyFailure(err)
+	h.app.WithValidationErrors(c, goinertia.ValidationErrors{"form": {message}})
+	if c.Method() == fiber.MethodGet {
+		id := requestID(c)
+		h.discardDeniedRecordFlash(c, id)
+		coreinertia.ScopeCRUDRecordAccessFallback(c, h.d.BasePath, id)
+		return h.redirect(c, h.listURL(c))
+	}
+	return h.redirectUpdate(c, h.listURL(c), false)
+}
+
+func (h *handler[R, C, U]) discardDeniedRecordFlash(c fiber.Ctx, id string) {
+	if c.Method() != fiber.MethodGet || id == "" {
+		return
+	}
+	bridge := coreinertia.SessionBridge{Store: h.app.Unwrap().Session()}
+	page := h.recordFlashPage(id, c.Path())
+	if err := bridge.DiscardCRUDRecordFlash(c, h.d.BasePath, id, page); err != nil {
+		h.app.Logger().ErrorContext(c, "Unable to discard denied CRUD response", logger.Error(err))
+	}
+}
+
 func (h *handler[R, C, U]) redirectUpdate(c fiber.Ctx, target string, conflict bool) error {
 	id := requestID(c)
 	path, _, _ := strings.Cut(target, "?")
-	destination := coreinertia.CRUDRecordIndex
+	coreinertia.ScopeCRUDRecordFlash(c, h.d.BasePath, id, h.recordFlashPage(id, path), conflict)
+	return h.redirect(c, target)
+}
+
+func (h *handler[R, C, U]) recordFlashPage(id, path string) coreinertia.CRUDRecordPage {
 	switch path {
 	case h.recordURL(id):
-		destination = coreinertia.CRUDRecordShow
+		return coreinertia.CRUDRecordShow
 	case h.recordURL(id) + "/edit":
-		destination = coreinertia.CRUDRecordEdit
+		return coreinertia.CRUDRecordEdit
+	default:
+		return coreinertia.CRUDRecordIndex
 	}
-	coreinertia.ScopeCRUDRecordFlash(c, h.d.BasePath, id, destination, conflict)
-	return h.redirect(c, target)
 }
 
 func (h *handler[R, C, U]) redirect(c fiber.Ctx, target string) error {
@@ -582,7 +652,11 @@ func (h *handler[R, C, U]) failure(c fiber.Ctx, err error, raw map[string]json.R
 		h.app.WithValidationErrors(c, safe)
 		conflict := status == fiber.StatusConflict
 		if conflict {
-			h.app.WithFlashError(c, message)
+			toast := message
+			if c.Method() == fiber.MethodPut && coreinertia.HasRecordEditAttempt(c) {
+				toast = "This record has changed. Review your edits."
+			}
+			h.app.WithFlashError(c, toast)
 		}
 		target := h.listURL(c)
 		if c.Method() == fiber.MethodPost && c.Path() == h.d.BasePath {

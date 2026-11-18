@@ -4,6 +4,7 @@ import { router } from '@inertiajs/vue3'
 import type { ActiveVisit, Page, VisitOptions } from '@inertiajs/core'
 import Form from './Form.vue'
 import type { CrudResource, CrudValue } from '@/crud'
+import { applyLocale } from '@/i18n'
 
 const page = reactive({
   component: 'crud/Form',
@@ -43,6 +44,7 @@ vi.mock('@inertiajs/vue3', async (importOriginal) => {
 
 let app: ReturnType<typeof createApp> | undefined
 afterEach(() => {
+  applyLocale('ru')
   app?.unmount()
   app = undefined
   mocks.form = undefined
@@ -129,7 +131,7 @@ const resource: CrudResource = {
 const visit = { cancelled: false, interrupted: false } as ActiveVisit
 const attemptHeader = 'X-GoAdmin-Record-Attempt'
 const defaultValues = { name: 'Original name', notes: 'Original notes' }
-type Values = Partial<typeof defaultValues>
+type Values = Record<string, CrudValue>
 
 function inertiaPage(props: Page['props']): Page {
   return {
@@ -147,20 +149,22 @@ function render(
   mode: 'create' | 'update' = 'update',
   requiredSecret: boolean | 'date' = false,
   returnTo = listHref,
+  fields = resource.fields,
+  values: Values = defaultValues,
 ) {
   const root = document.createElement('div')
   document.body.append(root)
   const data = reactive({
     resource: {
       ...resource,
-      fields: resource.fields
+      fields: fields
         .filter(({ required }) => requiredSecret || !required)
         .map((field) =>
           field.required && requiredSecret === 'date' ? { ...field, type: 'date' as const } : field,
         ),
     },
     mode,
-    values: { ...defaultValues } as Values,
+    values: { ...values },
     record: mode === 'update' ? { id: 'a', revision: 'r1', data: {} } : undefined,
   })
   page.url = `/products/records/a/edit?${new URLSearchParams({ returnTo })}`
@@ -334,6 +338,72 @@ it('keeps the draft when a host projection omits a readable field during a confl
   submit(root, true)
   expect(put).toHaveBeenCalledOnce()
   expect(get).not.toHaveBeenCalled()
+})
+
+it('requires an explicit value for a readable field omitted by a host, including after reload', async () => {
+  const field = { ...resource.fields[0]!, key: 'stock', type: 'number' as const }
+  const { root, put } = render('update', false, listHref, [...resource.fields, field])
+  expect(input(root, 'stock').value).toBe('')
+  input(root, 'name', 'Changed')
+  submit(root, true)
+  expect(put).not.toHaveBeenCalled()
+  input(root, 'stock', '0')
+  await nextTick()
+  submit(root, true)
+  expect(put.mock.lastCall?.[1]).toMatchObject({ name: 'Changed', stock: 0 })
+})
+
+it('distinguishes null from false, zero and empty text in localized conflict choices', async () => {
+  applyLocale('en')
+  const fields = [
+    { ...resource.fields[0]!, key: 'count', type: 'number' as const },
+    { ...resource.fields[0]!, key: 'enabled', type: 'boolean' as const },
+    { ...resource.fields[0]!, key: 'note' },
+    {
+      ...resource.fields[0]!,
+      key: 'action',
+      type: 'select' as const,
+      options: [
+        { value: 'a', label: 'Создать' },
+        { value: 'b', label: 'Удалить' },
+        { value: 'c', label: 'Отмена' },
+      ],
+    },
+  ]
+  const { root, put, conflict } = render('update', false, listHref, fields, {
+    count: 5,
+    enabled: null,
+    note: 'Original',
+    action: 'a',
+  })
+  input(root, 'count', '0')
+  input(root, 'enabled').click()
+  input(root, 'note', '')
+  const select = root.querySelector<HTMLSelectElement>('select[name="action"]')!
+  select.value = 'b'
+  select.dispatchEvent(new Event('change', { bubbles: true }))
+  submit(root)
+  await conflict('r2', { count: null, enabled: false, note: null, action: 'c' })
+  expect(choice(root, 'count', 'latest').labels?.[0]?.textContent).toContain('Not specified')
+  for (const [key, side, label] of [
+    ['count', 'mine', '0'],
+    ['enabled', 'latest', 'No'],
+    ['note', 'mine', 'Empty string'],
+    ['action', 'mine', 'Delete'],
+  ] as const) {
+    const radio = choice(root, key, side)
+    expect(radio.labels?.[0]?.textContent?.trim()).toMatch(new RegExp(': ' + label + '$'))
+    radio.click()
+  }
+  await nextTick()
+  submit(root)
+  expect(put.mock.lastCall?.[1]).toEqual({
+    count: 0,
+    enabled: false,
+    note: '',
+    action: 'b',
+    _revision: 'r2',
+  })
 })
 
 it('automatically merges disjoint and identical changes and waits for the next manual save', async () => {

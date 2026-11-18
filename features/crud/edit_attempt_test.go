@@ -156,7 +156,7 @@ func TestEditAttemptUsesFreshRecordAndScopedOutcome(t *testing.T) {
 				require.Equal(t, "v2", page.Props.Record.Revision)
 				require.Equal(t, "Fresh", page.Props.Values["name"])
 				require.Equal(t, map[string]string{"form": "Record changed; reload before saving"}, page.Props.Errors)
-				require.Equal(t, map[string]string{"recordEditAttempt": editAttempt, "crudEditConflict": "1", "error": "Record changed; reload before saving"}, page.Props.Flash)
+				require.Equal(t, map[string]string{"recordEditAttempt": editAttempt, "crudEditConflict": "1", "error": "This record has changed. Review your edits."}, page.Props.Flash)
 				require.Equal(t, map[string]any{"name": "Draft"}, page.Props.Old)
 			}
 			if name == "stale" {
@@ -230,6 +230,91 @@ func TestEditAttemptFallbackNeverCertifiesAnEdit(t *testing.T) {
 	}
 }
 
+func TestEditAttemptWhenPermissionsChange(t *testing.T) {
+	const id = "EU/42"
+	const edit = "/people/records/EU%2F42/edit?returnTo=%2Fpeople%3Fpage%3D2"
+	const update = "/people/records/EU%2F42?returnTo=%2Fpeople%3Fpage%3D2"
+	const list = "/people?page=2"
+	const draft = `{"name":"private-draft","_revision":"v1"}`
+	for _, scenario := range []struct {
+		name   string
+		before string
+		after  string
+	}{
+		{name: "read guard on PUT", before: "read"},
+		{name: "update guard on PUT", before: "update"},
+		{name: "read guard on redirected GET", after: "read"},
+		{name: "update guard on redirected GET", after: "update"},
+		{name: "record policy on redirected GET", after: "row"},
+		{name: "deleted record on redirected GET", after: "deleted"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			denied := scenario.before
+			d := definition()
+			d.Get = func(context.Context, host.Actor, string) (Record[testRow], error) {
+				require.Empty(t, scenario.before, "a revoked route permission must prevent the record lookup")
+				if denied == "deleted" {
+					return Record[testRow]{}, ErrNotFound
+				}
+				return Record[testRow]{ID: id, Revision: "v2", Data: testRow{Name: "private-record"}}, nil
+			}
+			d.Authorize = func(_ context.Context, _ host.Actor, _ Operation, record Record[testRow]) error {
+				if denied == "row" && record.ID == id {
+					return ErrDenied
+				}
+				return nil
+			}
+			d.List = func(context.Context, host.Actor, datagrid.Filtered) ([]Record[testRow], int, error) {
+				return nil, 0, nil
+			}
+			d.Update = func(context.Context, host.Actor, string, string, testUpdate) (Record[testRow], error) {
+				t.Error("revoked access or a stale revision must prevent the update")
+				return Record[testRow]{}, ErrDenied
+			}
+			app := mountedPolicy(t, d, false, false, func(_ context.Context, _ int64, _ host.PermissionDomain, action host.PermissionAction) bool {
+				return string(action) != denied
+			}, true)
+			cookie := startEditAttemptSession(t, app)
+			response := crudAttemptRequest(t, app, cookie, http.MethodPut, update, id, editAttempt, draft)
+			if scenario.after != "" {
+				require.Equal(t, http.StatusSeeOther, response.status)
+				require.Equal(t, edit, response.location)
+				denied = scenario.after
+				response = crudAttemptRequest(t, app, cookie, http.MethodGet, response.location, id, editAttempt, "")
+			}
+			if denied == "read" {
+				require.Equal(t, http.StatusForbidden, response.status)
+				require.Empty(t, response.location)
+				require.JSONEq(t, `{"message":"Record access denied","errors":{}}`, string(response.body))
+			} else {
+				require.Equal(t, http.StatusSeeOther, response.status)
+				require.Equal(t, list, response.location)
+				index := crudAttemptRequest(t, app, cookie, http.MethodGet, list, id, editAttempt, "")
+				require.NotContains(t, string(index.body), "private-draft")
+				require.NotContains(t, string(index.body), "private-record")
+				page := readEditAttemptPage(t, index)
+				require.Equal(t, "crud/Index", page.Component)
+				require.Empty(t, page.Props.Old)
+				require.Empty(t, page.Props.Flash)
+				message := "Record access denied"
+				if denied == "deleted" {
+					message = "Record not found"
+				}
+				require.Equal(t, map[string]string{"form": message}, page.Props.Errors)
+				consumed := readEditAttemptPage(t, crudAttemptRequest(t, app, cookie, http.MethodGet, list, id, editAttempt, ""))
+				require.Empty(t, consumed.Props.Errors)
+			}
+			if scenario.after != "" {
+				denied = ""
+				retry := readEditAttemptPage(t, crudAttemptRequest(t, app, cookie, http.MethodGet, edit, id, editAttempt, ""))
+				require.Empty(t, retry.Props.Old)
+				require.Empty(t, retry.Props.Flash)
+				require.Empty(t, retry.Props.Errors)
+			}
+		})
+	}
+}
+
 func TestEditValuesIncludeOmittedTypedScalars(t *testing.T) {
 	d := definition()
 	d.Fields = append(d.Fields,
@@ -252,6 +337,28 @@ func TestEditValuesIncludeOmittedTypedScalars(t *testing.T) {
 	require.NotContains(t, body, `"stock":0`)
 	require.NotContains(t, body, `"active":false`)
 	require.NotContains(t, body, `"note":""`)
+}
+
+type maskedEditValue string
+
+func (value maskedEditValue) IsZero() bool { return value == "" || value == "suppressed" }
+
+func TestEditValuesPreserveNonzeroOmissions(t *testing.T) {
+	type row struct {
+		Hidden maskedEditValue `json:"hidden,omitzero"`
+		Empty  maskedEditValue `json:"empty,omitzero"`
+	}
+	h := handler[row, testCreate, testUpdate]{d: Definition[row, testCreate, testUpdate]{
+		Fields: []Field{
+			{Key: "hidden", Type: "text", Read: true, Update: true},
+			{Key: "empty", Type: "text", Read: true, Update: true},
+		},
+	}}
+	out, err := h.project(Record[row]{ID: "42", Revision: "v1", Data: row{Hidden: "suppressed"}}, Update)
+	require.NoError(t, err)
+	wire, err := json.Marshal(out)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"id":"42","_revision":"v1","empty":""}`, string(wire))
 }
 
 type customEditRow struct {
