@@ -661,13 +661,7 @@ func (s *Service) RegenerateSessionID(ctx context.Context, sess *session.Session
 	if state, ok := sess.Get(sessioncore.AuthAdminKey.String()).(*browserSession); ok && state != nil {
 		state.Payload.SessionID = sess.ID()
 		sess.Set(sessioncore.AuthAdminKey.String(), state)
-		var err error
-		if c, ok := ctx.(fiber.Ctx); ok {
-			err = sessioncore.SavePassive(c, s.store, sess)
-		} else {
-			err = sess.SaveWithContext(ctx)
-		}
-		if err != nil {
+		if err := sessioncore.SavePassive(ctx, s.store, sess); err != nil {
 			return "", err
 		}
 	}
