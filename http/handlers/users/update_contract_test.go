@@ -235,6 +235,8 @@ func assertUserUpdateFeedback(t *testing.T, props map[string]any, success, email
 	old, ok := props[goinertia.ContextPropsOld].(map[string]any)
 	require.True(t, ok)
 	require.Equal(t, "Changed", old["name"])
+	require.Equal(t, "", old["lastName"])
+	require.Equal(t, "", old["username"])
 	if emailDisabled {
 		require.Equal(t, map[string]string{
 			"email": "Изменение электронной почты отключено",

@@ -1,4 +1,5 @@
 import { router, usePage, type InertiaForm } from '@inertiajs/vue3'
+import { v4 as uuid } from 'uuid'
 import { nextTick, onScopeDispose, watch, type Ref } from 'vue'
 
 interface RecordEditFields {
@@ -40,6 +41,7 @@ export function useRecordEditSubmission(
     const component = page.component
     const destination = returnToList ? listHref.value : undefined
     const submitted = form.data()
+    const requestId = uuid()
     const stillCurrent = () =>
       attempt === revision &&
       recordId() === id &&
@@ -48,22 +50,31 @@ export function useRecordEditSubmission(
     let confirmed = false
 
     form.put(`${basePath}/${id}`, {
+      headers: { 'X-GoAdmin-Record-Attempt': requestId },
       onStart: () => {
         saving = true
       },
       onSuccess: (response) => {
         const record = response.props.data as { id?: string | number } | undefined
-        const flash = response.props.flash as { success?: string; error?: string } | undefined
+        const flash = response.props.flash as
+          | { success?: string; error?: string; recordEditAttempt?: string }
+          | undefined
         if (
           !stillCurrent() ||
           response.component !== component ||
           record?.id !== id ||
-          ownerId(response.props) !== owner ||
-          !flash?.success ||
-          flash.error
+          ownerId(response.props) !== owner
         ) {
           // Preserve the existing baseline when Inertia received a page without a save result.
           form.defaults({})
+          return
+        }
+        if (!flash?.success || flash.error || flash.recordEditAttempt !== requestId) {
+          form.defaults({})
+          const errors: Record<string, string> = {
+            form: 'Результат операции неизвестен. Обновите страницу перед повтором.',
+          }
+          form.setError(errors)
           return
         }
 

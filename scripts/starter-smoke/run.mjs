@@ -375,7 +375,18 @@ async function runCase(name, config) {
       const releaseSave = deferred()
       await page.route(updateURL, async route => {
         await releaseSave.promise
-        await route.continue()
+        const redirect = await route.fetch({ maxRedirects: 0 })
+        assert.equal(redirect.status(), 303)
+        // Load the same edit page in the same session before the saving tab follows its redirect.
+        const probe = await context.request.get(editURL, { headers: {
+          'X-Inertia': 'true',
+          'X-Inertia-Version': route.request().headers()['x-inertia-version'] ?? '',
+        } })
+        assert.ok(probe.ok())
+        const otherPage = await probe.json()
+        assert.equal(otherPage.component, resource === 'users' ? 'users/EditPage' : 'admin/EditPage')
+        assert.ok(!otherPage.props.flash?.success && !otherPage.props.flash?.recordEditAttempt)
+        await route.fulfill({ response: redirect })
       }, { times: 1 })
       try {
         await page.locator('input[name="name"]').press('Enter')

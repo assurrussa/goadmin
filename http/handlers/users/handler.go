@@ -355,7 +355,7 @@ func (h *Handler) Update(c fiber.Ctx) error {
 	})
 	if err != nil {
 		old := map[string]any{
-			"name": form.Name, "lastName": form.LastName, "username": form.Username,
+			"name": form.Name, "lastName": valueOrEmpty(form.LastName), "username": valueOrEmpty(form.Username),
 		}
 		// A readonly email must recover from canonical edit-page data, not rejected input.
 		if h.adminApp.Enabled("authmail") {

@@ -12,6 +12,13 @@ The keyboard selection resets on reopening. Account links follow the flat
 profile menu. A dirty form still asks before leaving while an update is in
 flight. Filter controls and chips share the translated option labels.
 
+Record edits use the same redirect flow as before. The session bridge stores
+each attempt's feedback in a separate short-lived entry. Its key identifies
+the session, record and attempt, so a parallel session update cannot overwrite
+it. PostgreSQL and Redis consume the entry atomically, and unread entries
+expire after five minutes. An unconfirmed write stays on the form for
+reconciliation.
+
 Chromium covered both shells, RU/EN keyboard navigation, mobile filter removal
 and header layout at 320 and 390 pixels. With PostgreSQL 17, the starter smoke
 test held a real PUT pending, dismissed a navigation prompt and let the update

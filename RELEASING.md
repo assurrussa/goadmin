@@ -47,6 +47,16 @@ This module is published as `github.com/assurrussa/goadmin`.
 - The frontend advisory gate and its current zero-finding result are reviewed
   in [docs/dependency-advisory-review.md](docs/dependency-advisory-review.md).
 
+## v0.29.0 navigation and record editing
+
+- Ctrl/Cmd + K opens a searchable list of the signed-in user's sections and
+  account links in either bundled layout.
+- User and administrator edit forms can return to the originating list after
+  a confirmed save, preserving its search, filters, sort, page size and page.
+- Collapsed table filters show individually removable, localized labels.
+- Upgrade the GoAdmin module and rebuild the host to pick up the embedded
+  assets. This version uses the existing host API and database schema.
+
 ## v0.28.0 Ocean and compact filters
 
 - The embedded admin defaults to the Ocean gradient for primary actions in

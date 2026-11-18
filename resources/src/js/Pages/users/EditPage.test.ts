@@ -47,9 +47,15 @@ const put = () =>
     options?.onBefore?.(visit)
     options?.onStart?.(visit)
   })
-const response = (props?: Partial<Page['props']>): Page => ({
+const response = (options: VisitOptions, props?: Partial<Page['props']>): Page => ({
   ...page,
-  props: { data: record, authuser: owner, errors: {}, flash: { success: 'Saved' }, ...props },
+  props: {
+    data: record,
+    authuser: owner,
+    errors: {},
+    flash: { success: 'Saved', recordEditAttempt: options.headers?.['X-GoAdmin-Record-Attempt'] },
+    ...props,
+  },
   version: null,
   clearHistory: false,
   encryptHistory: false,
@@ -133,7 +139,7 @@ describe('users email capability', () => {
     submit(root)
     expect(routerPut).toHaveBeenCalledOnce()
     const options = latestOptions(routerPut)
-    await options.onSuccess?.(response())
+    await options.onSuccess?.(response(options))
     options.onFinish?.(visit)
     await nextTick()
     expect(root.querySelector<HTMLInputElement>('input[name="email"]')?.value).toBe(
@@ -186,7 +192,7 @@ describe('save and return', () => {
       const options = latestOptions(routerPut)
       // The response can strip returnTo. Navigation uses the validated pre-submit target.
       page.url = `/${resource}/1/edit`
-      await options.onSuccess?.(response())
+      await options.onSuccess?.(response(options))
       expect(routerGet).not.toHaveBeenCalled()
       const guard = before.mock.calls.find(([event]) => event === 'before')?.[1]
       expect(guard?.({ detail: { visit: { method: 'get' } } } as never)).toBeUndefined()
@@ -211,7 +217,7 @@ describe('save and return', () => {
       if (outcome === 'validation') options.onError?.({ name: 'Required' })
       if (outcome === 'unknown') options.onError?.({ form: 'Result unknown' })
       if (outcome === 'uncertain response')
-        await options.onSuccess?.(response({ flash: { warning: 'Unexpected response' } }))
+        await options.onSuccess?.(response(options, { flash: { warning: 'Unexpected response' } }))
       if (outcome === 'cancelled' || outcome === 'interrupted') options.onCancel?.()
       options.onFinish?.({
         ...visit,
@@ -226,6 +232,34 @@ describe('save and return', () => {
       expect(routerGet).not.toHaveBeenCalled()
     },
   )
+
+  it('retains the draft when a different save on the same record reports success', async () => {
+    const routerPut = put()
+    const routerGet = vi.spyOn(router, 'get').mockImplementation(() => {})
+    page.props = { errors: {}, authuser: owner }
+    const { root } = renderEdit()
+    input(root, 'name', 'First draft')
+    submit(root, true)
+    const first = latestOptions(routerPut)
+    first.onError?.({ name: 'Invalid' })
+    first.onFinish?.(visit)
+    await nextTick()
+
+    input(root, 'name', 'Current draft')
+    submit(root, true)
+    const second = latestOptions(routerPut)
+    const attemptHeader = 'X-GoAdmin-Record-Attempt'
+    expect(first.headers?.[attemptHeader]).toEqual(expect.any(String))
+    expect(second.headers?.[attemptHeader]).not.toBe(first.headers?.[attemptHeader])
+    await second.onSuccess?.(response(first))
+    second.onFinish?.(visit)
+    await nextTick()
+    expect(routerGet).not.toHaveBeenCalled()
+    expect(root.querySelector<HTMLInputElement>('input[name="name"]')?.value).toBe('Current draft')
+    expect(root.querySelector('[role="alert"]')?.textContent).toContain(
+      'Результат операции неизвестен',
+    )
+  })
 
   it.each(['new draft', 'draft edited at finish', 'new record', 'new owner'] as const)(
     'ignores the return intent after a %s',
@@ -244,7 +278,7 @@ describe('save and return', () => {
         page.props = { errors: {}, authuser: { idExact: '9007199254740995' } }
       await nextTick()
       if (change !== 'draft edited at finish') input(root, 'name', 'New draft')
-      await options.onSuccess?.(response())
+      await options.onSuccess?.(response(options))
       if (change === 'draft edited at finish') input(root, 'name', 'New draft')
       options.onFinish?.(visit)
       await nextTick()

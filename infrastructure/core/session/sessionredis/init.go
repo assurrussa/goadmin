@@ -14,6 +14,7 @@ import (
 	redisv9 "github.com/redis/go-redis/v9"
 
 	"github.com/assurrussa/goadmin/config"
+	sessioncore "github.com/assurrussa/goadmin/infrastructure/core/session"
 	redis "github.com/assurrussa/goadmin/infrastructure/redis"
 )
 
@@ -80,6 +81,16 @@ type persistentCookieStorage struct {
 	persistentTTL time.Duration
 }
 
+var _ sessioncore.RecordEditFlashStorage = (*persistentCookieStorage)(nil)
+
+func (s *persistentCookieStorage) SetRecordEditFlash(ctx context.Context, key string, payload []byte, ttl time.Duration) error {
+	return sessioncore.SetRecordEditFlash(ctx, s.Storage, key, payload, ttl)
+}
+
+func (s *persistentCookieStorage) TakeRecordEditFlash(ctx context.Context, key string) ([]byte, error) {
+	return sessioncore.TakeRecordEditFlash(ctx, s.Storage, key)
+}
+
 func (s *persistentCookieStorage) SetWithContext(ctx context.Context, key string, val []byte, exp time.Duration) error {
 	if err := s.Storage.SetWithContext(ctx, key, val, exp); err != nil {
 		return err
@@ -110,6 +121,27 @@ func sessionCookieTTL(cfg config.Config) time.Duration {
 // Временно пока не будет норм замена.
 type storage struct {
 	conn redisv9.UniversalClient
+}
+
+var _ sessioncore.RecordEditFlashStorage = (*storage)(nil)
+
+func (s *storage) SetRecordEditFlash(ctx context.Context, key string, payload []byte, ttl time.Duration) error {
+	if !strings.HasPrefix(key, sessioncore.RecordEditFlashKeyPrefix) || len(payload) == 0 || ttl <= 0 {
+		return nil
+	}
+	return s.conn.Set(ctx, key, payload, ttl).Err()
+}
+
+func (s *storage) TakeRecordEditFlash(ctx context.Context, key string) ([]byte, error) {
+	var payload []byte
+	if !strings.HasPrefix(key, sessioncore.RecordEditFlashKeyPrefix) {
+		return payload, nil
+	}
+	payload, err := s.conn.GetDel(ctx, key).Bytes()
+	if errors.Is(err, redisv9.Nil) {
+		return payload, nil
+	}
+	return payload, err
 }
 
 func (s *storage) Get(key string) ([]byte, error) {
@@ -186,9 +218,16 @@ func (s *storage) ResetWithContext(ctx context.Context) error {
 }
 
 func resetSessions(ctx context.Context, conn redisv9.UniversalClient) error {
+	if err := resetNamespace(ctx, conn, sessionKeyPrefix); err != nil {
+		return err
+	}
+	return resetNamespace(ctx, conn, sessioncore.RecordEditFlashKeyPrefix)
+}
+
+func resetNamespace(ctx context.Context, conn redisv9.UniversalClient, prefix string) error {
 	var cursor uint64
 	for {
-		keys, next, err := conn.Scan(ctx, cursor, sessionKeyPrefix+"*", resetScanCount).Result()
+		keys, next, err := conn.Scan(ctx, cursor, prefix+"*", resetScanCount).Result()
 		if err != nil {
 			return err
 		}

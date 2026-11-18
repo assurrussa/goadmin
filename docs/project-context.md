@@ -225,7 +225,11 @@ ask before leaving a dirty form, including while a save is in flight. Browser
 Back/Forward cannot be cancelled and no draft is stored. Handled update
 failures use the non-field `errors.form` bag, retaining
 input/dirty state instead of triggering Inertia success. Unknown outcomes never
-trigger automatic replay. Confirmed success emits one notification.
+trigger automatic replay. The two bundled edit forms send a fresh attempt ID
+with every PUT. Its redirect reads only that attempt's feedback for the same
+session and record. A missing or mismatched confirmation keeps the draft open
+and asks the operator to refresh before retrying. Confirmed success emits one
+notification.
 
 ## Optional users feature
 
