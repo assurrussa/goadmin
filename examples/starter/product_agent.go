@@ -20,8 +20,10 @@ import (
 	"github.com/assurrussa/goadmin/toolkit/datagrid"
 )
 
-const agentPath = "/agent/product-events"
-const connectPath = agentPath + "/connect"
+const (
+	agentPath   = "/agent/product-events"
+	connectPath = agentPath + "/connect"
+)
 
 type journalAgent struct {
 	app    *host.App
