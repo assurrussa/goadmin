@@ -138,7 +138,7 @@ func agentFailure(c fiber.Ctx, err error) error {
 		return agentJSON(c, 403, "denied")
 	case errors.Is(err, crud.ErrNotFound):
 		return agentJSON(c, 404, "not_found")
-	case errors.As(err, &fields):
+	case errors.Is(err, crud.ErrInvalidQuery), errors.As(err, &fields):
 		return agentJSON(c, 422, "invalid_request")
 	default:
 		return agentJSON(c, 503, "unavailable")

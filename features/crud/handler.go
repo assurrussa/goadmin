@@ -769,7 +769,7 @@ func classifyFailure(err error) (int, string, FieldErrors) {
 	case errors.As(err, &fields):
 		status = fiber.StatusUnprocessableEntity
 		message = "Check the form fields"
-	case errors.Is(err, errInvalidQuery):
+	case errors.Is(err, ErrInvalidQuery):
 		status, message = fiber.StatusBadRequest, "Invalid resource list query"
 	case errors.Is(err, ErrNotFound):
 		status = fiber.StatusNotFound

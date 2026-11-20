@@ -149,7 +149,7 @@ func TestReadOnlyReader(t *testing.T) {
 		{Fields: map[string]any{"label": float64(12)}},
 	} {
 		page, e := s.list(ctx, a, q)
-		require.ErrorIs(t, e, errInvalidQuery)
+		require.ErrorIs(t, e, ErrInvalidQuery)
 		require.Zero(t, page)
 	}
 	require.Equal(t, 2, calls)

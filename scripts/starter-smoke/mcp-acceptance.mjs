@@ -151,6 +151,7 @@ export async function journalMCPAcceptance({ browser, config, credentials, binar
     assert.deepEqual(tools.map(tool => tool.name).sort(), [get, search])
     assert.ok(tools.every(tool => tool.annotations?.readOnlyHint === true))
     const approvedCode = await pair(first, owner, query(product))
+    await call(first, search, { ...query(product), action: 'unknown-event' }, 'invalid_input')
     const archived = await comparePage(first, owner.context, query(product))
     assert.equal(archived.total, 2)
     assert.equal(archived.rows.length, 2)

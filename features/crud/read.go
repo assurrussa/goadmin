@@ -19,7 +19,8 @@ const (
 )
 
 var (
-	errInvalidQuery = errors.New("crud: invalid list query")
+	// ErrInvalidQuery means that a requested filter, sort or page is outside the resource's contract.
+	ErrInvalidQuery = errors.New("crud: invalid list query")
 	errInvalidPage  = errors.New("crud: invalid page result")
 )
 
@@ -95,7 +96,7 @@ func (s reader[R, C, U]) list(ctx context.Context, actor host.Actor, query datag
 	cfg := datagrid.FilterConfig[any]{Columns: s.d.Columns, DefaultSort: s.d.DefaultSort, DefaultOrder: s.d.DefaultOrder}
 	if query.Limit < 1 || query.Limit > s.maxPageSize() || query.Page < 1 || query.Page > math.MaxInt/query.Limit ||
 		len(query.Validate(cfg)) != 0 || (s.readOnly && !validReadOnlyFilters(query, s.d.Columns)) {
-		return readPage{}, errInvalidQuery
+		return readPage{}, ErrInvalidQuery
 	}
 	records, total, err := s.d.List(ctx, actor, query)
 	if err != nil {
