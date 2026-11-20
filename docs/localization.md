@@ -5,8 +5,9 @@ admin header and on sign-in screens. The choice is stored in `goadmin.locale` in
 browser local storage; blocked storage keeps a session-only choice. Unsupported
 or corrupt values fall back to Russian. Locale affects presentation only:
 server validation, CSRF, canonical identities, permissions and commands use the
-same contracts in both languages. User names, email addresses, field values and
-table cell content are not translated.
+same contracts in both languages. User names, email addresses and raw table
+values retain their original text. When a column declares a badge for a value,
+the table translates the badge's configured label.
 
 Consumer extensions can register explicit UI messages without replacing the
 core dictionary:

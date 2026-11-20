@@ -101,7 +101,7 @@
         >
       </div>
     </details>
-    <div class="flex flex-wrap items-center gap-2">
+    <div v-if="tableConfig.behaviour.selectable" class="flex flex-wrap items-center gap-2">
       <span role="status" class="text-sm">{{
         t('Выбрано: {count} из 100', undefined, { count: selectedCount })
       }}</span>
@@ -112,14 +112,19 @@
         >{{ t('Снять выделение') }}</AppButton
       >
       <AppButton
+        v-if="workflow?.exportUrl"
         variant="outline"
         :disabled="!selectedCount || busy || loading"
         @click="exportCSV('selected')"
         >{{ t('CSV выбранных') }}</AppButton
       >
-      <AppButton variant="outline" :disabled="busy || loading" @click="exportCSV('filtered')">{{
-        t('CSV по фильтрам')
-      }}</AppButton>
+      <AppButton
+        v-if="workflow?.exportUrl"
+        variant="outline"
+        :disabled="busy || loading"
+        @click="exportCSV('filtered')"
+        >{{ t('CSV по фильтрам') }}</AppButton
+      >
       <AppButton
         v-for="action in workflow?.bulkActions"
         :key="action.key"
@@ -216,6 +221,7 @@ const props = defineProps<{
 defineEmits<{ 'clear-selection': [] }>()
 const {
   workflow,
+  tableConfig,
   preferences,
   activeViewId,
   viewName: name,

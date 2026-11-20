@@ -1,6 +1,7 @@
 package datagrid //nolint:testpackage // Exercises visibility metadata without a renderer or DB.
 
 import (
+	"context"
 	"testing"
 
 	logger "github.com/assurrussa/gologger"
@@ -24,4 +25,21 @@ func TestRolePreviewFiltersLegacyGridActionsAndCreation(t *testing.T) {
 	require.Len(t, grid.availableActions(t.Context(), 1), 4, "ordinary action callbacks are unchanged")
 	require.False(t, grid.previewActionAllowed(ctx, "custom-run"), "custom grants are never inferred from labels")
 	require.True(t, grid.previewActionAllowed(integrationroles.WithSuperRolePreview(t.Context()), "create"))
+}
+
+func TestRolePreviewUsesDeclaredReadPermission(t *testing.T) {
+	permission := integrationroles.NewPermissionKey("product_events", "inspect")
+	grid := NewHandler(FilterConfig[int]{
+		RoutePath: "/product-events",
+		Actions:   []Action[int]{{Key: "view"}},
+		CanViewInPreview: func(ctx context.Context) bool {
+			return integrationroles.RolePreviewAllows(ctx, permission)
+		},
+	}, logger.Discard())
+	declared := integrationroles.WithRolePreview(t.Context(), map[integrationroles.PermissionKey]bool{permission: true})
+	routeDerived := integrationroles.WithRolePreview(t.Context(), map[integrationroles.PermissionKey]bool{
+		integrationroles.NewPermissionKey("product-events", "read"): true,
+	})
+	require.Len(t, grid.availableActions(declared, 1), 1)
+	require.Empty(t, grid.availableActions(routeDerived, 1))
 }

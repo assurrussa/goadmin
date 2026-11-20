@@ -43,7 +43,7 @@ func run() error {
 			continue
 		}
 		switch key {
-		case "users", "access", "jobs", "uploads", "queues", "notifications", "realtime", "authmail", "products":
+		case "users", "access", "jobs", "uploads", "queues", "notifications", "realtime", "authmail", "products", "product-events":
 			selected[key] = true
 		default:
 			return fmt.Errorf("unknown admin module %q", key)
@@ -98,7 +98,8 @@ func run() error {
 			return fmt.Errorf("migrate: %w", err)
 		}
 	}
-	if selected["products"] && migrate {
+	usesProductsDB := selected["products"] || selected["product-events"]
+	if usesProductsDB && migrate {
 		if err := migrateProducts(ctx, pgDSN); err != nil {
 			return fmt.Errorf("products migrate: %w", err)
 		}
@@ -192,17 +193,26 @@ func run() error {
 	if selected["authmail"] {
 		modules = append(modules, host.AuthMailModule(host.AuthMailConfig{Sender: mail.auth}))
 	}
-	if selected["products"] {
+	if usesProductsDB {
 		productDB, openErr := sql.Open("pgx", pgDSN)
 		if openErr != nil {
 			return openErr
 		}
 		defer productDB.Close()
-		products, moduleErr := productsModule(productDB)
-		if moduleErr != nil {
-			return moduleErr
+		if selected["products"] {
+			products, moduleErr := productsModule(productDB)
+			if moduleErr != nil {
+				return moduleErr
+			}
+			modules = append(modules, products)
 		}
-		modules = append(modules, products)
+		if selected["product-events"] {
+			events, moduleErr := productEventsModule(productDB)
+			if moduleErr != nil {
+				return moduleErr
+			}
+			modules = append(modules, events)
+		}
 	}
 	modules = append(modules, starterDashboardModules()...)
 	var runtime *host.Runtime

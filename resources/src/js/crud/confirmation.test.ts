@@ -81,6 +81,42 @@ const cases = (['list', 'detail'] as const).flatMap((view) =>
     (['publish', 'delete'] as const).map((action) => ({ view, locale, action })),
   ),
 )
+it('shows a revision-free event and restores the original filtered list', async () => {
+  const listURL = '/product-events?page=2&search=17'
+  mocks.page.url = '/product-events/records/28?' + new URLSearchParams({ returnTo: listURL })
+  const root = document.createElement('div')
+  app = createApp({
+    setup() {
+      provideConfirmation()
+      return () =>
+        h(Show, {
+          resource: {
+            key: 'product_events',
+            basePath: '/product-events',
+            title: 'Events',
+            fields: [
+              {
+                key: 'action',
+                label: 'Action',
+                type: 'text',
+                read: true,
+                create: false,
+                update: false,
+              },
+            ],
+            actions: [],
+          },
+          record: { id: '28', data: { action: 'Published' } },
+          permissions: { create: false, update: false, delete: false },
+        })
+    },
+  })
+  app.mount(root)
+  await settle()
+  expect(root.querySelector('dd')?.textContent).toBe('Published')
+  expect(root.querySelector('section button')).toBeNull()
+  expect(root.querySelector('a')?.getAttribute('href')).toBe(listURL)
+})
 it.each(cases)(
   'uses the correct fallback confirmation in $view $locale $action',
   async ({ view, locale, action }) => {

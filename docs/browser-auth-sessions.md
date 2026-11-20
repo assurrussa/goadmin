@@ -81,18 +81,18 @@ anonymous. It never selects or revokes one of the ambiguous sessions. Protected 
 mutations and Authorization headers continue to fail closed; login POST requires
 the fresh page's ordinary CSRF proof.
 
-Refresh uses an atomic owner/version claim. Redis uses a single-key Lua CAS
-and preserves absolute TTL; the PostgreSQL alternative uses conditional updates
-in `goadmin_browser_auth_state`. Concurrent nodes read the committed new version.
+Refresh uses an atomic owner/version claim. PostgreSQL uses conditional updates
+in `goadmin_browser_auth_state`. The optional Redis backend uses a single-key
+Lua CAS and preserves absolute TTL. Concurrent nodes read the committed new version.
 An unresolved/crashed owner never expires into retrying the old refresh secret:
 the browser must log in again. A stale Fiber save cannot overwrite the journal.
 Changing the opaque identifier fences the old journal before moving credentials
 and removes its authority. No canonical `sid` is accepted as a browser secret.
 
-`APP_ADMIN_CANONICAL_SESSION_BACKEND=redis` (the default) requires the host Redis
-connection. `pgsql` requires the additive migration and does not add a Redis
-requirement to install validation. Fiber's supplied session store still needs
-its own working storage. Existing migrations remain immutable.
+`APP_ADMIN_CANONICAL_SESSION_BACKEND` defaults to `pgsql`. Run the standard
+host migrations to install the journal. Selecting `redis` explicitly requires
+the host Redis connection. A custom Fiber session store also needs its own
+working storage.
 
 Hosts may supply `AuthAdapterConfig.NotificationSender` and
 `NotificationWorker` to enable the canonical managed encrypted queue. Supervise

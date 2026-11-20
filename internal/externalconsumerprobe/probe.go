@@ -122,6 +122,7 @@ const runnableProbeTest = `package probe
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -144,13 +145,76 @@ import (
 	_ "github.com/assurrussa/goadmin/features/realtime"
 	_ "github.com/assurrussa/goadmin/features/operations"
 	_ "github.com/assurrussa/goadmin/features/users"
- _ "github.com/assurrussa/goadmin/features/crud"
+	"github.com/assurrussa/goadmin/features/crud"
 	adminhost "github.com/assurrussa/goadmin/host"
 	adminhosttest "github.com/assurrussa/goadmin/hosttest"
 	adminmigrations "github.com/assurrussa/goadmin/migrations"
-	_ "github.com/assurrussa/goadmin/toolkit/datagrid"
+	"github.com/assurrussa/goadmin/toolkit/datagrid"
 	_ "github.com/assurrussa/goadmin/toolkit/formvalidator"
 )
+
+func TestWritableFieldConstraints(t *testing.T) {
+	name := crud.Field{Key: "name", Label: "Name", Type: "text", Create: true, Update: true, MaxLength: new(2)}
+	amount := crud.Field{Key: "amount", Label: "Amount", Type: "number", Create: true, Update: true, Minimum: new(0.5)}
+	if err := name.ValidateConstraints("🙂🙂"); err != nil {
+		t.Fatal(err)
+	}
+	if err := amount.ValidateConstraints(0.5); err != nil {
+		t.Fatal(err)
+	}
+	if name.ValidateConstraints("🙂🙂🙂") == nil || amount.ValidateConstraints(0) == nil {
+		t.Fatal("constraints must reject values outside their declared bounds")
+	}
+}
+
+func TestParameterizedActionContract(t *testing.T) {
+	type input struct {
+		Reason string ` + "`json:\"reason,omitempty\"`" + `
+	}
+	type row struct{}
+	reason := crud.ActionParam{Key: "reason", Label: "Reason", Type: "textarea", Required: true, TrimSpace: true, MaxLength: new(2)}
+	action := crud.ActionWithParams[row, input](
+		crud.Action[row]{Key: "unpublish", Label: "Unpublish", Permission: adminhost.NewPermissionKey("products", "unpublish")},
+		[]crud.ActionParam{reason},
+		func(context.Context, adminhost.Actor, string, string, input) error { return nil },
+	)
+	meta, err := json.Marshal(action)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(meta), "\"trimSpace\":true") || !strings.Contains(string(meta), "\"maxLength\":2") {
+		t.Fatalf("unexpected action metadata: %s", meta)
+	}
+	if value, err := reason.Normalize("\u0085🙂🙂 "); err != nil || value != "🙂🙂" {
+		t.Fatalf("unexpected normalized reason %q, %v", value, err)
+	}
+}
+
+func TestReadOnlyResourceContract(t *testing.T) {
+	type event struct {
+		Action string ` + "`json:\"action\"`" + `
+	}
+	type record = crud.ReadOnlyRecord[event]
+	module, err := crud.NewReadOnly(crud.ReadOnlyDefinition[event]{
+		Key: "events", BasePath: "/events", Title: "Events",
+		Permission: adminhost.NewPermissionKey("events", "read"),
+		Fields: []crud.Field{{Key: "action", Label: "Action", Type: "text", Read: true}},
+		Columns: []datagrid.Column{{Key: "action", Label: "Action", Type: "text", Sortable: true}},
+		List: func(context.Context, adminhost.Actor, datagrid.Filtered) ([]record, int, error) {
+			return nil, 0, nil
+		},
+		Get: func(context.Context, adminhost.Actor, string) (record, error) {
+			return record{}, crud.ErrNotFound
+		},
+		Authorize: func(context.Context, adminhost.Actor, record) error { return crud.ErrDenied },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if module.Descriptor().Key != "crud.events" {
+		t.Fatalf("unexpected module key %q", module.Descriptor().Key)
+	}
+}
 
 func TestHostActorCommandContract(t *testing.T) {
 	want := adminhost.Actor{AdminID: 42, SubjectID: "123e4567-e89b-12d3-a456-426614174201"}

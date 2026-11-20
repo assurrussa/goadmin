@@ -7,8 +7,54 @@ no host Vue source or client rebuild. The opt-in `products` module in
 [the starter](../examples/starter/products.go) is a complete PostgreSQL example.
 Its optional Category select is independent of the read-only publication Status;
 only the separately guarded Publish/Unpublish commands change that status.
-Unpublish requires `products:unpublish` and returns a published record to draft;
-both transitions use owner/revision CAS and transactional audit.
+Unpublish requires `products:unpublish` and an operator's reason. It returns
+the product to draft and records the reason in the same transaction.
+
+## Connect a read-only section
+
+Use `crud.NewReadOnly` for a journal, directory or other resource with a list
+and a detail page. The [starter journal](../examples/starter/product_events.go)
+shows the declaration, PostgreSQL queries and record policy together.
+
+1. Define a row DTO and choose a stable record ID. Return
+   `crud.ReadOnlyRecord[Row]{ID: id, Data: row}` from your callbacks.
+   Declare each displayed field with `Read: true` and a JSON key. Keep internal
+   fields such as the owner available to your policy only. The constructor
+   rejects `Create`, `Update` and `Required` flags on read-only fields.
+2. Build a `crud.ReadOnlyDefinition[Row]` with the key, path, title, read
+   permission, menu, fields, columns and callbacks. `List` receives the actor
+   and `datagrid.Filtered`. Use the same ownership and search predicates for
+   the page and count. Use a stable secondary sort key. `Get` looks up one ID
+   within the actor's scope and returns `crud.ErrNotFound` for an absent record.
+   `Authorize` checks the returned row for both operations. A rejected row
+   fails the whole page. A count obtained without the ownership predicate can
+   still disclose other users' activity.
+3. Pass the module returned by `crud.NewReadOnly(definition)` to `host.New`.
+   Use its read permission on the menu item and grant that permission to the
+   intended operator role. The embedded pages provide filters, personal views
+   and navigation back to the originating list. The resource exposes neither
+   domain writes nor CSV export. Each list request reads at most 100 records.
+4. In the starter, enable `ADMIN_MODULES=products,product-events` to generate
+   and inspect events. Create and publish a product, then open
+   `/product-events` as the same operator with `product_events:read`. Search
+   for its exact number, open an event and return to the filtered list. Delete
+   the product and search again. A second operator with the read permission
+   sees only their own events. The journal can also be enabled on its own.
+
+For example, this declaration displays one field from the starter's event DTO.
+The callbacks own the queries and the record policy. Append the returned
+module to the modules passed to `host.New`.
+
+```go
+module, err := crud.NewReadOnly(crud.ReadOnlyDefinition[productEvent]{
+	Key: "product-events", BasePath: "/product-events", Title: "Product activity",
+	Permission: host.NewPermissionKey("product_events", "read"),
+	Fields: []crud.Field{{Key: "createdAt", Label: "Time (UTC)", Type: "text", Read: true}},
+	Columns: []datagrid.Column{{Key: "createdAt", Label: "Time (UTC)", Type: "text", Sortable: true}},
+	DefaultSort: "createdAt", DefaultOrder: "desc",
+	List: repo.events, Get: repo.event, Authorize: authorizeProductEvent,
+})
+```
 
 ## Resource ownership
 
@@ -70,12 +116,44 @@ the previous complete value. Admission expiry uses the same control with local
 24-hour minute fields and keeps its existing timestamp conversion.
 
 Single-record `Actions` declare a key, permission, optional confirmation and
-callback.
-They receive ID and expected revision, with no additional input body. `Authorize`
-receives the action key as its operation. Action visibility is not authorization;
-every command repeats current permission and record checks.
+callback. An ordinary action takes only the record ID and expected revision.
+`Authorize` receives the action key as its operation. The server checks both
+the current permission and the scoped record.
 
-Built-in action confirmations use the shared localized admin dialog, including
+Use `crud.ActionWithParams` when the operator must supply additional input.
+The starter uses this pattern to drive the action dialog, the HTTP binder
+and the typed callback.
+
+```go
+type UnpublishInput struct {
+    Reason string `json:"reason"`
+}
+
+reason := crud.ActionParam{
+    Key: "reason", Label: "Reason", Type: "textarea",
+    Required: true, TrimSpace: true, MaxLength: new(500),
+}
+action := crud.ActionWithParams[Product, UnpublishInput](
+    crud.Action[Product]{Key: "unpublish", Label: "Unpublish", Permission: permission},
+    []crud.ActionParam{reason}, repo.unpublish,
+)
+```
+
+The callback receives `(context.Context, host.Actor, id, revision, UnpublishInput)`
+and returns an error. Each parameter matches an explicit, case-sensitive JSON
+tag on a string field of the input struct. The constructor checks this mapping
+at startup. An `omitempty` tag still allows the parameter to be required.
+For direct Go writes use `reason.Normalize(input.Reason)`. It trims Unicode
+`White_Space` when requested, checks required text and counts code points.
+Text parameters reject NUL, which PostgreSQL cannot store in a text column.
+
+POST to `/products/records/{id}/actions/unpublish` with JSON such as
+`{"_revision":"7","params":{"reason":"Price needs verification"}}`. A successful
+parameterized action returns 204. A field error returns 422 with messages in
+`errors.reason`. A stale revision returns 409. The dialog keeps the raw draft
+for correction or explicit confirmation against the newly read revision.
+
+Revision-only action confirmations use the shared localized admin dialog, including
 operation-specific buttons and destructive styling. Cancellation, navigation,
 actor changes and requester disposal never continue a pending action. Browser
 unload and unsaved-navigation guards retain their separate existing behavior.
@@ -122,6 +200,46 @@ CSV export. The constructor rejects such columns; the same keys remain valid
 for fields and non-filterable columns. `ids` remains a valid filter key.
 Number GET filters follow the shared grid's integer-only parsing; CRUD input
 fields still support fractional values.
+
+## Write constraints
+
+Declare limits on writable fields to show them in both form languages and
+enforce them on the server. The starter declares its name and stock limits on
+the fields passed to `crud.New`, and reuses those fields in its repository.
+
+```go
+name := crud.Field{
+	Key: "name", Label: "Name", Type: "text", Read: true, Create: true, Update: true,
+	Required: true, MaxLength: new(200),
+}
+stock := crud.Field{
+	Key: "stock", Label: "Stock", Type: "number", Read: true, Create: true, Update: true,
+	Minimum: new(0.0),
+}
+```
+
+`MaxLength` counts Unicode code points in the submitted text. Spaces and
+combining characters count individually. The limit must be positive and the
+field must be `text` or `textarea`. `Minimum` is inclusive and supports both
+integer and fractional `number` fields. Supply a finite bound in the
+JavaScript-safe magnitude supported by CRUD. A nil bound omits the rule.
+The constructor rejects write constraints on fields without a write mode and
+on resources built with `NewReadOnly`.
+
+POST and PUT collect constraint errors for the fields writable in that
+operation before calling the host. For numbers, the submitted decimal and
+the value decoded into the host's Go type must both meet the minimum. This
+also applies when a `float32` field rounds the input. An optional nil pointer
+has no value to compare. An omitted non-pointer number defaults to zero and
+must satisfy its minimum. Direct writers can call
+`name.ValidateConstraints(input.Name)` and `stock.ValidateConstraints(input.Stock)`
+on the same declarations before opening a transaction. Domain rules such as
+rejecting an all-whitespace product name still belong to the host.
+
+The form retains text pasted beyond the length limit and displays an inline
+error. Fixing the input enables submission. Reads apply the existing scalar
+and access checks, so an operator can open and correct a legacy value outside
+a newly declared write bound.
 
 ## Custom fields and bundle compatibility
 

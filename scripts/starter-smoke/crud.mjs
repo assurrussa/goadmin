@@ -4,6 +4,7 @@ import path from 'node:path'
 import { parseCSV } from './table-workflow.mjs'
 import { appearanceGeometry } from './appearance-visual.mjs'
 import { confirmationAcceptance } from './confirmation.mjs'
+import { unpublishFromCard, unpublishFromList } from './unpublish.mjs'
 
 // Runs only inside run.mjs's authenticated, isolated starter case. All records
 // are created through the public host resource. The confirmation matrix only
@@ -55,9 +56,14 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await expect(field('available')).toHaveAttribute('type', 'hidden')
   await expect(datePart('day')).toHaveAttribute('inputmode', 'numeric')
   await expect(field('category')).toHaveJSProperty('tagName', 'SELECT')
-  await field('name').fill(prefix)
+  const boundaryName = '🙂'.repeat(200)
+  const tooLong = boundaryName + '🙂'
+  await expect(field('name')).not.toHaveAttribute('maxlength', /.*/)
+  await expect(field('stock')).toHaveAttribute('min', '0')
+  await expect(page.locator('form')).toHaveJSProperty('noValidate', true)
+  await expect(field('name')).toHaveAccessibleDescription('Up to 200 characters')
+  await expect(field('stock')).toHaveAccessibleDescription('Minimum: 0')
   await field('description').fill('First paragraph\nSecond paragraph')
-  await field('stock').fill('12')
   await field('active').check()
   await setDate('2028-02-29')
   const createWrites = []
@@ -65,6 +71,31 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
     if (request.method() === 'POST' && new URL(request.url()).pathname === '/products') createWrites.push(request.postDataJSON())
   }
   page.on('request', trackCreate)
+  await field('name').fill(tooLong)
+  await field('stock').fill('-1')
+  await field('stock').press('Enter')
+  await expect(field('name')).toHaveAttribute('aria-invalid', 'true')
+  await expect(field('stock')).toHaveAttribute('aria-invalid', 'true')
+  await expect(field('name')).toHaveAccessibleDescription(/Up to 200 characters.*201 of 200 characters/)
+  await expect(field('stock')).toHaveAccessibleDescription(/Minimum: 0.*Enter a value of at least 0/)
+  await language(page, 'Русский', 'ru')
+  await expect(field('name')).toHaveAccessibleDescription(/До 200 символов.*201 из 200 символов/)
+  await expect(field('stock')).toHaveAccessibleDescription(/Минимум — 0.*Введите значение не меньше 0/)
+  await expect(field('name')).toHaveValue(tooLong)
+  await page.screenshot({ path: path.join(folder, `${name}-product-constraints-ru.png`), fullPage: true })
+  await language(page, 'English', 'en')
+  await field('name').fill(boundaryName)
+  await field('stock').fill('')
+  await field('stock').press('-')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(field('stock')).toHaveAccessibleDescription(/Enter a number/)
+  assert.ok(await field('stock').evaluate(input => input.validity.badInput))
+  await field('stock').fill('-1e-999')
+  await field('stock').press('Enter')
+  await expect(field('stock')).toHaveValue('-1e-999')
+  await expect(field('stock')).toHaveAccessibleDescription(/Enter a value of at least 0/)
+  assert.equal(createWrites.length, 0, 'Invalid name or numeric draft must remain local')
+  await field('stock').fill('0')
   await datePart('year').fill('2027')
   await expect(field('available')).toHaveValue('')
   assert.equal(await page.locator('form').evaluate(form => form.checkValidity()), false)
@@ -92,7 +123,9 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await expect(field('status')).toHaveCount(0)
   await save('/products', 'POST')
   page.off('request', trackCreate)
-  assert.equal(createWrites.length, 1, 'An invalid leap date must not issue a create request')
+  assert.equal(createWrites.length, 1, 'Only the corrected product may be submitted')
+  assert.equal(createWrites[0].name, boundaryName)
+  assert.equal(createWrites[0].stock, 0)
   assert.equal(createWrites[0].available, '2026-11-07')
   report.calendar = { locales: ['en', 'ru'], isoPreserved: true, partialBlocked: true, leapValidation: true, clearOptional: true }
   await expect(page).toHaveURL(/\/products\/records\/[^/?]+\/edit(?:\?.*)?$/)
@@ -100,9 +133,9 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   const recordPath = editPath.replace(/\/edit$/, '')
   const id = decodeURIComponent(recordPath.split('/').at(-1))
   assert.ok(id)
-  await expect(field('name')).toHaveValue(prefix)
+  await expect(field('name')).toHaveValue(boundaryName)
   await expect(field('description')).toHaveValue('First paragraph\nSecond paragraph')
-  await expect(field('stock')).toHaveValue('12')
+  await expect(field('stock')).toHaveValue('0')
   await expect(field('active')).toBeChecked()
   await expect(field('available')).toHaveValue('2026-11-07')
   await expect(field('category')).toHaveValue('')
@@ -151,16 +184,12 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await expect(page).toHaveURL(new RegExp(`${recordPath}$`))
   await expect(display('Status')).toHaveText('Published')
   await expect(page.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0)
-  const [unpublished] = await Promise.all([
-    page.waitForResponse(response => new URL(response.url()).pathname === `${recordPath}/actions/unpublish` && response.request().method() === 'POST'),
-    confirmCommand('Unpublish', 'Unpublish this product?'),
-  ])
-  assert.equal(unpublished.status(), 303)
+  const cardReason = await unpublishFromCard({ page, expect, recordPath, id, language, folder, name })
   await expect(display('Status')).toHaveText('Draft')
   await expect(page.getByRole('button', { name: 'Unpublish', exact: true })).toHaveCount(0)
   await confirmCommand('Publish', 'Publish this product?')
   await expect(display('Status')).toHaveText('Published')
-  report.unpublish = { confirmed: true, draftRestored: true, republish: true }
+  report.unpublish = { cardReason, confirmed: true, draftRestored: true, republish: true }
   await page.getByRole('link', { name: 'Edit', exact: true }).click()
   await expect(page).toHaveURL(new RegExp(`${editPath}(?:\\?.*)?$`))
   await expect(field('category')).toHaveValue('premium')
@@ -252,6 +281,23 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
     assert.deepEqual(rows[0].item, winner, 'Rejected commands must not change fields or revision')
   }
   await unchanged()
+  const auditCount = async () => (await get('/product-events/data?limit=1')).meta.pagination.total
+  const auditBefore = await auditCount()
+  assert.ok(Number.isInteger(auditBefore) && auditBefore > 0)
+  const invalid = { ...values, name: prefix + tooLong, stock: -1 }
+  const rejected = [
+    await send('/products', invalid, 'POST'),
+    await send(recordPath, { ...invalid, _revision: winner._revision }),
+  ]
+  for (const response of rejected) {
+    assert.equal(response.status(), 422)
+    assert.deepEqual((await response.json()).errors, {
+      name: ['Text is too long'], stock: ['Value is below the minimum'],
+    })
+  }
+  await unchanged()
+  assert.equal(await auditCount(), auditBefore, 'Rejected create and update must leave the journal untouched')
+  report.constraints = { acceptedCodePoints: 200, acceptedStock: 0, rawRejections: [422, 422], auditPreserved: true }
   for (const key of ['id', 'owner_admin_id', 'revision', '_actions', 'status']) {
     const forged = await send(recordPath, { ...values, _revision: winner._revision, [key]: 'forged' })
     assert.equal(forged.status(), 422, `Forged read-only key ${key}`)
@@ -347,10 +393,18 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await editRow()
   await field('stock').fill('-1')
   await saveAndReturn.click()
-  await expect(page.getByText('Stock must be a nonnegative safe integer', { exact: true }).first()).toBeVisible()
+  await expect(field('stock')).toHaveAccessibleDescription(/Enter a value of at least 0/)
   await expect(field('stock')).toHaveValue('-1')
-  assert.equal(new URL(page.url()).pathname, editPath)
+  assert.equal(attempts.length, 0, 'The minimum is enforced before PUT')
   await field('stock').fill('30')
+  await field('name').fill('   ')
+  await saveAndReturn.click()
+  await expect(field('name')).toHaveAccessibleDescription(/Name cannot be blank/)
+  assert.equal(attempts.length, 1, 'The server must receive the domain validation case')
+  assert.equal(new URL(page.url()).pathname, editPath)
+  await expect(field('name')).toHaveValue('   ')
+  await expect(field('stock')).toHaveValue('30')
+  await field('name').fill(winner.name)
   await saveAndReturn.click()
   await assertReturned('30')
   assert.equal(attempts.length, 2, 'One rejected PUT and one confirmed PUT')
@@ -460,6 +514,10 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await page.setViewportSize({ width: 1440, height: 1000 })
   await language(page, 'English', 'en')
   report.mobile = { locale: 'ru', viewport: '390x844', show: true, edit: true, noHorizontalOverflow: true }
+
+  report.unpublish.listReason = await unpublishFromList({
+    context, pageTwo, recordPath, name, folder, expect, conditions, currentName: canonicalValues.name,
+  })
 
   await page.goto(`${recordPath}?${new URLSearchParams({ returnTo })}`)
   await page.getByRole('button', { name: 'Delete', exact: true }).click()

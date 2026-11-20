@@ -156,6 +156,22 @@ current creation authorization and typed errors. Shared client dependencies use
 `FeatureDescriptor.ClientReferences`; unique ownership remains in
 `ClientRequirements`.
 
+Writable CRUD fields can declare `MaxLength` for text or `Minimum` for numbers.
+The embedded form and the Go write path use those declarations. Reading a
+record permits existing values outside a newly introduced write bound.
+
+Hosts can attach typed text parameters to record commands with
+`crud.ActionWithParams`. The command dialog and server use the Go parameter
+metadata for normalization and validation. The Products starter demonstrates
+this contract by recording an unpublish reason in the same transaction as
+the conditional status change.
+
+`crud.NewReadOnly` adds a list and detail page with a single row DTO, read
+permission and record policy. Read-only lists accept up to 100 rows and share
+record authorization and projection with the standard resource. Personal
+views remain writable per administrator. The independent `product-events`
+starter module demonstrates an immutable journal with no CSV or domain writes.
+
 ## Dashboard summaries
 
 The core dashboard renders authorized descriptors immediately and reads values

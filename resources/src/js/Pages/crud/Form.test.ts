@@ -325,6 +325,177 @@ it('does not show Save and return in create mode', () => {
   expect(render('create').root.querySelector('button[data-save-and-return]')).toBeNull()
 })
 
+const constrainedFields: CrudResource['fields'] = [
+  { ...resource.fields[0]!, maxLength: 200, required: true },
+  {
+    ...resource.fields[0]!,
+    key: 'stock',
+    label: 'Stock',
+    type: 'number',
+    minimum: 0,
+    required: true,
+  },
+]
+
+function descriptions(control: HTMLElement) {
+  return control
+    .getAttribute('aria-describedby')
+    ?.split(' ')
+    .map((id) => document.getElementById(id)?.textContent)
+}
+
+it.each(['create', 'update'] as const)(
+  'keeps the %s draft and submits only after every bound is satisfied',
+  async (mode) => {
+    const overlong = '🙂'.repeat(201)
+    const { root, put } = render(mode, true, listHref, constrainedFields, {
+      name: overlong,
+      stock: -1,
+    })
+    const post = vi.spyOn(router, 'post').mockImplementation(() => {})
+    const request = mode === 'create' ? post : put
+    const name = input(root, 'name')
+    const stock = input(root, 'stock')
+    expect(root.querySelector('form')!.noValidate).toBe(true)
+    expect(name.hasAttribute('maxlength')).toBe(false)
+    expect(stock.min).toBe('0')
+    expect(descriptions(name)).toEqual(['До 200 символов', '201 из 200 символов'])
+    expect(descriptions(stock)).toEqual(['Минимум — 0', 'Введите значение не меньше 0'])
+
+    applyLocale('en')
+    await nextTick()
+    expect(descriptions(name)).toEqual(['Up to 200 characters', '201 of 200 characters'])
+    expect(descriptions(stock)).toEqual(['Minimum: 0', 'Enter a value of at least 0'])
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    submit(root)
+    if (mode === 'update') submit(root, true)
+    expect(request).not.toHaveBeenCalled()
+    expect(name.value).toBe(overlong)
+    expect(stock.value).toBe('-1')
+
+    input(root, 'name', '🙂'.repeat(200))
+    await nextTick()
+    expect(descriptions(name)).toEqual(['Up to 200 characters'])
+    submit(root)
+    expect(request).not.toHaveBeenCalled()
+    input(root, 'stock', '')
+    await nextTick()
+    submit(root)
+    expect(request).not.toHaveBeenCalled()
+    input(root, 'stock', '0')
+    await nextTick()
+    submit(root, mode === 'update')
+    expect(request.mock.lastCall?.[1]).toMatchObject({ name: '🙂'.repeat(200), stock: 0 })
+  },
+)
+
+it('keeps an incomplete number draft dirty until the browser reports a complete value', async () => {
+  const { root, put } = render('update', true, listHref, constrainedFields, {
+    name: 'A',
+    stock: 18,
+  })
+  const stock = input(root, 'stock')
+  stock.value = ''
+  // jsdom has no keyboard number editor. Model the native DOM for a lone minus sign.
+  const validity = vi
+    .spyOn(stock, 'validity', 'get')
+    .mockReturnValue({ badInput: true } as ValidityState)
+  stock.dispatchEvent(new Event('input', { bubbles: true }))
+  await nextTick()
+  expect(stock.value).toBe('')
+  expect(mocks.form!.values.stock).toBe(18)
+  expect(descriptions(stock)).toEqual(['Минимум — 0', 'Введите число'])
+  expect(window.dispatchEvent(new Event('beforeunload', { cancelable: true }))).toBe(false)
+  submit(root)
+  expect(put).not.toHaveBeenCalled()
+  validity.mockRestore()
+  input(root, 'stock', '1.5')
+  await nextTick()
+  submit(root)
+  expect(put.mock.lastCall?.[1]).toMatchObject({ stock: 1.5 })
+})
+
+it.each([
+  [0, '-1e-999', '-0e-999'],
+  [0.3, '0.29999999999999999', '3e-1'],
+  [-0.3, '-30000000000000001e-17', '-.30'],
+  [10, '9.99999999999999999', '10.00'],
+] as const)(
+  'retains a decimal literal just below %s even if Number rounds it to the minimum',
+  async (minimum, rejected, accepted) => {
+    const field = { ...constrainedFields[1]!, minimum }
+    const { root, put } = render('update', true, listHref, [field], { stock: minimum })
+    expect(Number(rejected) === minimum).toBe(true)
+    const stock = input(root, 'stock', rejected)
+    await nextTick()
+    expect(stock.value).toBe(rejected)
+    expect(descriptions(stock)).toContain(`Введите значение не меньше ${minimum}`)
+    submit(root, true)
+    expect(put).not.toHaveBeenCalled()
+    input(root, 'stock', accepted)
+    await nextTick()
+    submit(root)
+    expect(put).toHaveBeenCalledOnce()
+    expect(put.mock.lastCall?.[1]).toMatchObject({ stock: Number(accepted) })
+  },
+)
+
+it('supports constrained textareas and host fields named after native form members', async () => {
+  const fields = [
+    { ...resource.fields[0]!, key: 'elements', type: 'textarea' as const, maxLength: 2 },
+    { ...resource.fields[0]!, key: 'reportValidity' },
+  ]
+  const { root, put } = render('update', false, listHref, fields, {
+    elements: '🌱🌱🌱',
+    reportValidity: 'kept',
+  })
+  const form = root.querySelector('form')!
+  const textarea = root.querySelector('textarea')!
+  // jsdom does not expose named controls as own properties like a browser.
+  Object.defineProperty(form, 'reportValidity', { value: input(root, 'reportValidity') })
+  Object.defineProperty(form, 'elements', { value: textarea })
+  submit(root)
+  expect(put).not.toHaveBeenCalled()
+  expect(document.activeElement).toBe(textarea)
+  expect(descriptions(textarea)).toEqual(['До 2 символов', '3 из 2 символов'])
+  textarea.value = 'e\u0301'
+  textarea.dispatchEvent(new Event('input', { bubbles: true }))
+  await nextTick()
+  submit(root)
+  expect(put.mock.lastCall?.[1]).toMatchObject({ elements: 'e\u0301', reportValidity: 'kept' })
+})
+
+it('localizes server bound errors and clears only the corrected field', async () => {
+  const { root } = render('update', true, listHref, constrainedFields, { name: 'Name', stock: 1 })
+  mocks.form!.setError({ name: 'Text is too long', stock: 'Value is below the minimum' })
+  await nextTick()
+  expect(descriptions(input(root, 'name'))).toContain('Слишком длинный текст')
+  expect(descriptions(input(root, 'stock'))).toContain('Значение меньше допустимого минимума')
+  input(root, 'stock', '0')
+  await nextTick()
+  expect(descriptions(input(root, 'stock'))).toEqual(['Минимум — 0'])
+  expect(descriptions(input(root, 'name'))).toContain('Слишком длинный текст')
+})
+
+it('lets an operator correct a selected legacy value after a conflict', async () => {
+  const { root, put, conflict } = render('update', true, listHref, constrainedFields, {
+    name: 'A',
+    stock: 3,
+  })
+  input(root, 'stock', '2')
+  submit(root)
+  await conflict('r2', { name: 'A', stock: -1 })
+  choice(root, 'stock', 'latest').click()
+  await nextTick()
+  expect(input(root, 'stock').value).toBe('-1')
+  submit(root)
+  expect(put).toHaveBeenCalledOnce()
+  input(root, 'stock', '0')
+  await nextTick()
+  submit(root, true)
+  expect(put.mock.lastCall?.[1]).toMatchObject({ stock: 0, _revision: 'r2' })
+})
+
 it('keeps the draft when a host projection omits a readable field during a conflict', async () => {
   const { root, put, get, conflict } = render()
   input(root, 'notes', 'My notes')

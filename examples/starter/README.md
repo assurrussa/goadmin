@@ -10,11 +10,12 @@ Source mode requires Git, Python 3 and Docker Compose. Its GoUploads pin is
 explicit candidate consumer resolves GoUploads v0.13.0 without that override
 when only GoAuth and GoNotify paths are selected.
 
-After GoAdmin v0.20.0 is published, use
-`GOADMIN_VERSION=v0.20.0 docker compose up --build` from this directory.
-That build removes local overrides and resolves libraries anonymously through the public Go proxy. Its embedded UI comes from the selected
-published release, not the current checkout. Run
-`make externalconsumer-published VERSION=v0.20.0` from the repository root first.
+For a published build, use the starter from the same GoAdmin release tag.
+Run `make externalconsumer-published VERSION=<tag>` from that checkout's root,
+then `GOADMIN_VERSION=<tag> docker compose up --build` from this directory.
+The build resolves the tagged library through the public Go proxy and uses
+its embedded UI. Use source mode for the product journal in this checkout
+until a matching release includes `crud.NewReadOnly`.
 
 For either mode, copy `.env.example` to `.env`. It sets `GOADMIN_VERSION=v0.20.0`
 for the published build. Set PostgreSQL credentials, a unique CSRF secret and
@@ -28,7 +29,7 @@ needs no Redis or SMTP. The login page offers first-admin registration until an
 administrator exists. Enter the setup token from `.env` in that form.
 
 `ADMIN_MODULES` selects comma-separated modules: `users,access,jobs,uploads,queues,
-notifications,realtime,authmail`. Uploads, queues and notifications require jobs.
+notifications,realtime,authmail,products,product-events`. Uploads, queues and notifications require jobs.
 For notifications or authmail, set `NOTIFYHUB_URL` and `NOTIFYHUB_PROJECT_KEY`
 for an existing NotifyHub gateway. Both modules reuse one client and project key;
 no second SMTP connection is needed. Use the gateway origin or deployment prefix,
@@ -146,11 +147,30 @@ Add `products` to `ADMIN_MODULES` to enable the host-owned example at `/products
 schema/ledger after the core migrations. Disabling the module retains its data.
 The example defines six simple fields, scoped PostgreSQL queries, per-record
 revision checks and transactional domain audit, plus guarded Publish/Unpublish
-commands.
+commands. The form displays the 200-character name limit and the minimum
+stock of zero before the operator types. Create, update and direct repository
+writes use the same field declarations. See
+[Write constraints](../../docs/crud.md#write-constraints).
 Each administrator sees their own records. Category is an optional editable
 select; publication Status is read-only in normal CRUD and changes only through
 the separately authorized Publish/Unpublish commands. Unpublish requires its own
-`products:unpublish` permission and returns the record to draft, with owner/revision
-CAS and transactional audit. Unknown commands are rejected. The versioned Products
+`products:unpublish` permission. From the list or product detail, enter a reason
+of up to 500 Unicode code points and confirm. The server trims its outer
+whitespace, returns the product to draft and records the reason atomically
+with the new revision. The versioned Products
 ledger upgrades existing example tables without resetting records. Standard pages use the embedded
 renderer without a Vue extension. See [CRUD resources](../../docs/crud.md).
+
+## Product event journal
+
+Add `product-events` to `ADMIN_MODULES` and grant the operator
+`product_events:read`. Either product module uses the same starter-owned
+migration. To try both, set `ADMIN_MODULES=products,product-events`, start in
+source mode and create or change a product. Open `/product-events` and search
+for the exact product number. Events show the action and UTC time, newest
+first, and remain available after deletion. Open an Unpublished event to read
+the full reason. Events created before starter migration v3 have no recorded
+reason and display an em dash. The detail page takes you back to
+the same search and page. Each administrator sees events for their own products.
+See [Connect a read-only section](../../docs/crud.md#connect-a-read-only-section)
+for the public host contract.

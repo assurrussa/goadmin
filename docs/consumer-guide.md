@@ -163,8 +163,10 @@ authorize mutations or implement business behavior.
 The built-in users CRUD implementation is internal. The supported
 `features/users` package mounts GoAdmin's existing users feature; it is not a
 generic custom-entity factory. For a declarative section, use the supported `features/crud` package and its
-embedded pages. The opt-in Products starter is the runnable PostgreSQL example;
-see [CRUD resources](crud.md). The lower-level DataGrid remains a list toolkit
+embedded pages. The starter's Products module demonstrates edits and actions.
+Its product event journal uses `crud.NewReadOnly` with one row type and a read
+permission. Follow [Connect a read-only section](crud.md#connect-a-read-only-section)
+to add a journal using the public API. The lower-level DataGrid remains a list toolkit
 for applications that own their page and mutation flows.
 
 ## Check the whole connection

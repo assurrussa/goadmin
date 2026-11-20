@@ -54,11 +54,11 @@ type WorkflowAction struct {
 	Label   string                     `json:"label"`
 }
 
-// WorkflowConfig opts a grid into persisted views and server-side exports.
+// WorkflowConfig opts a grid into persisted views and optional server-side actions.
 type WorkflowConfig struct {
 	Key            string           `json:"key"`
 	PreferencesURL string           `json:"preferencesUrl"`
-	ExportURL      string           `json:"exportUrl"`
+	ExportURL      string           `json:"exportUrl,omitempty"`
 	BulkURL        string           `json:"bulkUrl,omitempty"`
 	BulkActions    []WorkflowAction `json:"bulkActions,omitempty"`
 }
@@ -129,6 +129,9 @@ type FilterConfig[T any] struct {
 
 	// Действия
 	Actions []Action[T]
+	// CanViewInPreview checks the declared read permission of resources whose
+	// permission domain or action differs from the route-derived default.
+	CanViewInPreview func(context.Context) bool
 
 	// Пост-обработка строк (например, вычисление полей на основе связей)
 	RowDecorators []RowDecorator[T]

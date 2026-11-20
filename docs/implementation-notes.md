@@ -1,5 +1,37 @@
 # Implementation Notes
 
+## Unpublishing with a reason
+
+The starter declares the reason once as a typed CRUD action parameter.
+The command first performs an owner-scoped conditional status and revision
+update. Only the winning update can insert its reason into the product
+journal. The list query omits the reason, and the detail query reads it
+under the event owner's scope even after product deletion. A rejected command
+keeps its original draft in the open dialog, scoped to that actor and product.
+
+## Product form limits
+
+The product name limit counts Unicode code points, including spaces. The stock
+minimum is inclusive. The form preserves pasted text and incomplete numeric
+input so operators can correct either field. Declarative failures stop before
+the host callback. The starter's whitespace-only name check exercises the
+server rejection and draft recovery path separately from client-side errors.
+
+## Read-only resources and the starter product journal
+
+Both CRUD constructors share the permission check, actor-scoped page load and
+readable-field projection. A rejected row invalidates the whole page, including
+its count. The read-only constructor has no revision or domain write callbacks.
+Table preferences belong to the current administrator and can be saved
+independently of CSV or row selection.
+
+The starter reads product events by the owner stored on each event. Tests cover
+two owners, lookup after product deletion, equal timestamps across pages, and
+restoring a filtered list after viewing a record. The ordering regression uses
+event IDs 9 and 10 with the same timestamp to distinguish numeric order from
+the text IDs displayed to the client. The local external consumer exercises
+the SDK from a separate Go module.
+
 ## Concurrent CRUD edits and return to the list
 
 CRUD edit submissions use the existing per-attempt redirect feedback for

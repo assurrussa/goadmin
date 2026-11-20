@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
@@ -36,11 +35,22 @@ type productInput struct {
 	Category    string `json:"category"`
 }
 
+// UnpublishInput describes the operator's explanation for withdrawing a product.
+type UnpublishInput struct {
+	Reason string `json:"reason"`
+}
+
 func (p productData) input() productInput {
 	return productInput{Name: p.Name, Description: p.Description, Stock: p.Stock, Active: p.Active, Available: p.Available, Category: p.Category}
 }
 
 type productRepo struct{ db *sql.DB }
+
+var (
+	productNameField  = crud.Field{Key: "name", Label: "Name", Type: "text", Read: true, Create: true, Update: true, Required: true, MaxLength: new(200)}
+	productStockField = crud.Field{Key: "stock", Label: "Stock", Type: "number", Read: true, Create: true, Update: true, Minimum: new(0.0)}
+	unpublishReason   = crud.ActionParam{Key: "reason", Label: "Причина", Type: "textarea", Required: true, TrimSpace: true, MaxLength: new(500)}
+)
 
 const productColumns = "id::text, revision::text, name, description, stock, active, available, category, status"
 
@@ -106,11 +116,13 @@ func (r productRepo) list(ctx context.Context, actor host.Actor, f datagrid.Filt
 
 func validateProduct(p productInput) error {
 	errs := crud.FieldErrors{}
-	if strings.TrimSpace(p.Name) == "" || utf8.RuneCountInString(p.Name) > 200 {
-		errs["name"] = []string{"Name must contain 1–200 characters"}
+	if err := productNameField.ValidateConstraints(p.Name); err != nil {
+		errs[productNameField.Key] = []string{err.Error()}
+	} else if strings.TrimSpace(p.Name) == "" {
+		errs[productNameField.Key] = []string{"Name cannot be blank"}
 	}
-	if p.Stock < 0 || p.Stock > 9007199254740991 {
-		errs["stock"] = []string{"Stock must be a nonnegative safe integer"}
+	if err := productStockField.ValidateConstraints(p.Stock); err != nil {
+		errs[productStockField.Key] = []string{err.Error()}
 	}
 	if p.Available != "" {
 		if _, err := time.Parse("2006-01-02", p.Available); err != nil {
@@ -126,8 +138,8 @@ func validateProduct(p productInput) error {
 	return nil
 }
 
-func productAudit(ctx context.Context, tx *sql.Tx, actor host.Actor, id, action string) error {
-	_, err := tx.ExecContext(ctx, "INSERT INTO starter_product_events(owner_admin_id,product_id,action) VALUES($1,$2,$3)", actor.AdminID, id, action)
+func productAudit(ctx context.Context, tx *sql.Tx, actor host.Actor, id, action string, reason *string) error {
+	_, err := tx.ExecContext(ctx, "INSERT INTO starter_product_events(owner_admin_id,product_id,action,reason) VALUES($1,$2,$3,$4)", actor.AdminID, id, action, reason)
 	return err
 }
 
@@ -142,7 +154,7 @@ func (r productRepo) create(ctx context.Context, a host.Actor, p productInput) (
 	defer tx.Rollback()
 	record, err := productScan(tx.QueryRowContext(ctx, "INSERT INTO starter_products(owner_admin_id,name,description,stock,active,available,category,status) VALUES($1,$2,$3,$4,$5,$6,$7,'draft') RETURNING "+productColumns, a.AdminID, p.Name, p.Description, p.Stock, p.Active, p.Available, p.Category))
 	if err == nil {
-		err = productAudit(ctx, tx, a, record.ID, "created")
+		err = productAudit(ctx, tx, a, record.ID, "created", nil)
 	}
 	if err != nil {
 		return record, err
@@ -167,7 +179,7 @@ func (r productRepo) update(ctx context.Context, a host.Actor, id, revision stri
 		err = crud.ErrConflict
 	}
 	if err == nil {
-		err = productAudit(ctx, tx, a, id, "updated")
+		err = productAudit(ctx, tx, a, id, "updated", nil)
 	}
 	if err != nil {
 		return record, err
@@ -183,13 +195,24 @@ func (r productRepo) command(ctx context.Context, a host.Actor, id, revision, ac
 	switch action {
 	case "publish":
 		query = "UPDATE starter_products SET status='published',revision=revision+1 WHERE owner_admin_id=$1 AND id::text=$2 AND revision::text=$3 AND status='draft'"
-	case "unpublish":
-		query = "UPDATE starter_products SET status='draft',revision=revision+1 WHERE owner_admin_id=$1 AND id::text=$2 AND revision::text=$3 AND status='published'"
 	case "deleted":
 		query = "DELETE FROM starter_products WHERE owner_admin_id=$1 AND id::text=$2 AND revision::text=$3"
 	default:
 		return crud.ErrDenied
 	}
+	return r.applyCommand(ctx, a, id, revision, query, action, nil)
+}
+
+func (r productRepo) unpublish(ctx context.Context, a host.Actor, id, revision string, input UnpublishInput) error {
+	reason, err := unpublishReason.Normalize(input.Reason)
+	if err != nil {
+		return crud.FieldErrors{unpublishReason.Key: {err.Error()}}
+	}
+	const query = "UPDATE starter_products SET status='draft',revision=revision+1 WHERE owner_admin_id=$1 AND id::text=$2 AND revision::text=$3 AND status='published'"
+	return r.applyCommand(ctx, a, id, revision, query, "unpublish", &reason)
+}
+
+func (r productRepo) applyCommand(ctx context.Context, a host.Actor, id, revision, query, action string, reason *string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -206,7 +229,7 @@ func (r productRepo) command(ctx context.Context, a host.Actor, id, revision, ac
 	if n != 1 {
 		return crud.ErrConflict
 	}
-	if err = productAudit(ctx, tx, a, id, action); err != nil {
+	if err = productAudit(ctx, tx, a, id, action, reason); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -221,9 +244,9 @@ func productsModule(db *sql.DB) (host.Module, error) {
 		return host.NewPermissionKey("products", action)
 	}
 	fields := []crud.Field{
-		{Key: "name", Label: "Name", Type: "text", Read: true, Create: true, Update: true, Required: true},
+		productNameField,
 		{Key: "description", Label: "Description", Type: "textarea", Read: true, Create: true, Update: true},
-		{Key: "stock", Label: "Stock", Type: "number", Read: true, Create: true, Update: true},
+		productStockField,
 		{Key: "active", Label: "Active", Type: "boolean", Read: true, Create: true, Update: true},
 		{Key: "available", Label: "Available", Type: "date", Read: true, Create: true, Update: true},
 		{
@@ -278,9 +301,10 @@ func productsModule(db *sql.DB) (host.Module, error) {
 			{Key: "publish", Label: "Опубликовать", Confirmation: "Опубликовать этот товар?", Permission: permission("publish"), Run: func(ctx context.Context, a host.Actor, id, revision string) error {
 				return r.command(ctx, a, id, revision, "publish")
 			}},
-			{Key: "unpublish", Label: "Снять с публикации", Confirmation: "Снять этот товар с публикации?", Permission: permission("unpublish"), Run: func(ctx context.Context, a host.Actor, id, revision string) error {
-				return r.command(ctx, a, id, revision, "unpublish")
-			}},
+			crud.ActionWithParams[productData, UnpublishInput](
+				crud.Action[productData]{Key: "unpublish", Label: "Снять с публикации", Confirmation: "Снять этот товар с публикации?", Permission: permission("unpublish")},
+				[]crud.ActionParam{unpublishReason}, r.unpublish,
+			),
 		},
 	})
 }
@@ -311,6 +335,7 @@ func migrateProducts(ctx context.Context, dsn string) error {
 			"CREATE TABLE IF NOT EXISTS starter_product_events(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,owner_admin_id bigint NOT NULL,product_id text NOT NULL,action text NOT NULL,created_at timestamptz NOT NULL DEFAULT NOW())",
 		}},
 		{2, []string{"ALTER TABLE starter_products ADD COLUMN IF NOT EXISTS category text NOT NULL DEFAULT ''"}},
+		{3, []string{"ALTER TABLE starter_product_events ADD COLUMN reason text"}},
 	}
 	for _, change := range changes {
 		var installed bool

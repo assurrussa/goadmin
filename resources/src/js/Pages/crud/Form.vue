@@ -7,6 +7,7 @@ import { t } from '@/i18n'
 import AppHead from '@/components/layout/AppHead.vue'
 import RecordEditForm from '@/components/form/RecordEditForm.vue'
 import Field from '@/crud/Field.vue'
+import { constraintError } from '@/crud/constraints'
 import AppButton from '@/components/ui/AppButton.vue'
 import {
   crudDisplay,
@@ -40,6 +41,9 @@ const props = defineProps<{
 const page = usePage()
 const listHref = computed(() => crudReturnHref(props.resource.basePath, page.url))
 const activeFields = computed(() => props.resource.fields.filter((field) => field[props.mode]))
+const hasConstraints = computed(() =>
+  activeFields.value.some((field) => field.maxLength !== undefined || field.minimum !== undefined),
+)
 
 function editableValues(values = props.values): Values {
   if (props.mode === 'update') {
@@ -90,16 +94,31 @@ function setFormError(message: string) {
 }
 
 const fieldValidity = ref<Record<string, boolean>>({})
+const badNumbers = reactive(new Set<string>())
 const editedSecrets = reactive(new Set<string>())
 const disputedFields = reactive(new Map<string, Dispute>())
 const heldSecrets = reactive(new Map<string, HeldSecret>())
 const fieldsWithChoices = computed(() =>
-  activeFields.value.map((field) => ({
-    field,
-    dispute: disputedFields.get(field.key),
-    heldSecret: heldSecrets.get(field.key),
-  })),
+  activeFields.value.map((field) => {
+    const dispute = disputedFields.get(field.key)
+    const heldSecret = heldSecrets.get(field.key)
+    // A conflict may bring back a legacy value that now needs correction.
+    const showEditor =
+      !heldSecret &&
+      (!dispute || (dispute.choice && constraintError(field, dispute[dispute.choice])))
+    return { field, dispute, heldSecret, showEditor }
+  }),
 )
+const constraintErrors = computed(() => {
+  const result = new Map<string, string>()
+  for (const { field, dispute, heldSecret } of fieldsWithChoices.value) {
+    if ((dispute && !dispute.choice) || (heldSecret && !heldSecret.reapply)) continue
+    const value = heldSecret ? heldSecret.value : form.values[field.key]
+    const message = badNumbers.has(field.key) ? t('Enter a number') : constraintError(field, value)
+    if (message) result.set(field.key, message)
+  }
+  return result
+})
 const needsReload = ref(false)
 const activeAttempt = ref<string>()
 let cancelUpdate: (() => void) | undefined
@@ -107,7 +126,7 @@ let cancelUpdate: (() => void) | undefined
 const formState = computed(() => ({
   errors: form.errors,
   processing: form.processing || !!activeAttempt.value,
-  isDirty: form.isDirty || editedSecrets.size > 0 || heldSecrets.size > 0,
+  isDirty: form.isDirty || editedSecrets.size > 0 || heldSecrets.size > 0 || badNumbers.size > 0,
 }))
 const submitDisabled = computed(
   () =>
@@ -125,10 +144,19 @@ function needsExplicitValue(field: CrudField) {
 function editField(field: CrudField, value: CrudValue) {
   form.values[field.key] = value
   if (props.mode === 'update' && !field.read) editedSecrets.add(field.key)
+  const error = fieldError(field.key)
+  if (
+    (error === 'Text is too long' || error === 'Value is below the minimum') &&
+    !constraintError(field, value)
+  ) {
+    // The wire payload is flat, while useForm nests dynamic keys under values.
+    form.clearErrors(field.key as keyof typeof form.errors)
+  }
 }
 
 function choose(key: string, dispute: Dispute, choice: Choice) {
   dispute.choice = choice
+  badNumbers.delete(key)
   form.values[key] = dispute[choice]
 }
 
@@ -202,14 +230,34 @@ watch(identity, () => {
   draftRevision = props.record?.revision
   form.defaults({ values: baseline.values }).reset().clearErrors()
   fieldValidity.value = {}
+  badNumbers.clear()
   editedSecrets.clear()
   disputedFields.clear()
   heldSecrets.clear()
   needsReload.value = false
 })
 
-function submit(_event: Event, returnToList = false) {
+function submit(event: Event, returnToList = false) {
   if (formState.value.processing || submitDisabled.value) return
+  const element = event.target
+  if (hasConstraints.value) {
+    const first = constraintErrors.value.keys().next().value
+    if (first !== undefined) {
+      const control = Array.from(document.getElementsByName(first)).find(
+        (control) => control.closest('form') === element,
+      )
+      control?.focus()
+      return
+    }
+    // novalidate lets us show both inline errors before the browser reports
+    // remaining required, date and custom-field validation.
+    // A host field may itself be named "reportValidity".
+    if (
+      element instanceof HTMLFormElement &&
+      !HTMLFormElement.prototype.reportValidity.call(element)
+    )
+      return
+  }
   if (props.mode === 'create') {
     const suffix =
       listHref.value === props.resource.basePath
@@ -378,11 +426,12 @@ onUnmounted(() => {
     :return-href="listHref"
     :label="t(mode === 'create' ? 'Создание' : 'Редактирование')"
     :can-save-and-return="mode === 'update'"
+    :novalidate="hasConstraints"
     :submit-disabled="mode === 'update' && submitDisabled"
     @submit="submit"
   >
     <template
-      v-for="{ field, dispute, heldSecret } in fieldsWithChoices"
+      v-for="{ field, dispute, heldSecret, showEditor } in fieldsWithChoices"
       :key="`${identity}:${field.key}`"
     >
       <fieldset v-if="dispute" class="space-y-2 rounded-lg border border-border-primary p-3">
@@ -439,18 +488,25 @@ onUnmounted(() => {
             {{ t(field.required ? 'Ввести новое значение' : 'Пропустить поле') }}
           </AppButton>
         </div>
-        <p v-if="fieldError(field.key)" class="text-sm text-error" role="alert">
+        <p
+          v-if="fieldError(field.key) || constraintErrors.has(field.key)"
+          class="text-sm text-error"
+          role="alert"
+        >
           {{ t('Проверьте значение.') }}
         </p>
       </fieldset>
       <Field
-        v-else
+        v-if="showEditor"
         :field="field"
         :model-value="presentFields.has(field.key) ? form.values[field.key] : null"
         :error="fieldError(field.key)"
+        :constraint-error="constraintErrors.get(field.key)"
+        :bad-input="badNumbers.has(field.key)"
         :disabled="formState.processing"
         @update:model-value="editField(field, $event)"
         @update:valid="fieldValidity[field.key] = $event"
+        @update:bad-input="$event ? badNumbers.add(field.key) : badNumbers.delete(field.key)"
       />
       <p v-if="needsExplicitValue(field)" class="text-sm text-text-secondary">
         {{ t('Сервер не передал значение. Введите его перед сохранением.') }}

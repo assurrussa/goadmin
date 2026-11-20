@@ -107,6 +107,28 @@ func TestPreferencesOwnerValidationConflictAndDatabaseFailure(t *testing.T) {
 	require.NoError(t, response.Body.Close())
 }
 
+func TestPreferencesOnlyWorkflowRetainsStableIDs(t *testing.T) {
+	app := fiber.New()
+	grid := datagrid.NewHandler(testConfig(), logger.Discard())
+	require.NoError(t, Register(app.Group("/queues"), grid, Options[testRow]{
+		Key: "queues", Store: &memoryStore{}, CurrentAdmin: func(fiber.Ctx) (int64, error) { return 7, nil },
+		DisableExport: true,
+		SelectionID:   func(row testRow) string { return strconv.FormatInt(row.ID, 10) },
+	}))
+	metadata, err := json.Marshal(grid.GetConfig().Workflow)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"key":"queues","preferencesUrl":"/queues/table-preferences"}`, string(metadata))
+	rows, err := grid.DecorateItems(t.Context(), []testRow{{ID: 9007199254740993}})
+	require.NoError(t, err)
+	require.Equal(t, "9007199254740993", rows[0].SelectionID)
+	for path, want := range map[string]int{"/table-preferences": 200, "/table-export?scope=filtered": 404, "/table-export?scope=selected": 404} {
+		resp, testErr := app.Test(httptest.NewRequestWithContext(t.Context(), "GET", "/queues"+path, nil))
+		require.NoError(t, testErr)
+		require.Equal(t, want, resp.StatusCode, path)
+		require.NoError(t, resp.Body.Close())
+	}
+}
+
 func TestReconcileStaleColumnsWithoutWriting(t *testing.T) {
 	cfg := testConfig()
 	s := newSchema(cfg)

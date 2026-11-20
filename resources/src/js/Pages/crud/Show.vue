@@ -7,6 +7,7 @@ import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import Field from '@/crud/Field.vue'
+import ActionDialog from '@/crud/ActionDialog.vue'
 import { useConfirmation } from '@/composables/useConfirmation'
 import {
   crudReturnHref,
@@ -14,18 +15,19 @@ import {
   crudDisplay,
   crudValue,
   type CrudResource,
-  type CrudRecord,
+  type CrudViewRecord,
   type CrudPermissions,
 } from '@/crud'
 const props = defineProps<{
   resource: CrudResource
-  record: CrudRecord
+  record: CrudViewRecord
   permissions: CrudPermissions
 }>()
 const page = usePage()
 const mutating = ref(false)
 const confirming = ref(false)
 const confirm = useConfirmation()
+const actionDialog = ref<InstanceType<typeof ActionDialog>>()
 const listHref = computed(() => crudReturnHref(props.resource.basePath, page.url))
 const error = computed(() => (page.props.errors as Record<string, string> | undefined)?.form)
 async function run(key: string) {
@@ -36,7 +38,12 @@ async function run(key: string) {
   const basePath = props.resource.basePath
   const id = props.record.id
   const revision = props.record.revision
+  if (!revision) return
   const returnTo = listHref.value
+  if (action?.params?.length) {
+    actionDialog.value?.open(action, { ...props.record, revision }, returnTo)
+    return
+  }
   confirming.value = true
   try {
     await confirm(
@@ -81,6 +88,12 @@ async function run(key: string) {
 </script>
 <template>
   <AppHead :title="resource.title" />
+  <ActionDialog
+    v-if="resource.actions.some((item) => item.params?.length)"
+    ref="actionDialog"
+    :resource="resource"
+    :record-id="record.id"
+  />
   <PageActionBar
     :back-href="listHref"
     :back-text="t('К списку')"
@@ -114,7 +127,12 @@ async function run(key: string) {
         >
       </div>
     </dl>
-    <div class="flex flex-wrap gap-3" :inert="mutating || undefined" :aria-busy="mutating">
+    <div
+      v-if="record.revision && record.actions?.length"
+      class="flex flex-wrap gap-3"
+      :inert="mutating || undefined"
+      :aria-busy="mutating"
+    >
       <AppButton v-if="record.actions?.includes('edit')" as-child
         ><Link :href="crudRecordHref(resource.basePath, record.id, true, listHref)">{{
           t('Редактировать')

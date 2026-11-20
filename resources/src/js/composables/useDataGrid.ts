@@ -43,10 +43,13 @@ interface Column {
 interface GridWorkflow {
   key: string
   preferencesUrl: string
-  exportUrl: string
+  exportUrl?: string
   bulkUrl?: string
   bulkActions?: Array<{ key: string; label: string }>
 }
+
+export const workflowHasSelection = (workflow: GridWorkflow | undefined): boolean =>
+  !!(workflow?.exportUrl || (workflow?.bulkUrl && workflow.bulkActions?.length))
 
 export const dataGridRowId = (row: DataItem, config: Config): string | number | undefined => {
   if (config.workflow) return row.selectionId
@@ -265,7 +268,10 @@ export function useDataGrid({
 
   const hydrateResponse = (result: ApiResponse): void => {
     items.value = result.data || []
-    if (!result.config?.workflow || result.config.workflow.key !== config.value.workflow?.key)
+    if (
+      !workflowHasSelection(result.config?.workflow) ||
+      result.config?.workflow?.key !== config.value.workflow?.key
+    )
       selectedItems.value = []
     metaInfo.value = result.meta || null
     pagination.value = result.meta?.pagination || result.pagination || null
@@ -563,7 +569,11 @@ export function useDataGrid({
 
   // Retained rows belong to the last successful query, not an in-flight/failed one.
   const selectionDisabled = computed(
-    () => loading.value || !!loadError.value || navigationSuspended.value,
+    () =>
+      loading.value ||
+      !!loadError.value ||
+      navigationSuspended.value ||
+      (!!config.value.workflow && !workflowHasSelection(config.value.workflow)),
   )
 
   // Selection handlers
