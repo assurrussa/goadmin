@@ -15,9 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
-
 	"example.com/goadmin-starter/internal/productjournal"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func TestMain(m *testing.M) {

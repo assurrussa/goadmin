@@ -11,9 +11,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/gofiber/fiber/v3"
-
 	"example.com/goadmin-starter/internal/productjournal"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/assurrussa/goadmin/features/crud"
 	"github.com/assurrussa/goadmin/host"

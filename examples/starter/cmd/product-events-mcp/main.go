@@ -7,10 +7,9 @@ import (
 	"fmt"
 	"os"
 
+	"example.com/goadmin-starter/internal/productjournal"
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-
-	"example.com/goadmin-starter/internal/productjournal"
 )
 
 func main() {
