@@ -10,26 +10,55 @@ Source mode requires Git, Python 3 and Docker Compose. Its GoUploads pin is
 explicit candidate consumer resolves GoUploads v0.13.0 without that override
 when only GoAuth and GoNotify paths are selected.
 
-For a published build, use the starter from the same GoAdmin release tag.
-Run `make externalconsumer-published VERSION=<tag>` from that checkout's root,
-then `GOADMIN_VERSION=<tag> docker compose up --build` from this directory.
-The build resolves the tagged library through the public Go proxy and uses
-its embedded UI. Use source mode for the product journal in this checkout
-until a matching release includes `crud.NewReadOnly`.
+## Start with the published library
 
-For either mode, copy `.env.example` to `.env`. It sets `GOADMIN_VERSION=v0.20.0`
-for the published build. Set PostgreSQL credentials, a unique CSRF secret and
-first-admin setup token of at least 32 bytes, and three distinct 32-byte keys
-encoded with standard base64. Generate each key with `openssl rand -base64 32`.
-Then run the published command above. For source candidates, prepare the four
-sibling checkouts and run `bash ../../scripts/starter-local.sh up --build`
-instead; this explicit source mode does not use `GOADMIN_VERSION`.
+Prerequisites: Git, Docker Engine with Docker Compose, and OpenSSL for generating
+local secrets. No sibling repositories or Node.js installation are needed for
+this mode. Use the starter source from the **GoAdmin v0.30.0** tag with the
+published library and embedded UI from that release.
+
+```sh
+git clone --branch v0.30.0 --depth 1 https://github.com/assurrussa/goadmin.git
+cd goadmin/examples/starter
+cp .env.example .env
+# Fill the required values below before starting.
+GOADMIN_VERSION=v0.30.0 docker compose up --build
+```
+
+This command pins both the starter source and published library. The release
+snapshot may contain an older `.env.example` version value; the explicit
+`GOADMIN_VERSION=v0.30.0` command overrides it. Set the same value in your private
+`.env` for subsequent runs. This documentation branch also pins it in the template.
+Do not select an arbitrary older
+release with newer starter source: the source may use APIs that did not exist
+in that release. When upgrading, check out the matching starter revision, read
+the release notes and run the published-consumer check from the repository root:
+`make externalconsumer-published VERSION=v0.30.0`. That check needs the repository's
+Go toolchain; it does not replace running this starter in a browser.
+
+For either mode, copy `.env.example` to `.env` in the checkout you will run.
+Set PostgreSQL credentials, a unique CSRF secret, a first-admin setup token of
+at least 32 bytes, and three distinct 32-byte keys encoded with standard base64.
+Generate each key with `openssl rand -base64 32`. Keep `.env` private and untracked.
+
+### Run the current source
+
+For the Products form constraints, unpublish reason and event journal, use the
+current checkout and the four sibling checkouts listed above. In
+`examples/starter`, configure `.env` as above, set
+`ADMIN_MODULES=products,product-events`, and run
+`bash ../../scripts/starter-local.sh up --build`. This builds the checkout's
+server and embedded UI together.
+
 The default core uses PostgreSQL for browser and canonical auth sessions; it
 needs no Redis or SMTP. The login page offers first-admin registration until an
 administrator exists. Enter the setup token from `.env` in that form.
 
 `ADMIN_MODULES` selects comma-separated modules: `users,access,jobs,uploads,queues,
-notifications,realtime,authmail,products,product-events`. Uploads, queues and notifications require jobs.
+notifications,realtime,authmail,products`. Empty means core only. Select `products`
+for [your first CRUD resource](../../docs/first-crud.md). In source mode this
+checkout also provides `product-events` for the [product event journal](#product-event-journal).
+Uploads, queues and notifications require jobs.
 For notifications or authmail, set `NOTIFYHUB_URL` and `NOTIFYHUB_PROJECT_KEY`
 for an existing NotifyHub gateway. Both modules reuse one client and project key;
 no second SMTP connection is needed. Use the gateway origin or deployment prefix,
@@ -84,7 +113,30 @@ live under `media/v1` and resolve from `ADMIN_URL/uploads`. Staging and unfinish
 records are never served as admin files or previews. Existing migration history
 is preserved; this starter does not reset host data.
 
-## Compare presentation packs on a real backend
+## Restart and recovery
+
+PostgreSQL uses a named volume, but persistence does not guarantee that the app
+is ready after a restart. The Compose file gates initial startup on PostgreSQL's
+health check; do not assume a simultaneous `docker compose restart` of the app
+and database waits for the database to become ready again.
+
+In the PR #96 Mac acceptance run, restarting both services together caused the
+app to exit on the migration database ping. Running `docker compose up -d` with
+the **same project name and configuration** recovered the app, and the existing
+records were still present. This confirms recovery and persistence in that run,
+not automatic restart recovery or database-outage resilience.
+
+If you encounter this failure, inspect `docker compose ps -a` and
+`docker compose logs admin postgres`, then run `docker compose up -d` and verify
+application readiness and the saved records. Preserve any `-p` and `-f` options
+used for the original stack in every command: a different project name can use
+different volumes. Do not delete volumes or reset the database to fix readiness.
+For changed `.env` configuration, use `docker compose up -d --build` rather than
+`restart`, which [does not apply changed container configuration](https://docs.docker.com/reference/cli/docker/compose/restart/).
+
+## Source-candidate acceptance (maintainers)
+
+### Compare presentation packs on a real backend
 
 From the repository root, run the opt-in local acceptance command:
 
@@ -141,6 +193,8 @@ empty value retains the standard presentation. Custom packs use the normal
 manifest validation and the same pinned client/backend sources.
 
 ## Declarative Products example
+
+The following describes this checkout in source mode.
 
 Add `products` to `ADMIN_MODULES` to enable the host-owned example at `/products`.
 `STARTER_MIGRATE=1` or the explicit `migrate` command installs its own Products

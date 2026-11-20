@@ -52,18 +52,21 @@ The [dashboard card API](docs/dashboard.md) adds permission-scoped host summarie
 through the existing `host` facade, without a custom frontend build.
 
 New to embedding? Start with [the consumer guide](docs/consumer-guide.md) for
-the required stack and your first entity page. For a journal or directory,
-follow [Connect a read-only section](docs/crud.md#connect-a-read-only-section).
+the visible result, required stack, and [choice of extension](docs/consumer-guide.md#choose-the-smallest-extension).
+For a working entity without writing Vue, follow [your first CRUD resource](docs/first-crud.md).
+For a journal or directory, follow [Connect a read-only section](docs/crud.md#connect-a-read-only-section).
+For appearance, notifications and custom Inertia pages, use the
+[integration recipes](docs/integration-recipes.md) before selecting dependencies.
 
 The [standalone starter](examples/starter/README.md) runs the embedded admin,
-PostgreSQL with Docker Compose. Redis is an optional profile; mail modules use
-NotifyHub when explicitly enabled. Copy
-`examples/starter/.env.example` to `examples/starter/.env`, fill every required
-value, then choose the build mode. For a published release, use the starter
-from that release's checkout, set `GOADMIN_VERSION` to its exact tag and run
-`docker compose up --build` from `examples/starter`. This uses the release's
-embedded UI. For this checkout's product journal, use source mode below. Open
-`http://localhost:8080`; the login page offers first-admin registration until
+PostgreSQL with Docker Compose. Redis is an optional profile. Mail modules use
+NotifyHub when explicitly enabled. For the published example, check out the
+v0.30.0 tag. In that checkout's `examples/starter`, copy `.env.example` to
+`.env`, fill the required values, and run
+`GOADMIN_VERSION=v0.30.0 docker compose up --build`. This uses the release's
+embedded UI and requires no sibling checkouts. For this checkout's product
+event journal and unpublish reason, use source mode below. Open
+`http://localhost:8080`. The login page offers first-admin registration until
 an administrator exists. No administrator password is bundled.
 
 For source candidates, run `bash ../../scripts/starter-local.sh up --build` from

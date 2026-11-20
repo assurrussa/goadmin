@@ -56,6 +56,9 @@ module, err := crud.NewReadOnly(crud.ReadOnlyDefinition[productEvent]{
 })
 ```
 
+New here? Follow [your first CRUD resource](first-crud.md) for the runnable
+setup, code map and browser acceptance. This page is the detailed contract reference.
+
 ## Resource ownership
 
 `Definition` declares a stable key/base path, title/menu, explicit read/create/

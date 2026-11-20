@@ -39,6 +39,14 @@ choices. Use this checklist against the pinned GoAdmin version:
   flows, sender and worker ownership.
 - [ ] **Operations** (`features/operations`): choose the host-backed operations
   to expose.
+- [ ] **Admission** (`features/admission`), **SSO** (`features/sso`) and
+  **profile presentation** (`features/profile`): select only the needed identity
+  flows; read their [admission](sso-admission.md), [SSO adapter](sso-adapter.md)
+  and [profile](profile-presentation.md) contracts and pinned-version requirements.
+- [ ] **Presentation and client integration**: keep the embedded theme and Inertia
+  client or explicitly choose host customization. A different host solution is
+  allowed where the integration contract supports it; do not bypass security or
+  mix unmatched server/client bundles.
 - [ ] **Host-owned sections**: name each application feature and its permission
   policy; do not assume a generic CRUD generator.
 
@@ -53,6 +61,11 @@ unanswered options are not permission to enable them, and "all components"
 still needs a concrete list and dependency/ownership choices. Keep the core
 security requirements below intact. This is an integration workflow requirement,
 not a new runtime prompt or a change to module defaults.
+
+For appearance, flash versus durable notifications, authmail and custom Inertia
+pages, follow the [integration recipes](integration-recipes.md). They distinguish
+what core already includes, explicit dependencies, supported host alternatives
+and the checks required after wiring.
 
 ## See the existing interface first
 
@@ -96,22 +109,39 @@ with local replacements is not proof that a published consumer resolves.
   Optional users/operations features and your own features are mounted
   separately.
 
-Use only the 14 supported GoAdmin packages listed in the
+Use only the supported GoAdmin packages listed in the
 [public surface](../README.md#stable-public-api) and its
 [machine-readable manifest](../reference/externalconsumer/packages.go).
 An exported internal package is not a supported host SDK. Keep business
 models, repositories, migrations and services in your host.
 
-## Connect one host-owned entity page
+## Choose the smallest extension
 
-The following `/products` names illustrate the contract, not a runnable CRUD
-sample. See [Embedding and extending the admin client](embedding-client.md)
+| What you need | Supported entry point | Host Vue build? |
+| --- | --- | --- |
+| Login, setup, basic profile and shell | `host.New` with no optional modules | No |
+| Standard entity list/detail/create/edit and guarded actions | `features/crud` | No, for standard fields/pages |
+| A list with host-owned page and mutation flows | `toolkit/datagrid` | Yes, for your custom page |
+| A custom workflow or page | `host.Feature` and a client extension | Yes |
+| Built-in users, access, uploads or another optional capability | Its explicit feature package | No, with the embedded bundle |
+
+For a first business section, start with the runnable
+[Products CRUD tutorial](first-crud.md), then the [CRUD contract reference](crud.md).
+Use custom pages only when the standard renderer does not fit. A custom CRUD
+field also requires a client extension; it still uses the existing CRUD contract.
+The DataGrid is not a CRUD generator. `features/users` manages the built-in users
+feature, not arbitrary host entities.
+
+## Connect a custom host-owned page
+
+The following `/reports` names illustrate a custom page contract, not the runnable
+Products CRUD example. See [Embedding and extending the admin client](embedding-client.md)
 for the complete build and page-lifecycle instructions.
 
 1. **Define the feature.** Implement `host.Feature`: its
    `FeatureDescriptor` contributes a stable key, permission definitions, an
-   optional menu item with `Href: "/products"`, and
-   `ClientRequirements` for its client extension. Inject your product services
+   optional menu item with `Href: "/reports"`, and
+   `ClientRequirements` for its client extension. Inject your report services
    through the feature constructor. Its `Build` returns an
    `ExtensionBuilder`, which receives `*host.App`.
 2. **Mount authorized routes.** Use `host.NewExtension().WithRegister(...)`
@@ -123,12 +153,12 @@ for the complete build and page-lifecycle instructions.
    `app.Guard` or the typed `host.Command[T]` contract where appropriate.
 3. **Render through the shell.** After authorization and loading your data,
    the GET handler calls
-   `app.Render(c, "products/Index", map[string]any{"products": productData})`.
+   `app.Render(c, "reports/Index", map[string]any{"reports": reportData})`.
    The host chooses the props and the Vue page consumes that same shape.
    Returning a separate HTML document breaks internal Inertia navigation.
-4. **Provide the matching Vue page.** Put `Pages/products/Index.vue` under
+4. **Provide the matching Vue page.** Put `Pages/reports/Index.vue` under
    the extension's source root. The name after `Pages/`, without `.vue`,
-   must exactly match `products/Index`, including case. Shared components
+   must exactly match `reports/Index`, including case. Shared components
    belong outside `Pages/`.
 5. **Build the extension and core together.** The version-1 source manifest
    declares a unique key, `apiVersion: 1`, relative `sourceRoot` and a
