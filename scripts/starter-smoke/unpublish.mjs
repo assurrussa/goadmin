@@ -88,6 +88,7 @@ export async function unpublishFromList({ context, pageTwo, recordPath, name, fo
     assert.ok((await rejected.json()).errors.reason.length)
     await expect(reason(page)).toHaveValue(raw)
     await expect(reason(page)).toHaveAttribute('aria-invalid', 'true')
+    await expect(reason(page)).toBeFocused()
     // A real edit in the other tab advances the revision kept by the open dialog.
     await colleague.goto(recordPath + '/edit')
     await colleague.locator('[name="name"]').fill(updatedName)

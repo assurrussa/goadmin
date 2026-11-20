@@ -1,6 +1,6 @@
 import { t } from '@/i18n'
 import type { CrudField, CrudValue } from './index'
-import { belowMinimum } from './number'
+import { belowMinimum, exactWireNumber } from './number'
 
 export function constraintError(field: CrudField, value: CrudValue | undefined) {
   if (field.maxLength !== undefined && typeof value === 'string') {
@@ -17,4 +17,11 @@ export function constraintError(field: CrudField, value: CrudValue | undefined) 
   ) {
     return t('Enter a value of at least {minimum}', undefined, { minimum: field.minimum })
   }
+  if (
+    field.type === 'number' &&
+    typeof value === 'string' &&
+    value !== '' &&
+    !exactWireNumber(value)
+  )
+    return t('This number cannot be represented accurately')
 }

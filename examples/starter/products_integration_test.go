@@ -86,6 +86,25 @@ func productTestActor(t *testing.T, db *sql.DB, subjectID string) host.Actor {
 	return actor
 }
 
+func TestProductsPostgresListSnapshot(t *testing.T) {
+	db, _, owner := productTestDatabase(t, "products")
+	repo := productRepo{db}
+	ctx := t.Context()
+	query := datagrid.Filters{Page: 1, Limit: 20, Search: "Concurrent"}
+	rows, total, err := repo.list(ctx, owner, snapshotFilter{query, func() {
+		if _, createErr := repo.create(ctx, owner, productInput{Name: "Concurrent"}); createErr != nil {
+			t.Fatal(createErr)
+		}
+	}})
+	if err != nil || total != 0 || len(rows) != 0 {
+		t.Fatalf("list spans two snapshots: rows=%v total=%d err=%v", rows, total, err)
+	}
+	rows, total, err = repo.list(ctx, owner, query)
+	if err != nil || total != 1 || len(rows) != 1 {
+		t.Fatalf("next list missed the committed product: rows=%v total=%d err=%v", rows, total, err)
+	}
+}
+
 func TestProductsPostgresConstraintsAndLegacyCorrection(t *testing.T) {
 	db, _, actor := productTestDatabase(t, "products")
 	repo := productRepo{db}

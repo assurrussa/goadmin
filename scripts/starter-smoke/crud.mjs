@@ -94,6 +94,12 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await field('stock').press('Enter')
   await expect(field('stock')).toHaveValue('-1e-999')
   await expect(field('stock')).toHaveAccessibleDescription(/Enter a value of at least 0/)
+  for (const literal of ['1e-999', '9007199254740990.5']) {
+    await field('stock').fill(literal)
+    await field('stock').press('Enter')
+    await expect(field('stock')).toHaveValue(literal)
+    await expect(field('stock')).toHaveAccessibleDescription(/This number cannot be represented accurately/)
+  }
   assert.equal(createWrites.length, 0, 'Invalid name or numeric draft must remain local')
   await field('stock').fill('0')
   await datePart('year').fill('2027')
@@ -143,6 +149,15 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   const updatedName = `${prefix}-edited`
   await field('name').fill(updatedName)
   await field('description').fill('Edited description\nStill multiline')
+  await field('stock').fill('1.5')
+  await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).pathname === recordPath && response.request().method() === 'PUT'),
+    page.getByRole('button', { name: 'Save', exact: true }).click(),
+  ])
+  await expect(field('stock')).toHaveAttribute('aria-invalid', 'true')
+  await expect(field('stock')).toHaveValue('1.5')
+  await expect(field('stock')).toHaveAccessibleDescription(/Enter a whole number within the supported range/)
+  await expect(field('name')).toHaveValue(updatedName)
   await field('stock').fill('27')
   await field('category').selectOption('premium')
   await field('active').uncheck()

@@ -910,6 +910,8 @@
   "{length} of {limit} characters": "{length} of {limit} characters",
   "Enter a value of at least {minimum}": "Enter a value of at least {minimum}",
   "Enter a number": "Enter a number",
+  "This number cannot be represented accurately": "This number cannot be represented accurately",
+  "Enter a whole number within the supported range": "Enter a whole number within the supported range",
   "Text is too long": "Text is too long",
   "Value is below the minimum": "Value is below the minimum",
   "Name cannot be blank": "Name cannot be blank",

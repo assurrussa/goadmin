@@ -143,6 +143,25 @@ func TestNumericConstraintFollowsRawJSONAndBoundDTO(t *testing.T) {
 	}
 }
 
+func TestIntegerDTOReportsFieldForUnrepresentableNumber(t *testing.T) {
+	d := scalarDefinition[int32]("number")
+	d.Fields[0].Minimum = new(0.0)
+	app := mountScalar(t, d)
+	for _, req := range []struct{ method, path, body string }{
+		{http.MethodPost, "/scalars", `{"value":1.5}`},
+		{http.MethodPut, "/scalars/records/42", `{"value":1.5,"_revision":"v1"}`},
+		{http.MethodPost, "/scalars", `{"value":2147483648}`},
+	} {
+		status, body, _ := request(t, app, req.method, req.path, req.body)
+		require.Equal(t, http.StatusUnprocessableEntity, status, body)
+		var result struct {
+			Errors FieldErrors `json:"errors"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(body), &result))
+		require.Equal(t, FieldErrors{"value": {"Enter a whole number within the supported range"}}, result.Errors)
+	}
+}
+
 func TestFloat32CallbackReceivesValueAboveMinimum(t *testing.T) {
 	for _, tc := range []struct {
 		raw     string

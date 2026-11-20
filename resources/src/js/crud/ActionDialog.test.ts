@@ -42,7 +42,10 @@ const resource: CrudResource = {
   title: 'Products',
   basePath: '/products',
   actions: [action],
-  fields: [{ key: 'name', label: 'Name', type: 'text', read: true, create: false, update: false }],
+  fields: [
+    { key: 'name', label: 'Name', type: 'text', read: true, create: false, update: false },
+    { key: 'active', label: 'Active', type: 'boolean', read: true, create: false, update: false },
+  ],
 }
 const record: CrudRecord = {
   id: '9',
@@ -147,10 +150,32 @@ function reread(actions: string[], actor = '17') {
     props: {
       authuser: { idExact: actor },
       resource,
-      record: { ...record, revision: '13', actions, data: { name: 'Updated product' } },
+      record: {
+        ...record,
+        revision: '13',
+        actions,
+        data: { name: 'Updated product', active: false },
+      },
     },
   })
 }
+it('returns focus to the rejected reason and its linked error after a server validation failure', async () => {
+  await write('  rejected draft  ')
+  const confirm = dialog()!.querySelector<HTMLButtonElement>('[data-confirmation-accept]')!
+  confirm.focus()
+  fetch.mockResolvedValueOnce(
+    Response.json({ errors: { reason: ['Reason rejected'] } }, { status: 422 }),
+  )
+  confirm.click()
+  await vi.waitFor(() => expect(input().getAttribute('aria-invalid')).toBe('true'))
+  expect(document.activeElement).toBe(input())
+  expect(input().value).toBe('  rejected draft  ')
+  const linked = input()
+    .getAttribute('aria-describedby')!
+    .split(' ')
+    .map((id) => document.getElementById(id)?.textContent)
+  expect(linked).toContain('Reason rejected')
+})
 it('reads the new record after a conflict and waits for a second explicit confirmation', async () => {
   fetch
     .mockResolvedValueOnce(new Response(null, { status: 409 }))
@@ -158,6 +183,11 @@ it('reads the new record after a conflict and waits for a second explicit confir
   await write(' same draft ')
   accept()
   await vi.waitFor(() => expect(dialog()!.textContent).toContain('Updated product'))
+  const displayed = () => [...dialog()!.querySelectorAll('dd')].map((el) => el.textContent)
+  expect(displayed()).toEqual(['Updated product', 'No'])
+  applyLocale('ru')
+  await nextTick()
+  expect(displayed()).toEqual(['Updated product', 'Нет'])
   expect(fetch).toHaveBeenCalledTimes(2)
   expect(fetch.mock.calls[1]![0]).toBe(back)
   expect(fetch.mock.calls[1]![1]?.headers).toMatchObject({ 'X-Inertia-Version': page.version })

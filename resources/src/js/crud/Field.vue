@@ -4,7 +4,7 @@ import { computed, useId } from 'vue'
 import { t } from '@/i18n'
 import LocalizedDatePicker from '@/components/date/LocalizedDatePicker.vue'
 import { resolveCrudField, crudValue, type CrudField, type CrudValue } from './index'
-import { belowMinimum } from './number'
+import { constraintError as inputConstraintError } from './constraints'
 const props = defineProps<{
   field: CrudField
   modelValue: CrudValue
@@ -41,11 +41,11 @@ function customChange(value: unknown) {
 function change(event: Event) {
   if (props.disabled || props.readonly) return
   const target = event.target as HTMLInputElement
-  if (props.field.type === 'number' && props.field.minimum !== undefined) {
+  if (props.field.type === 'number') {
     emit('update:badInput', target.validity.badInput)
     // While the user types a sign or exponent, only the browser owns the draft.
     if (target.validity.badInput) return
-    if (target.value !== '' && belowMinimum(target.value, props.field.minimum)) {
+    if (target.value !== '' && inputConstraintError(props.field, target.value)) {
       // Keep the exact rejected literal available for display and correction.
       emit('update:modelValue', target.value)
       return
