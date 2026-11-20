@@ -102,7 +102,7 @@ func authorizeProductEvent(_ context.Context, actor host.Actor, event crud.ReadO
 	return nil
 }
 
-func productEventsModule(db *sql.DB) (host.Module, error) {
+func productEventsModule(db *sql.DB, agentOrigin string) (host.Module, error) {
 	repo := productRepo{db}
 	permission := host.NewPermissionKey("product_events", "read")
 	const title = "Журнал действий с товарами"
@@ -119,7 +119,7 @@ func productEventsModule(db *sql.DB) (host.Module, error) {
 		filterOptions = append(filterOptions, map[string]string{"value": action.Value, "label": action.Label})
 		badges[action.Value] = map[string]string{"label": action.Label, "variant": "secondary"}
 	}
-	return crud.NewReadOnly(crud.ReadOnlyDefinition[productEvent]{
+	definition := crud.ReadOnlyDefinition[productEvent]{
 		Key: "product-events", BasePath: "/product-events", Title: title, Permission: permission,
 		Menu: host.Menu{Sections: []host.Section{{Key: "products", Title: "Products", Items: []host.Item{
 			{Name: title, Href: "/product-events", Icon: "content", PermissionKey: permission},
@@ -137,5 +137,9 @@ func productEventsModule(db *sql.DB) (host.Module, error) {
 		},
 		DefaultSort: "createdAt", DefaultOrder: "desc",
 		List: repo.events, Get: repo.event, Authorize: authorizeProductEvent,
-	})
+	}
+	if agentOrigin != "" {
+		return crud.NewReadOnlyWithAdapter(definition, journalAdapter(agentOrigin))
+	}
+	return crud.NewReadOnly(definition)
 }

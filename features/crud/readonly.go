@@ -35,10 +35,23 @@ type ReadOnlyDefinition[R any] struct {
 // NewReadOnly validates a read-only resource without I/O. The module provides
 // list, detail and personal views. It registers only its read permission.
 func NewReadOnly[R any](d ReadOnlyDefinition[R]) (host.Module, error) {
+	return newReadOnly(d, nil)
+}
+
+// NewReadOnlyWithAdapter binds an additional transport to the same reader as
+// the web resource. Build runs separately for each host runtime.
+func NewReadOnlyWithAdapter[R any](d ReadOnlyDefinition[R], adapter ReadOnlyAdapter) (host.Module, error) {
+	if !pathPattern.MatchString(adapter.BasePath) || adapter.Build == nil {
+		return host.Module{}, errors.New("crud: read adapter requires a route namespace and builder")
+	}
+	return newReadOnly(d, &adapter)
+}
+
+func newReadOnly[R any](d ReadOnlyDefinition[R], adapter *ReadOnlyAdapter) (host.Module, error) {
 	if d.List == nil || d.Get == nil || d.Authorize == nil {
 		return host.Module{}, errors.New("crud: scoped List, Get and Authorize are required")
 	}
-	return newModule(d.definition(), true)
+	return newModule(d.definition(), true, adapter)
 }
 
 // Adapt the host callbacks once at construction so both declarations use the

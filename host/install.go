@@ -165,6 +165,7 @@ func buildDependencies(input assemblyInput) (bootstrap.Dependencies, error) {
 		adminservice.WithRuntime(authAdapter.Runtime(), adminRepoImpl),
 		adminservice.WithIdentityLinkAuthMaxAge(input.Auth.linkAuthMaxAge),
 		adminservice.WithCanonicalIdentityLinkReader(input.Auth.Runtime().Database(), links),
+		adminservice.WithDelegatedReadPolicy(mutationRolesGuard.IsSuperAdmin, rolesService),
 		adminservice.WithBrowserState(states),
 		adminservice.WithExternalAuthority(input.Services.ExternalAuthority, links),
 		adminservice.WithLocalAdminAdmission(input.Services.LocalAdminAdmission),

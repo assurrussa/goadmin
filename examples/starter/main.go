@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/url"
 	"os"
 	"os/signal"
@@ -43,11 +44,14 @@ func run() error {
 			continue
 		}
 		switch key {
-		case "users", "access", "jobs", "uploads", "queues", "notifications", "realtime", "authmail", "products", "product-events":
+		case "users", "access", "jobs", "uploads", "queues", "notifications", "realtime", "authmail", "products", "product-events", "product-events-mcp":
 			selected[key] = true
 		default:
 			return fmt.Errorf("unknown admin module %q", key)
 		}
+	}
+	if selected["product-events-mcp"] && !selected["product-events"] {
+		return errors.New("product-events-mcp requires explicit product-events module")
 	}
 	baseURL, err := required("ADMIN_URL")
 	if err != nil {
@@ -56,6 +60,15 @@ func run() error {
 	parsedURL, err := url.Parse(baseURL)
 	if err != nil || parsedURL.Host == "" || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
 		return errors.New("ADMIN_URL must be an absolute http(s) URL")
+	}
+	agentOrigin := ""
+	if selected["product-events-mcp"] {
+		loopback := parsedURL.Hostname() == "localhost" || net.ParseIP(parsedURL.Hostname()).IsLoopback()
+		if parsedURL.User != nil || parsedURL.RawQuery != "" || parsedURL.Fragment != "" ||
+			(parsedURL.Path != "" && parsedURL.Path != "/") || (parsedURL.Scheme == "http" && !loopback) {
+			return errors.New("product-events-mcp requires an HTTPS origin or a loopback HTTP origin")
+		}
+		agentOrigin = parsedURL.Scheme + "://" + parsedURL.Host
 	}
 	// Staging uses embedded templates/assets while keeping HTTP cookies usable on localhost.
 	adminEnv := "staging"
@@ -207,7 +220,7 @@ func run() error {
 			modules = append(modules, products)
 		}
 		if selected["product-events"] {
-			events, moduleErr := productEventsModule(productDB)
+			events, moduleErr := productEventsModule(productDB, agentOrigin)
 			if moduleErr != nil {
 				return moduleErr
 			}

@@ -915,5 +915,17 @@
   "Name cannot be blank": "Name cannot be blank",
   "number exceeds the safe range": "Number exceeds the safe range",
   "Use YYYY-MM-DD": "Use YYYY-MM-DD",
-  "Choose a category": "Choose a category"
+  "Choose a category": "Choose a category",
+  "Product journal connections": "Product journal connections",
+  "Enter the code from your local MCP client to allow it to read your product events and their unpublish reasons.": "Enter the code from your local MCP client to allow it to read your product events and their unpublish reasons.",
+  "Access lasts up to 15 minutes and ends when you sign out.": "Access lasts up to 15 minutes and ends when you sign out.",
+  "Connection code": "Connection code",
+  "Allow reading": "Allow reading",
+  "Deny": "Deny",
+  "Active connections": "Active connections",
+  "Revoke": "Revoke",
+  "The code is invalid, expired or already used.": "The code is invalid, expired or already used.",
+  "Reading allowed.": "Reading allowed.",
+  "Access closed.": "Access closed.",
+  "Reload this page to check connection status.": "Reload this page to check connection status."
 }

@@ -104,21 +104,26 @@ func (FieldErrors) Error() string { return "invalid resource fields" }
 
 // New validates the complete resource definition without I/O.
 func New[R, C, U any](d Definition[R, C, U]) (host.Module, error) {
-	return newModule(d, false)
+	return newModule(d, false, nil)
 }
 
-func newModule[R, C, U any](d Definition[R, C, U], readOnly bool) (host.Module, error) {
+func newModule[R, C, U any](d Definition[R, C, U], readOnly bool, adapter *ReadOnlyAdapter) (host.Module, error) {
 	if err := validate(d, readOnly); err != nil {
 		return host.Module{}, err
 	}
 	d = cloneDefinition(d)
-	f := feature[R, C, U]{d: d, readOnly: readOnly}
-	return host.DefinedFeatureModule(host.ModuleDescriptor{Key: "crud." + d.Key, RouteNamespaces: []string{d.BasePath}}, f), nil
+	f := feature[R, C, U]{d: d, readOnly: readOnly, adapter: adapter}
+	namespaces := []string{d.BasePath}
+	if adapter != nil {
+		namespaces = append(namespaces, adapter.BasePath)
+	}
+	return host.DefinedFeatureModule(host.ModuleDescriptor{Key: "crud." + d.Key, RouteNamespaces: namespaces}, f), nil
 }
 
 type feature[R, C, U any] struct {
 	d        Definition[R, C, U]
 	readOnly bool
+	adapter  *ReadOnlyAdapter
 }
 
 func (f feature[R, C, U]) Descriptor() host.FeatureDescriptor {
@@ -146,6 +151,17 @@ func (f feature[R, C, U]) Build(host.Menu) host.ExtensionBuilder {
 			return nil, errors.New("crud: admin app required")
 		}
 		h := &handler[R, C, U]{app: app, d: f.d, readOnly: f.readOnly}
-		return host.NewExtension().WithHandlers(h), nil
+		extension := host.NewExtension()
+		if f.adapter != nil {
+			var err error
+			extension, err = f.adapter.Build(app, h.reader())
+			if err != nil {
+				return nil, err
+			}
+			if extension == nil {
+				return nil, errors.New("crud: read adapter returned no extension")
+			}
+		}
+		return extension.WithHandlers(h), nil
 	}
 }

@@ -151,6 +151,16 @@ class IsolationTests(unittest.TestCase):
         self.assertNotIn('env_file', admin)
         self.assertNotIn('external', json.dumps(config['volumes']))
 
+    def test_mcp_is_opt_in_for_default_only(self):
+        for enabled in (False, True):
+            for layout in ('default', 'topbar'):
+                with self.subTest(enabled=enabled, layout=layout):
+                    modules = smoke.case_modules(layout, enabled)
+                    config = smoke.spec('owned-project', '18768', '', Path('/candidates'), modules)
+                    selected = config['services']['admin']['environment']['ADMIN_MODULES'].split(',')
+                    self.assertIn('product-events', selected)
+                    self.assertEqual('product-events-mcp' in selected, enabled and layout == 'default')
+
     def test_secret_is_created_private_and_never_overwritten(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'secret.env'

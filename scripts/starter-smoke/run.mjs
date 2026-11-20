@@ -11,6 +11,7 @@ import { dashboardAcceptance } from './dashboard.mjs'
 import { tableWorkflowAcceptance } from './table-workflow.mjs'
 import { appearanceAcceptance } from './appearance.mjs'
 import { crudAcceptance } from './crud.mjs'
+import { journalMCPAcceptance, journalMCPDisabled } from './mcp-acceptance.mjs'
 import { productEventsAcceptance } from './product-events.mjs'
 
 const expect = baseExpect.configure({ timeout: 20000 })
@@ -550,6 +551,18 @@ async function runCase(name, config) {
     check('Products CRUD, views/CSV, two-tab conflict resolution and save-and-return to the filtered second page')
     await productEventsAcceptance({ page, context, browser, config, folder, name, expect, result, ownedSQL })
     check('Product activity: deleted product, exact search, saved view, same-page return and identical UTC times on desktop and mobile')
+    if (manifest.productEventsMCP) {
+      if (config.modules.includes('product-events-mcp')) {
+        result.productEventsMCP = await journalMCPAcceptance({ browser, config, credentials, ownedSQL, expect, language,
+          login, logout, roleSlug: result.restrictedAccess.role, product: result.productEvents.archivedProduct,
+          reasons: [result.crud.unpublish.listReason, result.crud.unpublish.cardReason],
+          binary: path.join(folder, 'product-events-mcp') })
+        check('Product journal MCP: two stdio tools, browser parity, owner isolation, preview, live permission loss, revocation and logout')
+      } else {
+        await journalMCPDisabled(context, config.url)
+        check('Product journal MCP routes are unavailable in this layout')
+      }
+    }
     await tableWorkflowAcceptance({ page, context, config, credentials, ownedSQL, folder, name, expect, language, login, logout, result })
     check('table workflows: view CRUD/dirty/relogin, native CSRF/RBAC/preview/owner isolation, both CSV modes on six grids, cross-page cap100, real conflict, bulk results and server queue counters')
     await appearanceAcceptance({ page, context, browser, config, credentials, folder, name, expect, login, logout, result })

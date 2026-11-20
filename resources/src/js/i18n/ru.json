@@ -204,5 +204,17 @@
   "Name cannot be blank": "Название не может состоять только из пробелов",
   "number exceeds the safe range": "Число выходит за допустимый диапазон",
   "Use YYYY-MM-DD": "Используйте формат ГГГГ-ММ-ДД.",
-  "Choose a category": "Выберите категорию."
+  "Choose a category": "Выберите категорию.",
+  "Product journal connections": "Подключения к журналу товаров",
+  "Enter the code from your local MCP client to allow it to read your product events and their unpublish reasons.": "Введите код из локального MCP-клиента, чтобы разрешить ему читать события ваших товаров и причины снятия с публикации.",
+  "Access lasts up to 15 minutes and ends when you sign out.": "Доступ действует до 15 минут и прекращается при выходе из админки.",
+  "Connection code": "Код подключения",
+  "Allow reading": "Разрешить чтение",
+  "Deny": "Отклонить",
+  "Active connections": "Активные подключения",
+  "Revoke": "Отозвать",
+  "The code is invalid, expired or already used.": "Код неверен, истёк или уже использован.",
+  "Reading allowed.": "Чтение разрешено.",
+  "Access closed.": "Доступ закрыт.",
+  "Reload this page to check connection status.": "Обновите страницу, чтобы проверить состояние подключения."
 }

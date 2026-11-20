@@ -276,3 +276,15 @@ owned stack. The starter integration-tag test requires `PRODUCTS_TEST_DSN` for
 an isolated PostgreSQL server with create-database privileges; it creates and
 drops its own test database and proves CAS, owner scope and audit rollback.
 Local checks do not prove publication or deployment.
+
+### Connect a second read transport
+
+`NewReadOnlyWithAdapter(definition, ReadOnlyAdapter{BasePath: ..., Build: ...})`
+mounts the same resource pages as `NewReadOnly` and reserves the adapter's
+route namespace. Its builder receives the current `*host.App` and a
+`ReadOnlyReader` for that runtime. Authenticate the caller first, then pass
+their context and canonical actor to `List` or `Get`. Both calls use the same
+permission, row authorization, owner-scoped repository and field projection as
+the browser. The adapter receives projected fields and record identities.
+The [Products starter](../examples/starter/README.md#connect-a-local-mcp-client-to-product-activity)
+demonstrates session-bound delegation and two read-only MCP tools.

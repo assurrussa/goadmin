@@ -228,3 +228,51 @@ reason and display an em dash. The detail page takes you back to
 the same search and page. Each administrator sees events for their own products.
 See [Connect a read-only section](../../docs/crud.md#connect-a-read-only-section)
 for the public host contract.
+
+## Connect a local MCP client to Product activity
+
+In this checkout's source mode, enable
+`ADMIN_MODULES=products,product-events,product-events-mcp`. The MCP option
+requires `product-events`. The operator signs in with a native starter account
+that has `product_events:read`. Each admin instance owns its connections in
+memory. Restarting the instance clears them.
+
+Build the local stdio program from `examples/starter`:
+
+```sh
+go build -o /tmp/product-events-mcp ./cmd/product-events-mcp
+```
+
+Configure your MCP client to launch that executable as its stdio server. For a
+starter listening on the default local port, the server configuration is:
+
+```json
+{
+  "command": "/tmp/product-events-mcp",
+  "args": ["-admin-url", "http://localhost:8080"]
+}
+```
+
+Use the origin configured as `ADMIN_URL`. Plain HTTP is supported on loopback;
+use HTTPS for a remote starter. The client needs no database credentials.
+
+1. Call `search_product_events` with a product number as text and
+   `action: "unpublish"`. On the first call the program supplies a verification
+   URL and a five-minute code. Open the URL in the starter, enter the code from
+   your own client and choose **Allow reading**.
+2. Repeat the search. It returns the event IDs and the same scoped result
+   count as the journal. Optional `page` and `page_size` use 1 and 25 by
+   default, with a maximum page size of 100.
+3. Call `get_product_event` with the selected `event_id`. The response includes
+   the stored reason, with its original internal whitespace. Older events with
+   no recorded reason return `null`. Deleted products retain their events.
+
+The grant expires after 15 minutes at the latest. The next call checks the
+issuing login, current admin membership, role preview and journal permission
+again. Sign out or open `/agent/product-events/connect` and choose **Revoke**
+to end access. The client keeps its credential in process memory.
+
+To run browser and real stdio acceptance together, use
+`SMOKE_PRODUCT_EVENTS_MCP=1 make starter-smoke` from the repository root. The
+default instance enables the pilot and the topbar instance checks the disabled
+configuration.

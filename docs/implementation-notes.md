@@ -2781,3 +2781,17 @@ anonymous public-dependency consumer and final-version release gates remain
 pending. The release documentation records schema 14→15→16 rollout and rollback
 constraints. No new GoAdmin release version has been selected, published or
 deployed.
+
+## Products journal and local MCP pilot
+
+The Products review and MCP pilot are separate changes. The journal reads its
+page and total in one PostgreSQL snapshot. An action filter finds archived
+unpublish events beyond the first page. The pilot reuses that query and the
+existing detail projection through a reader bound at resource assembly time.
+
+A native operator approves a five-minute device code on the CSRF-protected
+admin page. One process can exchange each approved device secret once. The
+15-minute grant is scoped to that operator's journal and original browser
+session. Revocation and exchange are serialized in memory. Searches omit
+the reason; only detail reads return it. The single-instance starter is the
+acceptance target for this pilot. See the starter guide for setup and checks.

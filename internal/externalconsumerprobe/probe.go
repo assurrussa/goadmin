@@ -195,7 +195,7 @@ func TestReadOnlyResourceContract(t *testing.T) {
 		Action string ` + "`json:\"action\"`" + `
 	}
 	type record = crud.ReadOnlyRecord[event]
-	module, err := crud.NewReadOnly(crud.ReadOnlyDefinition[event]{
+	definition := crud.ReadOnlyDefinition[event]{
 		Key: "events", BasePath: "/events", Title: "Events",
 		Permission: adminhost.NewPermissionKey("events", "read"),
 		Fields: []crud.Field{{Key: "action", Label: "Action", Type: "text", Read: true}},
@@ -207,6 +207,12 @@ func TestReadOnlyResourceContract(t *testing.T) {
 			return record{}, crud.ErrNotFound
 		},
 		Authorize: func(context.Context, adminhost.Actor, record) error { return crud.ErrDenied },
+	}
+	module, err := crud.NewReadOnly(definition)
+	if err != nil { t.Fatal(err) }
+	_, err = crud.NewReadOnlyWithAdapter(definition, crud.ReadOnlyAdapter{
+		BasePath: "/agent/events",
+		Build: func(*adminhost.App, crud.ReadOnlyReader) (*adminhost.Extension, error) { return adminhost.NewExtension(), nil },
 	})
 	if err != nil {
 		t.Fatal(err)

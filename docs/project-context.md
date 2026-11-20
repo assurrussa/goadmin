@@ -171,6 +171,9 @@ permission and record policy. Read-only lists accept up to 100 rows and share
 record authorization and projection with the standard resource. Personal
 views remain writable per administrator. The independent `product-events`
 starter module demonstrates an immutable journal with no CSV or domain writes.
+The optional `product-events-mcp` starter pilot binds this same reader to a
+local stdio client. Each call resolves a grant tied to the approving native
+session and checks current role preview, resource permission and ownership.
 
 ## Dashboard summaries
 

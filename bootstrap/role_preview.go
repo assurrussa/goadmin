@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	rolePreviewSessionKey = "goadmin.role-preview"
+	rolePreviewSessionKey = integrationroles.RolePreviewSessionKey
 	rolePreviewPath       = "/auth/role-preview"
 )
 
@@ -106,26 +106,14 @@ func applyRolePreview(c fiber.Ctx, deps Dependencies, owner bool, id int64, stat
 	if id == 0 {
 		return nil
 	}
-	if !owner || deps.Repos.RolesManager == nil {
+	policy, role, err := integrationroles.ResolveRolePreview(c.Context(), owner, deps.Repos.RolesManager, id)
+	if errors.Is(err, integrationroles.ErrInvalidRolePreview) {
 		return fiber.ErrForbidden
 	}
-	role, err := deps.Repos.RolesManager.GetRole(c, id)
-	if err != nil || role == nil {
-		return fiber.ErrForbidden
-	}
-	permissions, err := deps.Repos.RolesManager.ListRolePermissions(c, id)
 	if err != nil {
 		return fiber.ErrServiceUnavailable
 	}
-	keys := make(map[integrationroles.PermissionKey]bool, len(permissions))
-	for _, permission := range permissions {
-		keys[integrationroles.NewPermissionKey(permission.Domain, permission.Action)] = true
-	}
-	if role.Slug == integrationroles.SuperAdminRole {
-		c.SetContext(integrationroles.WithSuperRolePreview(c.Context()))
-	} else {
-		c.SetContext(integrationroles.WithRolePreview(c.Context(), keys))
-	}
+	c.SetContext(policy)
 	state["roleName"] = role.Name
 	state["roleId"] = strconv.FormatInt(id, 10)
 	state["actions"] = rolePreviewActionPresentation(c, deps)
