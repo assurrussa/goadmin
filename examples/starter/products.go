@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
@@ -86,7 +87,12 @@ func (r productRepo) list(ctx context.Context, actor host.Actor, f datagrid.Filt
 		}
 	}
 	var total int
-	if err := r.db.QueryRowContext(ctx, "SELECT count(*) FROM starter_products WHERE "+where, args...).Scan(&total); err != nil {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	if err != nil {
+		return nil, 0, err
+	}
+	defer tx.Rollback()
+	if err := tx.QueryRowContext(ctx, "SELECT count(*) FROM starter_products WHERE "+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	sort := map[string]string{"id": "id", "name": "name", "stock": "stock", "active": "active", "available": "available", "status": "status", "category": "category"}[f.GetSortBy()]
@@ -98,7 +104,7 @@ func (r productRepo) list(ctx context.Context, actor host.Actor, f datagrid.Filt
 		order = "DESC"
 	}
 	args = append(args, f.GetLimit(), f.GetOffset())
-	rows, err := r.db.QueryContext(ctx, fmt.Sprintf("SELECT %s FROM starter_products WHERE %s ORDER BY %s %s,id LIMIT $%d OFFSET $%d", productColumns, where, sort, order, len(args)-1, len(args)), args...)
+	rows, err := tx.QueryContext(ctx, fmt.Sprintf("SELECT %s FROM starter_products WHERE %s ORDER BY %s %s,id LIMIT $%d OFFSET $%d", productColumns, where, sort, order, len(args)-1, len(args)), args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -111,21 +117,34 @@ func (r productRepo) list(ctx context.Context, actor host.Actor, f datagrid.Filt
 		}
 		records = append(records, record)
 	}
-	return records, total, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, 0, err
+	}
+	return records, total, nil
 }
 
 func validateProduct(p productInput) error {
 	errs := crud.FieldErrors{}
-	if err := productNameField.ValidateConstraints(p.Name); err != nil {
+	// PostgreSQL text must be valid UTF-8 and cannot contain a zero byte.
+	const invalidText = "Invalid field value"
+	if !validProductText(p.Name) {
+		errs[productNameField.Key] = []string{invalidText}
+	} else if err := productNameField.ValidateConstraints(p.Name); err != nil {
 		errs[productNameField.Key] = []string{err.Error()}
 	} else if strings.TrimSpace(p.Name) == "" {
 		errs[productNameField.Key] = []string{"Name cannot be blank"}
+	}
+	if !validProductText(p.Description) {
+		errs["description"] = []string{invalidText}
 	}
 	if err := productStockField.ValidateConstraints(p.Stock); err != nil {
 		errs[productStockField.Key] = []string{err.Error()}
 	}
 	if p.Available != "" {
-		if _, err := time.Parse("2006-01-02", p.Available); err != nil {
+		if date, err := time.Parse(time.DateOnly, p.Available); err != nil || date.Year() < 1 {
 			errs["available"] = []string{"Use YYYY-MM-DD"}
 		}
 	}
@@ -136,6 +155,10 @@ func validateProduct(p productInput) error {
 		return errs
 	}
 	return nil
+}
+
+func validProductText(value string) bool {
+	return utf8.ValidString(value) && strings.IndexByte(value, 0) < 0
 }
 
 func productAudit(ctx context.Context, tx *sql.Tx, actor host.Actor, id, action string, reason *string) error {

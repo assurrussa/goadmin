@@ -15,13 +15,8 @@ import {
 } from '@/components/ui/dialog'
 import Field from './Field.vue'
 import { constraintError } from './constraints'
-import {
-  crudDisplay,
-  crudRecordHref,
-  type CrudAction,
-  type CrudRecord,
-  type CrudResource,
-} from './index'
+import { displayFieldValue } from './display'
+import { crudRecordHref, type CrudAction, type CrudRecord, type CrudResource } from './index'
 
 const props = defineProps<{ resource: CrudResource; recordId?: string }>()
 const page = usePage()
@@ -179,20 +174,20 @@ async function recheck(target: Request) {
     notice.value = 'The record changed. Its current values could not be loaded.'
   }
 }
+async function focusField(form: HTMLFormElement, key: string) {
+  await nextTick()
+  const input = Array.from(document.getElementsByName(key)).find(
+    (control) => control.closest('form') === form,
+  )
+  input?.focus()
+}
 async function submit(event: SubmitEvent) {
   const target = request.value
   if (!target || pending.value || recovery.value) return
+  const form = event.currentTarget as HTMLFormElement
   attempted.value = true
   const invalid = fields.value.find((field) => localErrors.value[field.key])
-  if (invalid) {
-    const form = event.currentTarget as HTMLFormElement
-    const input = Array.from(document.getElementsByName(invalid.key)).find(
-      (control) => control.closest('form') === form,
-    )
-    await nextTick()
-    input?.focus()
-    return
-  }
+  if (invalid) return focusField(form, invalid.key)
   pending.value = true
   fieldErrors.value = Object.create(null)
   notice.value = ''
@@ -229,9 +224,10 @@ async function submit(event: SubmitEvent) {
         const error = result.errors?.[field.key]?.[0]
         if (typeof error === 'string') fieldErrors.value[field.key] = error
       }
-      if (!Object.keys(fieldErrors.value).length)
-        notice.value = result.errors?._form?.[0] || 'Invalid field value'
       pending.value = false
+      const first = fields.value.find((field) => fieldErrors.value[field.key])
+      if (first) await focusField(form, first.key)
+      else notice.value = result.errors?._form?.[0] || 'Invalid field value'
       return
     }
   } catch (error) {
@@ -306,11 +302,7 @@ onScopeDispose(() => {
         >
           <dt class="text-text-secondary">{{ t(field.label) }}</dt>
           <dd class="whitespace-pre-wrap break-words">
-            {{
-              field.type === 'select'
-                ? t(crudDisplay(field, request.record.data[field.key]))
-                : crudDisplay(field, request.record.data[field.key])
-            }}
+            {{ displayFieldValue(field, request.record.data[field.key]) }}
           </dd>
         </div>
       </dl>

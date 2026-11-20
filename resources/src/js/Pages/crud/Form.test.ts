@@ -4,6 +4,7 @@ import { router } from '@inertiajs/vue3'
 import type { ActiveVisit, Page, VisitOptions } from '@inertiajs/core'
 import Form from './Form.vue'
 import type { CrudResource, CrudValue } from '@/crud'
+import { exactWireNumber } from '@/crud/number'
 import { applyLocale } from '@/i18n'
 
 const page = reactive({
@@ -439,6 +440,36 @@ it.each([
     expect(put.mock.lastCall?.[1]).toMatchObject({ stock: Number(accepted) })
   },
 )
+
+it.each([constrainedFields[1]!, { ...constrainedFields[1]!, minimum: undefined }])(
+  'keeps an inexact numeric draft for correction with minimum $minimum',
+  async (field) => {
+    const { root, put } = render('update', true, listHref, [field], { stock: 5 })
+    for (const raw of ['9007199254740990.5', '1e-999', '0.1234567890123456789']) {
+      const stock = input(root, 'stock', raw)
+      await nextTick()
+      expect(stock.value).toBe(raw)
+      expect(descriptions(stock)).toContain('Это число нельзя передать без потери точности')
+      submit(root)
+      expect(put).not.toHaveBeenCalled()
+    }
+    for (const raw of ['.5', '1.500', '1e+2', '-0e-999', '1.25e-8']) {
+      const stock = input(root, 'stock', raw)
+      await nextTick()
+      expect(stock.getAttribute('aria-invalid')).toBe('false')
+      expect(mocks.form!.values.stock).toBe(Number(raw))
+    }
+    submit(root)
+    expect(put.mock.lastCall?.[1]).toMatchObject({ stock: 1.25e-8 })
+  },
+)
+
+it('rejects overflow and preserves signed values that round-trip through numeric JSON', () => {
+  for (const raw of ['1e309', '-1e309', '-1e-999', '-9007199254740990.5'])
+    expect(exactWireNumber(raw)).toBe(false)
+  for (const raw of ['-0.50', '-5e+2', '0e+999', '1e308', '-1e-323'])
+    expect(exactWireNumber(raw)).toBe(true)
+})
 
 it('supports constrained textareas and host fields named after native form members', async () => {
   const fields = [

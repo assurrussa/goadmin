@@ -199,6 +199,8 @@
   "{length} of {limit} characters": "{length} из {limit} символов",
   "Enter a value of at least {minimum}": "Введите значение не меньше {minimum}",
   "Enter a number": "Введите число",
+  "This number cannot be represented accurately": "Это число нельзя передать без потери точности",
+  "Enter a whole number within the supported range": "Введите целое число в допустимом диапазоне",
   "Text is too long": "Слишком длинный текст",
   "Value is below the minimum": "Значение меньше допустимого минимума",
   "Name cannot be blank": "Название не может состоять только из пробелов",

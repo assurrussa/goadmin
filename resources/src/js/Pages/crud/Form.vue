@@ -8,9 +8,9 @@ import AppHead from '@/components/layout/AppHead.vue'
 import RecordEditForm from '@/components/form/RecordEditForm.vue'
 import Field from '@/crud/Field.vue'
 import { constraintError } from '@/crud/constraints'
+import { displayFieldValue } from '@/crud/display'
 import AppButton from '@/components/ui/AppButton.vue'
 import {
-  crudDisplay,
   crudRecordHref,
   crudReturnHref,
   crudValue,
@@ -163,9 +163,7 @@ function choose(key: string, dispute: Dispute, choice: Choice) {
 function displayChoice(field: CrudField, value: CrudValue) {
   if (value === null) return t('Не указано')
   if (value === '') return t('Пустая строка')
-  if (field.type === 'boolean') return t(value ? 'Да' : 'Нет')
-  const display = crudDisplay(field, value)
-  return field.type === 'select' ? t(display) : display
+  return displayFieldValue(field, value)
 }
 
 function replaceSecret(key: string) {
@@ -240,15 +238,15 @@ watch(identity, () => {
 function submit(event: Event, returnToList = false) {
   if (formState.value.processing || submitDisabled.value) return
   const element = event.target
+  const first = constraintErrors.value.keys().next().value
+  if (first !== undefined) {
+    const control = Array.from(document.getElementsByName(first)).find(
+      (control) => control.closest('form') === element,
+    )
+    control?.focus()
+    return
+  }
   if (hasConstraints.value) {
-    const first = constraintErrors.value.keys().next().value
-    if (first !== undefined) {
-      const control = Array.from(document.getElementsByName(first)).find(
-        (control) => control.closest('form') === element,
-      )
-      control?.focus()
-      return
-    }
     // novalidate lets us show both inline errors before the browser reports
     // remaining required, date and custom-field validation.
     // A host field may itself be named "reportValidity".

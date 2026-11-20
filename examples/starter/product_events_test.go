@@ -119,12 +119,12 @@ func TestProductEventsPostgresJournal(t *testing.T) {
 	}
 }
 
-type journalSnapshotFilter struct {
+type snapshotFilter struct {
 	datagrid.Filters
 	beforePage func()
 }
 
-func (f journalSnapshotFilter) GetOffset() int {
+func (f snapshotFilter) GetOffset() int {
 	f.beforePage()
 	return f.Filters.GetOffset()
 }
@@ -138,7 +138,7 @@ func TestProductEventsPostgresSearchSnapshot(t *testing.T) {
 	// Commit the first event on another connection after count(*) has established
 	// its snapshot and before the page query starts.
 	var firstID string
-	rows, total, err := repo.events(ctx, owner, journalSnapshotFilter{filter, func() {
+	rows, total, err := repo.events(ctx, owner, snapshotFilter{filter, func() {
 		err := db.QueryRowContext(ctx, "INSERT INTO starter_product_events(owner_admin_id,product_id,action,reason) VALUES($1,'47','unpublish','Archived') RETURNING id::text", owner.AdminID).Scan(&firstID)
 		if err != nil {
 			t.Fatal(err)

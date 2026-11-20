@@ -557,13 +557,25 @@ func (h *handler[R, C, U]) decode(c fiber.Ctx, raw map[string]json.RawMessage, o
 	}
 	decoder := json.NewDecoder(bytes.NewReader(b))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(target) != nil {
-		return FieldErrors{formKey: {invalidFieldMessage}}
+	if err := decoder.Decode(target); err != nil {
+		return inputDecodeFailure(err, input, types)
 	}
 	if err = decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
 		return FieldErrors{formKey: {"Invalid form input"}}
 	}
 	return validateBoundFields(allowed, reflect.ValueOf(target).Elem())
+}
+
+func inputDecodeFailure(err error, input map[string]json.RawMessage, types map[string]reflect.Type) FieldErrors {
+	mismatch, ok := errors.AsType[*json.UnmarshalTypeError](err)
+	if !ok || input[mismatch.Field] == nil {
+		return FieldErrors{formKey: {invalidFieldMessage}}
+	}
+	kind := scalarType(types[mismatch.Field]).Kind()
+	if kind >= reflect.Int && kind <= reflect.Uint64 && input[mismatch.Field].Kind() == '0' {
+		return FieldErrors{mismatch.Field: {"Enter a whole number within the supported range"}}
+	}
+	return FieldErrors{mismatch.Field: {invalidFieldMessage}}
 }
 
 // Binding can supply a zero for an omitted non-pointer or round a numeric

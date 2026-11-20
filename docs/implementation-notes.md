@@ -8,6 +8,7 @@ update. Only the winning update can insert its reason into the product
 journal. The list query omits the reason, and the detail query reads it
 under the event owner's scope even after product deletion. A rejected command
 keeps its original draft in the open dialog, scoped to that actor and product.
+When the server rejects the reason, focus returns to the field and its error.
 
 ## Product form limits
 
@@ -16,6 +17,8 @@ minimum is inclusive. The form preserves pasted text and incomplete numeric
 input so operators can correct either field. Declarative failures stop before
 the host callback. The starter's whitespace-only name check exercises the
 server rejection and draft recovery path separately from client-side errors.
+The product list reads its count and page in one PostgreSQL snapshot, including
+when another operator session creates a matching product between the two reads.
 
 ## Read-only resources and the starter product journal
 

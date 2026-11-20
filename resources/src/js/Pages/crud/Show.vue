@@ -7,12 +7,12 @@ import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import Field from '@/crud/Field.vue'
+import { displayFieldValue } from '@/crud/display'
 import ActionDialog from '@/crud/ActionDialog.vue'
 import { useConfirmation } from '@/composables/useConfirmation'
 import {
   crudReturnHref,
   crudRecordHref,
-  crudDisplay,
   crudValue,
   type CrudResource,
   type CrudViewRecord,
@@ -114,15 +114,7 @@ async function run(key: string) {
         <template v-else
           ><dt class="text-sm text-text-secondary">{{ t(field.label) }}</dt>
           <dd class="mt-1 whitespace-pre-wrap break-words">
-            {{
-              record.data[field.key] == null
-                ? '—'
-                : field.type === 'boolean'
-                  ? t(record.data[field.key] ? 'Да' : 'Нет')
-                  : field.type === 'select'
-                    ? t(crudDisplay(field, record.data[field.key]))
-                    : crudDisplay(field, record.data[field.key])
-            }}
+            {{ displayFieldValue(field, record.data[field.key]) }}
           </dd></template
         >
       </div>

@@ -35,6 +35,15 @@ func TestValidateProduct(t *testing.T) {
 		{"blank name and unsafe stock", productInput{Name: "   ", Stock: 9007199254740992}, crud.FieldErrors{
 			"name": {"Name cannot be blank"}, "stock": {"number exceeds the safe range"},
 		}},
+		{"text PostgreSQL cannot store", productInput{Name: "Part\x00 A", Description: "details\x00"}, crud.FieldErrors{
+			"name": {"Invalid field value"}, "description": {"Invalid field value"},
+		}},
+		{"invalid UTF-8 from Go", productInput{Name: name, Description: "\xff"}, crud.FieldErrors{
+			"description": {"Invalid field value"},
+		}},
+		{"date outside the form contract", productInput{Name: name, Available: "0000-01-01"}, crud.FieldErrors{
+			"available": {"Use YYYY-MM-DD"},
+		}},
 	} {
 		t.Run(test.label, func(t *testing.T) {
 			err := validateProduct(test.input)

@@ -240,9 +240,11 @@ on the same declarations before opening a transaction. Domain rules such as
 rejecting an all-whitespace product name still belong to the host.
 
 The form retains text pasted beyond the length limit and displays an inline
-error. Fixing the input enables submission. Reads apply the existing scalar
-and access checks, so an operator can open and correct a legacy value outside
-a newly declared write bound.
+error. It also preserves a decimal entry such as `9007199254740990.5` when
+JavaScript would send a different value. For an integer DTO field, the server
+returns fractional and out-of-range input errors on that field. Reads apply
+the existing scalar and access checks, so an operator can open and correct a
+legacy value outside a newly declared write bound.
 
 ## Custom fields and bundle compatibility
 
