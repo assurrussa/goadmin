@@ -41,7 +41,7 @@ func (r productRepo) event(ctx context.Context, actor host.Actor, id string) (cr
 func (r productRepo) events(ctx context.Context, actor host.Actor, f datagrid.Filtered) ([]crud.ReadOnlyRecord[productEvent], int, error) {
 	// Read the event owner directly so deleting a product keeps its history accessible.
 	const from = ` FROM starter_product_events AS e WHERE owner_admin_id=$1
-		AND ($2::text='' OR product_id=$2) AND ($3::text='' OR product_id=$3)`
+		AND ($2::text='' OR product_id=$2) AND ($3::text='' OR product_id=$3) AND ($4::text='' OR action=$4)`
 	var productID string
 	if value, present := f.GetFields()["productId"]; present {
 		var ok bool
@@ -49,9 +49,23 @@ func (r productRepo) events(ctx context.Context, actor host.Actor, f datagrid.Fi
 			return nil, 0, crud.FieldErrors{"productId": {"Product number must be text"}}
 		}
 	}
+	var action string
+	if value, present := f.GetFields()["action"]; present {
+		var ok bool
+		if action, ok = value.(string); !ok {
+			return nil, 0, crud.FieldErrors{"action": {"Action must be text"}}
+		}
+	}
+
+	// A concurrent append must not make the page disagree with its total.
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	if err != nil {
+		return nil, 0, err
+	}
+	defer tx.Rollback()
 	search := f.GetSearch()
 	var total int
-	if err := r.db.QueryRowContext(ctx, "SELECT count(*)"+from, actor.AdminID, search, productID).Scan(&total); err != nil {
+	if err := tx.QueryRowContext(ctx, "SELECT count(*)"+from, actor.AdminID, search, productID, action).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	order := " ORDER BY e.created_at DESC, e.id DESC"
@@ -59,7 +73,7 @@ func (r productRepo) events(ctx context.Context, actor host.Actor, f datagrid.Fi
 		order = " ORDER BY e.created_at ASC, e.id ASC"
 	}
 	// Only the owner-scoped detail query fetches the operator's explanation.
-	rows, err := r.db.QueryContext(ctx, "SELECT "+eventColumns+", NULL::text"+from+order+" LIMIT $4 OFFSET $5", actor.AdminID, search, productID, f.GetLimit(), f.GetOffset())
+	rows, err := tx.QueryContext(ctx, "SELECT "+eventColumns+", NULL::text"+from+order+" LIMIT $5 OFFSET $6", actor.AdminID, search, productID, action, f.GetLimit(), f.GetOffset())
 	if err != nil {
 		return nil, 0, err
 	}
@@ -73,6 +87,9 @@ func (r productRepo) events(ctx context.Context, actor host.Actor, f datagrid.Fi
 		events = append(events, event)
 	}
 	if err = rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	if err := tx.Commit(); err != nil {
 		return nil, 0, err
 	}
 	return events, total, nil
@@ -97,7 +114,9 @@ func productEventsModule(db *sql.DB) (host.Module, error) {
 		{Value: "deleted", Label: "Удалён"},
 	}
 	badges := make(map[string]map[string]string, len(actions))
+	filterOptions := make([]map[string]string, 0, len(actions))
 	for _, action := range actions {
+		filterOptions = append(filterOptions, map[string]string{"value": action.Value, "label": action.Label})
 		badges[action.Value] = map[string]string{"label": action.Label, "variant": "secondary"}
 	}
 	return crud.NewReadOnly(crud.ReadOnlyDefinition[productEvent]{
@@ -113,7 +132,7 @@ func productEventsModule(db *sql.DB) (host.Module, error) {
 		},
 		Columns: []datagrid.Column{
 			{Key: "productId", Label: "Номер товара", Type: "text", Filterable: true},
-			{Key: "action", Label: "Действие", Type: "select", Badges: badges},
+			{Key: "action", Label: "Действие", Type: "select", Badges: badges, Filterable: true, FilterOptions: filterOptions},
 			{Key: "createdAt", Label: "Время (UTC)", Type: "text", Sortable: true},
 		},
 		DefaultSort: "createdAt", DefaultOrder: "desc",

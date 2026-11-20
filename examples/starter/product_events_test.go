@@ -118,3 +118,45 @@ func TestProductEventsPostgresJournal(t *testing.T) {
 		t.Fatalf("invalid product filter: %v, total=%d, err=%v", rows, total, err)
 	}
 }
+
+type journalSnapshotFilter struct {
+	datagrid.Filters
+	beforePage func()
+}
+
+func (f journalSnapshotFilter) GetOffset() int {
+	f.beforePage()
+	return f.Filters.GetOffset()
+}
+
+func TestProductEventsPostgresSearchSnapshot(t *testing.T) {
+	db, _, owner := productTestDatabase(t, "product-events")
+	ctx := t.Context()
+	repo := productRepo{db}
+	filter := datagrid.Filters{Page: 1, Limit: 25, Fields: map[string]any{"productId": "47", "action": "unpublish"}}
+
+	// Commit the first event on another connection after count(*) has established
+	// its snapshot and before the page query starts.
+	var firstID string
+	rows, total, err := repo.events(ctx, owner, journalSnapshotFilter{filter, func() {
+		err := db.QueryRowContext(ctx, "INSERT INTO starter_product_events(owner_admin_id,product_id,action,reason) VALUES($1,'47','unpublish','Archived') RETURNING id::text", owner.AdminID).Scan(&firstID)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}})
+	if err != nil || total != 0 || len(rows) != 0 {
+		t.Fatalf("inconsistent initial snapshot: rows=%v total=%d err=%v", rows, total, err)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO starter_product_events(owner_admin_id,product_id,action) SELECT $1,'47','updated' FROM generate_series(1,101)", owner.AdminID); err != nil {
+		t.Fatal(err)
+	}
+	rows, total, err = repo.events(ctx, owner, filter)
+	if err != nil || total != 1 || len(rows) != 1 || rows[0].ID != firstID || rows[0].Data.Reason != nil {
+		t.Fatalf("historical unpublish filter: rows=%v total=%d err=%v", rows, total, err)
+	}
+	filter.Page = 2
+	rows, total, err = repo.events(ctx, owner, filter)
+	if err != nil || total != 1 || len(rows) != 0 {
+		t.Fatalf("past last page: rows=%v total=%d err=%v", rows, total, err)
+	}
+}

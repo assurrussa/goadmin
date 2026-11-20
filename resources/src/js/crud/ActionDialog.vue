@@ -2,7 +2,7 @@
 import { computed, nextTick, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 import { appearance } from '@/appearance/state'
-import { adminFetch, AdminFetchNotSentError } from '@/http'
+import { adminFetch, AdminFetchNotSentError, reportSessionAuthFailure } from '@/http'
 import { t } from '@/i18n'
 import AppButton from '@/components/ui/AppButton.vue'
 import {
@@ -124,6 +124,9 @@ function viewRecord(target: Request) {
   clear()
   router.get(target.href)
 }
+function requestSignal(target: Request) {
+  return AbortSignal.any([target.controller.signal, AbortSignal.timeout(15_000)])
+}
 async function readCurrent(target: Request) {
   const response = await adminFetch(target.href, {
     headers: {
@@ -132,7 +135,7 @@ async function readCurrent(target: Request) {
       Accept: 'text/html, application/xhtml+xml',
     },
     cache: 'no-store',
-    signal: target.controller.signal,
+    signal: requestSignal(target),
     redirect: 'error',
   })
   if (target.controller.signal.aborted) return
@@ -200,12 +203,25 @@ async function submit(event: SubmitEvent) {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ _revision: target.record.revision, params: values.value }),
       redirect: 'error',
-      signal: target.controller.signal,
+      signal: requestSignal(target),
     })
     if (target.controller.signal.aborted) return
     if (response.status === 204) return viewRecord(target)
     if ([401, 403, 404].includes(response.status)) return clear('Record access denied')
-    if (response.status === 409) return await recheck(target)
+    if (response.status === 419 || response.status === 409) {
+      const marked = response.headers.get('x-goadmin-auth-error') === '1'
+      if (marked) {
+        const body = await response.json().catch(() => null)
+        if (target.controller.signal.aborted) return
+        if (reportSessionAuthFailure(response.status, response.headers, body, false)) {
+          if (response.status === 409) return clear('Record access denied')
+          // adminFetch started CSRF repair. A manual submit joins its readiness gate.
+          pending.value = false
+          notice.value = 'The action was not performed. Confirm again after access is restored.'
+          return
+        }
+      } else if (response.status === 409) return await recheck(target)
+    }
     if (response.status === 422) {
       const result = await response.json()
       if (target.controller.signal.aborted) return

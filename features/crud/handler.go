@@ -730,7 +730,7 @@ func (h *handler[R, C, U]) listURL(c fiber.Ctx) string {
 }
 
 func (h *handler[R, C, U]) visibleActions(ctx context.Context) []Action[R] {
-	if h.readOnly || integrationroles.RolePreviewActive(ctx) {
+	if len(h.d.Actions) == 0 || h.readOnly || integrationroles.RolePreviewActive(ctx) {
 		return []Action[R]{}
 	}
 	return h.d.Actions

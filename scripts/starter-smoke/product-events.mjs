@@ -91,12 +91,29 @@ export async function productEventsAcceptance({ page, context, browser, config, 
     await mobile.close()
   }
 
-  const all = await context.request.get(journal + '/data?' + new URLSearchParams({ search: id, limit: '100' }))
-  assert.equal(all.status(), 200)
-  const rows = (await all.json()).data.map(row => row.item)
-  assert.ok(rows.every(row => row.productId === id && !Object.hasOwn(row, 'reason')))
-  const removals = rows.filter(row => row.action === 'unpublish')
+  // Bury the archived reasons beneath more rows than one maximum-size page.
+  ownedSQL(config, `INSERT INTO starter_product_events(owner_admin_id, product_id, action, created_at)
+    SELECT event.owner_admin_id, event.product_id, 'updated', '2100-01-01 00:00:00+00'
+    FROM (SELECT owner_admin_id, product_id FROM starter_product_events
+          WHERE product_id='${id}' ORDER BY id DESC LIMIT 1) AS event, generate_series(1, 101)`)
+  await page.goto(journal + '?' + new URLSearchParams({ search: id }))
+  const filterPanel = page.locator('[data-part="filters"]')
+  await filterPanel.getByRole('button', { name: 'Filters', exact: true }).click()
+  await filterPanel.getByRole('combobox').click()
+  const [filtered] = await Promise.all([
+    page.waitForResponse(r => {
+      const url = new URL(r.url())
+      return url.pathname === journal + '/data' && url.searchParams.get('search') === id &&
+        url.searchParams.get('action') === 'unpublish'
+    }),
+    page.getByRole('option', { name: 'Unpublished', exact: true }).click(),
+  ])
+  assert.equal(filtered.status(), 200)
+  const resultPage = await filtered.json()
+  const removals = resultPage.data.map(row => row.item)
   assert.equal(removals.length, 2, 'Validation and revision conflicts must leave no extra journal entry')
+  assert.ok(removals.every(row => row.productId === id && row.action === 'unpublish' && !Object.hasOwn(row, 'reason')))
+  await expect(page.locator('[data-part="table"] tbody tr')).toHaveCount(2)
   const reasons = []
   for (const removal of removals) {
     await page.goto(journal + '/records/' + removal.id)

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -410,6 +411,20 @@ func previewPage(t *testing.T, app *fiber.App, path string) map[string]any {
 	props, ok := page["props"].(map[string]any)
 	require.True(t, ok)
 	return props
+}
+
+func TestPagePropsWithoutBusinessActions(t *testing.T) {
+	app := mounted(t, definition(), false, false)
+	fixture, err := os.ReadFile("../../resources/src/js/Pages/crud/no-business-actions.test.json")
+	require.NoError(t, err)
+	for _, path := range []string{"/people", "/people/records/42"} {
+		props := previewPage(t, app, path)
+		resource, ok := props["resource"].(map[string]any)
+		require.True(t, ok)
+		encoded, err := json.Marshal(resource)
+		require.NoError(t, err)
+		require.JSONEq(t, string(fixture), string(encoded))
+	}
 }
 
 func TestPreviewSuppressesMutationMetadata(t *testing.T) {

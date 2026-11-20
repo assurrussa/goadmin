@@ -3,7 +3,12 @@ import { createApp, h, nextTick, reactive } from 'vue'
 import { applyLocale } from '@/i18n'
 import { appearance } from '@/appearance/state'
 import { router } from '@inertiajs/vue3'
-import { adminFetch, AdminFetchNotSentError, SessionReadinessError } from '@/http'
+import {
+  adminFetch,
+  AdminFetchNotSentError,
+  sessionCoordinator,
+  SessionReadinessError,
+} from '@/http'
 import ActionDialog from './ActionDialog.vue'
 import type { CrudAction, CrudResource, CrudRecord } from './index'
 
@@ -262,3 +267,58 @@ it('clears the previous owner’s reason when the re-read identifies a different
   expect(document.body.textContent).not.toContain('Private')
   expect(router.get).not.toHaveBeenCalled()
 })
+
+it('keeps the original draft for manual confirmation after a marked 419', async () => {
+  const enabled = vi.spyOn(sessionCoordinator, 'isEnabled').mockReturnValue(true)
+  try {
+    fetch.mockResolvedValueOnce(
+      Response.json(
+        { status: 419, code: 'csrf_needs_sync' },
+        { status: 419, headers: { 'x-goadmin-auth-error': '1' } },
+      ),
+    )
+    await write('  original reason  ')
+    accept()
+    await vi.waitFor(() => expect(dialog()!.textContent).toContain('Confirm again'))
+    expect(input().value).toBe('  original reason  ')
+    expect(fetch).toHaveBeenCalledTimes(1)
+    fetch.mockResolvedValueOnce(new Response(null, { status: 204 }))
+    accept()
+    await vi.waitFor(() => expect(router.get).toHaveBeenCalledWith(back))
+    expect(fetch).toHaveBeenCalledTimes(2)
+  } finally {
+    enabled.mockRestore()
+  }
+})
+it.each(['POST', 'GET'])(
+  'bounds a stalled %s and releases the dialog without replay',
+  async (method) => {
+    const timeout = new AbortController()
+    const deadline = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeout.signal)
+    try {
+      if (method === 'GET') fetch.mockResolvedValueOnce(new Response(null, { status: 409 }))
+      fetch.mockImplementationOnce(
+        (_url, init) =>
+          new Promise((_resolve, reject) => {
+            init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason))
+          }),
+      )
+      await write('Reason')
+      accept()
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(method === 'POST' ? 1 : 2))
+      expect(deadline).toHaveBeenCalledWith(15_000)
+      timeout.abort()
+      await vi.waitFor(() =>
+        expect(dialog()!.textContent).toContain(
+          method === 'POST' ? 'The outcome is unknown' : 'Its current values could not be loaded',
+        ),
+      )
+      expect(
+        dialog()!.querySelector<HTMLButtonElement>('[data-confirmation-cancel]')?.disabled,
+      ).toBe(false)
+      expect(fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
+    } finally {
+      deadline.mockRestore()
+    }
+  },
+)

@@ -89,7 +89,8 @@ func fieldValue(f Field, t reflect.Type, raw json.RawMessage) (any, error) {
 	if integer, err := number.Int64(); err == nil {
 		return integer, nil
 	}
-	return number.Float64()
+	// Preserve the validated decimal token through JSON and CSV projection.
+	return number, nil
 }
 
 func decodeScalar(f Field, t reflect.Type, raw json.RawMessage) (any, error) {
