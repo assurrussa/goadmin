@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +16,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"example.com/goadmin-starter/internal/productjournal"
 )
 
 func TestMain(m *testing.M) {
@@ -58,14 +61,17 @@ func TestStdioJournal(t *testing.T) {
 			}
 			row := journalRow{ID: "12", ProductID: "9", Action: "unpublish", CreatedAt: "2026-01-01 00:00:00 UTC"}
 			if strings.HasSuffix(r.URL.Path, "/search") {
-				var in searchInput
+				var in productjournal.SearchInput
 				if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.ProductID != "9" || in.Action != "unpublish" {
 					t.Error("search query did not reach the journal")
+				}
+				if page, size := in.Pagination(); page != 1 || size != 25 {
+					t.Errorf("default page and size: got %d, %d", page, size)
 				}
 				_ = json.NewEncoder(w).Encode(searchOutput{Rows: []journalRow{row}, Total: 1})
 				return
 			}
-			var in getInput
+			var in productjournal.GetInput
 			if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 				t.Error(err)
 			}
@@ -128,11 +134,19 @@ func TestStdioJournal(t *testing.T) {
 		return payload
 	}
 	const search, get = "search_product_events", "get_product_event"
-	query := searchInput{ProductID: "9", Action: "unpublish"}
+	query := productjournal.SearchInput{ProductID: "9", Action: "unpublish"}
 	if res, err := session.CallTool(ctx, &mcp.CallToolParams{Name: search, Arguments: map[string]any{"product_id": "9", "admin_id": 3}}); err != nil || !res.IsError {
 		t.Fatal("unexpected arguments were accepted", err)
 	}
-	call(search, searchInput{ProductID: "9", PageSize: new(101)}, "invalid_input")
+	call(search, productjournal.SearchInput{ProductID: "9", Page: new(0)}, "invalid_input")
+	call(search, productjournal.SearchInput{ProductID: "9", PageSize: new(0)}, "invalid_input")
+	call(search, productjournal.SearchInput{ProductID: "9", PageSize: new(101)}, "invalid_input")
+	call(search, productjournal.SearchInput{ProductID: "Product 9"}, "invalid_input")
+	call(get, productjournal.GetInput{EventID: "0"}, "invalid_input")
+	call(search, productjournal.SearchInput{ProductID: "9", Page: new(math.MaxInt/2 + 1)}, "invalid_input")
+	if pairCalls.Load() != 0 {
+		t.Fatal("invalid journal input started a connection request")
+	}
 	need := call(search, query, "authorization_required")
 	pending := call(search, query, "authorization_pending")
 	if pairCalls.Load() != 1 || need["code"] != "123456" || need["verification_url"] != gateway.URL+"/verify" || pending["code"] != need["code"] {
@@ -142,19 +156,22 @@ func TestStdioJournal(t *testing.T) {
 	result := call(search, query, "")
 	rows := result["rows"].([]any)
 	row := rows[0].(map[string]any)
-	if result["total"] != float64(1) || row["id"] != "12" || row["reason"] != nil {
+	if result["total"] != float64(1) || row["id"] != "12" {
 		t.Fatal(result)
 	}
-	if detail := call(get, getInput{EventID: "12"}, ""); detail["reason"] != reason || detail["id"] != row["id"] {
+	if _, listedReason := row["reason"]; listedReason {
+		t.Fatal("search returned a reason field")
+	}
+	if detail := call(get, productjournal.GetInput{EventID: "12"}, ""); detail["reason"] != reason || detail["id"] != row["id"] {
 		t.Fatal(detail)
 	}
-	if r, ok := call(get, getInput{EventID: "13"}, "")["reason"]; !ok || r != nil {
+	if r, ok := call(get, productjournal.GetInput{EventID: "13"}, "")["reason"]; !ok || r != nil {
 		t.Fatal("missing historical null")
 	}
-	call(get, getInput{EventID: "404"}, "not_found")
+	call(get, productjournal.GetInput{EventID: "404"}, "not_found")
 	revoked.Store(true)
-	call(get, getInput{EventID: "12"}, "authorization_expired")
-	call(get, getInput{EventID: "12"}, "authorization_required")
+	call(get, productjournal.GetInput{EventID: "12"}, "authorization_expired")
+	call(get, productjournal.GetInput{EventID: "12"}, "authorization_required")
 	if pairCalls.Load() != 2 {
 		t.Fatal("new pairing was not started after revocation")
 	}

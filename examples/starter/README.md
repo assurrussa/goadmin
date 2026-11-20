@@ -257,7 +257,9 @@ Use the origin configured as `ADMIN_URL`. Plain HTTP is supported on loopback;
 use HTTPS for a remote starter. The client needs no database credentials.
 
 1. Call `search_product_events` with a product number as text and
-   `action: "unpublish"`. On the first call the program supplies a verification
+   `action: "unpublish"`. Use the positive decimal ID shown in the journal,
+   for example `"47"`. The client checks IDs and pagination before it asks for
+   access. On the first valid call the program supplies a verification
    URL and a five-minute code. Open the URL in the starter, enter the code from
    your own client and choose **Allow reading**.
 2. Repeat the search. It returns the event IDs and the same scoped result

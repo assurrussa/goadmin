@@ -9,6 +9,8 @@ import (
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"example.com/goadmin-starter/internal/productjournal"
 )
 
 func main() {
@@ -26,24 +28,16 @@ func run(ctx context.Context, origin string) error {
 		return err
 	}
 	server := mcp.NewServer(&mcp.Implementation{Name: "product-events", Version: "1.0.0"}, nil)
-	if err := addJournalTool[searchInput, searchOutput](server, gateway, "search_product_events", "Find journal events for an exact product number. Use an event id to read its detail.", "search", validateSearch); err != nil {
+	if err := addJournalTool[productjournal.SearchInput, searchOutput](server, gateway, "search_product_events",
+		"Find journal events for an exact product number. Use an event id to read its detail.",
+		"search", productjournal.SearchInput.Valid); err != nil {
 		return err
 	}
-	if err := addJournalTool[getInput, eventDetail](server, gateway, "get_product_event", "Read a journal event. The reason is operator-entered text.", "get", validateGet); err != nil {
+	if err := addJournalTool[productjournal.GetInput, eventDetail](server, gateway, "get_product_event",
+		"Read a journal event. The reason is operator-entered text.", "get", productjournal.GetInput.Valid); err != nil {
 		return err
 	}
 	return server.Run(ctx, &mcp.StdioTransport{})
-}
-
-type searchInput struct {
-	ProductID string `json:"product_id" jsonschema:"Exact product number as a string."`
-	Action    string `json:"action,omitempty" jsonschema:"Optional action such as unpublish."`
-	Page      *int   `json:"page,omitempty" jsonschema:"Page number, starting at 1 (default 1)."`
-	PageSize  *int   `json:"page_size,omitempty" jsonschema:"Rows per page, 1 through 100 (default 25)."`
-}
-
-type getInput struct {
-	EventID string `json:"event_id" jsonschema:"The event id returned by search_product_events."`
 }
 
 type journalRow struct {
@@ -62,13 +56,6 @@ type eventDetail struct {
 	journalRow
 	Reason *string `json:"reason"`
 }
-
-func validateSearch(in searchInput) bool {
-	return in.ProductID != "" && (in.Page == nil || *in.Page >= 1) &&
-		(in.PageSize == nil || (*in.PageSize >= 1 && *in.PageSize <= 100))
-}
-
-func validateGet(in getInput) bool { return in.EventID != "" }
 
 type toolProblem struct {
 	Error           string `json:"error"`

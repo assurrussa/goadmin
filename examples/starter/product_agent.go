@@ -6,14 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"math"
 	"mime"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
+
+	"example.com/goadmin-starter/internal/productjournal"
 
 	"github.com/assurrussa/goadmin/features/crud"
 	"github.com/assurrussa/goadmin/host"
@@ -145,26 +145,17 @@ func agentFailure(c fiber.Ctx, err error) error {
 	}
 }
 
-func validJournalID(id string) bool {
-	n, err := strconv.ParseInt(id, 10, 64)
-	return err == nil && n > 0 && strconv.FormatInt(n, 10) == id
-}
-
 func (h *journalAgent) search(c fiber.Ctx) error {
 	ctx, actor, err := h.actor(c)
 	if err != nil {
 		return agentFailure(c, err)
 	}
-	request := struct {
-		Product string `json:"product_id"`
-		Action  string `json:"action"`
-		Page    int    `json:"page"`
-		Limit   int    `json:"page_size"`
-	}{Page: 1, Limit: 25}
-	if !readAgentJSON(c, &request) || !validJournalID(request.Product) || request.Limit < 1 || request.Limit > 100 || request.Page < 1 || request.Page > math.MaxInt/request.Limit {
+	var request productjournal.SearchInput
+	if !readAgentJSON(c, &request) || !request.Valid() {
 		return agentJSON(c, 422, "invalid_request")
 	}
-	filters := datagrid.Filters{Page: request.Page, Limit: request.Limit, Fields: map[string]any{"productId": request.Product}}
+	page, size := request.Pagination()
+	filters := datagrid.Filters{Page: page, Limit: size, Fields: map[string]any{"productId": request.ProductID}}
 	if request.Action != "" {
 		filters.Fields["action"] = request.Action
 	}
@@ -188,13 +179,11 @@ func (h *journalAgent) get(c fiber.Ctx) error {
 	if err != nil {
 		return agentFailure(c, err)
 	}
-	var request struct {
-		ID string `json:"event_id"`
-	}
-	if !readAgentJSON(c, &request) || !validJournalID(request.ID) {
+	var request productjournal.GetInput
+	if !readAgentJSON(c, &request) || !request.Valid() {
 		return agentJSON(c, 422, "invalid_request")
 	}
-	row, err := h.reader.Get(ctx, actor, request.ID)
+	row, err := h.reader.Get(ctx, actor, request.EventID)
 	if err != nil {
 		return agentFailure(c, err)
 	}
