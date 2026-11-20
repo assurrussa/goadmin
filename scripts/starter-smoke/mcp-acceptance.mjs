@@ -6,6 +6,11 @@ const gateway = '/agent/product-events'
 const connect = gateway + '/connect'
 const search = 'search_product_events'
 const get = 'get_product_event'
+const decisionNames = {
+  approve: /^(Allow reading|Разрешить чтение)$/,
+  deny: /^(Deny|Отклонить)$/,
+  revoke: /^(Revoke|Отозвать)$/,
+}
 
 async function json(context, url) {
   const response = await context.request.get(url, { maxRedirects: 0 })
@@ -60,7 +65,7 @@ async function compareDetail(client, browserPage, row, expect) {
   assert.deepEqual(detail, { ...row, reason: detail.reason })
   assert.ok(detail.reason === null || typeof detail.reason === 'string')
   await browserPage.goto(journal + '/records/' + row.id)
-  const field = browserPage.locator('dl > div').filter({ has: browserPage.getByText('Reason', { exact: true }) }).locator('dd')
+  const field = browserPage.locator('dl > div').filter({ has: browserPage.getByText(/^(Reason|Причина)$/) }).locator('dd')
   await expect(field).toBeVisible()
   assert.equal(await field.textContent(), detail.reason ?? '—')
   return detail.reason
@@ -80,19 +85,19 @@ async function setJournalPermission(page, id, enabled, expect) {
   await expect(page.locator('form[aria-busy="true"]')).toHaveCount(0)
 }
 
-async function decide(page, button, scope = page) {
+async function decide(page, decision, scope = page) {
   const [reply] = await Promise.all([
     page.waitForResponse(r => new URL(r.url()).pathname === connect && r.request().method() === 'POST'),
-    scope.getByRole('button', { name: button, exact: true }).click(),
+    scope.getByRole('button', { name: decisionNames[decision] }).click(),
   ])
-  assert.equal(reply.status(), 200, button)
+  assert.equal(reply.status(), 200, decision)
   assert.ok(Array.isArray((await reply.json()).grants))
 }
 
 // Pairing codes and browser sessions stay in memory. In particular these contexts
 // are never traced, screenshotted or exported as storageState by the smoke runner.
 export async function journalMCPAcceptance({ browser, config, credentials, binary, roleSlug, product, reasons,
-  ownedSQL, login, language, logout, expect }) {
+  ownedSQL, login, logout, expect }) {
   const contexts = []
   const clients = []
   const secrets = new Set([credentials.password])
@@ -101,7 +106,6 @@ export async function journalMCPAcceptance({ browser, config, credentials, binar
     contexts.push(context)
     const page = await context.newPage()
     await login(page, email, credentials.password)
-    if (await page.locator('html').getAttribute('lang') !== 'en') await language(page, 'English', 'en')
     return { context, page }
   }
   async function newClient() {
@@ -109,7 +113,7 @@ export async function journalMCPAcceptance({ browser, config, credentials, binar
     clients.push(client)
     return client
   }
-  async function pair(client, operator, args, button = 'Allow reading') {
+  async function pair(client, operator, args, decision = 'approve') {
     const instruction = await call(client, search, args, 'authorization_required')
     assert.ok(typeof instruction.code === 'string' && /^[A-Z2-7]{5}-[A-Z2-7]{5}$/.test(instruction.code), 'expected pairing code')
     secrets.add(instruction.code)
@@ -120,7 +124,7 @@ export async function journalMCPAcceptance({ browser, config, credentials, binar
     const body = { decision: 'approve', code: instruction.code }
     assert.equal((await sessionPost(operator.context, config.url, connect, body, false)).status(), 419)
     await operator.page.locator('input[name="code"]').fill(instruction.code)
-    await decide(operator.page, button)
+    await decide(operator.page, decision)
     assert.equal((await sessionPost(operator.context, config.url, connect, body)).status(), 404, 'a used code cannot approve another grant')
     return instruction.code
   }
@@ -128,6 +132,7 @@ export async function journalMCPAcceptance({ browser, config, credentials, binar
   try {
     const owner = await operator(credentials.email)
     const restricted = await operator(credentials.restrictedEmail)
+    const appearance = await json(restricted.context, '/auth/profile/appearance')
     const roles = await json(owner.context, '/roles/data?limit=100')
     const role = roles.data.find(row => row.item.slug === roleSlug)
     assert.ok(role)
@@ -198,14 +203,15 @@ export async function journalMCPAcceptance({ browser, config, credentials, binar
 
     await owner.page.goto(connect)
     const grant = owner.page.locator('li').filter({ has: owner.page.getByText(approvedCode, { exact: true }) })
-    await decide(owner.page, 'Revoke', grant)
+    await decide(owner.page, 'revoke', grant)
     await call(first, get, ownerEvent, 'authorization_expired')
-    await pair(first, owner, query(product), 'Deny')
+    await pair(first, owner, query(product), 'deny')
     await call(first, search, query(product), 'denied')
     await pair(first, owner, query(product))
     assert.equal((await call(first, get, ownerEvent)).id, ownerEvent.event_id)
     await logout(owner.page)
     await call(first, get, ownerEvent, 'authorization_expired')
+    assert.deepEqual(await json(restricted.context, '/auth/profile/appearance'), appearance)
     return { tools: tools.map(tool => tool.name), archivedReasons: actual.length, historicalNull: true,
       ownerIsolation: true, permissionRevocation: true, rolePreview: true, grantRevocation: true, logout: true }
   } catch (error) {

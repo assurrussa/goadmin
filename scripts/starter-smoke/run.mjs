@@ -553,7 +553,7 @@ async function runCase(name, config) {
     check('Product activity: deleted product, exact search, saved view, same-page return and identical UTC times on desktop and mobile')
     if (manifest.productEventsMCP) {
       if (config.modules.includes('product-events-mcp')) {
-        result.productEventsMCP = await journalMCPAcceptance({ browser, config, credentials, ownedSQL, expect, language,
+        result.productEventsMCP = await journalMCPAcceptance({ browser, config, credentials, ownedSQL, expect,
           login, logout, roleSlug: result.restrictedAccess.role, product: result.productEvents.archivedProduct,
           reasons: [result.crud.unpublish.listReason, result.crud.unpublish.cardReason],
           binary: path.join(folder, 'product-events-mcp') })
