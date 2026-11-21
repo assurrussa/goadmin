@@ -19,14 +19,15 @@ const props = defineProps<{
 const connections = ref(props.grants ?? [])
 const code = ref('')
 const busy = ref(false)
-const notice = ref('')
-const message = ref('')
 type Decision = 'approve' | 'deny' | 'revoke'
+const lastDecision = ref<Decision>()
+const message = ref('')
 
 async function decide(decision: Decision, value: string) {
   if (busy.value) return
   busy.value = true
-  notice.value = message.value = ''
+  lastDecision.value = undefined
+  message.value = ''
   try {
     const response = await adminFetch(props.connectPath, {
       method: 'POST',
@@ -44,12 +45,7 @@ async function decide(decision: Decision, value: string) {
     }
     if (!response.ok) throw new Error()
     connections.value = (await response.json()).grants
-    notice.value =
-      decision === 'approve'
-        ? props.confirmedAction
-          ? 'Connection approved.'
-          : 'Reading allowed.'
-        : 'Access closed.'
+    lastDecision.value = decision
     code.value = ''
   } catch {
     message.value = 'Reload this page to check connection status.'
@@ -100,7 +96,13 @@ async function decide(decision: Decision, value: string) {
         >
       </div>
     </form>
-    <p v-if="notice" role="status">{{ t(notice) }}</p>
+    <p v-if="lastDecision" role="status">
+      <template v-if="lastDecision === 'approve'">
+        {{ t(confirmedAction ? 'Connection approved.' : 'Reading allowed.') }}
+        {{ t('Return to your MCP client and repeat the request.') }}
+      </template>
+      <template v-else>{{ t('Access closed.') }}</template>
+    </p>
     <p v-if="message" role="alert" class="text-error">{{ t(message) }}</p>
     <section v-if="connections.length" class="space-y-3">
       <h2 class="font-semibold">{{ t('Active connections') }}</h2>

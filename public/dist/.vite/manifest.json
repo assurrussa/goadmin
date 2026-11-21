@@ -208,8 +208,8 @@
       "_editor-DHjMAgj7.js"
     ]
   },
-  "_ReadAccess.vue_vue_type_script_setup_true_lang-d9jbpZ2Y.js": {
-    "file": "js/ReadAccess.vue_vue_type_script_setup_true_lang-d9jbpZ2Y.js",
+  "_ReadAccess.vue_vue_type_script_setup_true_lang-CxL1wEq6.js": {
+    "file": "js/ReadAccess.vue_vue_type_script_setup_true_lang-CxL1wEq6.js",
     "name": "ReadAccess.vue_vue_type_script_setup_true_lang",
     "imports": [
       "_editor-DHjMAgj7.js",
@@ -489,12 +489,12 @@
     ]
   },
   "src/js/Pages/agent/ProductEventsAccess.vue": {
-    "file": "js/ProductEventsAccess-DOsuSboC.js",
+    "file": "js/ProductEventsAccess-Bfm_oR-c.js",
     "name": "ProductEventsAccess",
     "src": "src/js/Pages/agent/ProductEventsAccess.vue",
     "isDynamicEntry": true,
     "imports": [
-      "_ReadAccess.vue_vue_type_script_setup_true_lang-d9jbpZ2Y.js",
+      "_ReadAccess.vue_vue_type_script_setup_true_lang-CxL1wEq6.js",
       "_editor-DHjMAgj7.js",
       "_AppHead.vue_vue_type_script_setup_true_lang-BKzE8imW.js",
       "src/js/app.ts",
@@ -504,12 +504,12 @@
     ]
   },
   "src/js/Pages/agent/ReadAccess.vue": {
-    "file": "js/ReadAccess-BlEUU5ZM.js",
+    "file": "js/ReadAccess-BF5Flaw8.js",
     "name": "ReadAccess",
     "src": "src/js/Pages/agent/ReadAccess.vue",
     "isDynamicEntry": true,
     "imports": [
-      "_ReadAccess.vue_vue_type_script_setup_true_lang-d9jbpZ2Y.js",
+      "_ReadAccess.vue_vue_type_script_setup_true_lang-CxL1wEq6.js",
       "_editor-DHjMAgj7.js",
       "_AppHead.vue_vue_type_script_setup_true_lang-BKzE8imW.js",
       "src/js/app.ts",

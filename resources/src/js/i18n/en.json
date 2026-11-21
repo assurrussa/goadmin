@@ -951,6 +951,7 @@
   "Revoke": "Revoke",
   "The code is invalid, expired or already used.": "The code is invalid, expired or already used.",
   "Reading allowed.": "Reading allowed.",
+  "Return to your MCP client and repeat the request.": "Return to your MCP client and repeat the request.",
   "Access closed.": "Access closed.",
   "Reload this page to check connection status.": "Reload this page to check connection status.",
   "Служебные операции": "Maintenance operations",

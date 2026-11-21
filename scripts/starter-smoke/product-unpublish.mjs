@@ -367,10 +367,17 @@ try {
   stage = 'closed connections and deadline'
   const ended = input(id2)
   const open = await propose(first, ended)
+  assert.equal(open.status, 'pending')
   await page.goto('/auth/profile')
   await page.locator('[data-profile-menu-trigger]').click()
   await page.getByRole('menuitem', { name: /^(Выйти|Log out|Logout|Sign out)$/i }).click()
   await expect(page).toHaveURL(/\/auth\/login/)
+  // Observe the browser logout before a subsequent device call can retire the grant.
+  assert.equal(
+    sql(`SELECT state FROM admin_confirmed_actions WHERE actor_admin_id=${owner}
+      AND request_id='${ended.request_id}' AND binding_id IS NULL AND normalized_input IS NULL AND review_fields IS NULL`),
+    'expired',
+  )
   await status(first, ended, 'authorization_expired')
   await login(page)
   await pair(page, first)
