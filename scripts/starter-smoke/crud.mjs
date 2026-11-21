@@ -175,7 +175,12 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   report.form = { id, createRedirectsToEdit: true, saveStaysOnEdit: true, types: ['text', 'textarea', 'number', 'boolean', 'date', 'select'] }
 
   await page.goto(recordPath)
-  const display = label => page.locator('dl > div').filter({ has: page.locator('dt').filter({ hasText: new RegExp(`^${label}$`) }) }).locator('dd')
+  const display = label => page.locator('dl > div').filter({
+    has: page.locator('dt').filter({ hasText: new RegExp(`^${label}`) }),
+  }).locator('dd')
+  await expect(page.locator('dt').filter({ hasText: /^Name/ })).toContainText(
+    'The product name appears in the catalog and in its activity history.',
+  )
   await expect(display('Name')).toHaveText(updatedName)
   await expect(display('Description')).toHaveText('Edited description\nStill multiline')
   await expect(display('Stock')).toHaveText('27')
