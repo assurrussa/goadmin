@@ -1,4 +1,4 @@
-package main
+package mcp
 
 import (
 	"bytes"
@@ -6,50 +6,47 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
-	"strings"
+	"regexp"
 	"sync"
 	"time"
 )
 
-const agentPath = "/agent/product-events/"
+var codePattern = regexp.MustCompile(`^[A-Z2-7]{5}-[A-Z2-7]{5}$`)
 
 type gateway struct {
 	origin *url.URL
+	path   string
 	client *http.Client
 
 	// Only pairing/exchange are serialized. Reads may proceed concurrently.
 	mu         sync.Mutex
-	pending    pairing
+	pending    gatewayPairing
 	token      string
 	validUntil time.Time
 }
 
-type pairing struct {
+type gatewayPairing struct {
 	Code            string `json:"code"`
-	DeviceSecret    string `json:"device_secret"`
-	VerificationURL string `json:"verification_url"`
-	ExpiresIn       int    `json:"expires_in"`
+	DeviceSecret    string `json:"device_secret"`    //nolint:tagliatelle // Existing device protocol.
+	VerificationURL string `json:"verification_url"` //nolint:tagliatelle // Existing device protocol.
+	ExpiresIn       int    `json:"expires_in"`       //nolint:tagliatelle // Existing device protocol.
 }
 
-func newGateway(origin string) (*gateway, error) {
-	u, err := url.Parse(origin)
-	if err != nil || u.Hostname() == "" || u.User != nil || u.Fragment != "" || u.RawQuery != "" ||
-		u.ForceQuery || u.RawPath != "" || (u.Path != "" && u.Path != "/") {
-		return nil, errors.New("provide the starter origin using -admin-url or GOADMIN_URL")
+func newGateway(origin, path string) (*gateway, error) {
+	u, err := adminOrigin(origin)
+	if err != nil {
+		return nil, err
 	}
-	loopback := u.Hostname() == "localhost" || net.ParseIP(u.Hostname()).IsLoopback()
-	if u.Scheme != "https" && !(u.Scheme == "http" && loopback) {
-		return nil, errors.New("use HTTPS or a loopback HTTP origin")
+	if !pathPattern.MatchString(path) {
+		return nil, errors.New("mcp: provide the configured resource path using -resource-path or GOADMIN_MCP_RESOURCE_PATH")
 	}
-	u.Path = ""
 	client := &http.Client{
 		Timeout:       10 * time.Second,
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
 	}
-	return &gateway{origin: u, client: client}, nil
+	return &gateway{origin: u, path: path, client: client}, nil
 }
 
 // post contacts only a route selected by the tool implementation. Neither the
@@ -59,7 +56,8 @@ func (g *gateway) post(ctx context.Context, route, token string, in, out any) (i
 	if err != nil {
 		return 0, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.origin.String()+agentPath+route, bytes.NewReader(data))
+	//nolint:gosec // Origin and path are validated operator configuration, and the tool selects the endpoint.
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.origin.String()+g.path+"/"+route, bytes.NewReader(data))
 	if err != nil {
 		return 0, err
 	}
@@ -68,6 +66,7 @@ func (g *gateway) post(ctx context.Context, route, token string, in, out any) (i
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
+	//nolint:gosec // The client refuses redirects and uses the configured origin.
 	resp, err := g.client.Do(req)
 	if err != nil {
 		return 0, err
@@ -85,7 +84,7 @@ func (g *gateway) post(ctx context.Context, route, token string, in, out any) (i
 }
 
 func gatewayUnavailable() *toolProblem {
-	return &toolProblem{Error: "unavailable", Message: "The starter could not complete the request."}
+	return &toolProblem{Error: "unavailable", Message: "The admin server could not complete the request."}
 }
 
 func (g *gateway) read(ctx context.Context, route string, in, out any) *toolProblem {
@@ -107,12 +106,17 @@ func (g *gateway) read(ctx context.Context, route string, in, out any) *toolProb
 		}
 		g.mu.Unlock()
 		return &toolProblem{Error: "authorization_expired", Message: "Access ended. Request a new connection to continue."}
+	case http.StatusConflict:
+		return &toolProblem{
+			Error: "browser_refresh_required", VerificationURL: g.connectURL(),
+			Message: "Ask the operator to open or refresh the admin page in the same browser session, then retry.",
+		}
 	case http.StatusForbidden:
-		return &toolProblem{Error: "denied", Message: "Access to the journal is denied."}
+		return &toolProblem{Error: "denied", Message: "Access to the resource is denied."}
 	case http.StatusNotFound:
-		return &toolProblem{Error: "not_found", Message: "The event was not found."}
+		return &toolProblem{Error: "not_found", Message: "The record was not found."}
 	case http.StatusUnprocessableEntity, http.StatusBadRequest:
-		return &toolProblem{Error: "invalid_input", Message: "The starter rejected the input."}
+		return &toolProblem{Error: "invalid_input", Message: "The admin server rejected the input."}
 	default:
 		return gatewayUnavailable()
 	}
@@ -122,31 +126,28 @@ func (g *gateway) credential(ctx context.Context) (string, *toolProblem) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if !time.Now().Before(g.validUntil) {
-		g.token, g.pending = "", pairing{}
+		g.token, g.pending = "", gatewayPairing{}
 	}
 	if g.token != "" {
 		return g.token, nil
 	}
 	if g.pending.DeviceSecret == "" {
-		var p pairing
+		var p gatewayPairing
 		status, err := g.post(ctx, "pair", "", struct{}{}, &p)
 		if err != nil || (status != http.StatusOK && status != http.StatusCreated) {
 			return "", gatewayUnavailable()
 		}
-		verify, err := g.origin.Parse(p.VerificationURL)
-		if p.VerificationURL == "" || err != nil || verify.User != nil || verify.Scheme != g.origin.Scheme ||
-			!strings.EqualFold(verify.Host, g.origin.Host) || verify.Fragment != "" ||
-			p.Code == "" || p.DeviceSecret == "" || p.ExpiresIn <= 0 || p.ExpiresIn > 300 {
+		if p.VerificationURL != g.connectURL() || !codePattern.MatchString(p.Code) ||
+			p.DeviceSecret == "" || p.ExpiresIn <= 0 || p.ExpiresIn > int(pairLifetime.Seconds()) {
 			return "", gatewayUnavailable()
 		}
-		p.VerificationURL = verify.String()
 		g.pending, g.validUntil = p, time.Now().Add(time.Duration(p.ExpiresIn)*time.Second)
 		return "", p.instructions("authorization_required")
 	}
 
 	var grant struct {
-		Token     string `json:"access_token"`
-		ExpiresIn int    `json:"expires_in"`
+		Token     string `json:"access_token"` //nolint:tagliatelle // Existing device protocol.
+		ExpiresIn int    `json:"expires_in"`   //nolint:tagliatelle // Existing device protocol.
 	}
 	status, err := g.post(ctx, "token", "", map[string]string{"device_secret": g.pending.DeviceSecret}, &grant)
 	if err != nil {
@@ -156,26 +157,30 @@ func (g *gateway) credential(ctx context.Context) (string, *toolProblem) {
 	case http.StatusAccepted:
 		return "", g.pending.instructions("authorization_pending")
 	case http.StatusOK:
-		g.pending = pairing{}
-		if grant.Token == "" || grant.ExpiresIn <= 0 || grant.ExpiresIn > 900 {
+		g.pending = gatewayPairing{}
+		if grant.Token == "" || grant.ExpiresIn <= 0 || grant.ExpiresIn > int(grantLifetime.Seconds()) {
 			return "", gatewayUnavailable()
 		}
 		g.token, g.validUntil = grant.Token, time.Now().Add(time.Duration(grant.ExpiresIn)*time.Second)
 		return g.token, nil
 	case http.StatusForbidden:
-		g.pending = pairing{}
+		g.pending = gatewayPairing{}
 		return "", &toolProblem{Error: "denied", Message: "The operator denied this connection request."}
 	case http.StatusGone:
-		g.pending = pairing{}
-		return "", &toolProblem{Error: "authorization_expired", Message: "This connection request has expired. Request a new connection to continue."}
+		g.pending = gatewayPairing{}
+		return "", &toolProblem{
+			Error: "authorization_expired", Message: "This connection request has expired. Request a new connection to continue.",
+		}
 	default:
 		return "", gatewayUnavailable()
 	}
 }
 
-func (p pairing) instructions(code string) *toolProblem {
+func (g *gateway) connectURL() string { return g.origin.String() + g.path + "/connect" }
+
+func (p gatewayPairing) instructions(code string) *toolProblem {
 	return &toolProblem{
 		Error: code, VerificationURL: p.VerificationURL, Code: p.Code,
-		Message: "Ask the operator to open the verification URL, match the code and approve journal access. Retry after approval.",
+		Message: "Ask the operator to open the verification URL, match the code and approve read access. Retry after approval.",
 	}
 }

@@ -11,6 +11,14 @@ import (
 	"github.com/assurrussa/goadmin/toolkit/datagrid"
 )
 
+const (
+	eventProductHelp  = "Number of the product to which the event belongs."
+	eventActionHelp   = "Journaled operation, such as unpublish."
+	eventTimeHelp     = "When the event happened, in UTC."
+	eventReasonHelp   = "Reason entered by the operator when unpublishing, if recorded."
+	productEventsHelp = "Read the operator's product event journal."
+)
+
 type productEvent struct {
 	ProductID string  `json:"productId"`
 	Action    string  `json:"action"`
@@ -102,17 +110,20 @@ func authorizeProductEvent(_ context.Context, actor host.Actor, event crud.ReadO
 	return nil
 }
 
-func productEventsModule(db *sql.DB, adapter *crud.ReadOnlyAdapter) (host.Module, error) {
-	repo := productRepo{db}
-	permission := host.NewPermissionKey("product_events", "read")
-	const title = "Журнал действий с товарами"
-	actions := []crud.Option{
+func productEventActions() []crud.Option {
+	return []crud.Option{
 		{Value: "created", Label: "Создан"},
 		{Value: "updated", Label: "Обновлён"},
 		{Value: "publish", Label: "Опубликован"},
 		{Value: "unpublish", Label: "Снят с публикации"},
 		{Value: "deleted", Label: "Удалён"},
 	}
+}
+
+func productEventsModule(db *sql.DB, adapter *crud.ReadOnlyAdapter) (host.Module, error) {
+	repo := productRepo{db}
+	permission := host.NewPermissionKey(productEventsPermission, "read")
+	actions := productEventActions()
 	badges := make(map[string]map[string]string, len(actions))
 	filterOptions := make([]map[string]string, 0, len(actions))
 	for _, action := range actions {
@@ -120,15 +131,15 @@ func productEventsModule(db *sql.DB, adapter *crud.ReadOnlyAdapter) (host.Module
 		badges[action.Value] = map[string]string{"label": action.Label, "variant": "secondary"}
 	}
 	definition := crud.ReadOnlyDefinition[productEvent]{
-		Key: "product-events", BasePath: "/product-events", Title: title, Permission: permission,
+		Key: "product-events", BasePath: productEventsPath, Title: productEventsTitle, Description: productEventsHelp, Permission: permission,
 		Menu: host.Menu{Sections: []host.Section{{Key: "products", Title: "Products", Items: []host.Item{
-			{Name: title, Href: "/product-events", Icon: "content", PermissionKey: permission},
+			{Name: productEventsTitle, Href: productEventsPath, Icon: "content", PermissionKey: permission},
 		}}}},
 		Fields: []crud.Field{
-			{Key: "productId", Label: "Номер товара", Type: "text", Read: true},
-			{Key: "action", Label: "Действие", Type: "select", Options: actions, Read: true},
-			{Key: "createdAt", Label: "Время (UTC)", Type: "text", Read: true},
-			{Key: unpublishReason.Key, Label: unpublishReason.Label, Type: unpublishReason.Type, Read: true},
+			{Key: "productId", Description: eventProductHelp, Label: "Номер товара", Type: "text", Read: true},
+			{Key: "action", Description: eventActionHelp, Label: "Действие", Type: "select", Options: actions, Read: true},
+			{Key: "createdAt", Description: eventTimeHelp, Label: "Время (UTC)", Type: "text", Read: true},
+			{Key: unpublishReason.Key, Description: eventReasonHelp, Label: unpublishReason.Label, Type: unpublishReason.Type, Read: true},
 		},
 		Columns: []datagrid.Column{
 			{Key: "productId", Label: "Номер товара", Type: "text", Filterable: true},

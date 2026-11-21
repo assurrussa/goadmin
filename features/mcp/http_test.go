@@ -1,7 +1,8 @@
-package main
+package mcp //nolint:testpackage // Exercise the unexported MCP transport and grant state.
 
 import (
 	"encoding/json"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -23,13 +24,13 @@ func TestAgentPairingQuotaIsLocalToSource(t *testing.T) {
 		{name: "trusted proxy", proxy: netip.MustParseAddr("192.0.2.1")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			h := journalAgent{grants: newJournalGrants(), origin: origin, trustedProxy: tc.proxy}
+			h := newHandler(nil, Config{Origin: origin, TrustedProxy: tc.proxy}, testResource(), nil)
 			now := time.Now()
 			h.grants.now = func() time.Time { return now }
 			pair := func(client netip.Addr) int {
 				t.Helper()
 				peer := client
-				req := httptest.NewRequest(http.MethodPost, origin+agentPath+"/pair", nil)
+				req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, origin+testResourcePath+"/pair", nil)
 				if tc.proxy.IsValid() {
 					peer = tc.proxy
 					req.Header.Set("X-Real-IP", client.String())
@@ -70,11 +71,11 @@ func TestAgentPairingQuotaIsLocalToSource(t *testing.T) {
 func TestAgentDeviceRoutesAreSeparateFromOperatorApproval(t *testing.T) {
 	const origin = "http://localhost:8080"
 	app := fiber.New()
-	h := journalAgent{grants: newJournalGrants(), origin: origin}
+	h := newHandler(nil, Config{Origin: origin}, testResource(), nil)
 	h.registerDevice(app)
-	request := func(path, body string, headers map[string]string) *http.Response {
+	request := func(path, body string, headers map[string]string, want int) (http.Header, []byte) {
 		t.Helper()
-		req := httptest.NewRequest(http.MethodPost, origin+agentPath+path, strings.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, origin+testResourcePath+path, strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		for k, v := range headers {
 			req.Header.Set(k, v)
@@ -83,39 +84,33 @@ func TestAgentDeviceRoutesAreSeparateFromOperatorApproval(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Cleanup(func() { _ = resp.Body.Close() })
-		return resp
-	}
-	for _, headers := range []map[string]string{{"Origin": origin}, {"Cookie": "goadmin_session=unused"}, {"Sec-Fetch-Site": "same-origin"}} {
-		if result := request("/pair", "{}", headers); result.StatusCode != 403 {
-			t.Fatalf("browser request returned %d", result.StatusCode)
+		defer resp.Body.Close()
+		if resp.StatusCode != want {
+			t.Fatalf("%s returned %d, want %d", path, resp.StatusCode, want)
 		}
+		raw, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp.Header, raw
 	}
-	if result := request("/connect", "{}", nil); result.StatusCode != 404 {
-		t.Fatal("approval was publicly mounted")
+	for _, headers := range []map[string]string{
+		{"Origin": origin}, {"Cookie": "goadmin_session=unused"}, {"Sec-Fetch-Site": "same-origin"},
+	} {
+		request("/pair", "{}", headers, http.StatusForbidden)
 	}
-	if result := request("/get", `{"event_id":"1"}`, nil); result.StatusCode != 401 {
-		t.Fatalf("unpaired lookup returned %d", result.StatusCode)
+	request("/connect", "{}", nil, http.StatusNotFound)
+	request("/get", `{"reading_id":"1"}`, nil, http.StatusUnauthorized)
+	request("/pair", `{"actor":"9"}`, nil, http.StatusBadRequest)
+	headers, pair := request("/pair", "{}", nil, http.StatusOK)
+	if headers.Get("Cache-Control") != "no-store" {
+		t.Fatal("pairing response is cacheable")
 	}
-	if result := request("/pair", `{"actor":"9"}`, nil); result.StatusCode != 400 {
-		t.Fatalf("unrecognized input returned %d", result.StatusCode)
-	}
-	pair := request("/pair", "{}", nil)
-	if pair.StatusCode != 200 || pair.Header.Get("Cache-Control") != "no-store" {
-		t.Fatalf("pairing status %d", pair.StatusCode)
-	}
-	var data struct {
-		Code   string
-		Secret string `json:"device_secret"`
-		URL    string `json:"verification_url"`
-	}
-	if err := json.NewDecoder(pair.Body).Decode(&data); err != nil || data.Code == "" || data.Secret == "" || data.URL != origin+connectPath {
+	var data gatewayPairing
+	if err := json.Unmarshal(pair, &data); err != nil || data.Code == "" || data.DeviceSecret == "" ||
+		data.VerificationURL != origin+h.connectPath() {
 		t.Fatal("incomplete device response", err)
 	}
-	if r := request("/token", `{"device_secret":"`+data.Code+`"}`, nil); r.StatusCode != 410 {
-		t.Fatal("human code accepted as device credential")
-	}
-	if r := request("/token", `{"device_secret":"`+data.Secret+`"}`, nil); r.StatusCode != 202 {
-		t.Fatal("device polling did not await approval")
-	}
+	request("/token", `{"device_secret":"`+data.Code+`"}`, nil, http.StatusGone)
+	request("/token", `{"device_secret":"`+data.DeviceSecret+`"}`, nil, http.StatusAccepted)
 }

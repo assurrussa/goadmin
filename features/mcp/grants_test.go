@@ -1,4 +1,4 @@
-package main
+package mcp //nolint:testpackage // Exercise the unexported MCP transport and grant state.
 
 import (
 	"net/http"
@@ -11,11 +11,13 @@ import (
 	"github.com/assurrussa/goadmin/host"
 )
 
-func TestJournalGrantOwnerAndExpiry(t *testing.T) {
-	store := newJournalGrants()
+const testOwnerSubject = "owner"
+
+func TestJournalGrantOwnerAndExpiry(t *testing.T) { //nolint:gocyclo // One grant lifecycle is checked end to end.
+	store := newGrantStore()
 	now := time.Date(2026, 11, 21, 10, 0, 0, 0, time.UTC)
 	store.now = func() time.Time { return now }
-	owner := host.Actor{AdminID: 1, SubjectID: "owner"}
+	owner := host.Actor{AdminID: 1, SubjectID: testOwnerSubject}
 	other := host.Actor{AdminID: 2, SubjectID: "other"}
 	var pin host.ReadSessionBinding // Only the host's session service creates usable pins.
 
@@ -78,7 +80,7 @@ func TestJournalGrantOwnerAndExpiry(t *testing.T) {
 }
 
 func TestJournalGrantConcurrentDecisionsAndExchange(t *testing.T) {
-	store := newJournalGrants()
+	store := newGrantStore()
 	code, secret, ok := store.start(netip.IPv6Loopback())
 	if !ok {
 		t.Fatal("pairing unavailable")
@@ -130,9 +132,9 @@ func TestJournalGrantConcurrentDecisionsAndExchange(t *testing.T) {
 }
 
 func TestJournalPairingQuotaFollowsPendingDecisions(t *testing.T) {
-	owner := host.Actor{AdminID: 1, SubjectID: "owner"}
+	owner := host.Actor{AdminID: 1, SubjectID: testOwnerSubject}
 	for _, approve := range []bool{true, false} {
-		store := newJournalGrants()
+		store := newGrantStore()
 		first := netip.MustParseAddr("2001:db8:1::10")
 		sameSubnet := netip.MustParseAddr("2001:db8:1::20")
 		var code string
@@ -159,7 +161,7 @@ func TestJournalPairingQuotaFollowsPendingDecisions(t *testing.T) {
 }
 
 func TestJournalPairingPreservesGlobalCapacity(t *testing.T) {
-	store := newJournalGrants()
+	store := newGrantStore()
 	expires := store.now().Add(grantLifetime)
 	for i := range maxAgentRequests - 1 {
 		store.tokens[[32]byte{byte(i)}] = readGrant{expires: expires}
@@ -173,7 +175,7 @@ func TestJournalPairingPreservesGlobalCapacity(t *testing.T) {
 }
 
 func TestJournalPairingReservesLastSourceSlotOnce(t *testing.T) {
-	store := newJournalGrants()
+	store := newGrantStore()
 	source := netip.MustParseAddr("192.0.2.10")
 	for range maxPendingPerSource - 1 {
 		if _, _, ok := store.start(source); !ok {
@@ -197,9 +199,9 @@ func TestJournalPairingReservesLastSourceSlotOnce(t *testing.T) {
 }
 
 func TestJournalGrantRevokeRacingExchange(t *testing.T) {
-	owner := host.Actor{AdminID: 1, SubjectID: "owner"}
+	owner := host.Actor{AdminID: 1, SubjectID: testOwnerSubject}
 	for range 32 {
-		store := newJournalGrants()
+		store := newGrantStore()
 		code, secret, ok := store.start(netip.IPv6Loopback())
 		if !ok || !store.decide(code, true, owner, host.ReadSessionBinding{}) {
 			t.Fatal("failed to approve pairing")

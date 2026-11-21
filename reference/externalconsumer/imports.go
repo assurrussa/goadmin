@@ -7,6 +7,7 @@ import (
 	_ "github.com/assurrussa/goadmin/features/authmail"
 	_ "github.com/assurrussa/goadmin/features/crud"
 	_ "github.com/assurrussa/goadmin/features/jobs"
+	_ "github.com/assurrussa/goadmin/features/mcp"
 	_ "github.com/assurrussa/goadmin/features/notifications"
 	_ "github.com/assurrussa/goadmin/features/operations"
 	_ "github.com/assurrussa/goadmin/features/profile"

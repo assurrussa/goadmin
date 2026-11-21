@@ -62,6 +62,7 @@ published support. Host projects should integrate only through:
 - `github.com/assurrussa/goadmin/features/realtime`
 - `github.com/assurrussa/goadmin/features/authmail`
 - `github.com/assurrussa/goadmin/features/crud`
+- `github.com/assurrussa/goadmin/features/mcp`
 - `github.com/assurrussa/goadmin/features/users`
 - `github.com/assurrussa/goadmin/toolkit/datagrid`
 - `github.com/assurrussa/goadmin/toolkit/formvalidator`

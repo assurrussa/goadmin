@@ -1,4 +1,4 @@
-package main
+package mcp
 
 import (
 	"crypto/rand"
@@ -36,20 +36,20 @@ type pairing struct {
 
 // All transitions, including a one-time exchange racing revocation, hold mu.
 // Only the local process receives the device secret and bearer token.
-type journalGrants struct {
+type grantStore struct {
 	mu      sync.Mutex
 	now     func() time.Time
 	devices map[[32]byte]*pairing
 	tokens  map[[32]byte]readGrant
 }
 
-func newJournalGrants() *journalGrants {
-	return &journalGrants{now: time.Now, devices: make(map[[32]byte]*pairing), tokens: make(map[[32]byte]readGrant)}
+func newGrantStore() *grantStore {
+	return &grantStore{now: time.Now, devices: make(map[[32]byte]*pairing), tokens: make(map[[32]byte]readGrant)}
 }
 
 func secretKey(s string) [32]byte { return sha256.Sum256([]byte(s)) }
 
-func (g *journalGrants) prune(now time.Time) {
+func (g *grantStore) prune(now time.Time) {
 	for key, p := range g.devices {
 		if !p.until.After(now) {
 			delete(g.devices, key)
@@ -62,7 +62,7 @@ func (g *journalGrants) prune(now time.Time) {
 	}
 }
 
-func (g *journalGrants) start(source netip.Addr) (code, secret string, ok bool) {
+func (g *grantStore) start(source netip.Addr) (code, secret string, ok bool) {
 	if !source.IsValid() {
 		return "", "", false
 	}
@@ -100,7 +100,7 @@ func (g *journalGrants) start(source netip.Addr) (code, secret string, ok bool) 
 	return code, secret, true
 }
 
-func (g *journalGrants) codeInUse(code string) bool {
+func (g *grantStore) codeInUse(code string) bool {
 	if g.byCode(code) != nil {
 		return true
 	}
@@ -112,7 +112,7 @@ func (g *journalGrants) codeInUse(code string) bool {
 	return false
 }
 
-func (g *journalGrants) byCode(code string) *pairing {
+func (g *grantStore) byCode(code string) *pairing {
 	for _, p := range g.devices {
 		if p.code == code {
 			return p
@@ -121,7 +121,7 @@ func (g *journalGrants) byCode(code string) *pairing {
 	return nil
 }
 
-func (g *journalGrants) decide(code string, approve bool, actor host.Actor, binding host.ReadSessionBinding) bool {
+func (g *grantStore) decide(code string, approve bool, actor host.Actor, binding host.ReadSessionBinding) bool {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	now := g.now()
@@ -139,7 +139,7 @@ func (g *journalGrants) decide(code string, approve bool, actor host.Actor, bind
 	return true
 }
 
-func (g *journalGrants) exchange(secret string) (token string, seconds int, status int) {
+func (g *grantStore) exchange(secret string) (token string, seconds int, status int) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	now := g.now()
@@ -161,7 +161,7 @@ func (g *journalGrants) exchange(secret string) (token string, seconds int, stat
 	return token, int(p.approved.expires.Sub(now).Seconds()), 200
 }
 
-func (g *journalGrants) lookup(token string) (readGrant, bool) {
+func (g *grantStore) lookup(token string) (readGrant, bool) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.prune(g.now())
@@ -169,7 +169,7 @@ func (g *journalGrants) lookup(token string) (readGrant, bool) {
 	return grant, ok
 }
 
-func (g *journalGrants) active(owner host.Actor) []string {
+func (g *grantStore) active(owner host.Actor) []string {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.prune(g.now())
@@ -188,7 +188,7 @@ func (g *journalGrants) active(owner host.Actor) []string {
 	return codes
 }
 
-func (g *journalGrants) revoke(code string, owner host.Actor) bool {
+func (g *grantStore) revoke(code string, owner host.Actor) bool {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.prune(g.now())

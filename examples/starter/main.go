@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net"
 	"net/url"
 	"os"
 	"os/signal"
@@ -19,6 +18,7 @@ import (
 	"github.com/assurrussa/goauth"
 
 	"github.com/assurrussa/goadmin/features/crud"
+	"github.com/assurrussa/goadmin/features/mcp"
 	"github.com/assurrussa/goadmin/features/users"
 	"github.com/assurrussa/goadmin/host"
 	"github.com/assurrussa/goadmin/migrations"
@@ -64,16 +64,14 @@ func run() error {
 	}
 	var agentAdapter *crud.ReadOnlyAdapter
 	if selected["product-events-mcp"] {
-		loopback := parsedURL.Hostname() == "localhost" || net.ParseIP(parsedURL.Hostname()).IsLoopback()
-		if parsedURL.User != nil || parsedURL.RawQuery != "" || parsedURL.Fragment != "" ||
-			(parsedURL.Path != "" && parsedURL.Path != "/") || (parsedURL.Scheme == "http" && !loopback) {
-			return errors.New("product-events-mcp requires an HTTPS origin or a loopback HTTP origin")
+		trustedProxy, err := mcp.ParseTrustedProxy(os.Getenv("MCP_PAIRING_TRUSTED_PROXY_IP"))
+		if err != nil {
+			return fmt.Errorf("MCP_PAIRING_TRUSTED_PROXY_IP: %w", err)
 		}
-		trustedProxy, proxyErr := pairingTrustedProxy(os.Getenv("MCP_PAIRING_TRUSTED_PROXY_IP"))
-		if proxyErr != nil {
-			return proxyErr
+		adapter, err := mcp.Adapter(mcp.Config{Origin: baseURL, TrustedProxy: trustedProxy}, productEventsResource())
+		if err != nil {
+			return err
 		}
-		adapter := journalAdapter(parsedURL.Scheme+"://"+parsedURL.Host, trustedProxy)
 		agentAdapter = &adapter
 	}
 	// Staging uses embedded templates/assets while keeping HTTP cookies usable on localhost.

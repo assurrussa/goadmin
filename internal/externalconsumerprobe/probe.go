@@ -146,12 +146,27 @@ import (
 	_ "github.com/assurrussa/goadmin/features/operations"
 	_ "github.com/assurrussa/goadmin/features/users"
 	"github.com/assurrussa/goadmin/features/crud"
+	"github.com/assurrussa/goadmin/features/mcp"
 	adminhost "github.com/assurrussa/goadmin/host"
 	adminhosttest "github.com/assurrussa/goadmin/hosttest"
 	adminmigrations "github.com/assurrussa/goadmin/migrations"
 	"github.com/assurrussa/goadmin/toolkit/datagrid"
 	_ "github.com/assurrussa/goadmin/toolkit/formvalidator"
 )
+
+func TestReadOnlyMCPAdapter(t *testing.T) {
+	resource := mcp.Resource{
+		Path: "/agent/events", Name: "events", Description: "Read your activity.", RecordIDDescription: "Event ID.",
+		Permission: adminhost.NewPermissionKey("events", "read"),
+		Detail: &mcp.Detail{ToolName: "get_event", Description: "Read one event.",
+			ID: mcp.Parameter{Name: "event_id", Kind: mcp.PositiveID, Description: "Event ID."},
+			Fields: []mcp.Field{{Key: "action", Kind: mcp.Text, Description: "Recorded action."}}},
+	}
+	adapter, err := mcp.Adapter(mcp.Config{Origin: "http://localhost:8080"}, resource)
+	if err != nil || adapter.BasePath != resource.Path || adapter.Build == nil {
+		t.Fatalf("assemble read-only MCP: %v", err)
+	}
+}
 
 func TestWritableFieldConstraints(t *testing.T) {
 	name := crud.Field{Key: "name", Label: "Name", Type: "text", Create: true, Update: true, MaxLength: new(2)}

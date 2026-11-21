@@ -22,7 +22,7 @@ var (
 	ErrReadSessionDenied = errors.New("delegated read session denied")
 )
 
-// ReadSessionBinding is an opaque in-process reference to one native login.
+// ReadSessionBinding is an opaque in-process reference to one login.
 // The Fiber storage key also acts as a browser cookie. Only its authenticated
 // ciphertext leaves the service. Access-token refresh keeps the pin. Replacing
 // the browser cookie or restarting the service requires fresh approval.
@@ -31,6 +31,7 @@ type ReadSessionBinding struct {
 	loginID    string
 	subject    goauth.SubjectID
 	adminID    int64
+	external   *ExternalBinding
 }
 
 type delegatedReadPolicy struct {
@@ -64,6 +65,19 @@ func newReadBindingSeal() (cipher.AEAD, error) {
 // BindDelegatedRead receives the middleware-authenticated identity, including
 // the introspected login ID. Verify the login again before issuing a pin.
 func (s *Service) BindDelegatedRead(ctx context.Context, admin *models.SessionAdmin) (ReadSessionBinding, error) {
+	return s.bindDelegatedRead(ctx, admin, false)
+}
+
+// BindDelegatedReadWithExternal opts this approval into external-session checks.
+func (s *Service) BindDelegatedReadWithExternal(
+	ctx context.Context, admin *models.SessionAdmin,
+) (ReadSessionBinding, error) {
+	return s.bindDelegatedRead(ctx, admin, true)
+}
+
+func (s *Service) bindDelegatedRead(
+	ctx context.Context, admin *models.SessionAdmin, allowExternal bool,
+) (ReadSessionBinding, error) {
 	if s == nil || s.delegatedReads == nil || admin == nil || admin.ID <= 0 || admin.SubjectID.IsZero() ||
 		admin.AuthSessionID == "" || admin.SessionID == "" {
 		return ReadSessionBinding{}, ErrReadSessionEnded
@@ -80,6 +94,20 @@ func (s *Service) BindDelegatedRead(ctx context.Context, admin *models.SessionAd
 	binding := ReadSessionBinding{
 		storageKey: string(sealed), loginID: admin.AuthSessionID,
 		subject: admin.SubjectID, adminID: admin.ID,
+	}
+	if !admin.ExternalValidUntil.IsZero() {
+		if !allowExternal || s.states == nil {
+			return ReadSessionBinding{}, ErrReadSessionEnded
+		}
+		record, found, loadErr := s.states.Load(ctx, admin.SessionID)
+		if loadErr != nil {
+			return ReadSessionBinding{}, loadErr
+		}
+		if !found || record.External == nil {
+			return ReadSessionBinding{}, ErrReadSessionEnded
+		}
+		initial := *record.External
+		binding.external = &initial
 	}
 	active, _, err := s.ResolveDelegatedRead(ctx, binding)
 	if err != nil {
@@ -99,9 +127,6 @@ func (s *Service) ResolveDelegatedRead(ctx context.Context, b ReadSessionBinding
 		return ctx, models.Admin{}, err
 	}
 	defer sess.Release()
-	if err := s.checkDelegatedBrowser(ctx, b, sess); err != nil {
-		return ctx, models.Admin{}, err
-	}
 	admin, err := s.delegatedAdmin(ctx, b)
 	if err != nil {
 		return ctx, models.Admin{}, err
@@ -118,6 +143,9 @@ func (s *Service) ResolveDelegatedRead(ctx context.Context, b ReadSessionBinding
 		if err != nil {
 			return ctx, models.Admin{}, err
 		}
+	}
+	if err := s.checkDelegatedBrowser(ctx, b, sess); err != nil {
+		return ctx, models.Admin{}, err
 	}
 	return ctx, admin, nil
 }
@@ -169,14 +197,14 @@ func (s *Service) delegatedAdmin(ctx context.Context, b ReadSessionBinding) (mod
 
 func (s *Service) checkDelegatedBrowser(ctx context.Context, b ReadSessionBinding, sess *session.Session) error {
 	state, ok := sess.Get(sessioncore.AuthAdminKey.String()).(*browserSession)
-	if !ok || state == nil || state.External != nil || state.SubjectID != b.subject || state.AuthSessionID != b.loginID {
+	if !ok || state == nil || state.SubjectID != b.subject || state.AuthSessionID != b.loginID {
 		return ErrReadSessionEnded
 	}
 	record, found, err := s.states.Load(ctx, sess.ID())
 	if err != nil {
 		return err
 	}
-	if !found || record.External != nil || record.SubjectID != b.subject || record.Tokens.Session.ID != b.loginID {
+	if !found || record.SubjectID != b.subject || record.Tokens.Session.ID != b.loginID {
 		return ErrReadSessionEnded
 	}
 	if record.Owner != "" {
@@ -185,6 +213,16 @@ func (s *Service) checkDelegatedBrowser(ctx context.Context, b ReadSessionBindin
 	hard, _ := sess.Get("goadmin.browserHardExpiresAt").(time.Time)
 	expires := earliestMaintenanceExpiry(hard, state.HardExpiresAt, record.ExpiresAt, record.Tokens.Session.ExpiresAt)
 	if expires.IsZero() || !time.Now().Before(expires) {
+		return ErrReadSessionEnded
+	}
+	if b.external != nil {
+		if state.External == nil || record.External == nil || record.External.LocalSubject != b.subject ||
+			!sameExternalLogin(*b.external, *record.External) || !sameExternalLogin(*state.External, *record.External) {
+			return ErrReadSessionEnded
+		}
+		return s.checkDelegatedExternal(ctx, *record.External)
+	}
+	if state.External != nil || record.External != nil {
 		return ErrReadSessionEnded
 	}
 	if err := s.validateLocalLoginPublication(ctx, state); err != nil {
@@ -202,4 +240,25 @@ func (s *Service) checkDelegatedBrowser(ctx context.Context, b ReadSessionBindin
 		}
 	}
 	return nil
+}
+
+func (s *Service) checkDelegatedExternal(ctx context.Context, current ExternalBinding) error {
+	link, err := s.canonicalExternalLink(ctx, current)
+	if errors.Is(err, goauth.ErrExplicitIdentityLink) || errors.Is(err, goauth.ErrIdentityLinkNotFound) {
+		return ErrReadSessionEnded
+	}
+	if err != nil {
+		return err
+	}
+	if link.ID != current.LinkID {
+		return ErrReadSessionEnded
+	}
+	if recoverableExternalDeadline(current, time.Now()) {
+		return ErrExternalRecoveryRequired
+	}
+	_, err = s.externalProof(ctx, current)
+	if errors.Is(err, goauth.ErrSessionRevoked) {
+		return ErrReadSessionEnded
+	}
+	return err
 }

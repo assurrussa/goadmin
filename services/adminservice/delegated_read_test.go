@@ -237,3 +237,57 @@ func TestDelegatedReadSessionLifecycle(t *testing.T) {
 		}, 4*time.Second, 50*time.Millisecond)
 	})
 }
+
+func TestDelegatedExternalReadFollowsOnlyTheApprovingLogin(t *testing.T) {
+	f := newExternalFixture(t)
+	require.NoError(t, WithDelegatedReadPolicy(func(context.Context, int64) bool { return true }, &delegatedPreview{})(f.service))
+	f.service.identityLinkSessions = f.runtime.Store
+	var pin ReadSessionBinding
+	f.app.Post("/consent", func(c fiber.Ctx) error {
+		admin, err := f.service.GetAdminAuth(c)
+		require.NoError(t, err)
+		_, err = f.service.BindDelegatedRead(c.Context(), admin)
+		require.ErrorIs(t, err, ErrReadSessionEnded)
+		pin, err = f.service.BindDelegatedReadWithExternal(c.Context(), admin)
+		require.NoError(t, err)
+		return c.SendStatus(http.StatusNoContent)
+	})
+	cookie := admittedExternal(t, f)
+	approved := performSessionRequest(t, f.app, http.MethodPost, "/consent", cookie)
+	require.NoError(t, approved.Body.Close())
+	require.Equal(t, http.StatusNoContent, approved.StatusCode)
+	resolve := func() error {
+		_, _, err := f.service.ResolveDelegatedRead(t.Context(), pin)
+		return err
+	}
+	require.NoError(t, resolve())
+	f.resolver.replacement = true
+	require.ErrorIs(t, resolve(), ErrReadSessionEnded)
+	f.resolver.replacement = false
+
+	// Publish a subsequent generation of this login whose short proof has expired.
+	changeExternalRecoveryRecord(t, f, cookie, func(r *browserstate.Record) {
+		r.External.Generation++
+		r.External.Deadline = time.Now().Add(-time.Millisecond)
+	})
+	require.ErrorIs(t, resolve(), ErrExternalRecoveryRequired)
+	f.app.Get("/renew-proof", func(c fiber.Ctx) error {
+		snapshot, err := f.service.BeginExternalAdminRecovery(c)
+		require.NoError(t, err)
+		require.NoError(t, f.service.CompleteExternalAdminRecovery(c, snapshot, freshRecoveryBinding(f, snapshot.Binding())))
+		return c.SendStatus(http.StatusNoContent)
+	})
+	renew := performSessionRequest(t, f.app, http.MethodGet, "/renew-proof", cookie)
+	require.NoError(t, renew.Body.Close())
+	require.Equal(t, http.StatusNoContent, renew.StatusCode)
+	require.NoError(t, resolve())
+	changeExternalRecoveryRecord(t, f, cookie, func(r *browserstate.Record) { r.External.LoginGeneration++ })
+	require.ErrorIs(t, resolve(), ErrReadSessionEnded)
+	changeExternalRecoveryRecord(t, f, cookie, func(r *browserstate.Record) { r.External.LoginGeneration-- })
+	require.NoError(t, resolve())
+	response, err := f.app.Test(requestWithCookie(http.MethodDelete, "/logout", cookie))
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, response.StatusCode)
+	require.NoError(t, response.Body.Close())
+	require.ErrorIs(t, resolve(), ErrReadSessionEnded)
+}
