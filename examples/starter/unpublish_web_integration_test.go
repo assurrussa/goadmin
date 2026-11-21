@@ -4,12 +4,14 @@ package main
 
 import (
 	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +19,7 @@ import (
 	"github.com/assurrussa/goauth"
 	"github.com/assurrussa/goauth/postgres"
 	"github.com/assurrussa/goauth/rbac"
+	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/adaptor"
 
 	"github.com/assurrussa/goadmin/host"
@@ -210,7 +213,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		}
 		t.Cleanup(func() { _ = runtime.Close() })
 		return unpublishTestHTTP{t: t, runtime: runtime, origin: rawOrigin, do: func(req *http.Request) (*http.Response, error) {
-			return runtime.App().Test(req)
+			return runtime.App().Test(req, fiber.TestConfig{Timeout: 15 * time.Second})
 		}}
 	}
 	httpServer := newHTTP(t, unpublishTestOrigin)
@@ -415,6 +418,42 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		production.agent("/status", current, statusInput, http.StatusUnauthorized)
 	})
 
+	t.Run("absolute browser expiry while the SQL row is live", func(t *testing.T) {
+		live := httpServer.login(email)
+		grant := httpServer.pair(live)
+		key := live[unpublishTestSessionName].Value
+		var raw []byte
+		if err := db.QueryRowContext(ctx, "SELECT payload FROM goadmin_browser_sessions WHERE id=$1", key).Scan(&raw); err != nil {
+			t.Fatal(err)
+		}
+		var values map[any]any
+		if err := gob.NewDecoder(bytes.NewReader(raw)).Decode(&values); err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for k := range values {
+			if reflect.TypeOf(k).Name() == "absExpirationKeyType" {
+				values[k] = time.Now().Add(-time.Minute)
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("fixture has no Fiber absolute deadline")
+		}
+		var encoded bytes.Buffer
+		if err := gob.NewEncoder(&encoded).Encode(values); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.ExecContext(ctx, "UPDATE goadmin_browser_sessions SET payload=$1 WHERE id=$2", encoded.Bytes(), key); err != nil {
+			t.Fatal(err)
+		}
+		httpServer.agent("/status", grant, statusInput, http.StatusUnauthorized)
+		var retained bool
+		if err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM goadmin_browser_sessions WHERE id=$1)", key).Scan(&retained); err != nil || !retained {
+			t.Fatalf("delegated observation modified the native session: %t %v", retained, err)
+		}
+	})
+
 	// Share native state with a second runtime, so the first runtime's
 	// transition observer cannot know about this preview until it resolves it.
 	peer := newHTTP(t, unpublishTestOrigin)
@@ -484,7 +523,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 	}
 	finished := make(chan pendingHTTP, 1)
 	go func() {
-		resp, err := httpServer.runtime.App().Test(review)
+		resp, err := httpServer.runtime.App().Test(review, fiber.TestConfig{Timeout: 15 * time.Second})
 		if err != nil {
 			finished <- pendingHTTP{err: err}
 			return

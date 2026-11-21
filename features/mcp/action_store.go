@@ -303,7 +303,13 @@ func (s actionStore) decidePending(
 		return s.finish(ctx, tx, req, actionConflict, nil)
 	}
 
-	result, err := s.action.Apply(ctx, tx, actor, req.input, req.Snapshot, req.RequestID)
+	// Host work can wait on an audit or outbox row after its record has been
+	// locked. Roll back those writes if the receipt misses the original deadline.
+	applyTx, err := tx.Begin(ctx)
+	if err != nil {
+		return actionRequest{}, err
+	}
+	result, err := s.action.Apply(ctx, applyTx, actor, req.input, req.Snapshot, req.RequestID)
 	if err != nil {
 		return actionRequest{}, err
 	}
@@ -313,7 +319,17 @@ func (s actionStore) decidePending(
 	if result == nil {
 		result = map[string]string{}
 	}
-	return s.finish(ctx, tx, req, actionSucceeded, result)
+	receipt, err := s.finish(ctx, applyTx, req, actionSucceeded, result)
+	if errors.Is(err, errActionExpired) {
+		if err := applyTx.Rollback(ctx); err != nil {
+			return actionRequest{}, err
+		}
+		return s.finish(ctx, tx, req, actionExpired, nil)
+	}
+	if err != nil {
+		return actionRequest{}, err
+	}
+	return receipt, applyTx.Commit(ctx)
 }
 
 func (s actionStore) finish(
@@ -324,13 +340,18 @@ func (s actionStore) finish(
 		resultValue = result
 	}
 	err := tx.QueryRow(ctx, `
-		UPDATE admin_confirmed_actions
-		SET state=$4, result=$5, normalized_input=NULL, review_fields=NULL, binding_id=NULL, decided_at=clock_timestamp()
+		WITH decision AS MATERIALIZED (SELECT clock_timestamp() AS at)
+		UPDATE admin_confirmed_actions SET state=$4, result=$5, normalized_input=NULL,
+			review_fields=NULL, binding_id=NULL, decided_at=decision.at FROM decision
 		WHERE namespace=$1 AND actor_admin_id=$2 AND request_id=$3 AND state='pending'
+			AND ($4 <> 'succeeded' OR expires_at > decision.at)
 		RETURNING decided_at`,
 		s.action.Namespace, req.OwnerAdminID, req.RequestID, state, resultValue,
 	).Scan(&req.DecidedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
+		if state == actionSucceeded {
+			return actionRequest{}, errActionExpired
+		}
 		return actionRequest{}, errActionUnknown
 	}
 	if err != nil {

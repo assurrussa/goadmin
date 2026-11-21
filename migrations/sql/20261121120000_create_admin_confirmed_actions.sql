@@ -29,7 +29,7 @@ CREATE TABLE admin_confirmed_actions
 );
 
 CREATE INDEX admin_confirmed_actions_pending_expiry_idx
-    ON admin_confirmed_actions (namespace, action_key, expires_at, actor_admin_id, request_id)
+    ON admin_confirmed_actions (expires_at, namespace, actor_admin_id, request_id)
     WHERE state = 'pending';
 
 -- +goose Down

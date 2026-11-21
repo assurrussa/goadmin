@@ -5,8 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/gofiber/fiber/v3"
 
@@ -19,37 +17,6 @@ func (h *actionHandler) registerBrowser(app *fiber.App) {
 	app.Post(path+"/connect", h.browserHeaders, h.exactOrigin, h.connect)
 	app.Get(path+"/requests/:id", h.browserHeaders, h.reviewPage)
 	app.Post(path+"/requests/:id", h.browserHeaders, h.exactOrigin, h.decide)
-	h.registerCleanup(app)
-}
-
-func (h *actionHandler) registerCleanup(app *fiber.App) {
-	var start sync.Once
-	ctx, cancel := context.WithCancel(context.Background())
-	var workers sync.WaitGroup
-	app.Hooks().OnListen(func(fiber.ListenData) error {
-		start.Do(func() {
-			workers.Go(func() {
-				ticker := time.NewTicker(time.Minute)
-				defer ticker.Stop()
-				for ctx.Err() == nil {
-					_, err := h.store.sweep(ctx, 256, func(_ context.Context, _ ActionTx, r actionRequest) (bool, error) {
-						_, ok := h.grants.bound(r.BindingID)
-						return ok, nil
-					})
-					if err != nil && ctx.Err() == nil {
-						h.app.Logger().ErrorContext(ctx, "Unable to expire confirmed action requests")
-					}
-					select {
-					case <-ctx.Done():
-						return
-					case <-ticker.C:
-					}
-				}
-			})
-		})
-		return nil
-	})
-	app.Hooks().OnPostShutdown(func(error) error { cancel(); workers.Wait(); return nil })
 }
 
 func (h *actionHandler) browserHeaders(c fiber.Ctx) error {

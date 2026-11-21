@@ -172,6 +172,7 @@ func New(ctx context.Context, cfg Config, deps Dependencies, modules ...Module) 
 	if err != nil {
 		return nil, err
 	}
+	a.workers = append(a.workers, confirmedActionExpiryWorker(deps.Database.DB().Pool(), deps.Logger))
 	r.workers = a.workers
 	return r, nil
 }

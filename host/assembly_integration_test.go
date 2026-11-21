@@ -161,7 +161,8 @@ func TestAssemblyMinimalPostgresLoginProfileAndSessionRestart(t *testing.T) {
 	first, err := New(t.Context(), cfg, deps)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, first.Close()) })
-	require.Len(t, first.workers, 1, "the minimal core owns only session cleanup")
+	require.Len(t, first.workers, 2)
+	require.Equal(t, "confirmed action expiry", first.workers[1].name)
 	require.Equal(t, "sessions", first.workers[0].name)
 	account, err := first.Auth.Runtime().ProvisionTrustedLocalAccount(t.Context(), goauth.RegisterRequest{
 		Email: "assembly-admin@example.test", Password: assemblyPassword,
@@ -481,4 +482,32 @@ WHERE audit.action='admin.first_created' AND audit.actor_subject_id=$1 AND admin
 	require.NoError(t, json.Unmarshal(body, &profile))
 	require.Equal(t, "profile/ViewPage", profile.Component)
 	require.Contains(t, string(profile.Props["authuser"]), email)
+}
+
+func TestCoreExpiresDisabledActions(t *testing.T) {
+	cfg, deps := assemblyFixture(t)
+	runtime, err := New(t.Context(), cfg, deps)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, runtime.Close()) })
+	pool := deps.Database.DB().Pool()
+	_, err = pool.Exec(t.Context(), `INSERT INTO admin_confirmed_actions(namespace,actor_admin_id,request_id,action_key,
+		action_version,input_fingerprint,record_id,record_revision,binding_id,normalized_input,review_fields,created_at,expires_at,state)
+		SELECT 'fixture',1,gen_random_uuid(),'disabled','1',decode(repeat('00',32),'hex'),'doc','v1','old-login','{}','[]',
+			expiry - interval '5 minutes',expiry,'pending'
+		FROM (VALUES (now()-interval '1 minute'),(now()-interval '1 second'),(now()+interval '4 minutes')) AS times(expiry)`)
+	require.NoError(t, err)
+	n, err := expireConfirmedActionBatch(t.Context(), pool, 1)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, n)
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() { done <- runtime.workers[len(runtime.workers)-1].run(ctx) }()
+	defer func() { cancel(); require.NoError(t, <-done) }()
+	require.Eventually(t, func() bool {
+		var expired, pending int
+		err := pool.QueryRow(t.Context(), `SELECT
+			count(*) FILTER (WHERE state='expired' AND normalized_input IS NULL AND review_fields IS NULL AND binding_id IS NULL),
+			count(*) FILTER (WHERE state='pending' AND review_fields IS NOT NULL) FROM admin_confirmed_actions`).Scan(&expired, &pending)
+		return err == nil && expired == 2 && pending == 1
+	}, 5*time.Second, 10*time.Millisecond)
 }

@@ -57,7 +57,7 @@ the exact configured Origin.
   input hash, record identity, reviewed revision, outcome and declared result.
   Confirmation clears the raw input, binding and review fields in the same
   transaction. Decline, conflict and expiry also clear them. A periodic cleanup
-  expires abandoned proposals while the module runs. Keep the library schema
+  expires abandoned proposals while the admin runtime runs, including after disabling every action. Keep the library schema
   when disabling the module or rolling back an application.
 
 Run the [starter HTTPS acceptance](../examples/starter/README.md#confirmed-product-withdrawal)

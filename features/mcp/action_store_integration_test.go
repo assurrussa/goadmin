@@ -302,52 +302,6 @@ func TestConfirmedActionStoreReportsInFlightAndAppliesOnce(t *testing.T) {
 	require.Equal(t, 1, events)
 }
 
-func TestConfirmedActionStoreCleanupIsScopedAndBounded(t *testing.T) {
-	pool, store := confirmedFixture(t)
-	ids := make([]string, 0, 3)
-	for range 3 {
-		proposal := confirmedProposal(t, "r1")
-		_, err := store.propose(t.Context(), confirmedActor, proposal, confirmedAuthorize)
-		require.NoError(t, err)
-		ids = append(ids, proposal.RequestID)
-	}
-	other := store
-	other.action.Key = "other-action"
-	proposal := confirmedProposal(t, "r2")
-	_, err := other.propose(t.Context(), confirmedActor, proposal, confirmedAuthorize)
-	require.NoError(t, err)
-
-	count, err := store.sweep(t.Context(), 2, func(context.Context, ActionTx, actionRequest) (bool, error) { return false, nil })
-	require.NoError(t, err)
-	require.Equal(t, 2, count)
-	count, err = store.sweep(t.Context(), 2, func(context.Context, ActionTx, actionRequest) (bool, error) { return false, nil })
-	require.NoError(t, err)
-	require.Equal(t, 1, count)
-	for _, id := range ids {
-		req, err := store.status(t.Context(), confirmedActor, id)
-		require.NoError(t, err)
-		require.Equal(t, actionExpired, req.State)
-		require.Empty(t, req.Snapshot.Fields)
-		require.Empty(t, req.BindingID)
-	}
-	req, err := other.status(t.Context(), confirmedActor, proposal.RequestID)
-	require.NoError(t, err)
-	require.Equal(t, actionPending, req.State)
-
-	_, err = pool.Exec(t.Context(), `
-		UPDATE admin_confirmed_actions
-		SET created_at=clock_timestamp()-interval '2 minutes', expires_at=clock_timestamp()-interval '1 minute'
-		WHERE request_id=$1`, proposal.RequestID)
-	require.NoError(t, err)
-	req, err = other.status(t.Context(), confirmedActor, proposal.RequestID)
-	require.NoError(t, err)
-	require.Equal(t, actionExpired, req.State)
-	require.Empty(t, req.Snapshot.Fields)
-	count, err = other.sweep(t.Context(), 2, nil)
-	require.NoError(t, err)
-	require.Equal(t, 1, count)
-}
-
 func TestConfirmedActionStoreRechecksExpiryAfterWaitingForRecord(t *testing.T) {
 	pool, store := confirmedFixture(t)
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
@@ -431,4 +385,36 @@ func TestConfirmedActionStoreReconcilesLostCommitReply(t *testing.T) {
 	var events int
 	require.NoError(t, pool.QueryRow(ctx, "SELECT count(*) FROM confirmed_action_test_event").Scan(&events))
 	require.Equal(t, 1, events)
+}
+
+func TestConfirmedActionStoreDeadlineDuringApplyRollsBack(t *testing.T) {
+	pool, store := confirmedFixture(t)
+	ctx := t.Context()
+	p := confirmedProposal(t, "r1")
+	p.ExpiresAt = time.Now().Add(time.Second)
+	_, err := store.propose(ctx, confirmedActor, p, confirmedAuthorize)
+	require.NoError(t, err)
+	apply := store.action.Apply
+	applied := false
+	store.action.Apply = func(
+		ctx context.Context, tx ActionTx, actor host.Actor, input json.RawMessage, snapshot ActionSnapshot, id string,
+	) (map[string]string, error) {
+		result, err := apply(ctx, tx, actor, input, snapshot, id)
+		if err != nil {
+			return nil, err
+		}
+		applied = true
+		_, err = tx.Exec(ctx, `SELECT pg_sleep(greatest(0,extract(epoch FROM expires_at-clock_timestamp()))::float8)
+			FROM admin_confirmed_actions WHERE request_id=$1`, id)
+		return result, err
+	}
+	receipt, err := store.decide(ctx, confirmedActor, p.RequestID, true, confirmedAuthorizeDecision)
+	require.NoError(t, err)
+	require.True(t, applied)
+	require.Equal(t, actionExpired, receipt.State)
+	var revision, events int
+	require.NoError(t, pool.QueryRow(ctx, `SELECT revision,(SELECT count(*) FROM confirmed_action_test_event)
+		FROM confirmed_action_test_record WHERE id='r1'`).Scan(&revision, &events))
+	require.Equal(t, 1, revision)
+	require.Zero(t, events)
 }

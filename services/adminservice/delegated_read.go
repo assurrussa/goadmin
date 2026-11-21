@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/assurrussa/goauth"
+	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/session"
 
 	sessioncore "github.com/assurrussa/goadmin/infrastructure/core/session"
@@ -163,13 +164,23 @@ func (s *Service) openDelegatedSession(ctx context.Context, b ReadSessionBinding
 	if err != nil {
 		return nil, ErrReadSessionEnded
 	}
-	// GetByID reads the live store with its idle expiry; it does not touch it.
-	sess, err := s.store.GetByID(ctx, string(raw))
+	// Keep Fiber's decoding and absolute deadline check. A delegated reader
+	// must not delete a session while its own transaction holds the row.
+	reader := session.Store{Config: s.store.Config}
+	reader.Storage = delegatedSessionStorage{reader.Storage}
+	sess, err := reader.GetByID(ctx, string(raw))
 	if errors.Is(err, session.ErrSessionIDNotFoundInStore) {
 		return nil, ErrReadSessionEnded
 	}
 	return sess, err
 }
+
+// GetByID calls DestroyWithContext on absolute expiry, using a background
+// context. Let the native session lifecycle delete the stored row.
+type delegatedSessionStorage struct{ fiber.Storage }
+
+func (delegatedSessionStorage) DeleteWithContext(context.Context, string) error { return nil }
+func (delegatedSessionStorage) Delete(string) error                             { return nil }
 
 func (s *Service) delegatedAdmin(ctx context.Context, b ReadSessionBinding) (models.Admin, error) {
 	security, err := s.identityLinkSessions.IntrospectSession(ctx, b.loginID)

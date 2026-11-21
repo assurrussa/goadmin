@@ -180,7 +180,9 @@ func TestConfirmedMCPAction(t *testing.T) {
 		Inspect: func(context.Context, mcp.ActionTx, adminhost.Actor, json.RawMessage, bool) (mcp.ActionSnapshot, error) {
 			return mcp.ActionSnapshot{}, mcp.ErrActionNotFound
 		},
-		Apply: func(context.Context, mcp.ActionTx, adminhost.Actor, json.RawMessage, mcp.ActionSnapshot, string) (map[string]string, error) {
+		Apply: func(
+			context.Context, mcp.ActionTx, adminhost.Actor, json.RawMessage, mcp.ActionSnapshot, string,
+		) (map[string]string, error) {
 			return nil, mcp.ErrActionNotFound
 		},
 	}
