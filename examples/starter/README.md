@@ -237,6 +237,20 @@ requires `product-events`. The operator signs in with a native starter account
 that has `product_events:read`. Each admin instance owns its connections in
 memory. Restarting the instance clears them.
 
+Each source can have four pairing codes awaiting a decision. An approval,
+denial or five-minute expiry frees the source slot. The instance also caps
+all outstanding device requests and active grants at 128. Pairing returns
+HTTP 429 when either limit is reached.
+
+The starter groups clients by IPv4 address or IPv6 /64 subnet. Clients sharing
+a NAT address share its quota. Behind an HTTPS reverse proxy, set
+`MCP_PAIRING_TRUSTED_PROXY_IP` to the proxy's exact TCP peer address as seen by
+the starter. Configure that proxy to overwrite `X-Real-IP` with the client
+address on every request. With this setting, pairing requires a single valid
+address from that peer. For every other peer, the starter uses the socket
+address. Leaving the setting empty groups connections through a proxy under
+the proxy's own quota.
+
 Build the local stdio program from `examples/starter`:
 
 ```sh

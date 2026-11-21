@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"net/netip"
 	"slices"
 	"strings"
 	"sync"
@@ -12,9 +13,10 @@ import (
 )
 
 const (
-	pairLifetime     = 5 * time.Minute
-	grantLifetime    = 15 * time.Minute
-	maxAgentRequests = 128
+	pairLifetime        = 5 * time.Minute
+	grantLifetime       = 15 * time.Minute
+	maxAgentRequests    = 128
+	maxPendingPerSource = 4
 )
 
 type readGrant struct {
@@ -25,10 +27,11 @@ type readGrant struct {
 }
 
 type pairing struct {
-	code     string
-	until    time.Time
-	approved *readGrant
-	denied   bool
+	pendingSource netip.Addr
+	code          string
+	until         time.Time
+	approved      *readGrant
+	denied        bool
 }
 
 // All transitions, including a one-time exchange racing revocation, hold mu.
@@ -59,12 +62,30 @@ func (g *journalGrants) prune(now time.Time) {
 	}
 }
 
-func (g *journalGrants) start() (code, secret string, ok bool) {
+func (g *journalGrants) start(source netip.Addr) (code, secret string, ok bool) {
+	if !source.IsValid() {
+		return "", "", false
+	}
+	source = source.Unmap()
+	if source.Is6() {
+		// Treat privacy addresses on one IPv6 subnet as a single source.
+		source = netip.PrefixFrom(source, 64).Masked().Addr()
+	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	now := g.now()
 	g.prune(now)
 	if len(g.devices)+len(g.tokens) >= maxAgentRequests {
+		return "", "", false
+	}
+	// The global cap bounds this scan. Keep no source state beyond pending codes.
+	pending := 0
+	for _, device := range g.devices {
+		if device.pendingSource == source {
+			pending++
+		}
+	}
+	if pending >= maxPendingPerSource {
 		return "", "", false
 	}
 	for {
@@ -75,7 +96,7 @@ func (g *journalGrants) start() (code, secret string, ok bool) {
 		}
 	}
 	secret = rand.Text()
-	g.devices[secretKey(secret)] = &pairing{code: code, until: now.Add(pairLifetime)}
+	g.devices[secretKey(secret)] = &pairing{pendingSource: source, code: code, until: now.Add(pairLifetime)}
 	return code, secret, true
 }
 
@@ -109,6 +130,7 @@ func (g *journalGrants) decide(code string, approve bool, actor host.Actor, bind
 	if p == nil || p.approved != nil || p.denied || actor.IsZero() {
 		return false
 	}
+	p.pendingSource = netip.Addr{}
 	if approve {
 		p.approved = &readGrant{code: p.code, owner: actor, binding: binding, expires: now.Add(grantLifetime)}
 	} else {

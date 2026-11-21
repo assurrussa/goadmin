@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"net/netip"
 	"slices"
 	"sync"
 	"testing"
@@ -18,7 +19,7 @@ func TestJournalGrantOwnerAndExpiry(t *testing.T) {
 	other := host.Actor{AdminID: 2, SubjectID: "other"}
 	var pin host.ReadSessionBinding // Only the host's session service creates usable pins.
 
-	code, secret, ok := store.start()
+	code, secret, ok := store.start(netip.IPv6Loopback())
 	if !ok || code == "" || secret == "" || code == secret {
 		t.Fatal("expected distinct verification code and device secret")
 	}
@@ -56,7 +57,7 @@ func TestJournalGrantOwnerAndExpiry(t *testing.T) {
 	if _, ok := store.lookup(token); ok || len(store.active(owner)) != 0 || store.revoke(code, owner) {
 		t.Fatal("a grant remained active at its expiry")
 	}
-	code, secret, ok = store.start()
+	code, secret, ok = store.start(netip.IPv6Loopback())
 	if !ok || !store.decide(code, false, owner, pin) || store.decide(code, true, owner, pin) {
 		t.Fatal("denied pairing could be approved again")
 	}
@@ -66,7 +67,7 @@ func TestJournalGrantOwnerAndExpiry(t *testing.T) {
 	if _, _, status := store.exchange(secret); status != http.StatusGone {
 		t.Fatal("denied exchange must also be consumed")
 	}
-	code, secret, ok = store.start()
+	code, secret, ok = store.start(netip.IPv6Loopback())
 	now = now.Add(pairLifetime)
 	if !ok || store.decide(code, true, owner, pin) {
 		t.Fatal("expired pending code was approved")
@@ -78,7 +79,7 @@ func TestJournalGrantOwnerAndExpiry(t *testing.T) {
 
 func TestJournalGrantConcurrentDecisionsAndExchange(t *testing.T) {
 	store := newJournalGrants()
-	code, secret, ok := store.start()
+	code, secret, ok := store.start(netip.IPv6Loopback())
 	if !ok {
 		t.Fatal("pairing unavailable")
 	}
@@ -128,11 +129,78 @@ func TestJournalGrantConcurrentDecisionsAndExchange(t *testing.T) {
 	}
 }
 
+func TestJournalPairingQuotaFollowsPendingDecisions(t *testing.T) {
+	owner := host.Actor{AdminID: 1, SubjectID: "owner"}
+	for _, approve := range []bool{true, false} {
+		store := newJournalGrants()
+		first := netip.MustParseAddr("2001:db8:1::10")
+		sameSubnet := netip.MustParseAddr("2001:db8:1::20")
+		var code string
+		for range maxPendingPerSource {
+			var ok bool
+			code, _, ok = store.start(first)
+			if !ok {
+				t.Fatal("source quota exhausted early")
+			}
+		}
+		if _, _, ok := store.start(sameSubnet); ok {
+			t.Fatal("IPv6 subnet exceeded its pending quota")
+		}
+		if _, _, ok := store.start(netip.MustParseAddr("2001:db8:2::10")); !ok {
+			t.Fatal("independent IPv6 subnet refused")
+		}
+		if !store.decide(code, approve, owner, host.ReadSessionBinding{}) {
+			t.Fatal("operator decision refused")
+		}
+		if _, _, ok := store.start(sameSubnet); !ok {
+			t.Fatalf("decision (approve=%t) did not release the source slot", approve)
+		}
+	}
+}
+
+func TestJournalPairingPreservesGlobalCapacity(t *testing.T) {
+	store := newJournalGrants()
+	expires := store.now().Add(grantLifetime)
+	for i := range maxAgentRequests - 1 {
+		store.tokens[[32]byte{byte(i)}] = readGrant{expires: expires}
+	}
+	if _, _, ok := store.start(netip.MustParseAddr("192.0.2.10")); !ok {
+		t.Fatal("last available slot refused")
+	}
+	if _, _, ok := store.start(netip.MustParseAddr("192.0.2.20")); ok {
+		t.Fatal("independent source exceeded the shared memory limit")
+	}
+}
+
+func TestJournalPairingReservesLastSourceSlotOnce(t *testing.T) {
+	store := newJournalGrants()
+	source := netip.MustParseAddr("192.0.2.10")
+	for range maxPendingPerSource - 1 {
+		if _, _, ok := store.start(source); !ok {
+			t.Fatal("could not reserve pending pairing")
+		}
+	}
+	ready := make(chan struct{})
+	result := make(chan bool, 2)
+	for range 2 {
+		go func() {
+			<-ready
+			_, _, ok := store.start(source)
+			result <- ok
+		}()
+	}
+	close(ready)
+	first, second := <-result, <-result
+	if first == second {
+		t.Fatalf("expected exactly one reservation for the last slot, got %t and %t", first, second)
+	}
+}
+
 func TestJournalGrantRevokeRacingExchange(t *testing.T) {
 	owner := host.Actor{AdminID: 1, SubjectID: "owner"}
 	for range 32 {
 		store := newJournalGrants()
-		code, secret, ok := store.start()
+		code, secret, ok := store.start(netip.IPv6Loopback())
 		if !ok || !store.decide(code, true, owner, host.ReadSessionBinding{}) {
 			t.Fatal("failed to approve pairing")
 		}

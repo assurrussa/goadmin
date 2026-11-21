@@ -102,7 +102,7 @@ func authorizeProductEvent(_ context.Context, actor host.Actor, event crud.ReadO
 	return nil
 }
 
-func productEventsModule(db *sql.DB, agentOrigin string) (host.Module, error) {
+func productEventsModule(db *sql.DB, adapter *crud.ReadOnlyAdapter) (host.Module, error) {
 	repo := productRepo{db}
 	permission := host.NewPermissionKey("product_events", "read")
 	const title = "Журнал действий с товарами"
@@ -138,8 +138,8 @@ func productEventsModule(db *sql.DB, agentOrigin string) (host.Module, error) {
 		DefaultSort: "createdAt", DefaultOrder: "desc",
 		List: repo.events, Get: repo.event, Authorize: authorizeProductEvent,
 	}
-	if agentOrigin != "" {
-		return crud.NewReadOnlyWithAdapter(definition, journalAdapter(agentOrigin))
+	if adapter != nil {
+		return crud.NewReadOnlyWithAdapter(definition, *adapter)
 	}
 	return crud.NewReadOnly(definition)
 }

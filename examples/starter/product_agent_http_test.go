@@ -2,13 +2,70 @@ package main
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 )
+
+func TestAgentPairingQuotaIsLocalToSource(t *testing.T) {
+	const origin = "https://admin.example.test"
+	for _, tc := range []struct {
+		name  string
+		proxy netip.Addr
+	}{
+		{name: "direct"},
+		{name: "trusted proxy", proxy: netip.MustParseAddr("192.0.2.1")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := journalAgent{grants: newJournalGrants(), origin: origin, trustedProxy: tc.proxy}
+			now := time.Now()
+			h.grants.now = func() time.Time { return now }
+			pair := func(client netip.Addr) int {
+				t.Helper()
+				peer := client
+				req := httptest.NewRequest(http.MethodPost, origin+agentPath+"/pair", nil)
+				if tc.proxy.IsValid() {
+					peer = tc.proxy
+					req.Header.Set("X-Real-IP", client.String())
+				}
+				app := fiber.New()
+				app.Use(func(c fiber.Ctx) error {
+					c.RequestCtx().SetRemoteAddr(net.TCPAddrFromAddrPort(netip.AddrPortFrom(peer, 44300)))
+					return c.Next()
+				})
+				h.registerDevice(app)
+				resp, err := app.Test(req)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer resp.Body.Close()
+				return resp.StatusCode
+			}
+			first := netip.MustParseAddr("192.0.2.10")
+			for range maxPendingPerSource {
+				if _, _, ok := h.grants.start(first); !ok {
+					t.Fatal("could not reserve pending pairing")
+				}
+			}
+			if got := pair(first); got != http.StatusTooManyRequests {
+				t.Fatalf("source at capacity: got %d", got)
+			}
+			if got := pair(netip.MustParseAddr("192.0.2.20")); got != http.StatusOK {
+				t.Fatalf("independent source: got %d", got)
+			}
+			now = now.Add(pairLifetime)
+			if got := pair(first); got != http.StatusOK {
+				t.Fatalf("source after pending codes expired: got %d", got)
+			}
+		})
+	}
+}
 
 func TestAgentDeviceRoutesAreSeparateFromOperatorApproval(t *testing.T) {
 	const origin = "http://localhost:8080"

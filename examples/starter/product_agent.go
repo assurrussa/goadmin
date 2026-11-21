@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 
@@ -25,15 +26,16 @@ const (
 )
 
 type journalAgent struct {
-	app    *host.App
-	reader crud.ReadOnlyReader
-	grants *journalGrants
-	origin string
+	app          *host.App
+	reader       crud.ReadOnlyReader
+	grants       *journalGrants
+	origin       string
+	trustedProxy netip.Addr
 }
 
-func journalAdapter(origin string) crud.ReadOnlyAdapter {
+func journalAdapter(origin string, trustedProxy netip.Addr) crud.ReadOnlyAdapter {
 	return crud.ReadOnlyAdapter{BasePath: agentPath, Build: func(app *host.App, reader crud.ReadOnlyReader) (*host.Extension, error) {
-		h := &journalAgent{app: app, reader: reader, grants: newJournalGrants(), origin: origin}
+		h := &journalAgent{app: app, reader: reader, grants: newJournalGrants(), origin: origin, trustedProxy: trustedProxy}
 		return host.NewExtension().WithPublicRegister(h.registerDevice).WithRegister(h.registerBrowser), nil
 	}}
 }
@@ -81,7 +83,11 @@ func (h *journalAgent) start(c fiber.Ctx) error {
 	if len(c.Body()) != 0 && !readAgentJSON(c, &struct{}{}) {
 		return agentJSON(c, 400, "invalid_request")
 	}
-	code, secret, ok := h.grants.start()
+	source, ok := h.pairingSource(c)
+	if !ok {
+		return agentJSON(c, http.StatusBadRequest, "invalid_request")
+	}
+	code, secret, ok := h.grants.start(source)
 	if !ok {
 		return agentJSON(c, 429, "too_many_requests")
 	}
