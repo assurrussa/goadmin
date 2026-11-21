@@ -565,7 +565,7 @@ async function runCase(name, config) {
     if (manifest.productEventsMCP) {
       if (config.modules.includes('product-events-mcp')) {
         result.productEventsMCP = await journalMCPAcceptance({ browser, config, credentials, ownedSQL, expect,
-          login, logout, roleSlug: result.restrictedAccess.role, product: result.productEvents.archivedProduct,
+          login, logout, language, roleSlug: result.restrictedAccess.role, product: result.productEvents.archivedProduct,
           reasons: [result.crud.unpublish.listReason, result.crud.unpublish.cardReason],
           binary: path.join(folder, 'product-events-mcp') })
         check('Product journal MCP: two stdio tools, browser parity, owner isolation, preview, live permission loss, revocation and logout')

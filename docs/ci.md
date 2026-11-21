@@ -61,7 +61,8 @@ git diff --exit-code
 test -z "$(git status --porcelain --untracked-files=all)"
 ```
 
-- `make check` runs tidy, non-mutating formatting, vet, lint, one race/coverage
+- `make check` verifies the first CRUD guide's source excerpt and runs tidy,
+  non-mutating formatting, vet, lint, one race/coverage
   pass, manifest/frontend unit tests, ESLint, Prettier, type checking, and the
   production build. Redirecting stdin avoids gci treating an inherited pipe as
   source input. It does not need PostgreSQL or Redis.

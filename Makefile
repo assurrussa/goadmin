@@ -40,7 +40,11 @@ prepare:
 	$(MAKE) fmt
 	$(MAKE) lint-fix
 
-check: tidy-check fmt-check vet lint test-full resources
+.PHONY: docs-snippets-check
+check: docs-snippets-check tidy-check fmt-check vet lint test-full resources
+
+docs-snippets-check:
+	python3 scripts/check-doc-snippets.py
 
 release-version-check:
 	@printf '%s\n' "$(VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$$' || \

@@ -8,17 +8,17 @@ second toy implementation. It needs no custom Vue, Redis, uploads or mail servic
 ## 1. Start the published example
 
 Follow the [starter prerequisites and secret setup](../examples/starter/README.md#start-with-the-published-library)
-to clone the v0.32.0 tag. In that checkout's private `.env`, select the example:
+to clone the v0.32.1 tag. In that checkout's private `.env`, select the example:
 
 ```dotenv
-GOADMIN_VERSION=v0.32.0
+GOADMIN_VERSION=v0.32.1
 ADMIN_MODULES=products
 ```
 
 From `examples/starter`, run:
 
 ```sh
-GOADMIN_VERSION=v0.32.0 docker compose up --build
+GOADMIN_VERSION=v0.32.1 docker compose up --build
 ```
 
 Open `http://localhost:8080`. On a fresh database, register the first administrator
@@ -127,7 +127,7 @@ func productsModule(db *sql.DB) (host.Module, error) {
 		},
 	}
 	return crud.New(crud.Definition[productData, productInput, productInput]{
-		Key: "products", BasePath: "/products", Title: "Products", Fields: fields, PageSize: 20, DefaultSort: "name", DefaultOrder: "asc",
+		Key: "products", BasePath: "/products", Title: "Products", Description: "Manage your catalog and review publication changes in Product activity.", Fields: fields, PageSize: 20, DefaultSort: "name", DefaultOrder: "asc",
 		Columns: []datagrid.Column{
 			{Key: "name", Label: "Name", Type: "text", Sortable: true},
 			{Key: "stock", Label: "Stock", Type: "number", Sortable: true, Filterable: true},
@@ -170,7 +170,7 @@ func productsModule(db *sql.DB) (host.Module, error) {
 				return r.command(ctx, a, id, revision, "publish")
 			}},
 			crud.ActionWithParams[productData, UnpublishInput](
-				crud.Action[productData]{Key: "unpublish", Label: "Снять с публикации", Confirmation: "Снять этот товар с публикации?", Permission: permission("unpublish")},
+				crud.Action[productData]{Key: "unpublish", Label: "Снять с публикации", Description: "The product will become a draft. This action and its reason are recorded in Product activity.", Confirmation: "Снять этот товар с публикации?", Permission: permission("unpublish")},
 				[]crud.ActionParam{unpublishReason}, r.unpublish,
 			),
 		},
@@ -179,10 +179,9 @@ func productsModule(db *sql.DB) (host.Module, error) {
 ```
 <!-- /source: examples/starter/products.go#productsModule -->
 
-Maintainers: `python3 scripts/check-doc-snippets.py` checks this excerpt
-against the existing Go function text. After an intentional source change,
-review it and run the same command with `--write`, then rerun affected Go tests.
-The excerpt checker proves synchronization, not compilation or browser behavior.
+`make check` compares this excerpt with the Go function. After changing
+`productsModule`, run `python3 scripts/check-doc-snippets.py --write` and review
+the updated example.
 
 ## 4. Verify denied paths too
 
@@ -198,8 +197,8 @@ Existing maintainer checks cover these boundaries; reuse them rather than treati
 successful compilation as end-to-end acceptance:
 
 - `go test ./features/crud ./reference/externalconsumer` from the repository root.
-- In the current checkout, run `make externalconsumer-local`. In the v0.32.0
-  checkout from step 1, run `make externalconsumer-published VERSION=v0.32.0`
+- In the current checkout, run `make externalconsumer-local`. In the v0.32.1
+  checkout from step 1, run `make externalconsumer-published VERSION=v0.32.1`
   to check the published package with that release's consumer.
 - From `examples/starter`, run `PRODUCTS_TEST_DSN='<isolated PostgreSQL URL>' go test -tags=integration -run '^TestProductsPostgresCASIsolationAndAuditRollback$' .`.
   This requires create-database privileges and creates/drops its own test database.

@@ -99,7 +99,7 @@ async function decide(page, decision, scope = page) {
 // Pairing codes and browser sessions stay in memory. In particular these contexts
 // are never traced, screenshotted or exported as storageState by the smoke runner.
 export async function journalMCPAcceptance({ browser, config, credentials, binary, roleSlug, product, reasons,
-  ownedSQL, login, logout, expect }) {
+  ownedSQL, login, logout, language, expect }) {
   const contexts = []
   const clients = []
   const secrets = new Set([credentials.password])
@@ -204,6 +204,10 @@ export async function journalMCPAcceptance({ browser, config, credentials, binar
     await call(second, get, restrictedEvent, 'denied')
 
     await owner.page.goto(connect)
+    await language(owner.page, 'Русский', 'ru')
+    await expect(owner.page.getByText('Подключения к журналу товаров', { exact: true })).toBeVisible()
+    await language(owner.page, 'English', 'en')
+    await expect(owner.page.getByText('Product journal connections', { exact: true })).toBeVisible()
     const grant = owner.page.locator('li').filter({ has: owner.page.getByText(approvedCode, { exact: true }) })
     await decide(owner.page, 'revoke', grant)
     await call(first, get, ownerEvent, 'authorization_expired')

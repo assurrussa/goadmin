@@ -133,6 +133,10 @@ async function pair(page, cli) {
   await page.goto(instruction.verification_url)
   await page.locator('input[name="code"]').fill(instruction.code)
   await submit(page, connectPath, page.getByRole('button', { name: /^(Подключить|Connect)$/ }))
+  const retryHint = (await page.locator('html').getAttribute('lang')) === 'ru'
+    ? 'Вернитесь в MCP-клиент и повторите запрос.'
+    : 'Return to your MCP client and repeat the request.'
+  await expect(page.getByRole('status').filter({ hasText: retryHint })).toBeVisible()
   await status(cli, key, 'not_found')
 }
 async function review(page, req, action) {

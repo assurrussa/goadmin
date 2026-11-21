@@ -3,6 +3,15 @@
 This file records changes prepared in the checkout. A release is published only
 after a new tag and its clean-consumer checks complete.
 
+## v0.32.1
+
+- After pairing for read access or confirmed actions, the browser prompts the
+  operator to return to the MCP client and retry the request.
+- Regression tests cover independent read permissions and grants for two
+  resources and revocation of a confirmed-action grant at native logout.
+- The starter uses the CSRF service created by `host.New` for confirmed product
+  withdrawal. The first CRUD guide's Products example is checked by `make check`.
+
 ## v0.13.0 candidate (unpublished)
 
 - Add opt-in assisted recovery, local MFA settings and owner-only read-only role
