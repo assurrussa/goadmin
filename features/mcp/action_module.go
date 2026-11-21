@@ -3,6 +3,7 @@ package mcp
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -12,11 +13,15 @@ import (
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 )
 
+const receiptSchemaKey = "receipt_schema"
+
 type actionDescription struct {
-	Propose    string      `json:"propose"`
-	Status     string      `json:"status"`
-	Parameters []Parameter `json:"parameters"`
-	Fields     []Field     `json:"fields"`
+	Version        string             `json:"version"`
+	PreviousFields map[string][]Field `json:"previousFields,omitempty"`
+	Propose        string             `json:"propose"`
+	Status         string             `json:"status"`
+	Parameters     []Parameter        `json:"parameters"`
+	Fields         []Field            `json:"fields"`
 }
 
 func (a actionDescription) validate() error {
@@ -30,11 +35,27 @@ func (a actionDescription) validate() error {
 		}
 		seen[p.Name] = true
 	}
-	seen = map[string]bool{
+	if !namePattern.MatchString(a.Version) || len(a.Version) > 100 {
+		return errors.New("mcp: invalid action version")
+	}
+	for version, fields := range a.PreviousFields {
+		if version == a.Version || !namePattern.MatchString(version) || len(version) > 100 {
+			return fmt.Errorf("mcp: invalid previous receipt version %q", version)
+		}
+		if err := validateReceiptFields(fields); err != nil {
+			return err
+		}
+	}
+	return validateReceiptFields(a.Fields)
+}
+
+func validateReceiptFields(fields []Field) error {
+	seen := map[string]bool{
 		fieldRequestID: true, fieldStatus: true, fieldReviewURL: true, fieldExpiresAt: true,
 		fieldError: true, "message": true, fieldCode: true, fieldVerificationURL: true,
+		receiptSchemaKey: true, "receiptLink": true,
 	}
-	for _, f := range a.Fields {
+	for _, f := range fields {
 		if seen[f.Key] || !namePattern.MatchString(f.Key) || !hasDescription(f.Description) ||
 			(f.Kind != Text && f.Kind != PositiveID) {
 			return fmt.Errorf("mcp: invalid action result field %q", f.Key)
@@ -52,6 +73,7 @@ type actionFeature struct {
 
 func (a Action) describe() description {
 	return description{Version: 2, Name: a.ProposeTool, Description: a.Description, Action: &actionDescription{
+		Version: a.Version, PreviousFields: a.PreviousResultFields,
 		Propose: a.ProposeTool, Status: a.StatusTool, Parameters: a.Parameters, Fields: a.ResultFields,
 	}}
 }
@@ -100,6 +122,10 @@ func ConfirmedModule(cfg Config, action Action) (host.Module, error) {
 		action.Parameters[i].Enum = slices.Clone(action.Parameters[i].Enum)
 	}
 	action.ResultFields = slices.Clone(action.ResultFields)
+	action.PreviousResultFields = maps.Clone(action.PreviousResultFields)
+	for version, fields := range action.PreviousResultFields {
+		action.PreviousResultFields[version] = slices.Clone(fields)
+	}
 	action.Permissions = slices.Clone(action.Permissions)
 	key := "mcp-action." + action.Namespace + "." + action.Key
 	f := actionFeature{cfg: cfg, action: action, key: key}

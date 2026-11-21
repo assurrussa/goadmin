@@ -39,11 +39,13 @@ type actionPairings struct {
 	now     func() time.Time
 	pending map[[32]byte]actionPairing
 	active  map[[32]byte]actionGrant
+	retired map[string]actionGrant
 }
 
 func newActionPairings() *actionPairings {
 	return &actionPairings{
 		now: time.Now, pending: make(map[[32]byte]actionPairing), active: make(map[[32]byte]actionGrant),
+		retired: make(map[string]actionGrant),
 	}
 }
 
@@ -51,13 +53,18 @@ func actionSecretKey(secret string) [32]byte { return sha256.Sum256([]byte(secre
 
 func (p *actionPairings) prune(now time.Time) {
 	for key, pair := range p.pending {
-		if !now.Before(pair.deadline) {
+		if !now.Before(pair.deadline) || (pair.grant.id != "" && !now.Before(pair.grant.deadline)) {
 			delete(p.pending, key)
 		}
 	}
 	for key, grant := range p.active {
 		if !now.Before(grant.deadline) {
 			delete(p.active, key)
+		}
+	}
+	for id, grant := range p.retired {
+		if !now.Before(grant.deadline) {
+			delete(p.retired, id)
 		}
 	}
 }
@@ -102,8 +109,13 @@ func (p *actionPairings) approve(code string, grant actionGrant) bool {
 	p.prune(now)
 	for key, pair := range p.pending {
 		if pair.code == code && pair.grant.id == "" {
+			if grant.deadline.IsZero() || !now.Before(grant.deadline) {
+				return false
+			}
 			grant.id = rand.Text()
-			grant.deadline = now.Add(grantLifetime)
+			if maxDeadline := now.Add(grantLifetime); grant.deadline.After(maxDeadline) {
+				grant.deadline = maxDeadline
+			}
 			pair.grant = grant
 			p.pending[key] = pair
 			return true
@@ -172,12 +184,13 @@ func (p *actionPairings) connections(browser string) []string {
 
 // An empty id closes all connections for a browser. A nonempty id is private
 // connection metadata, never accepted as a device secret or an access token.
-func (p *actionPairings) revoke(browser, id string) {
+func (p *actionPairings) revoke(browser, id string) []actionGrant {
 	if browser == "" {
-		return
+		return nil
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.prune(p.now())
 	for key, pair := range p.pending {
 		if pair.grant.browser == browser && (id == "" || pair.grant.id == id) {
 			delete(p.pending, key)
@@ -186,7 +199,24 @@ func (p *actionPairings) revoke(browser, id string) {
 	for key, grant := range p.active {
 		if grant.browser == browser && (id == "" || grant.id == id) {
 			delete(p.active, key)
+			grant.session = host.ReadSessionBinding{}
+			p.retired[grant.id] = grant
 		}
+	}
+	var retired []actionGrant
+	for _, grant := range p.retired {
+		if grant.browser == browser && (id == "" || grant.id == id) {
+			retired = append(retired, grant)
+		}
+	}
+	return retired
+}
+
+func (p *actionPairings) cleared(grants []actionGrant) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, grant := range grants {
+		delete(p.retired, grant.id)
 	}
 }
 
@@ -199,11 +229,12 @@ type actionLoginFences struct {
 }
 
 type actionLoginFence struct {
-	mu   sync.Mutex
-	refs int
+	mu          sync.Mutex
+	refs        int
+	transitions int
 }
 
-func (f *actionLoginFences) acquire(browser string) func() {
+func (f *actionLoginFences) reference(browser string) (*actionLoginFence, func()) {
 	f.mu.Lock()
 	if f.logins == nil {
 		f.logins = make(map[string]*actionLoginFence)
@@ -215,14 +246,37 @@ func (f *actionLoginFences) acquire(browser string) func() {
 	}
 	fence.refs++
 	f.mu.Unlock()
-	fence.mu.Lock()
-	return func() {
-		fence.mu.Unlock()
+	return fence, func() {
 		f.mu.Lock()
 		fence.refs--
 		if fence.refs == 0 {
 			delete(f.logins, browser)
 		}
 		f.mu.Unlock()
+	}
+}
+
+func (f *actionLoginFences) acquire(browser string) (ready bool, release func()) {
+	fence, unref := f.reference(browser)
+	fence.mu.Lock()
+	return fence.transitions == 0, func() {
+		fence.mu.Unlock()
+		unref()
+	}
+}
+
+// Native transitions mark the login unavailable without keeping the mutex
+// while native auth waits for PostgreSQL.
+func (f *actionLoginFences) transition(browser string) func(func()) {
+	fence, unref := f.reference(browser)
+	fence.mu.Lock()
+	fence.transitions++
+	fence.mu.Unlock()
+	return func(beforeRelease func()) {
+		fence.mu.Lock()
+		defer unref()
+		defer fence.mu.Unlock()
+		beforeRelease()
+		fence.transitions--
 	}
 }

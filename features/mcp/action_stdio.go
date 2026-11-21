@@ -3,7 +3,9 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"net/http"
+	"slices"
 	"time"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -24,8 +26,19 @@ func addActionTools(server *sdk.Server, g *gateway, d description) {
 	})
 	addParameter(output, Parameter{Name: fieldReviewURL, Kind: Text, Description: "Open in the approving native browser login."})
 	addParameter(output, Parameter{Name: fieldExpiresAt, Kind: Text, Description: "Original deadline of a pending proposal."})
+	// Both output kinds are JSON strings. If a field changed kind, publish
+	// the broader string schema and validate the specific receipt below.
+	for _, version := range slices.Sorted(maps.Keys(a.PreviousFields)) {
+		for _, field := range a.PreviousFields[version] {
+			addParameter(output, Parameter{Name: field.Key, Kind: Text, Description: field.Description})
+		}
+	}
 	for _, field := range a.Fields {
-		addParameter(output, Parameter{Name: field.Key, Kind: field.Kind, Description: field.Description})
+		kind := field.Kind
+		if _, historical := output.Properties[field.Key]; historical {
+			kind = Text
+		}
+		addParameter(output, Parameter{Name: field.Key, Kind: kind, Description: field.Description})
 	}
 	add := func(name, help, route string, fields []Parameter, readOnly bool) {
 		input := objectSchema()
@@ -40,7 +53,7 @@ func addActionTools(server *sdk.Server, g *gateway, d description) {
 			}
 			return validActionParameters(fields, in, 1)
 		}, func(ctx context.Context, in map[string]json.RawMessage) (any, *toolProblem) {
-			return g.actionCall(ctx, route, in, a.Fields)
+			return g.actionCall(ctx, route, in, a)
 		})
 	}
 	help := d.Description + " An operator confirms in the admin browser. Save the UUID before proposing."
@@ -49,7 +62,7 @@ func addActionTools(server *sdk.Server, g *gateway, d description) {
 }
 
 func (g *gateway) actionCall(
-	ctx context.Context, route string, in map[string]json.RawMessage, fields []Field,
+	ctx context.Context, route string, in map[string]json.RawMessage, action *actionDescription,
 ) (any, *toolProblem) {
 	token, problem := g.credential(ctx)
 	if problem != nil {
@@ -96,20 +109,41 @@ func (g *gateway) actionCall(
 		}
 		result[fieldReviewURL], result[fieldExpiresAt] = review, expires
 	case actionSucceeded:
-		for _, f := range fields {
-			if raw, exists := out[f.Key]; exists {
-				value, ok := f.Kind.parse(raw)
-				if !ok {
-					return nil, unknownActionOutcome()
-				}
-				result[f.Key] = value
-			}
+		if !action.decodeReceipt(out, result) {
+			return nil, unknownActionOutcome()
 		}
 	case actionDeclined, actionConflict, actionExpired:
 	default:
 		return nil, unknownActionOutcome()
 	}
 	return result, nil
+}
+
+func (a *actionDescription) decodeReceipt(out map[string]json.RawMessage, result map[string]any) bool {
+	var version string
+	if json.Unmarshal(out[receiptSchemaKey], &version) != nil || version == "" {
+		return false
+	}
+	fields := a.Fields
+	if version != a.Version {
+		previous, declared := a.PreviousFields[version]
+		if !declared {
+			return false
+		}
+		fields = previous
+	}
+	for _, f := range fields {
+		raw, exists := out[f.Key]
+		if !exists && f.Nullable {
+			continue
+		}
+		value, ok := f.Kind.parse(raw)
+		if !exists || !ok {
+			return false
+		}
+		result[f.Key] = value
+	}
+	return true
 }
 
 func unknownActionOutcome() *toolProblem {

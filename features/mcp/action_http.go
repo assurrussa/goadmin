@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 
@@ -79,15 +80,45 @@ func (h *actionHandler) checkGrant(ctx context.Context, g actionGrant) error {
 	}
 	err := h.checkSession(ctx, g.session)
 	if errors.Is(err, host.ErrReadSessionEnded) || errors.Is(err, host.ErrReadSessionDenied) {
-		h.grants.revoke(g.browser, g.id)
+		if expireErr := h.revoke(ctx, g.browser, g.id); expireErr != nil {
+			return expireErr
+		}
+	}
+	if err == nil {
+		if _, ok := h.grants.bound(g.id); !ok {
+			return host.ErrReadSessionEnded
+		}
 	}
 	return err
 }
 
+func (h *actionHandler) revoke(ctx context.Context, browser, id string) error {
+	_, release := h.fences.acquire(browser)
+	retired := h.grants.revoke(browser, id)
+	release()
+	return h.clearRetired(ctx, retired)
+}
+
+func (h *actionHandler) clearRetired(ctx context.Context, retired []actionGrant) error {
+	if len(retired) == 0 {
+		return nil
+	}
+	if err := h.store.expireBindings(ctx, retired); err != nil {
+		return err
+	}
+	h.grants.cleared(retired)
+	return nil
+}
+
 func (h *actionHandler) checkSession(ctx context.Context, binding host.ReadSessionBinding) error {
 	return h.app.TxManager().RunInTx(ctx, func(txctx context.Context) error {
-		return h.app.Unwrap().AdminAuth().CheckConfirmedAction(txctx, binding, h.action.Permissions)
+		_, err := h.sessionDeadline(txctx, binding)
+		return err
 	})
+}
+
+func (h *actionHandler) sessionDeadline(ctx context.Context, binding host.ReadSessionBinding) (time.Time, error) {
+	return h.app.Unwrap().AdminAuth().ConfirmedActionDeadline(ctx, binding, h.action.Permissions)
 }
 
 func (h *actionHandler) bearer(c fiber.Ctx) (actionGrant, error) {
@@ -125,30 +156,42 @@ func (h *actionHandler) propose(c fiber.Ctx) error {
 	release := func() {}
 	defer func() { release() }()
 	proposal := actionProposal{RequestID: id, Input: in, BindingID: g.id, ExpiresAt: g.deadline}
-	r, err := h.store.propose(c.Context(), g.actor, proposal, func(ctx context.Context, _ ActionTx) error {
-		release = h.fences.acquire(g.browser)
+	r, err := h.store.propose(c.Context(), g.actor, proposal, func(ctx context.Context, _ ActionTx) (time.Time, error) {
+		var ready bool
+		ready, release = h.fences.acquire(g.browser)
+		if !ready {
+			return time.Time{}, errActionTransition
+		}
 		return h.checkGrantInTx(ctx, g)
 	})
 	release()
 	release = func() {}
 	if err != nil {
+		if errors.Is(err, host.ErrReadSessionEnded) || errors.Is(err, host.ErrReadSessionDenied) {
+			if expireErr := h.revoke(c.Context(), g.browser, g.id); expireErr != nil {
+				return actionFailure(c, expireErr)
+			}
+		}
 		return actionFailure(c, err)
 	}
 	return h.sendResult(c, g.actor, r)
 }
 
-func (h *actionHandler) checkGrantInTx(ctx context.Context, g actionGrant) error {
+func (h *actionHandler) checkGrantInTx(ctx context.Context, g actionGrant) (time.Time, error) {
 	if _, ok := h.grants.bound(g.id); !ok {
-		return host.ErrReadSessionEnded
+		return time.Time{}, host.ErrReadSessionEnded
 	}
-	err := h.app.Unwrap().AdminAuth().CheckConfirmedAction(ctx, g.session, h.action.Permissions)
-	if errors.Is(err, host.ErrReadSessionEnded) || errors.Is(err, host.ErrReadSessionDenied) {
-		h.grants.revoke(g.browser, g.id)
+	deadline, err := h.sessionDeadline(ctx, g.session)
+	if err != nil {
+		return time.Time{}, err
 	}
-	if err == nil && !h.grants.now().Before(g.deadline) {
-		return host.ErrReadSessionEnded
+	if !h.grants.now().Before(g.deadline) {
+		return time.Time{}, host.ErrReadSessionEnded
 	}
-	return err
+	if g.deadline.Before(deadline) {
+		deadline = g.deadline
+	}
+	return deadline, nil
 }
 
 func (h *actionHandler) status(c fiber.Ctx) error {
@@ -192,29 +235,48 @@ func (h *actionHandler) sendResult(c fiber.Ctx, actor host.Actor, r actionReques
 	if err != nil {
 		return actionFailure(c, err)
 	}
-	return c.JSON(h.wireResult(r))
+	out, err := h.wireResult(r)
+	if err != nil {
+		return actionFailure(c, err)
+	}
+	return c.JSON(out)
 }
 
-func (h *actionHandler) wireResult(r actionRequest) fiber.Map {
+func (h *actionHandler) wireResult(r actionRequest) (fiber.Map, error) {
 	out := fiber.Map{fieldRequestID: r.RequestID, fieldStatus: r.State}
 	if r.State == actionPending {
 		out[fieldReviewURL] = h.origin.String() + h.action.Path + "/requests/" + r.RequestID
 		out[fieldExpiresAt] = r.ExpiresAt
 	}
-	for key, value := range h.resultFields(r) {
+	fields, err := h.resultFields(r)
+	if err != nil {
+		return nil, err
+	}
+	if r.State == actionSucceeded {
+		version := h.action.Version
+		if _, declared := h.action.PreviousResultFields[r.Version]; declared {
+			version = r.Version
+		}
+		out[receiptSchemaKey] = version
+	}
+	for key, value := range fields {
 		out[key] = value
 	}
-	return out
+	return out, nil
 }
 
-func (h *actionHandler) resultFields(r actionRequest) map[string]string {
-	result := make(map[string]string, len(r.Result))
-	for _, f := range h.action.ResultFields {
-		if value, ok := r.Result[f.Key]; ok {
-			result[f.Key] = value
-		}
+func (h *actionHandler) resultFields(r actionRequest) (map[string]string, error) {
+	if r.State != actionSucceeded {
+		return map[string]string{}, nil
 	}
-	return result
+	fields, ok := h.action.PreviousResultFields[r.Version]
+	if !ok {
+		fields = h.action.ResultFields
+	}
+	if err := validateActionResult(fields, r.Result); err != nil {
+		return nil, errActionUnknown
+	}
+	return r.Result, nil
 }
 
 func actionFailure(c fiber.Ctx, err error) error {

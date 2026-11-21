@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 
@@ -36,6 +37,8 @@ func (h *actionHandler) exactOrigin(c fiber.Ctx) error {
 	return c.Next()
 }
 
+type nativeTransitionOutcomeKey struct{}
+
 func (h *actionHandler) nativeTransitions(c fiber.Ctx) error {
 	path := strings.TrimRight(c.Path(), "/")
 	preview := c.Method() == http.MethodPost && strings.EqualFold(path, "/auth/role-preview")
@@ -45,17 +48,34 @@ func (h *actionHandler) nativeTransitions(c fiber.Ctx) error {
 		return c.Next()
 	}
 	browser := host.CSRFSessionBinding(cookie)
-	release := h.fences.acquire(browser)
-	defer release()
-	if err := c.Next(); err != nil {
+	var retired []actionGrant
+	err := func() error {
+		finish := h.fences.transition(browser)
+		var ended bool
+		defer finish(func() {
+			if ended {
+				retired = h.grants.revoke(browser, "")
+			}
+		})
+		err := c.Next()
+		cleared, cookieErr := http.ParseSetCookie(string(c.Response().Header.PeekCookie(h.sessionName)))
+		ended = (preview && err == nil && c.Response().StatusCode() == http.StatusOK) ||
+			(logout && cookieErr == nil && cleared.Value == "" && cleared.MaxAge < 0)
+		// Several action modules can wrap the same native transition. Retain
+		// its outcome even when an inner module reports a cleanup error.
+		if outcome, ok := c.Locals(nativeTransitionOutcomeKey{}).(bool); ok {
+			ended = outcome
+		} else {
+			c.Locals(nativeTransitionOutcomeKey{}, ended)
+		}
 		return err
+	}()
+	if expireErr := h.clearRetired(c.Context(), retired); expireErr != nil {
+		// The native transition is already durable. Preserve its cookies and
+		// report the cleanup failure without making the grant usable again.
+		return actionFailure(c, expireErr)
 	}
-	cleared, err := http.ParseSetCookie(string(c.Response().Header.PeekCookie(h.sessionName)))
-	if (preview && c.Response().StatusCode() == http.StatusOK) ||
-		(logout && err == nil && cleared.Value == "" && cleared.MaxAge < 0) {
-		h.grants.revoke(browser, "")
-	}
-	return nil
+	return err
 }
 
 type actionBrowser struct {
@@ -78,7 +98,9 @@ func (h *actionHandler) browser(c fiber.Ctx) (actionBrowser, error) {
 		err = h.checkSession(c.Context(), binding)
 	}
 	if errors.Is(err, host.ErrReadSessionDenied) || errors.Is(err, host.ErrReadSessionEnded) {
-		h.grants.revoke(host.CSRFSessionBinding(cookie), "")
+		if expireErr := h.revoke(c.Context(), host.CSRFSessionBinding(cookie), ""); expireErr != nil {
+			err = expireErr
+		}
 	}
 	return actionBrowser{actor: actor, id: host.CSRFSessionBinding(cookie), session: binding}, err
 }
@@ -107,32 +129,51 @@ func (h *actionHandler) connect(c fiber.Ctx) error {
 	if err != nil {
 		return actionFailure(c, err)
 	}
-	release := h.fences.acquire(b.id)
-	defer release()
 	switch body.Decision {
 	case "revoke":
 		if body.ConnectionID == "" || body.Code != "" {
 			return agentJSON(c, 422, "invalid_request")
 		}
-		h.grants.revoke(b.id, body.ConnectionID)
+		if err := h.revoke(c.Context(), b.id, body.ConnectionID); err != nil {
+			return actionFailure(c, err)
+		}
 	case decisionApprove:
 		code := strings.ToUpper(strings.TrimSpace(body.Code))
 		if body.ConnectionID != "" || !codePattern.MatchString(code) {
 			return agentJSON(c, 422, "invalid_request")
 		}
-		// Rebind while holding the login fence. A preview or logout could
-		// have completed between the request middleware and this approval.
-		b, err = h.browser(c)
+		approved, err := h.approve(c.Context(), b, code)
 		if err != nil {
 			return actionFailure(c, err)
 		}
-		if !h.grants.approve(code, actionGrant{actor: b.actor, browser: b.id, session: b.session}) {
+		if !approved {
 			return agentJSON(c, 404, "not_found")
 		}
 	default:
 		return agentJSON(c, 422, "invalid_request")
 	}
 	return c.JSON(fiber.Map{fieldStatus: "connected", propGrants: h.grants.connections(b.id)})
+}
+
+func (h *actionHandler) approve(ctx context.Context, browser actionBrowser, code string) (bool, error) {
+	var deadline time.Time
+	release := func() {}
+	defer func() { release() }()
+	err := h.app.TxManager().RunInTx(ctx, func(ctx context.Context) error {
+		var ready bool
+		ready, release = h.fences.acquire(browser.id)
+		if !ready {
+			return errActionTransition
+		}
+		var err error
+		deadline, err = h.sessionDeadline(ctx, browser.session)
+		return err
+	})
+	if err != nil {
+		return false, err
+	}
+	grant := actionGrant{actor: browser.actor, browser: browser.id, session: browser.session, deadline: deadline}
+	return h.grants.approve(code, grant), nil
 }
 
 func (h *actionHandler) reviewPage(c fiber.Ctx) error {
@@ -155,10 +196,20 @@ func (h *actionHandler) reviewPage(c fiber.Ctx) error {
 	if err != nil {
 		return actionFailure(c, err)
 	}
+	if h.action.LoadReview != nil && r.State == actionPending {
+		r, err = h.loadBrowserReview(c.Context(), b, r.RequestID)
+		if err != nil {
+			return actionFailure(c, err)
+		}
+	}
+	result, err := h.resultFields(r)
+	if err != nil {
+		return actionFailure(c, err)
+	}
 	return h.app.Render(c, "agent/ActionReview", map[string]any{
 		propTitle: h.action.Title, "confirmLabel": h.action.ConfirmLabel, propDescription: h.action.Description,
 		"path": h.action.Path + "/requests/" + id, "requestID": id, fieldStatus: r.State, "expiresAt": r.ExpiresAt,
-		"recordID": r.Snapshot.RecordID, "revision": r.Snapshot.Revision, "fields": r.Snapshot.Fields, "result": h.resultFields(r),
+		"recordID": r.Snapshot.RecordID, "revision": r.Snapshot.Revision, "fields": r.Snapshot.Fields, "result": result,
 		"receiptLink": h.receiptLink(c.Context(), b.actor, r),
 	})
 }
@@ -175,28 +226,44 @@ func (h *actionHandler) decide(c fiber.Ctx) error {
 	if err != nil {
 		return actionFailure(c, err)
 	}
+	var grant actionGrant
 	release := func() {}
 	defer func() { release() }()
+	recheck := func(ctx context.Context) (time.Time, error) {
+		deadline, err := h.checkGrantInTx(ctx, grant)
+		if errors.Is(err, host.ErrReadSessionEnded) || errors.Is(err, host.ErrReadSessionDenied) {
+			return time.Time{}, errActionExpired
+		}
+		return deadline, err
+	}
 	authorize := func(ctx context.Context, _ ActionTx, r actionRequest) error {
-		release = h.fences.acquire(b.id)
-		g, ok := h.grants.bound(r.BindingID)
+		var ready bool
+		ready, release = h.fences.acquire(b.id)
+		if !ready {
+			return errActionTransition
+		}
+		var ok bool
+		grant, ok = h.grants.bound(r.BindingID)
 		if !ok {
 			return errActionExpired
 		}
-		if g.browser != b.id || g.actor != b.actor {
+		if grant.browser != b.id || grant.actor != b.actor {
 			return errActionNotFound
 		}
-		err := h.checkGrantInTx(ctx, g)
-		if errors.Is(err, host.ErrReadSessionEnded) || errors.Is(err, host.ErrReadSessionDenied) {
-			return errActionExpired
-		}
+		_, err := recheck(ctx)
 		return err
 	}
-	r, err := h.store.decide(c.Context(), b.actor, id, in.Decision == decisionApprove, authorize)
+	r, err := h.store.decide(c.Context(), b.actor, id, in.Decision == decisionApprove, authorize, recheck)
+	release()
+	release = func() {}
 	if err != nil {
 		return actionFailure(c, err)
 	}
-	out := h.wireResult(r)
+	out, err := h.wireResult(r)
+	if err != nil {
+		return actionFailure(c, err)
+	}
+	delete(out, receiptSchemaKey) // Only the stdio transport negotiates receipt schemas.
 	out["receiptLink"] = h.receiptLink(c.Context(), b.actor, r)
 	return c.JSON(out)
 }

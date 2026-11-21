@@ -17,9 +17,19 @@ import (
 func (s *Service) CheckConfirmedAction(
 	ctx context.Context, b ReadSessionBinding, permissions []integrationroles.PermissionKey,
 ) error {
+	_, err := s.ConfirmedActionDeadline(ctx, b, permissions)
+	return err
+}
+
+// ConfirmedActionDeadline checks the confirmed action's native authority and
+// returns its earliest known expiry. Recheck after host work to observe expiry
+// of the Fiber storage lease as well as the canonical deadline.
+func (s *Service) ConfirmedActionDeadline(
+	ctx context.Context, b ReadSessionBinding, permissions []integrationroles.PermissionKey,
+) (time.Time, error) {
 	tx := pgstore.GetTx(ctx)
 	if tx == nil || b.external != nil || len(permissions) == 0 {
-		return ErrReadSessionDenied
+		return time.Time{}, ErrReadSessionDenied
 	}
 	ctx = admintx.WithSessionReadTx(ctx, tx)
 	var expires time.Time
@@ -31,9 +41,9 @@ func (s *Service) CheckConfirmedAction(
 		AND l.security_version=s.security_version FOR SHARE OF s,a,l`
 	if err := tx.QueryRow(ctx, login, b.subject.String(), b.adminID, b.loginID).Scan(&expires); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrReadSessionEnded
+			return time.Time{}, ErrReadSessionEnded
 		}
-		return err
+		return time.Time{}, err
 	}
 	const allowed = `SELECT 1 FROM auth_subject_roles sr
 		JOIN auth_role_permissions rp ON rp.role_id=sr.role_id JOIN auth_permissions p ON p.id=rp.permission_id
@@ -42,24 +52,26 @@ func (s *Service) CheckConfirmedAction(
 		var present int
 		if err := tx.QueryRow(ctx, allowed, b.subject.String(), permission.String()).Scan(&present); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrReadSessionDenied
+				return time.Time{}, ErrReadSessionDenied
 			}
-			return err
+			return time.Time{}, err
 		}
 	}
 	sess, err := s.openDelegatedSession(ctx, b)
 	if err != nil {
-		return err
+		return time.Time{}, err
 	}
 	defer sess.Release()
 	if sess.Get(integrationroles.RolePreviewSessionKey) != nil {
-		return ErrReadSessionDenied
+		return time.Time{}, ErrReadSessionDenied
 	}
-	if err := s.checkDelegatedBrowser(ctx, b, sess); err != nil {
-		return err
+	browserExpires, err := s.checkDelegatedBrowser(ctx, b, sess)
+	if err != nil {
+		return time.Time{}, err
 	}
-	if !time.Now().Before(expires) {
-		return ErrReadSessionEnded
+	deadline := earliestMaintenanceExpiry(expires, browserExpires)
+	if !time.Now().Before(deadline) {
+		return time.Time{}, ErrReadSessionEnded
 	}
-	return nil
+	return deadline, nil
 }

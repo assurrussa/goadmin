@@ -41,13 +41,21 @@ the exact configured Origin.
 - Declare all required permission keys, typed input parameters, tool names and
   allowed result fields. Keep the tools' parameter contracts compatible with
   issued proposals. Keep `Normalize` deterministic and able to recognize
-  previous versions whose receipts can still be replayed.
-- `Inspect` must scope the query to the actor, load the identity, revision and
-  full fields the operator needs, and lock every relevant row when requested.
-  Include changes to related data in the revision when they affect the action.
-  Return `mcp.ErrActionNotFound` for unavailable or ineligible records.
-  A review can contain up to 32 plain-text fields, 256 KiB per value and
-  1 MiB total for labels and values. The client receives the URL of the review.
+  previous versions whose receipts can still be replayed. When a version changes
+  the result schema, keep its original fields in `PreviousResultFields` under
+  the original version. Replays then return the same values and field names.
+  An incomplete receipt or an unknown schema returns `outcome_unknown`.
+- `Inspect` must scope the query to the actor, load the identity and revision,
+  and lock every relevant row when requested. Include changes to related data
+  in the revision when they affect the action. Return `mcp.ErrActionNotFound`
+  for unavailable or ineligible records. The fields it returns are stored for
+  browser review, with up to 32 plain-text fields, 256 KiB per value and 1 MiB
+  total for labels and values. For larger reviews, set `LoadReview` and return
+  only the identity and revision from `Inspect`. `LoadReview` must read the
+  actor-scoped identity, revision and full review fields from a consistent view
+  without locking the domain record. GoAdmin compares the identity and revision
+  before displaying the fields to the originating browser login. These fields
+  are rendered only in that browser response. The client receives the review URL.
 - `Apply` receives the checked snapshot and the current transaction. Write the
   same domain transition used by the native UI, its history and any outbox
   entries through that transaction. Use the request UUID for host correlations.

@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"net/url"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -19,8 +20,11 @@ import (
 	"github.com/assurrussa/goauth"
 	"github.com/assurrussa/goauth/postgres"
 	"github.com/assurrussa/goauth/rbac"
+	"github.com/assurrussa/outbox/backends/pgsql/storage/pgsqlclient"
+	"github.com/assurrussa/outbox/backends/pgsql/storage/pgsqlinit"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/adaptor"
+	"github.com/google/uuid"
 
 	"github.com/assurrussa/goadmin/host"
 )
@@ -165,7 +169,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = pg.Close() })
-	newHTTP := func(t *testing.T, rawOrigin string) unpublishTestHTTP {
+	buildHTTP := func(t *testing.T, rawOrigin string, client host.StoragePgsqlClient, redis host.RedisClient) unpublishTestHTTP {
 		t.Helper()
 		origin, err := url.Parse(rawOrigin)
 		if err != nil {
@@ -178,6 +182,9 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 			SessionTTL: time.Hour, SessionInactiveTTL: time.Hour,
 		})
 		admin.CanonicalSessionBackend = "pgsql"
+		if redis != nil {
+			admin.CanonicalSessionBackend = "redis"
+		}
 		cfg := host.Config{
 			Admin: admin, Server: host.ServerConfig{Addr: ":8080", AllowOrigins: []string{rawOrigin}},
 			CSRF: host.CSRFConfig{AppDomain: origin.Hostname(), SecretKey: strings.Repeat("c", 32), AllowedOrigins: []string{rawOrigin}},
@@ -198,7 +205,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		deps := host.Dependencies{Database: pg, TxManager: host.NewTxManager(pg), Logger: lg, CSRF: csrf}
+		deps := host.Dependencies{Database: client, TxManager: host.NewTxManager(client), Logger: lg, CSRF: csrf, SessionRedis: redis}
 		products, err := productsModule(db)
 		if err != nil {
 			t.Fatal(err)
@@ -215,6 +222,10 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		return unpublishTestHTTP{t: t, runtime: runtime, origin: rawOrigin, do: func(req *http.Request) (*http.Response, error) {
 			return runtime.App().Test(req, fiber.TestConfig{Timeout: 15 * time.Second})
 		}}
+	}
+	newHTTP := func(t *testing.T, rawOrigin string) unpublishTestHTTP {
+		t.Helper()
+		return buildHTTP(t, rawOrigin, pg, nil)
 	}
 	httpServer := newHTTP(t, unpublishTestOrigin)
 	roles, err := postgres.NewRBAC(db, nil)
@@ -258,6 +269,19 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 			t.Fatal(err)
 		}
 		return product.ID
+	}
+	assertScrubbed := func(t *testing.T, requestID string) {
+		t.Helper()
+		var state string
+		var scrubbed bool
+		if err := db.QueryRowContext(t.Context(), `
+			SELECT state, normalized_input IS NULL AND review_fields IS NULL AND binding_id IS NULL
+			FROM admin_confirmed_actions WHERE request_id=$1`, requestID).Scan(&state, &scrubbed); err != nil {
+			t.Fatal(err)
+		}
+		if state != unpublishExpired || !scrubbed {
+			t.Fatalf("action %s cleanup state=%q scrubbed=%t", requestID, state, scrubbed)
+		}
 	}
 
 	jar := httpServer.login(email)
@@ -352,6 +376,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 			s.t.Fatalf("failed preview transition changed the pending review: %+v", got)
 		}
 		s.request("POST", "/auth/role-preview", map[string]int64{"roleId": previewCandidate.ID}, jar, s.formHeaders(jar), http.StatusOK)
+		assertScrubbed(s.t, requestID)
 		// Only the native transitions may retire the grant between these requests.
 		s.request("POST", "/auth/role-preview", map[string]int64{"roleId": 0}, jar, s.formHeaders(jar), http.StatusOK)
 		s.agent("/status", token, input, http.StatusUnauthorized)
@@ -366,6 +391,50 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		return freshToken
 	}
 	token = checkPreview(httpServer, jar, token, "d1f23610-53d6-4262-bb60-c343b578c03c")
+	smallPoolWorkflow := func(t *testing.T, loginServer unpublishTestHTTP, redis host.RedisClient) {
+		t.Helper()
+		single, err := pgsqlinit.Create(t.Context(), dsn,
+			pgsqlclient.WithMinConnectionsCount(1), pgsqlclient.WithMaxConnectionsCount(1))
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = single.Close() })
+		server := buildHTTP(t, unpublishTestOrigin, single, redis)
+		browser := loginServer.login(email)
+		bearer := checkPreview(server, browser, server.pair(browser), uuid.NewString())
+		approveID := uuid.NewString()
+		server.agent("/propose", bearer, map[string]string{
+			"request_id": approveID, "product_id": publish(t), "reason": "single connection",
+		}, http.StatusOK)
+		server.request(http.MethodPost, unpublishRequestPath+approveID, approval, browser, server.formHeaders(browser), http.StatusOK)
+		if got := server.agent("/status", bearer, map[string]string{"request_id": approveID}, http.StatusOK); got.Status != unpublishSucceeded {
+			t.Fatalf("single connection confirmation returned %+v", got)
+		}
+		pendingID := uuid.NewString()
+		server.agent("/propose", bearer, map[string]string{
+			"request_id": pendingID, "product_id": publish(t), "reason": "logout cleanup",
+		}, http.StatusOK)
+		headers := server.formHeaders(browser)
+		headers.Set("Referer", server.origin+"/auth/profile")
+		server.request(http.MethodDelete, "/auth/logout", nil, browser, headers, http.StatusFound)
+		assertScrubbed(t, pendingID)
+		server.agent("/status", bearer, map[string]string{"request_id": pendingID}, http.StatusUnauthorized)
+	}
+	t.Run("single_connection_native_transitions_pgsql", func(t *testing.T) {
+		smallPoolWorkflow(t, httpServer, nil)
+	})
+	t.Run("single_connection_native_transitions_redis", func(t *testing.T) {
+		addr := os.Getenv("GOAUTH_TEST_REDIS_ADDRESS")
+		if addr == "" {
+			t.Skip("GOAUTH_TEST_REDIS_ADDRESS must name an isolated Redis test server")
+		}
+		client, err := host.NewRedisClient(t.Context(), host.RedisConfig{Addrs: []string{addr}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = client.Close() })
+		smallPoolWorkflow(t, buildHTTP(t, unpublishTestOrigin, pg, client), client)
+	})
 	t.Run("production_role_preview", func(t *testing.T) {
 		server := httptest.NewUnstartedServer(nil)
 		defer server.Close()
@@ -552,6 +621,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 	}
 	httpServer.request("POST", unpublishConnectPath, map[string]string{"decision": "revoke", "connection_id": connections.Props.Grants[0]},
 		jar, httpServer.formHeaders(jar), http.StatusOK)
+	assertScrubbed(t, blockedID)
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}

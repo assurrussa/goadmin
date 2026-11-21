@@ -145,7 +145,7 @@ func (s *Service) ResolveDelegatedRead(ctx context.Context, b ReadSessionBinding
 			return ctx, models.Admin{}, err
 		}
 	}
-	if err := s.checkDelegatedBrowser(ctx, b, sess); err != nil {
+	if _, err := s.checkDelegatedBrowser(ctx, b, sess); err != nil {
 		return ctx, models.Admin{}, err
 	}
 	return ctx, admin, nil
@@ -206,51 +206,51 @@ func (s *Service) delegatedAdmin(ctx context.Context, b ReadSessionBinding) (mod
 	return admin, nil
 }
 
-func (s *Service) checkDelegatedBrowser(ctx context.Context, b ReadSessionBinding, sess *session.Session) error {
+func (s *Service) checkDelegatedBrowser(ctx context.Context, b ReadSessionBinding, sess *session.Session) (time.Time, error) {
 	state, ok := sess.Get(sessioncore.AuthAdminKey.String()).(*browserSession)
 	if !ok || state == nil || state.SubjectID != b.subject || state.AuthSessionID != b.loginID {
-		return ErrReadSessionEnded
+		return time.Time{}, ErrReadSessionEnded
 	}
 	record, found, err := s.states.Load(ctx, sess.ID())
 	if err != nil {
-		return err
+		return time.Time{}, err
 	}
 	if !found || record.SubjectID != b.subject || record.Tokens.Session.ID != b.loginID {
-		return ErrReadSessionEnded
+		return time.Time{}, ErrReadSessionEnded
 	}
 	if record.Owner != "" {
-		return ErrRefreshInProgress
+		return time.Time{}, ErrRefreshInProgress
 	}
 	hard, _ := sess.Get("goadmin.browserHardExpiresAt").(time.Time)
 	expires := earliestMaintenanceExpiry(hard, state.HardExpiresAt, record.ExpiresAt, record.Tokens.Session.ExpiresAt)
 	if expires.IsZero() || !time.Now().Before(expires) {
-		return ErrReadSessionEnded
+		return time.Time{}, ErrReadSessionEnded
 	}
 	if b.external != nil {
 		if state.External == nil || record.External == nil || record.External.LocalSubject != b.subject ||
 			!sameExternalLogin(*b.external, *record.External) || !sameExternalLogin(*state.External, *record.External) {
-			return ErrReadSessionEnded
+			return time.Time{}, ErrReadSessionEnded
 		}
-		return s.checkDelegatedExternal(ctx, *record.External)
+		return expires, s.checkDelegatedExternal(ctx, *record.External)
 	}
 	if state.External != nil || record.External != nil {
-		return ErrReadSessionEnded
+		return time.Time{}, ErrReadSessionEnded
 	}
 	if err := s.validateLocalLoginPublication(ctx, state); err != nil {
 		if errors.Is(err, goauth.ErrSessionRevoked) {
-			return ErrReadSessionEnded
+			return time.Time{}, ErrReadSessionEnded
 		}
-		return err
+		return time.Time{}, err
 	}
 	if s.localAdmission != nil {
 		if err := s.localAdmission(ctx, b.subject); err != nil {
 			if isTerminalSessionError(err) {
-				return ErrReadSessionDenied
+				return time.Time{}, ErrReadSessionDenied
 			}
-			return err
+			return time.Time{}, err
 		}
 	}
-	return nil
+	return expires, nil
 }
 
 func (s *Service) checkDelegatedExternal(ctx context.Context, current ExternalBinding) error {

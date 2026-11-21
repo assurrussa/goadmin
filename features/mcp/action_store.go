@@ -21,12 +21,13 @@ import (
 )
 
 const (
-	actionPending     = "pending"
-	actionSucceeded   = "succeeded"
-	actionDeclined    = "declined"
-	actionExpired     = "expired"
-	actionConflict    = "conflict"
-	actionMaxLifetime = 15 * time.Minute
+	actionPending      = "pending"
+	actionSucceeded    = "succeeded"
+	actionDeclined     = "declined"
+	actionExpired      = "expired"
+	actionConflict     = "conflict"
+	actionMaxLifetime  = 15 * time.Minute
+	pgLockNotAvailable = "55P03"
 )
 
 var (
@@ -36,6 +37,7 @@ var (
 	errActionExpired      = errors.New("mcp: action's original binding ended")
 	errActionUnauthorized = errors.New("mcp: action authorization unavailable")
 	errActionUnknown      = errors.New("mcp: action outcome unknown")
+	errActionTransition   = errors.New("mcp: native session transition in progress")
 )
 
 type actionStore struct {
@@ -100,7 +102,7 @@ func actionRequestID(raw string) (string, error) {
 }
 
 func (s actionStore) propose(
-	ctx context.Context, actor host.Actor, proposal actionProposal, authorize func(context.Context, ActionTx) error,
+	ctx context.Context, actor host.Actor, proposal actionProposal, authorize func(context.Context, ActionTx) (time.Time, error),
 ) (actionRequest, error) {
 	if actor.AdminID <= 0 || authorize == nil {
 		return actionRequest{}, errActionUnauthorized
@@ -118,7 +120,7 @@ func (s actionStore) propose(
 		}
 		req, err := scanActionRequest(tx.QueryRow(ctx, selectActionRequest+" FOR UPDATE", s.action.Namespace, actor.AdminID, id))
 		if err == nil {
-			if err := authorize(ctx, tx); err != nil {
+			if _, err := authorize(ctx, tx); err != nil {
 				return actionRequest{}, err
 			}
 			return s.replay(ctx, tx, req, proposal.Input)
@@ -148,14 +150,14 @@ func (s actionStore) replay(
 		return actionRequest{}, err
 	}
 	if !now.Before(req.ExpiresAt) {
-		return s.finish(ctx, tx, req, actionExpired, nil)
+		return s.finish(ctx, tx, req, actionExpired)
 	}
 	return req, nil
 }
 
 func (s actionStore) create(
 	ctx context.Context, tx pgx.Tx, actor host.Actor, id string, proposal actionProposal,
-	authorize func(context.Context, ActionTx) error,
+	authorize func(context.Context, ActionTx) (time.Time, error),
 ) (actionRequest, error) {
 	if !validActionText(proposal.BindingID, 256) || proposal.ExpiresAt.IsZero() ||
 		!validActionParameters(s.action.Parameters, proposal.Input, 0) {
@@ -166,7 +168,8 @@ func (s actionStore) create(
 		return actionRequest{}, err
 	}
 	snapshot, inspectErr := s.action.Inspect(ctx, tx, actor, input, true)
-	if err := authorize(ctx, tx); err != nil {
+	deadline, err := authorize(ctx, tx)
+	if err != nil {
 		return actionRequest{}, err
 	}
 	if actionRecordMissing(inspectErr) {
@@ -175,14 +178,24 @@ func (s actionStore) create(
 	if inspectErr != nil {
 		return actionRequest{}, inspectErr
 	}
-	if err := validateActionSnapshot(snapshot); err != nil {
-		return actionRequest{}, err
+	if s.action.LoadReview == nil {
+		if err := validateActionSnapshot(snapshot); err != nil {
+			return actionRequest{}, err
+		}
+	} else {
+		if !validActionText(snapshot.RecordID, 256) || !validActionText(snapshot.Revision, 256) {
+			return actionRequest{}, errors.New("mcp: invalid action snapshot")
+		}
+		snapshot.Fields = []ReviewField{}
 	}
 	now, err := actionClock(ctx, tx)
 	if err != nil {
 		return actionRequest{}, err
 	}
 	expires := proposal.ExpiresAt.Truncate(time.Microsecond)
+	if !deadline.IsZero() && deadline.Before(expires) {
+		expires = deadline.Truncate(time.Microsecond)
+	}
 	if !now.Before(expires) {
 		return actionRequest{}, errActionExpired
 	}
@@ -221,7 +234,7 @@ func (s actionStore) status(ctx context.Context, actor host.Actor, requestID str
 		}
 		req, err := scanActionRequest(tx.QueryRow(ctx, selectActionRequest+" FOR SHARE NOWAIT", s.action.Namespace, actor.AdminID, id))
 		var dbErr *pgconn.PgError
-		if errors.As(err, &dbErr) && dbErr.Code == "55P03" {
+		if errors.As(err, &dbErr) && dbErr.Code == pgLockNotAvailable {
 			return actionRequest{}, errActionUnknown
 		}
 		if err != nil {
@@ -247,6 +260,7 @@ func (s actionStore) status(ctx context.Context, actor host.Actor, requestID str
 func (s actionStore) decide(
 	ctx context.Context, actor host.Actor, requestID string, confirm bool,
 	authorize func(context.Context, ActionTx, actionRequest) error,
+	recheck func(context.Context) (time.Time, error),
 ) (actionRequest, error) {
 	if actor.AdminID <= 0 || authorize == nil {
 		return actionRequest{}, errActionUnauthorized
@@ -256,7 +270,10 @@ func (s actionStore) decide(
 		return actionRequest{}, err
 	}
 	return s.run(ctx, func(ctx context.Context, tx pgx.Tx) (actionRequest, error) {
-		req, err := scanActionRequest(tx.QueryRow(ctx, selectActionRequest+" FOR UPDATE", s.action.Namespace, actor.AdminID, id))
+		if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", s.lockKey(actor.AdminID, id)); err != nil {
+			return actionRequest{}, err
+		}
+		req, err := scanActionRequest(tx.QueryRow(ctx, selectActionRequest, s.action.Namespace, actor.AdminID, id))
 		if err != nil {
 			return actionRequest{}, err
 		}
@@ -266,41 +283,55 @@ func (s actionStore) decide(
 		if req.State != actionPending {
 			return req, nil
 		}
-		return s.decidePending(ctx, tx, actor, req, confirm, authorize)
+		var current ActionSnapshot
+		var inspectErr error
+		now, err := actionClock(ctx, tx)
+		if err != nil {
+			return actionRequest{}, err
+		}
+		// The pending snapshot is immutable. Lock the product first so a
+		// disconnect can retire the request while this confirmation waits.
+		if now.Before(req.ExpiresAt) && confirm && req.Version == s.action.Version {
+			current, inspectErr = s.action.Inspect(ctx, tx, actor, req.input, true)
+		}
+		req, err = scanActionRequest(tx.QueryRow(ctx, selectActionRequest+" FOR UPDATE", s.action.Namespace, actor.AdminID, id))
+		if err != nil {
+			return actionRequest{}, err
+		}
+		if req.State != actionPending {
+			return req, nil
+		}
+		return s.decidePending(ctx, tx, actor, req, confirm, current, inspectErr, actionDecisionAuthority{authorize, recheck})
 	})
 }
 
+type actionDecisionAuthority struct {
+	authorize func(context.Context, ActionTx, actionRequest) error
+	recheck   func(context.Context) (time.Time, error)
+}
+
 func (s actionStore) decidePending(
-	ctx context.Context, tx pgx.Tx, actor host.Actor, req actionRequest, confirm bool,
-	authorize func(context.Context, ActionTx, actionRequest) error,
+	ctx context.Context, tx pgx.Tx, actor host.Actor, req actionRequest, confirm bool, current ActionSnapshot, inspectErr error,
+	authority actionDecisionAuthority,
 ) (actionRequest, error) {
-	now, err := actionClock(ctx, tx)
-	if err != nil {
-		return actionRequest{}, err
-	}
-	var current ActionSnapshot
-	var inspectErr error
-	if now.Before(req.ExpiresAt) && confirm && req.Version == s.action.Version {
-		current, inspectErr = s.action.Inspect(ctx, tx, actor, req.input, true)
-	}
-	authErr := authorize(ctx, tx, req)
+	authErr := authority.authorize(ctx, tx, req)
 	if authErr != nil && !errors.Is(authErr, errActionExpired) {
 		return actionRequest{}, authErr
 	}
-	now, err = actionClock(ctx, tx)
+	now, err := actionClock(ctx, tx)
 	if err != nil {
 		return actionRequest{}, err
 	}
 	switch {
 	case !now.Before(req.ExpiresAt) || errors.Is(authErr, errActionExpired):
-		return s.finish(ctx, tx, req, actionExpired, nil)
+		return s.finish(ctx, tx, req, actionExpired)
 	case !confirm:
-		return s.finish(ctx, tx, req, actionDeclined, nil)
+		return s.finish(ctx, tx, req, actionDeclined)
 	case inspectErr != nil && !actionRecordMissing(inspectErr):
 		return actionRequest{}, inspectErr
 	case req.Version != s.action.Version || inspectErr != nil ||
 		req.Snapshot.RecordID != current.RecordID || req.Snapshot.Revision != current.Revision:
-		return s.finish(ctx, tx, req, actionConflict, nil)
+		return s.finish(ctx, tx, req, actionConflict)
 	}
 
 	// Host work can wait on an audit or outbox row after its record has been
@@ -313,18 +344,25 @@ func (s actionStore) decidePending(
 	if err != nil {
 		return actionRequest{}, err
 	}
-	if err := s.validateResult(result); err != nil {
+	if err := validateActionResult(s.action.ResultFields, result); err != nil {
 		return actionRequest{}, err
 	}
 	if result == nil {
 		result = map[string]string{}
 	}
-	receipt, err := s.finish(ctx, applyTx, req, actionSucceeded, result)
+	var deadline time.Time
+	if authority.recheck != nil {
+		deadline, err = authority.recheck(ctx)
+	}
+	var receipt actionRequest
+	if err == nil {
+		receipt, err = s.finishAt(ctx, applyTx, req, actionSucceeded, result, deadline)
+	}
 	if errors.Is(err, errActionExpired) {
 		if err := applyTx.Rollback(ctx); err != nil {
 			return actionRequest{}, err
 		}
-		return s.finish(ctx, tx, req, actionExpired, nil)
+		return s.finish(ctx, tx, req, actionExpired)
 	}
 	if err != nil {
 		return actionRequest{}, err
@@ -333,20 +371,27 @@ func (s actionStore) decidePending(
 }
 
 func (s actionStore) finish(
-	ctx context.Context, tx ActionTx, req actionRequest, state string, result map[string]string,
+	ctx context.Context, tx ActionTx, req actionRequest, state string,
+) (actionRequest, error) {
+	return s.finishAt(ctx, tx, req, state, nil, time.Time{})
+}
+
+func (s actionStore) finishAt(
+	ctx context.Context, tx ActionTx, req actionRequest, state string, result map[string]string, deadline time.Time,
 ) (actionRequest, error) {
 	var resultValue any
 	if result != nil {
 		resultValue = result
 	}
+	expires := pgtype.Timestamptz{Time: deadline.Truncate(time.Microsecond), Valid: !deadline.IsZero()}
 	err := tx.QueryRow(ctx, `
 		WITH decision AS MATERIALIZED (SELECT clock_timestamp() AS at)
 		UPDATE admin_confirmed_actions SET state=$4, result=$5, normalized_input=NULL,
 			review_fields=NULL, binding_id=NULL, decided_at=decision.at FROM decision
 		WHERE namespace=$1 AND actor_admin_id=$2 AND request_id=$3 AND state='pending'
-			AND ($4 <> 'succeeded' OR expires_at > decision.at)
+			AND ($4 <> 'succeeded' OR (expires_at > decision.at AND ($6::timestamptz IS NULL OR $6 > decision.at)))
 		RETURNING decided_at`,
-		s.action.Namespace, req.OwnerAdminID, req.RequestID, state, resultValue,
+		s.action.Namespace, req.OwnerAdminID, req.RequestID, state, resultValue, expires,
 	).Scan(&req.DecidedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		if state == actionSucceeded {
@@ -464,9 +509,9 @@ func validActionParameters(fields []Parameter, input map[string]json.RawMessage,
 	return count == len(input)
 }
 
-func (s actionStore) validateResult(result map[string]string) error {
+func validateActionResult(fields []Field, result map[string]string) error {
 	count := 0
-	for _, field := range s.action.ResultFields {
+	for _, field := range fields {
 		value, present := result[field.Key]
 		if !present && field.Nullable {
 			continue

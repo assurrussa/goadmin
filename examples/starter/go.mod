@@ -6,6 +6,7 @@ require (
 	github.com/assurrussa/goadmin v0.32.0
 	github.com/assurrussa/goauth v0.18.0
 	github.com/assurrussa/gonotify v0.6.0
+	github.com/assurrussa/outbox/backends/pgsql v0.17.0
 	github.com/gofiber/fiber/v3 v3.5.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.10.0
@@ -21,7 +22,6 @@ require (
 	github.com/assurrussa/gouploads v0.13.0 // indirect
 	github.com/assurrussa/gowebsocket v0.2.1 // indirect
 	github.com/assurrussa/outbox v0.17.0 // indirect
-	github.com/assurrussa/outbox/backends/pgsql v0.17.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.41.11 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.12 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.21 // indirect

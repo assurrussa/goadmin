@@ -2840,3 +2840,15 @@ Delegated Fiber session inspection observes absolute expiry without deleting
 a row held by its own transaction. PostgreSQL integration tests cover each
 case, including recovery of the original event after a lost commit reply.
 The previous Products ledger remains available for rollback with writes off.
+
+The review follow-up exercises a second external host in the generated Go
+module. Its native operator approves archiving a document identified by text.
+The integration gate compares the transaction IDs on the document and its
+receipt, then reads the original archive reference on replay. Changed receipt
+schemas can be registered by version. A client reports an unknown outcome if
+the receipt lacks a required field. Sportsite loads long draft content for the
+original browser login at the reviewed revision, keeping it out of the ledger
+and the stdio response.
+
+Local acceptance for this change uses both PostgreSQL and Redis native
+sessions on each host. The single GoAdmin tag follows the required PR review.

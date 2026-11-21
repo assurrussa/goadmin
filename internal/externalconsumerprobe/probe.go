@@ -1,6 +1,7 @@
 package externalconsumerprobe
 
 import (
+	_ "embed"
 	"errors"
 	"path/filepath"
 	"strconv"
@@ -118,6 +119,15 @@ func (c Config) BuildProbeTest() (string, error) {
 	return content, nil
 }
 
+//go:embed testdata/archive_action_test.go
+var archiveActionTest string
+
+func (c Config) BuildArchiveTest() string {
+	cfg := c.normalized()
+	content := strings.ReplaceAll(archiveActionTest, DefaultModulePath, cfg.ModulePath)
+	return strings.ReplaceAll(content, DefaultGoauthModulePath, cfg.GoauthModulePath)
+}
+
 const runnableProbeTest = `package probe
 
 import (
@@ -165,29 +175,6 @@ func TestReadOnlyMCPAdapter(t *testing.T) {
 	adapter, err := mcp.Adapter(mcp.Config{Origin: "http://localhost:8080"}, resource)
 	if err != nil || adapter.BasePath != resource.Path || adapter.Build == nil {
 		t.Fatalf("assemble read-only MCP: %v", err)
-	}
-}
-
-func TestConfirmedMCPAction(t *testing.T) {
-	action := mcp.Action{
-		Namespace: "library", Key: "archive", Version: "1", Path: "/agent/archive",
-		Title: "Archive document", Description: "Propose archiving a selected document.", ConfirmLabel: "Archive",
-		ProposeTool: "propose_archive", StatusTool: "get_archive_request",
-		Permissions: []adminhost.PermissionKey{adminhost.NewPermissionKey("documents", "archive")},
-		Parameters: []mcp.Parameter{{Name: "reference", Kind: mcp.Text, Required: true, Description: "Document reference."}},
-		ResultFields: []mcp.Field{{Key: "archive_ref", Kind: mcp.Text, Description: "Archive reference."}},
-		Normalize: func(_ string, in map[string]json.RawMessage) (json.RawMessage, error) { return json.Marshal(in) },
-		Inspect: func(context.Context, mcp.ActionTx, adminhost.Actor, json.RawMessage, bool) (mcp.ActionSnapshot, error) {
-			return mcp.ActionSnapshot{}, mcp.ErrActionNotFound
-		},
-		Apply: func(
-			context.Context, mcp.ActionTx, adminhost.Actor, json.RawMessage, mcp.ActionSnapshot, string,
-		) (map[string]string, error) {
-			return nil, mcp.ErrActionNotFound
-		},
-	}
-	if _, err := mcp.ConfirmedModule(mcp.Config{Origin: "https://admin.example.org"}, action); err != nil {
-		t.Fatal(err)
 	}
 }
 

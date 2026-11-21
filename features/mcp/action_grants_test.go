@@ -24,7 +24,7 @@ func TestActionPairingLifetimeAndSingleExchange(t *testing.T) {
 	now = now.Add(4 * time.Minute)
 	approvedAt := now
 	browser := host.CSRFSessionBinding("synthetic-browser-session")
-	grant := actionGrant{actor: host.Actor{AdminID: 1}, browser: browser}
+	grant := actionGrant{actor: host.Actor{AdminID: 1}, browser: browser, deadline: pairs.now().Add(time.Hour)}
 	if !pairs.approve(code, grant) || pairs.approve(code, grant) {
 		t.Fatal("the code must be approved only once")
 	}
@@ -55,7 +55,7 @@ func TestActionLostExchangeCannotEraseAnotherPairing(t *testing.T) {
 	code, secret, _ := pairs.start(source)
 	_, unrelated, _ := pairs.start(source)
 	browser := host.CSRFSessionBinding("synthetic-revoked-login")
-	pairs.approve(code, actionGrant{browser: browser})
+	pairs.approve(code, actionGrant{browser: browser, deadline: pairs.now().Add(time.Hour)})
 	exchanged, token, _, status := pairs.exchange(secret)
 	if status != http.StatusOK || exchanged.browser != browser {
 		t.Fatal("exchange did not capture the approved browser")
@@ -68,5 +68,53 @@ func TestActionLostExchangeCannotEraseAnotherPairing(t *testing.T) {
 	pairs.revoke(lost.browser, lost.id)
 	if _, _, _, status := pairs.exchange(unrelated); status != http.StatusAccepted {
 		t.Fatalf("unrelated code was removed: HTTP %d", status)
+	}
+}
+
+func TestActionRevocationRetainsOnlyOwnedCleanup(t *testing.T) {
+	pairs := newActionPairings()
+	source := netip.MustParseAddr("127.0.0.1")
+	code, secret, started := pairs.start(source)
+	if !started || !pairs.approve(code, actionGrant{
+		browser: "first-browser", actor: host.Actor{AdminID: 1}, deadline: pairs.now().Add(time.Minute),
+	}) {
+		t.Fatal("could not pair first browser")
+	}
+	grant, _, _, status := pairs.exchange(secret)
+	if status != http.StatusOK {
+		t.Fatalf("exchange returned %d", status)
+	}
+	if retired := pairs.revoke("second-browser", grant.id); len(retired) != 0 {
+		t.Fatal("another browser could revoke the grant")
+	}
+	retired := pairs.revoke("first-browser", grant.id)
+	if len(retired) != 1 || retired[0].id != grant.id {
+		t.Fatal("original browser could not retire the grant")
+	}
+	if _, ok := pairs.bound(grant.id); ok {
+		t.Fatal("retired binding could still be used")
+	}
+	if retry := pairs.revoke("first-browser", grant.id); len(retry) != 1 {
+		t.Fatal("original browser could not retry cleanup")
+	}
+	pairs.cleared(retired)
+	if retry := pairs.revoke("first-browser", grant.id); len(retry) != 0 {
+		t.Fatal("cleanup retained retired metadata")
+	}
+}
+
+func TestActionLoginFenceNativeTransitionReleasesMutex(t *testing.T) {
+	var fences actionLoginFences
+	finish := fences.transition("browser")
+	ready, release := fences.acquire("browser")
+	release()
+	if ready {
+		t.Fatal("native transition admitted a concurrent action")
+	}
+	finish(func() {})
+	ready, release = fences.acquire("browser")
+	release()
+	if !ready || len(fences.logins) != 0 {
+		t.Fatal("completed transition left a login unavailable")
 	}
 }

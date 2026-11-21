@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	pgstore "github.com/assurrussa/outbox/backends/pgsql/storage"
 	"github.com/assurrussa/outbox/backends/pgsql/storage/transaction"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -95,18 +96,19 @@ func confirmedProposal(t *testing.T, record string) actionProposal {
 	}
 }
 
-func confirmedAuthorize(ctx context.Context, tx ActionTx) error {
+func confirmedAuthorize(ctx context.Context, tx ActionTx) (time.Time, error) {
 	// This query is deliberately made through the passed transaction. It also
 	// proves that authorizing a proposal works with a single pooled connection.
 	var value int
-	return tx.QueryRow(ctx, "SELECT 1").Scan(&value)
+	return time.Time{}, tx.QueryRow(ctx, "SELECT 1").Scan(&value)
 }
 
 func confirmedAuthorizeDecision(ctx context.Context, tx ActionTx, req actionRequest) error {
 	if req.BindingID != "issuing-grant" {
 		return errActionNotFound
 	}
-	return confirmedAuthorize(ctx, tx)
+	_, err := confirmedAuthorize(ctx, tx)
+	return err
 }
 
 func TestConfirmedActionStoreRollbackAndSingleConnection(t *testing.T) {
@@ -138,7 +140,7 @@ func TestConfirmedActionStoreRollbackAndSingleConnection(t *testing.T) {
 		}
 		return nil, failed
 	}
-	_, err = store.decide(ctx, confirmedActor, proposal.RequestID, true, confirmedAuthorizeDecision)
+	_, err = store.decide(ctx, confirmedActor, proposal.RequestID, true, confirmedAuthorizeDecision, nil)
 	require.ErrorIs(t, err, failed)
 	req, err = store.status(ctx, confirmedActor, proposal.RequestID)
 	require.NoError(t, err)
@@ -152,7 +154,7 @@ func TestConfirmedActionStoreRollbackAndSingleConnection(t *testing.T) {
 	require.Zero(t, events)
 
 	store.action.Apply = originalApply
-	req, err = store.decide(ctx, confirmedActor, proposal.RequestID, true, confirmedAuthorizeDecision)
+	req, err = store.decide(ctx, confirmedActor, proposal.RequestID, true, confirmedAuthorizeDecision, nil)
 	require.NoError(t, err)
 	require.Equal(t, actionSucceeded, req.State)
 	require.Equal(t, "r1", req.Snapshot.RecordID)
@@ -169,7 +171,7 @@ func TestConfirmedActionStoreRollbackAndSingleConnection(t *testing.T) {
 	terminal, err := store.decide(ctx, confirmedActor, proposal.RequestID, false,
 		func(context.Context, ActionTx, actionRequest) error {
 			return errors.New("terminal replay invoked authorization")
-		})
+		}, nil)
 	require.NoError(t, err)
 	require.Equal(t, req, terminal)
 }
@@ -209,12 +211,12 @@ func TestConfirmedActionStoreUUIDAndOriginalBinding(t *testing.T) {
 	require.ErrorIs(t, err, errActionConflict)
 
 	_, err = store.decide(t.Context(), confirmedActor, proposal.RequestID, true,
-		func(context.Context, ActionTx, actionRequest) error { return errActionNotFound })
+		func(context.Context, ActionTx, actionRequest) error { return errActionNotFound }, nil)
 	require.ErrorIs(t, err, errActionNotFound)
 	req, err = store.status(t.Context(), confirmedActor, proposal.RequestID)
 	require.NoError(t, err)
 	require.Equal(t, original, req)
-	req, err = upgraded.decide(t.Context(), confirmedActor, proposal.RequestID, true, confirmedAuthorizeDecision)
+	req, err = upgraded.decide(t.Context(), confirmedActor, proposal.RequestID, true, confirmedAuthorizeDecision, nil)
 	require.NoError(t, err)
 	require.Equal(t, actionConflict, req.State)
 	require.Empty(t, req.Snapshot.Fields)
@@ -241,13 +243,13 @@ func TestConfirmedActionStoreReportsInFlightAndAppliesOnce(t *testing.T) {
 	entered, release := make(chan struct{}), make(chan struct{})
 	proposed := make(chan outcome, 1)
 	go func() {
-		req, err := store.propose(ctx, confirmedActor, proposal, func(ctx context.Context, _ ActionTx) error {
+		req, err := store.propose(ctx, confirmedActor, proposal, func(ctx context.Context, _ ActionTx) (time.Time, error) {
 			close(entered)
 			select {
 			case <-release:
-				return nil
+				return time.Time{}, nil
 			case <-ctx.Done():
-				return ctx.Err()
+				return time.Time{}, ctx.Err()
 			}
 		})
 		proposed <- outcome{req, err}
@@ -274,7 +276,7 @@ func TestConfirmedActionStoreReportsInFlightAndAppliesOnce(t *testing.T) {
 				return ctx.Err()
 			}
 		}
-		req, err := store.decide(ctx, confirmedActor, proposal.RequestID, true, authorize)
+		req, err := store.decide(ctx, confirmedActor, proposal.RequestID, true, authorize, nil)
 		decided <- outcome{req, err}
 	}()
 	select {
@@ -284,7 +286,7 @@ func TestConfirmedActionStoreReportsInFlightAndAppliesOnce(t *testing.T) {
 	}
 	replayed := make(chan outcome, 1)
 	go func() {
-		req, err := store.decide(ctx, confirmedActor, proposal.RequestID, true, confirmedAuthorizeDecision)
+		req, err := store.decide(ctx, confirmedActor, proposal.RequestID, true, confirmedAuthorizeDecision, nil)
 		replayed <- outcome{req, err}
 	}()
 	_, err = store.status(ctx, confirmedActor, proposal.RequestID)
@@ -334,7 +336,7 @@ func TestConfirmedActionStoreRechecksExpiryAfterWaitingForRecord(t *testing.T) {
 	}
 	decided := make(chan outcome, 1)
 	go func() {
-		req, err := store.decide(ctx, confirmedActor, proposal.RequestID, true, confirmedAuthorizeDecision)
+		req, err := store.decide(ctx, confirmedActor, proposal.RequestID, true, confirmedAuthorizeDecision, nil)
 		decided <- outcome{req, err}
 	}()
 	select {
@@ -373,7 +375,7 @@ func TestConfirmedActionStoreReconcilesLostCommitReply(t *testing.T) {
 	require.NoError(t, err)
 	disconnected := store
 	disconnected.tx = lostCommitReply{store.tx}
-	_, err = disconnected.decide(ctx, confirmedActor, proposal.RequestID, true, confirmedAuthorizeDecision)
+	_, err = disconnected.decide(ctx, confirmedActor, proposal.RequestID, true, confirmedAuthorizeDecision, nil)
 	require.ErrorIs(t, err, errActionUnknown)
 	receipt, err := store.status(ctx, confirmedActor, proposal.RequestID)
 	require.NoError(t, err)
@@ -408,10 +410,40 @@ func TestConfirmedActionStoreDeadlineDuringApplyRollsBack(t *testing.T) {
 			FROM admin_confirmed_actions WHERE request_id=$1`, id)
 		return result, err
 	}
-	receipt, err := store.decide(ctx, confirmedActor, p.RequestID, true, confirmedAuthorizeDecision)
+	receipt, err := store.decide(ctx, confirmedActor, p.RequestID, true, confirmedAuthorizeDecision, nil)
 	require.NoError(t, err)
 	require.True(t, applied)
 	require.Equal(t, actionExpired, receipt.State)
+	var revision, events int
+	require.NoError(t, pool.QueryRow(ctx, `SELECT revision,(SELECT count(*) FROM confirmed_action_test_event)
+		FROM confirmed_action_test_record WHERE id='r1'`).Scan(&revision, &events))
+	require.Equal(t, 1, revision)
+	require.Zero(t, events)
+}
+
+func TestConfirmedActionStoreNativeDeadlineFinalizesExpired(t *testing.T) {
+	pool, store := confirmedFixture(t)
+	ctx := t.Context()
+	proposal := confirmedProposal(t, "r1")
+	receipt, err := store.propose(ctx, confirmedActor, proposal, confirmedAuthorize)
+	require.NoError(t, err)
+	require.True(t, receipt.ExpiresAt.After(time.Now()))
+
+	var reapplied bool
+	receipt, err = store.decide(ctx, confirmedActor, proposal.RequestID, true, confirmedAuthorizeDecision,
+		func(ctx context.Context) (time.Time, error) {
+			tx := pgstore.GetTx(ctx)
+			var effects int
+			err := tx.QueryRow(ctx, "SELECT count(*) FROM confirmed_action_test_event").Scan(&effects)
+			reapplied = effects == 1
+			return time.Now().Add(-time.Second), err
+		})
+	require.NoError(t, err)
+	require.True(t, reapplied)
+	require.Equal(t, actionExpired, receipt.State)
+	require.Empty(t, receipt.Snapshot.Fields)
+	require.Empty(t, receipt.input)
+	require.Empty(t, receipt.BindingID)
 	var revision, events int
 	require.NoError(t, pool.QueryRow(ctx, `SELECT revision,(SELECT count(*) FROM confirmed_action_test_event)
 		FROM confirmed_action_test_record WHERE id='r1'`).Scan(&revision, &events))

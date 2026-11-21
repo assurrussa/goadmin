@@ -31,7 +31,10 @@ type Action struct {
 	Permissions  []host.PermissionKey
 	Parameters   []Parameter
 	ResultFields []Field
-	ReceiptLink  *ReceiptLink
+	// PreviousResultFields declares earlier receipt schemas when a version
+	// used different result fields. Versions with an unchanged schema need no entry.
+	PreviousResultFields map[string][]Field
+	ReceiptLink          *ReceiptLink
 
 	// Requires lists other host modules that must be installed with this action.
 	Requires []string
@@ -43,6 +46,11 @@ type Action struct {
 	// to the actor. When lock is true it must lock the record and any other
 	// data whose change would invalidate the proposed action.
 	Inspect func(ctx context.Context, tx ActionTx, actor host.Actor, input json.RawMessage, lock bool) (ActionSnapshot, error)
+	// LoadReview optionally supplies the full browser-only review instead of
+	// persisting Inspect.Fields. Return the fields and the identity and revision
+	// they describe from a consistent read, without locking the domain record.
+	// GoAdmin displays the fields only when both match the pending proposal.
+	LoadReview func(ctx context.Context, tx ActionTx, actor host.Actor, input json.RawMessage) (ActionSnapshot, error)
 	// Apply uses the locked, rechecked snapshot and writes all domain changes
 	// and audit data through tx. The result may contain only declared fields.
 	Apply func(
