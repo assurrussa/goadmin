@@ -1,5 +1,40 @@
 # Implementation Notes
 
+## Unpublishing with a reason
+
+The starter declares the reason once as a typed CRUD action parameter.
+The command first performs an owner-scoped conditional status and revision
+update. Only the winning update can insert its reason into the product
+journal. The list query omits the reason, and the detail query reads it
+under the event owner's scope even after product deletion. A rejected command
+keeps its original draft in the open dialog, scoped to that actor and product.
+When the server rejects the reason, focus returns to the field and its error.
+
+## Product form limits
+
+The product name limit counts Unicode code points, including spaces. The stock
+minimum is inclusive. The form preserves pasted text and incomplete numeric
+input so operators can correct either field. Declarative failures stop before
+the host callback. The starter's whitespace-only name check exercises the
+server rejection and draft recovery path separately from client-side errors.
+The product list reads its count and page in one PostgreSQL snapshot, including
+when another operator session creates a matching product between the two reads.
+
+## Read-only resources and the starter product journal
+
+Both CRUD constructors share the permission check, actor-scoped page load and
+readable-field projection. A rejected row invalidates the whole page, including
+its count. The read-only constructor has no revision or domain write callbacks.
+Table preferences belong to the current administrator and can be saved
+independently of CSV or row selection.
+
+The starter reads product events by the owner stored on each event. Tests cover
+two owners, lookup after product deletion, equal timestamps across pages, and
+restoring a filtered list after viewing a record. The ordering regression uses
+event IDs 9 and 10 with the same timestamp to distinguish numeric order from
+the text IDs displayed to the client. The local external consumer exercises
+the SDK from a separate Go module.
+
 ## Concurrent CRUD edits and return to the list
 
 CRUD edit submissions use the existing per-attempt redirect feedback for
@@ -2749,3 +2784,17 @@ anonymous public-dependency consumer and final-version release gates remain
 pending. The release documentation records schema 14→15→16 rollout and rollback
 constraints. No new GoAdmin release version has been selected, published or
 deployed.
+
+## Products journal and local MCP pilot
+
+The Products review and MCP pilot are separate changes. The journal reads its
+page and total in one PostgreSQL snapshot. An action filter finds archived
+unpublish events beyond the first page. The pilot reuses that query and the
+existing detail projection through a reader bound at resource assembly time.
+
+A native operator approves a five-minute device code on the CSRF-protected
+admin page. One process can exchange each approved device secret once. The
+15-minute grant is scoped to that operator's journal and original browser
+session. Revocation and exchange are serialized in memory. Searches omit
+the reason; only detail reads return it. The single-instance starter is the
+acceptance target for this pilot. See the starter guide for setup and checks.

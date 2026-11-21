@@ -7,8 +7,8 @@ second toy implementation. It needs no custom Vue, Redis, uploads or mail servic
 
 ## 1. Start the published example
 
-Follow the [starter prerequisites and secret setup](../examples/starter/README.md#start-with-the-published-library).
-In its private `.env`, select only the example:
+Follow the [starter prerequisites and secret setup](../examples/starter/README.md#start-with-the-published-library)
+to clone the v0.30.0 tag. In that checkout's private `.env`, select the example:
 
 ```dotenv
 GOADMIN_VERSION=v0.30.0
@@ -60,6 +60,14 @@ permission definitions does **not** grant them to every administrator.
 
 ## 3. Follow the implementation into your host
 
+The code below follows the current source. To try it, use the
+[starter's source mode](../examples/starter/README.md#run-the-current-source)
+and select `ADMIN_MODULES=products,product-events`. The Products form shows the
+200-code-point name limit and a minimum stock of zero. Publish a product, open
+Unpublish from its list or detail page, enter a reason and confirm. In Product
+events, search for its number and open the Unpublished event to read the reason.
+The event remains available after deleting the product.
+
 Use the named functions in [products.go](../examples/starter/products.go) as the
 complete runnable source, and [main.go](../examples/starter/main.go) for assembly.
 Do not copy GoAdmin internals into your application.
@@ -70,7 +78,7 @@ Do not copy GoAdmin internals into your application.
 | Define the resource | `productsModule`, `crud.New`, `crud.Definition` | Stable key/path, fields, columns and separate read/create/update/delete permissions. |
 | Read scoped records | `productRepo.list`, `get`, `LoadSelected` callback | Apply the same owner scope to rows, totals and exports, not just visible buttons. |
 | Write safely | `create`, `update`, `command` | Validate domain rules, compare revision atomically, and commit audit with the mutation. |
-| Add domain actions | `Actions` and `Authorize` | Guard Publish/Unpublish separately and enforce their rules in any equivalent write path. |
+| Add domain actions | `Actions`, `Authorize`, `ActionWithParams` | Guard each transition and validate the typed unpublish reason before committing it with the status change. |
 | Own the schema | `migrateProducts` | Versioned host migrations; no automatic schema inference from DTOs. |
 | Mount the module | `main.go` Products branch | Pass the returned module to `host.New`; keep borrowed database lifecycle with the host. |
 
@@ -86,12 +94,15 @@ Its callbacks are stubs, not a persistence or authorization implementation.
 ### The resource assembly, directly from the runnable starter
 
 The following is the complete `productsModule` function, synchronized from
-[products.go](../examples/starter/products.go). It uses that file's DTOs and
-owner-scoped repository methods, plus `context`, `database/sql`, `errors`,
+[products.go](../examples/starter/products.go). In the same file, `productNameField`
+and `productStockField` define the form and write constraints. `unpublishReason`
+defines the required, trimmed reason and its 500-code-point limit for
+`UnpublishInput`. The function uses the file's DTOs and owner-scoped repository
+methods, plus `context`, `database/sql`, `errors`,
 `features/crud`, `host` and `toolkit/datagrid`. It is **not a standalone program**:
 run the starter above or keep the surrounding repository/migration code when
 adapting it. In particular, the small `Authorize` callback does not replace the
-owner checks inside `get`, `list`, `create`, `update` and `command`.
+owner checks in the repository reads and writes.
 
 <!-- source: examples/starter/products.go#productsModule -->
 ```go
@@ -101,9 +112,9 @@ func productsModule(db *sql.DB) (host.Module, error) {
 		return host.NewPermissionKey("products", action)
 	}
 	fields := []crud.Field{
-		{Key: "name", Label: "Name", Type: "text", Read: true, Create: true, Update: true, Required: true},
+		productNameField,
 		{Key: "description", Label: "Description", Type: "textarea", Read: true, Create: true, Update: true},
-		{Key: "stock", Label: "Stock", Type: "number", Read: true, Create: true, Update: true},
+		productStockField,
 		{Key: "active", Label: "Active", Type: "boolean", Read: true, Create: true, Update: true},
 		{Key: "available", Label: "Available", Type: "date", Read: true, Create: true, Update: true},
 		{
@@ -158,9 +169,10 @@ func productsModule(db *sql.DB) (host.Module, error) {
 			{Key: "publish", Label: "Опубликовать", Confirmation: "Опубликовать этот товар?", Permission: permission("publish"), Run: func(ctx context.Context, a host.Actor, id, revision string) error {
 				return r.command(ctx, a, id, revision, "publish")
 			}},
-			{Key: "unpublish", Label: "Снять с публикации", Confirmation: "Снять этот товар с публикации?", Permission: permission("unpublish"), Run: func(ctx context.Context, a host.Actor, id, revision string) error {
-				return r.command(ctx, a, id, revision, "unpublish")
-			}},
+			crud.ActionWithParams[productData, UnpublishInput](
+				crud.Action[productData]{Key: "unpublish", Label: "Снять с публикации", Confirmation: "Снять этот товар с публикации?", Permission: permission("unpublish")},
+				[]crud.ActionParam{unpublishReason}, r.unpublish,
+			),
 		},
 	})
 }
@@ -186,8 +198,9 @@ Existing maintainer checks cover these boundaries; reuse them rather than treati
 successful compilation as end-to-end acceptance:
 
 - `go test ./features/crud ./reference/externalconsumer` from the repository root.
-- `make externalconsumer-local` for the current checkout; separately run
-  `make externalconsumer-published VERSION=v0.30.0` for the published package.
+- In the current checkout, run `make externalconsumer-local`. In the v0.30.0
+  checkout from step 1, run `make externalconsumer-published VERSION=v0.30.0`
+  to check the published package with that release's consumer.
 - From `examples/starter`, run `PRODUCTS_TEST_DSN='<isolated PostgreSQL URL>' go test -tags=integration -run '^TestProductsPostgresCASIsolationAndAuditRollback$' .`.
   This requires create-database privileges and creates/drops its own test database.
 - `make starter-smoke` runs the existing source-candidate browser acceptance,

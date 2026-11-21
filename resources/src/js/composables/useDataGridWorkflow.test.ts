@@ -64,6 +64,28 @@ afterEach(() => {
 })
 
 describe('opt-in workflow lifecycle', () => {
+  it('uses the allowed operations to enable selection and cannot export without a URL', async () => {
+    const { grid, model } = mount()
+    await settle()
+    grid.config.value.workflow = {
+      key: workflow.key,
+      preferencesUrl: workflow.preferencesUrl,
+      bulkUrl: workflow.bulkUrl,
+      bulkActions: workflow.bulkActions,
+    }
+    expect(model.tableConfig.value.behaviour.selectable).toBe(true)
+    grid.toggleSelectAll()
+    expect(grid.selectedItems.value).toEqual(['9007199254740993'])
+    const requests = fetchMock.mock.calls.length
+    await model.exportCSV('selected')
+    await model.exportCSV('filtered')
+    expect(fetchMock).toHaveBeenCalledTimes(requests)
+    grid.config.value.workflow.bulkActions = []
+    expect(model.tableConfig.value.behaviour.selectable).toBe(false)
+    grid.selectedItems.value = []
+    grid.toggleSelectAll()
+    expect(grid.selectedItems.value).toEqual([])
+  })
   it('retains the selected view and visible columns as an unsaved edit after resetting conditions', async () => {
     const saved = {
       id: 'view',

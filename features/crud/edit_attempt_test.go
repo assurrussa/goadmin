@@ -354,11 +354,11 @@ func TestEditValuesPreserveNonzeroOmissions(t *testing.T) {
 			{Key: "empty", Type: "text", Read: true, Update: true},
 		},
 	}}
-	out, err := h.project(Record[row]{ID: "42", Revision: "v1", Data: row{Hidden: "suppressed"}}, Update)
+	out, err := projectFields(h.d.Fields, Record[row]{ID: "42", Revision: "v1", Data: row{Hidden: "suppressed"}}, Update)
 	require.NoError(t, err)
 	wire, err := json.Marshal(out)
 	require.NoError(t, err)
-	require.JSONEq(t, `{"id":"42","_revision":"v1","empty":""}`, string(wire))
+	require.JSONEq(t, `{"empty":""}`, string(wire))
 }
 
 type customEditRow struct {
@@ -379,9 +379,9 @@ func TestEditValuesRespectCustomRowOmissions(t *testing.T) {
 			},
 		},
 	}
-	out, err := h.project(Record[customEditRow]{ID: "42", Revision: "v1", Data: customEditRow{Note: "suppressed"}}, Update)
+	out, err := projectFields(h.d.Fields, Record[customEditRow]{ID: "42", Revision: "v1", Data: customEditRow{Note: "suppressed"}}, Update)
 	require.NoError(t, err)
 	wire, err := json.Marshal(out)
 	require.NoError(t, err)
-	require.JSONEq(t, `{"id":"42","_revision":"v1","stock":8}`, string(wire))
+	require.JSONEq(t, `{"stock":8}`, string(wire))
 }

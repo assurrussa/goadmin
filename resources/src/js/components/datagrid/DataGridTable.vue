@@ -354,6 +354,7 @@ const getBadgeLabel = (
   badges: Record<string | number, { label: string; variant: string }>,
 ): string => {
   const safeValue = typeof value === 'string' || typeof value === 'number' ? value : String(value)
-  return badges[safeValue]?.label || String(value)
+  const label = badges[safeValue]?.label
+  return label ? t(label) : String(value)
 }
 </script>

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/url"
 	"os"
 	"os/signal"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/assurrussa/goauth"
 
+	"github.com/assurrussa/goadmin/features/crud"
 	"github.com/assurrussa/goadmin/features/users"
 	"github.com/assurrussa/goadmin/host"
 	"github.com/assurrussa/goadmin/migrations"
@@ -43,11 +45,14 @@ func run() error {
 			continue
 		}
 		switch key {
-		case "users", "access", "jobs", "uploads", "queues", "notifications", "realtime", "authmail", "products":
+		case "users", "access", "jobs", "uploads", "queues", "notifications", "realtime", "authmail", "products", "product-events", "product-events-mcp":
 			selected[key] = true
 		default:
 			return fmt.Errorf("unknown admin module %q", key)
 		}
+	}
+	if selected["product-events-mcp"] && !selected["product-events"] {
+		return errors.New("product-events-mcp requires explicit product-events module")
 	}
 	baseURL, err := required("ADMIN_URL")
 	if err != nil {
@@ -56,6 +61,20 @@ func run() error {
 	parsedURL, err := url.Parse(baseURL)
 	if err != nil || parsedURL.Host == "" || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
 		return errors.New("ADMIN_URL must be an absolute http(s) URL")
+	}
+	var agentAdapter *crud.ReadOnlyAdapter
+	if selected["product-events-mcp"] {
+		loopback := parsedURL.Hostname() == "localhost" || net.ParseIP(parsedURL.Hostname()).IsLoopback()
+		if parsedURL.User != nil || parsedURL.RawQuery != "" || parsedURL.Fragment != "" ||
+			(parsedURL.Path != "" && parsedURL.Path != "/") || (parsedURL.Scheme == "http" && !loopback) {
+			return errors.New("product-events-mcp requires an HTTPS origin or a loopback HTTP origin")
+		}
+		trustedProxy, proxyErr := pairingTrustedProxy(os.Getenv("MCP_PAIRING_TRUSTED_PROXY_IP"))
+		if proxyErr != nil {
+			return proxyErr
+		}
+		adapter := journalAdapter(parsedURL.Scheme+"://"+parsedURL.Host, trustedProxy)
+		agentAdapter = &adapter
 	}
 	// Staging uses embedded templates/assets while keeping HTTP cookies usable on localhost.
 	adminEnv := "staging"
@@ -98,7 +117,8 @@ func run() error {
 			return fmt.Errorf("migrate: %w", err)
 		}
 	}
-	if selected["products"] && migrate {
+	usesProductsDB := selected["products"] || selected["product-events"]
+	if usesProductsDB && migrate {
 		if err := migrateProducts(ctx, pgDSN); err != nil {
 			return fmt.Errorf("products migrate: %w", err)
 		}
@@ -192,17 +212,26 @@ func run() error {
 	if selected["authmail"] {
 		modules = append(modules, host.AuthMailModule(host.AuthMailConfig{Sender: mail.auth}))
 	}
-	if selected["products"] {
+	if usesProductsDB {
 		productDB, openErr := sql.Open("pgx", pgDSN)
 		if openErr != nil {
 			return openErr
 		}
 		defer productDB.Close()
-		products, moduleErr := productsModule(productDB)
-		if moduleErr != nil {
-			return moduleErr
+		if selected["products"] {
+			products, moduleErr := productsModule(productDB)
+			if moduleErr != nil {
+				return moduleErr
+			}
+			modules = append(modules, products)
 		}
-		modules = append(modules, products)
+		if selected["product-events"] {
+			events, moduleErr := productEventsModule(productDB, agentAdapter)
+			if moduleErr != nil {
+				return moduleErr
+			}
+			modules = append(modules, events)
+		}
 	}
 	modules = append(modules, starterDashboardModules()...)
 	var runtime *host.Runtime

@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	revisionKey = "_revision"
-	formKey     = "_form"
+	revisionKey         = "_revision"
+	formKey             = "_form"
+	invalidFieldMessage = "Invalid field value"
 )
 
 type Operation string
@@ -38,13 +39,17 @@ type Option struct {
 // Field explicitly opts a JSON key into each supported mode. Undeclared and
 // unreadable row fields are never sent to the browser or exported.
 type Field struct {
-	Key       string   `json:"key"`
-	Label     string   `json:"label"`
-	Type      string   `json:"type"`
-	Read      bool     `json:"read"`
-	Create    bool     `json:"create"`
-	Update    bool     `json:"update"`
-	Required  bool     `json:"required"`
+	Key      string `json:"key"`
+	Label    string `json:"label"`
+	Type     string `json:"type"`
+	Read     bool   `json:"read"`
+	Create   bool   `json:"create"`
+	Update   bool   `json:"update"`
+	Required bool   `json:"required"`
+	// MaxLength counts Unicode code points in writable text and textarea fields.
+	MaxLength *int `json:"maxLength,omitempty"`
+	// Minimum is an inclusive bound on writable numbers. A nil bound is absent.
+	Minimum   *float64 `json:"minimum,omitempty"`
 	Options   []Option `json:"options,omitempty"`
 	Component string   `json:"component,omitempty"`
 }
@@ -54,8 +59,10 @@ type (
 		Key          string                                                  `json:"key"`
 		Label        string                                                  `json:"label"`
 		Confirmation string                                                  `json:"confirmation,omitempty"`
+		Params       []ActionParam                                           `json:"params,omitempty"`
 		Permission   host.PermissionKey                                      `json:"-"`
 		Run          func(context.Context, host.Actor, string, string) error `json:"-"`
+		input        *actionInput
 	}
 )
 
@@ -97,20 +104,35 @@ func (FieldErrors) Error() string { return "invalid resource fields" }
 
 // New validates the complete resource definition without I/O.
 func New[R, C, U any](d Definition[R, C, U]) (host.Module, error) {
-	if err := validate(d); err != nil {
+	return newModule(d, false, nil)
+}
+
+func newModule[R, C, U any](d Definition[R, C, U], readOnly bool, adapter *ReadOnlyAdapter) (host.Module, error) {
+	if err := validate(d, readOnly); err != nil {
 		return host.Module{}, err
 	}
 	d = cloneDefinition(d)
-	f := feature[R, C, U]{d: d}
-	return host.DefinedFeatureModule(host.ModuleDescriptor{Key: "crud." + d.Key, RouteNamespaces: []string{d.BasePath}}, f), nil
+	f := feature[R, C, U]{d: d, readOnly: readOnly, adapter: adapter}
+	namespaces := []string{d.BasePath}
+	if adapter != nil {
+		namespaces = append(namespaces, adapter.BasePath)
+	}
+	return host.DefinedFeatureModule(host.ModuleDescriptor{Key: "crud." + d.Key, RouteNamespaces: namespaces}, f), nil
 }
 
-type feature[R, C, U any] struct{ d Definition[R, C, U] }
+type feature[R, C, U any] struct {
+	d        Definition[R, C, U]
+	readOnly bool
+	adapter  *ReadOnlyAdapter
+}
 
 func (f feature[R, C, U]) Descriptor() host.FeatureDescriptor {
 	p := f.d.Permissions
 	keys := make([]host.PermissionKey, 0, 4+len(f.d.Actions))
-	keys = append(keys, p.Read, p.Create, p.Update, p.Delete)
+	keys = append(keys, p.Read)
+	if !f.readOnly {
+		keys = append(keys, p.Create, p.Update, p.Delete)
+	}
 	for _, a := range f.d.Actions {
 		keys = append(keys, a.Permission)
 	}
@@ -128,7 +150,18 @@ func (f feature[R, C, U]) Build(host.Menu) host.ExtensionBuilder {
 		if app == nil || app.Unwrap() == nil {
 			return nil, errors.New("crud: admin app required")
 		}
-		h := &handler[R, C, U]{app: app, d: f.d}
-		return host.NewExtension().WithHandlers(h), nil
+		h := &handler[R, C, U]{app: app, d: f.d, readOnly: f.readOnly}
+		extension := host.NewExtension()
+		if f.adapter != nil {
+			var err error
+			extension, err = f.adapter.Build(app, h.reader())
+			if err != nil {
+				return nil, err
+			}
+			if extension == nil {
+				return nil, errors.New("crud: read adapter returned no extension")
+			}
+		}
+		return extension.WithHandlers(h), nil
 	}
 }

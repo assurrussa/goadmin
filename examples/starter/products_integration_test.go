@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -20,7 +21,8 @@ import (
 	"github.com/assurrussa/goadmin/toolkit/datagrid"
 )
 
-func TestProductsPostgresCASIsolationAndAuditRollback(t *testing.T) {
+func productTestDatabase(t *testing.T, module string) (*sql.DB, string, host.Actor) {
+	t.Helper()
 	dsn := os.Getenv("PRODUCTS_TEST_DSN")
 	if dsn == "" {
 		t.Skip("PRODUCTS_TEST_DSN must name an isolated PostgreSQL test server")
@@ -30,16 +32,16 @@ func TestProductsPostgresCASIsolationAndAuditRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer admin.Close()
+	t.Cleanup(func() { _ = admin.Close() })
 	database := fmt.Sprintf("products_test_%d", time.Now().UnixNano())
 	if _, err = admin.ExecContext(ctx, "CREATE DATABASE "+database); err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
+	t.Cleanup(func() {
 		if _, e := admin.ExecContext(ctx, "DROP DATABASE "+database+" WITH (FORCE)"); e != nil {
 			t.Error(e)
 		}
-	}()
+	})
 	u, err := url.Parse(dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -49,7 +51,7 @@ func TestProductsPostgresCASIsolationAndAuditRollback(t *testing.T) {
 	// Explicit migrate must install core and selected Products even without the
 	// automatic-startup flag; it must return without opening the HTTP listener.
 	t.Setenv("DATABASE_DSN", testDSN)
-	t.Setenv("ADMIN_MODULES", "products")
+	t.Setenv("ADMIN_MODULES", module)
 	t.Setenv("ADMIN_URL", "http://localhost:18768")
 	t.Setenv("CSRF_SECRET", strings.Repeat("c", 32))
 	t.Setenv("FIRST_ADMIN_SETUP_TOKEN", strings.Repeat("s", 40))
@@ -64,39 +66,114 @@ func TestProductsPostgresCASIsolationAndAuditRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 	os.Args = oldArgs
-	if err = migrateProducts(ctx, testDSN); err != nil {
-		t.Fatal(err)
-	}
-	if err = migrateProducts(ctx, testDSN); err != nil {
-		t.Fatal(err)
-	}
 	db, err := sql.Open("pgx", testDSN)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
-	actor := host.Actor{SubjectID: "00000000-0000-4000-8000-000000000001"}
-	if _, err = db.ExecContext(ctx, "INSERT INTO auth_subjects(id,status,created_at,updated_at) VALUES($1,'active',NOW(),NOW())", actor.SubjectID); err != nil {
+	t.Cleanup(func() { _ = db.Close() })
+	return db, testDSN, productTestActor(t, db, "00000000-0000-4000-8000-000000000001")
+}
+
+func productTestActor(t *testing.T, db *sql.DB, subjectID string) host.Actor {
+	t.Helper()
+	actor := host.Actor{SubjectID: subjectID}
+	if _, err := db.ExecContext(t.Context(), "INSERT INTO auth_subjects(id,status,created_at,updated_at) VALUES($1,'active',NOW(),NOW())", actor.SubjectID); err != nil {
 		t.Fatal(err)
 	}
-	if err = db.QueryRowContext(ctx, "INSERT INTO administrations(subject_id,uuid) VALUES($1,gen_random_uuid()) RETURNING id", actor.SubjectID).Scan(&actor.AdminID); err != nil {
+	if err := db.QueryRowContext(t.Context(), "INSERT INTO administrations(subject_id,uuid) VALUES($1,gen_random_uuid()) RETURNING id", actor.SubjectID).Scan(&actor.AdminID); err != nil {
 		t.Fatal(err)
 	}
+	return actor
+}
+
+func TestProductsPostgresListSnapshot(t *testing.T) {
+	db, _, owner := productTestDatabase(t, "products")
 	repo := productRepo{db}
+	ctx := t.Context()
+	query := datagrid.Filters{Page: 1, Limit: 20, Search: "Concurrent"}
+	rows, total, err := repo.list(ctx, owner, snapshotFilter{query, func() {
+		if _, createErr := repo.create(ctx, owner, productInput{Name: "Concurrent"}); createErr != nil {
+			t.Fatal(createErr)
+		}
+	}})
+	if err != nil || total != 0 || len(rows) != 0 {
+		t.Fatalf("list spans two snapshots: rows=%v total=%d err=%v", rows, total, err)
+	}
+	rows, total, err = repo.list(ctx, owner, query)
+	if err != nil || total != 1 || len(rows) != 1 {
+		t.Fatalf("next list missed the committed product: rows=%v total=%d err=%v", rows, total, err)
+	}
+}
+
+func TestProductsPostgresConstraintsAndLegacyCorrection(t *testing.T) {
+	db, _, actor := productTestDatabase(t, "products")
+	repo := productRepo{db}
+	ctx := t.Context()
+	validName := strings.Repeat("🙂", 200)
+	invalid := productInput{Name: validName + "🙂", Stock: -1}
+
+	// Represent a host database that already contains a product outside today's rules.
+	var id string
+	if err := db.QueryRowContext(ctx, "INSERT INTO starter_products(owner_admin_id,name,description,stock,active,available,status) VALUES($1,$2,'',$3,false,'','draft') RETURNING id::text", actor.AdminID, invalid.Name, invalid.Stock).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	legacy, err := repo.get(ctx, actor, id)
+	if err != nil || legacy.Data.input() != invalid {
+		t.Fatalf("read legacy product: %+v, %v", legacy, err)
+	}
+	rows, total, err := repo.list(ctx, actor, datagrid.Filters{Page: 1, Limit: 20})
+	if err != nil || total != 1 || len(rows) != 1 || rows[0] != legacy {
+		t.Fatalf("list legacy product: %+v, total %d, %v", rows, total, err)
+	}
+
+	_, createErr := repo.create(ctx, actor, invalid)
+	_, updateErr := repo.update(ctx, actor, id, legacy.Revision, invalid)
+	for _, writeErr := range []error{createErr, updateErr} {
+		var fields crud.FieldErrors
+		if !errors.As(writeErr, &fields) || len(fields["name"]) != 1 || len(fields["stock"]) != 1 {
+			t.Fatalf("expected both field errors, got %#v", writeErr)
+		}
+	}
+	unchanged, total, err := repo.list(ctx, actor, datagrid.Filters{Page: 1, Limit: 20})
+	if err != nil || total != 1 || len(unchanged) != 1 || unchanged[0] != legacy {
+		t.Fatalf("rejected writes changed products: %+v, total %d, %v", unchanged, total, err)
+	}
+	var count int
+	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM starter_product_events").Scan(&count); err != nil || count != 0 {
+		t.Fatalf("rejected writes created events: %d, %v", count, err)
+	}
+	corrected := productInput{Name: validName, Stock: 0}
+	saved, err := repo.update(ctx, actor, id, legacy.Revision, corrected)
+	if err != nil || saved.Revision == legacy.Revision || saved.Data.input() != corrected {
+		t.Fatalf("correct legacy product: %+v, %v", saved, err)
+	}
+}
+
+func TestProductsPostgresCASIsolationAndAuditRollback(t *testing.T) {
+	db, testDSN, actor := productTestDatabase(t, "products")
+	other := productTestActor(t, db, "00000000-0000-4000-8000-000000000002")
+	ctx := t.Context()
+	repo := productRepo{db}
+	for range 2 {
+		if err := migrateProducts(ctx, testDSN); err != nil {
+			t.Fatal(err)
+		}
+	}
 	// Upgrade an existing version-1 installation without resetting its rows/audit.
 	for _, statement := range []string{
 		"ALTER TABLE starter_products DROP COLUMN category",
-		"DELETE FROM starter_product_migrations WHERE version=2",
+		"ALTER TABLE starter_product_events DROP COLUMN reason",
+		"DELETE FROM starter_product_migrations WHERE version IN (2,3)",
 	} {
-		if _, err = db.ExecContext(ctx, statement); err != nil {
+		if _, err := db.ExecContext(ctx, statement); err != nil {
 			t.Fatal(err)
 		}
 	}
 	var legacyID string
-	if err = db.QueryRowContext(ctx, "INSERT INTO starter_products(owner_admin_id,revision,name,description,stock,active,available,status) VALUES($1,7,'Legacy','retained',4,true,'','draft') RETURNING id::text", actor.AdminID).Scan(&legacyID); err != nil {
+	if err := db.QueryRowContext(ctx, "INSERT INTO starter_products(owner_admin_id,revision,name,description,stock,active,available,status) VALUES($1,7,'Legacy','retained',4,true,'','draft') RETURNING id::text", actor.AdminID).Scan(&legacyID); err != nil {
 		t.Fatal(err)
 	}
-	if err = migrateProducts(ctx, testDSN); err != nil {
+	if err := migrateProducts(ctx, testDSN); err != nil {
 		t.Fatal(err)
 	}
 	legacy, err := repo.get(ctx, actor, legacyID)
@@ -108,10 +185,10 @@ func TestProductsPostgresCASIsolationAndAuditRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = repo.get(ctx, host.Actor{AdminID: actor.AdminID + 1}, original.ID); !errors.Is(err, crud.ErrNotFound) {
+	if _, err = repo.get(ctx, other, original.ID); !errors.Is(err, crud.ErrNotFound) {
 		t.Fatalf("cross-owner get: %v", err)
 	}
-	rows, total, err := repo.list(ctx, host.Actor{AdminID: actor.AdminID + 1}, datagrid.Filters{Page: 1, Limit: 20})
+	rows, total, err := repo.list(ctx, other, datagrid.Filters{Page: 1, Limit: 20})
 	if err != nil || len(rows) != 0 || total != 0 {
 		t.Fatalf("scope: %v %d %d", err, len(rows), total)
 	}
@@ -172,7 +249,9 @@ func TestProductsPostgresCASIsolationAndAuditRollback(t *testing.T) {
 	if err = repo.command(ctx, actor, current.ID, original.Revision, "deleted"); !errors.Is(err, crud.ErrConflict) {
 		t.Fatalf("stale delete %v", err)
 	}
-	raceProductCommand(t, repo, actor, current.ID, current.Revision, "publish")
+	raceProductCommand(t, "publish", func(_ int) error {
+		return repo.command(ctx, actor, current.ID, current.Revision, "publish")
+	})
 	published, err := repo.get(ctx, actor, current.ID)
 	if err != nil || published.Data.Status != "published" {
 		t.Fatalf("publish %v %+v", err, published)
@@ -182,22 +261,25 @@ func TestProductsPostgresCASIsolationAndAuditRollback(t *testing.T) {
 		t.Fatalf("ordinary update changed publication: %+v %v", editedPublished, err)
 	}
 	published = editedPublished
-	if err = repo.command(ctx, actor, published.ID, published.Revision, "unknown"); !errors.Is(err, crud.ErrDenied) {
-		t.Fatalf("unknown command must be denied: %v", err)
+	for _, action := range []string{"unknown", "unpublish"} {
+		if err = repo.command(ctx, actor, published.ID, published.Revision, action); !errors.Is(err, crud.ErrDenied) {
+			t.Fatalf("parameterless %s must be denied: %v", action, err)
+		}
 	}
-	for _, owner := range []host.Actor{actor, {AdminID: actor.AdminID + 1}} {
+	input := UnpublishInput{Reason: "Rejected attempt"}
+	for _, owner := range []host.Actor{actor, other} {
 		revision := published.Revision
 		if owner.AdminID == actor.AdminID {
 			revision = original.Revision
 		}
-		if err = repo.command(ctx, owner, published.ID, revision, "unpublish"); !errors.Is(err, crud.ErrConflict) {
+		if err = repo.unpublish(ctx, owner, published.ID, revision, input); !errors.Is(err, crud.ErrConflict) {
 			t.Fatalf("stale/cross-owner unpublish: %v", err)
 		}
 	}
 	if _, err = db.ExecContext(ctx, "ALTER TABLE starter_product_events ADD CONSTRAINT test_unpublish_audit_failure CHECK(action <> 'unpublish') NOT VALID"); err != nil {
 		t.Fatal(err)
 	}
-	if err = repo.command(ctx, actor, published.ID, published.Revision, "unpublish"); err == nil {
+	if err = repo.unpublish(ctx, actor, published.ID, published.Revision, input); err == nil {
 		t.Fatal("unpublish audit failure unexpectedly succeeded")
 	}
 	after, err = repo.get(ctx, actor, published.ID)
@@ -207,52 +289,70 @@ func TestProductsPostgresCASIsolationAndAuditRollback(t *testing.T) {
 	if _, err = db.ExecContext(ctx, "ALTER TABLE starter_product_events DROP CONSTRAINT test_unpublish_audit_failure"); err != nil {
 		t.Fatal(err)
 	}
-	raceProductCommand(t, repo, actor, published.ID, published.Revision, "unpublish")
+	reasons := [2]string{"Missing details\n  in description", "\uFEFF" + strings.Repeat("🙂", 499)}
+	winner := raceProductCommand(t, "unpublish", func(i int) error {
+		return repo.unpublish(ctx, actor, published.ID, published.Revision, UnpublishInput{Reason: "\u0085 " + reasons[i] + "\n\t"})
+	})
+	revision, err := strconv.ParseInt(published.Revision, 10, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
 	draft, err := repo.get(ctx, actor, published.ID)
-	if err != nil || draft.Data.Status != "draft" || draft.Revision == published.Revision {
+	if err != nil || draft.Data.Status != "draft" || draft.Revision != strconv.FormatInt(revision+1, 10) {
 		t.Fatalf("unpublish: %+v %v", draft, err)
 	}
-	if err = repo.command(ctx, actor, draft.ID, draft.Revision, "unpublish"); !errors.Is(err, crud.ErrConflict) {
+	if err = repo.unpublish(ctx, actor, draft.ID, draft.Revision, input); !errors.Is(err, crud.ErrConflict) {
 		t.Fatalf("cannot unpublish a draft: %v", err)
 	}
 	if err = db.QueryRowContext(ctx, "SELECT count(*) FROM starter_product_events WHERE product_id=$1 AND action='unpublish'", draft.ID).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("unpublish audit count %d %v", count, err)
 	}
-	published = draft
-	if err = repo.command(ctx, actor, published.ID, published.Revision, "deleted"); err != nil {
+	if err = repo.command(ctx, actor, draft.ID, draft.Revision, "deleted"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = repo.get(ctx, actor, published.ID); !errors.Is(err, crud.ErrNotFound) {
+	if _, err = repo.get(ctx, actor, draft.ID); !errors.Is(err, crud.ErrNotFound) {
 		t.Fatalf("delete %v", err)
+	}
+	events, _, err := repo.events(ctx, actor, datagrid.Filters{Page: 1, Limit: 100, Search: draft.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var unpublishID string
+	for _, row := range events {
+		if row.Data.Reason != nil {
+			t.Fatal("event list exposed a reason")
+		}
+		if row.Data.Action == "unpublish" {
+			unpublishID = row.ID
+		}
+	}
+	detail, err := repo.event(ctx, actor, unpublishID)
+	if err != nil || detail.Data.Reason == nil || *detail.Data.Reason != reasons[winner] {
+		t.Fatalf("archived unpublish reason did not match the winning command: %+v, %v", detail, err)
+	}
+	if _, err = repo.event(ctx, other, unpublishID); !errors.Is(err, crud.ErrNotFound) {
+		t.Fatalf("foreign event lookup: %v", err)
 	}
 }
 
-func raceProductCommand(t *testing.T, repo productRepo, actor host.Actor, id, revision, action string) {
+func raceProductCommand(t *testing.T, action string, command func(int) error) int {
 	t.Helper()
 	start := make(chan struct{})
-	results := make(chan error, 2)
+	var results [2]error
 	var workers sync.WaitGroup
-	for range 2 {
+	for i := range results {
 		workers.Go(func() {
 			<-start
-			results <- repo.command(t.Context(), actor, id, revision, action)
+			results[i] = command(i)
 		})
 	}
 	close(start)
 	workers.Wait()
-	close(results)
-	successes, conflicts := 0, 0
-	for err := range results {
-		switch {
-		case err == nil:
-			successes++
-		case errors.Is(err, crud.ErrConflict):
-			conflicts++
-		default:
-			t.Fatal(err)
+	for winner, err := range results {
+		if err == nil && errors.Is(results[1-winner], crud.ErrConflict) {
+			return winner
 		}
 	}
-	if successes != 1 || conflicts != 1 {
-		t.Fatalf("%s CAS: %d successes, %d conflicts", action, successes, conflicts)
-	}
+	t.Fatalf("%s CAS: expected one winner and one conflict, got %v", action, results)
+	return -1
 }

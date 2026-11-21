@@ -301,3 +301,18 @@ func TestConstructorChecksCreateAndUpdateKindsIndependently(t *testing.T) {
 	_, err = New(wrongUpdate)
 	require.ErrorContains(t, err, "field kind")
 }
+
+// A host can publish an exact decimal from a scalar implementing json.Marshaler.
+type fixedAmount int64
+
+func (fixedAmount) MarshalJSON() ([]byte, error) { return []byte("9007199254740990.5"), nil }
+
+func TestProjectedDecimalSurvivesJSONAndCSV(t *testing.T) {
+	app := mountScalar(t, scalarDefinition[fixedAmount]("number"))
+	status, rows, _ := request(t, app, "GET", "/scalars/data", "")
+	require.Equal(t, 200, status)
+	require.Contains(t, rows, `"value":9007199254740990.5`)
+	status, csv, _ := request(t, app, "GET", "/scalars/table-export?scope=selected&ids=42&columns=value", "")
+	require.Equal(t, 200, status)
+	require.Equal(t, "Value\n9007199254740990.5\n", csv)
+}

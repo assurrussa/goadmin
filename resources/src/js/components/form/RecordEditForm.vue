@@ -14,6 +14,7 @@ const props = defineProps<{
   label: string
   canSaveAndReturn?: boolean
   submitDisabled?: boolean
+  novalidate?: boolean
 }>()
 const emit = defineEmits<{ submit: [event: Event, returnToList?: boolean] }>()
 
@@ -35,7 +36,7 @@ function submit(event: Event) {
     />
   </div>
   <Card class="overflow-hidden">
-    <AdminForm :form="form" :fields="fields" warn-unsaved @submit="submit">
+    <AdminForm :form="form" :fields="fields" :novalidate="novalidate" warn-unsaved @submit="submit">
       <CardContent class="pt-6 space-y-6"><slot /></CardContent>
       <template #actions>
         <CardFooter

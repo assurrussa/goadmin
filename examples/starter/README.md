@@ -14,8 +14,8 @@ when only GoAuth and GoNotify paths are selected.
 
 Prerequisites: Git, Docker Engine with Docker Compose, and OpenSSL for generating
 local secrets. No sibling repositories or Node.js installation are needed for
-this mode. This starter source targets **GoAdmin v0.30.0**. Its Docker build uses
-that release's embedded UI, not a frontend built from the checkout.
+this mode. Use the starter source from the **GoAdmin v0.30.0** tag with the
+published library and embedded UI from that release.
 
 ```sh
 git clone --branch v0.30.0 --depth 1 https://github.com/assurrussa/goadmin.git
@@ -36,21 +36,29 @@ the release notes and run the published-consumer check from the repository root:
 `make externalconsumer-published VERSION=v0.30.0`. That check needs the repository's
 Go toolchain; it does not replace running this starter in a browser.
 
-For either mode, copy `.env.example` to `.env`. It sets `GOADMIN_VERSION=v0.30.0`
-for the published build. Set PostgreSQL credentials, a unique CSRF secret and
-first-admin setup token of at least 32 bytes, and three distinct 32-byte keys
-encoded with standard base64. Generate each key with `openssl rand -base64 32`.
-Keep `.env` private and untracked. Then run the published command above. For source candidates, prepare the four
-sibling checkouts and run `bash ../../scripts/starter-local.sh up --build`
-instead; this explicit source mode does not use `GOADMIN_VERSION`.
+For either mode, copy `.env.example` to `.env` in the checkout you will run.
+Set PostgreSQL credentials, a unique CSRF secret, a first-admin setup token of
+at least 32 bytes, and three distinct 32-byte keys encoded with standard base64.
+Generate each key with `openssl rand -base64 32`. Keep `.env` private and untracked.
+
+### Run the current source
+
+For the Products form constraints, unpublish reason and event journal, use the
+current checkout and the four sibling checkouts listed above. In
+`examples/starter`, configure `.env` as above, set
+`ADMIN_MODULES=products,product-events`, and run
+`bash ../../scripts/starter-local.sh up --build`. This builds the checkout's
+server and embedded UI together.
+
 The default core uses PostgreSQL for browser and canonical auth sessions; it
 needs no Redis or SMTP. The login page offers first-admin registration until an
 administrator exists. Enter the setup token from `.env` in that form.
 
 `ADMIN_MODULES` selects comma-separated modules: `users,access,jobs,uploads,queues,
-notifications,realtime,authmail,products`. Empty means core only; `products` adds
-the host-owned CRUD tutorial without other optional modules. See
-[your first CRUD resource](../../docs/first-crud.md). Uploads, queues and notifications require jobs.
+notifications,realtime,authmail,products`. Empty means core only. Select `products`
+for [your first CRUD resource](../../docs/first-crud.md). In source mode this
+checkout also provides `product-events` for the [product event journal](#product-event-journal).
+Uploads, queues and notifications require jobs.
 For notifications or authmail, set `NOTIFYHUB_URL` and `NOTIFYHUB_PROJECT_KEY`
 for an existing NotifyHub gateway. Both modules reuse one client and project key;
 no second SMTP connection is needed. Use the gateway origin or deployment prefix,
@@ -186,16 +194,101 @@ manifest validation and the same pinned client/backend sources.
 
 ## Declarative Products example
 
+The following describes this checkout in source mode.
+
 Add `products` to `ADMIN_MODULES` to enable the host-owned example at `/products`.
 `STARTER_MIGRATE=1` or the explicit `migrate` command installs its own Products
 schema/ledger after the core migrations. Disabling the module retains its data.
 The example defines six simple fields, scoped PostgreSQL queries, per-record
 revision checks and transactional domain audit, plus guarded Publish/Unpublish
-commands.
+commands. The form displays the 200-character name limit and the minimum
+stock of zero before the operator types. Create, update and direct repository
+writes use the same field declarations. See
+[Write constraints](../../docs/crud.md#write-constraints).
 Each administrator sees their own records. Category is an optional editable
 select; publication Status is read-only in normal CRUD and changes only through
 the separately authorized Publish/Unpublish commands. Unpublish requires its own
-`products:unpublish` permission and returns the record to draft, with owner/revision
-CAS and transactional audit. Unknown commands are rejected. The versioned Products
+`products:unpublish` permission. From the list or product detail, enter a reason
+of up to 500 Unicode code points and confirm. The server trims its outer
+whitespace, returns the product to draft and records the reason atomically
+with the new revision. The versioned Products
 ledger upgrades existing example tables without resetting records. Standard pages use the embedded
 renderer without a Vue extension. See [CRUD resources](../../docs/crud.md).
+
+## Product event journal
+
+Add `product-events` to `ADMIN_MODULES` and grant the operator
+`product_events:read`. Either product module uses the same starter-owned
+migration. To try both, set `ADMIN_MODULES=products,product-events`, start in
+source mode and create or change a product. Open `/product-events` and search
+for the exact product number. Events show the action and UTC time, newest
+first, and remain available after deletion. Open an Unpublished event to read
+the full reason. Events created before starter migration v3 have no recorded
+reason and display an em dash. The detail page takes you back to
+the same search and page. Each administrator sees events for their own products.
+See [Connect a read-only section](../../docs/crud.md#connect-a-read-only-section)
+for the public host contract.
+
+## Connect a local MCP client to Product activity
+
+In this checkout's source mode, enable
+`ADMIN_MODULES=products,product-events,product-events-mcp`. The MCP option
+requires `product-events`. The operator signs in with a native starter account
+that has `product_events:read`. Each admin instance owns its connections in
+memory. Restarting the instance clears them.
+
+Each source can have four pairing codes awaiting a decision. An approval,
+denial or five-minute expiry frees the source slot. The instance also caps
+all outstanding device requests and active grants at 128. Pairing returns
+HTTP 429 when either limit is reached.
+
+The starter groups clients by IPv4 address or IPv6 /64 subnet. Clients sharing
+a NAT address share its quota. Behind an HTTPS reverse proxy, set
+`MCP_PAIRING_TRUSTED_PROXY_IP` to the proxy's exact TCP peer address as seen by
+the starter. Configure that proxy to overwrite `X-Real-IP` with the client
+address on every request. With this setting, pairing requires a single valid
+address from that peer. For every other peer, the starter uses the socket
+address. Leaving the setting empty groups connections through a proxy under
+the proxy's own quota.
+
+Build the local stdio program from `examples/starter`:
+
+```sh
+go build -o /tmp/product-events-mcp ./cmd/product-events-mcp
+```
+
+Configure your MCP client to launch that executable as its stdio server. For a
+starter listening on the default local port, the server configuration is:
+
+```json
+{
+  "command": "/tmp/product-events-mcp",
+  "args": ["-admin-url", "http://localhost:8080"]
+}
+```
+
+Use the origin configured as `ADMIN_URL`. Plain HTTP is supported on loopback;
+use HTTPS for a remote starter. The client needs no database credentials.
+
+1. Call `search_product_events` with a product number as text and
+   `action: "unpublish"`. Use the positive decimal ID shown in the journal,
+   for example `"47"`. The client checks IDs and pagination before it asks for
+   access. On the first valid call the program supplies a verification
+   URL and a five-minute code. Open the URL in the starter, enter the code from
+   your own client and choose **Allow reading**.
+2. Repeat the search. It returns the event IDs and the same scoped result
+   count as the journal. Optional `page` and `page_size` use 1 and 25 by
+   default, with a maximum page size of 100.
+3. Call `get_product_event` with the selected `event_id`. The response includes
+   the stored reason, with its original internal whitespace. Older events with
+   no recorded reason return `null`. Deleted products retain their events.
+
+The grant expires after 15 minutes at the latest. The next call checks the
+issuing login, current admin membership, role preview and journal permission
+again. Sign out or open `/agent/product-events/connect` and choose **Revoke**
+to end access. The client keeps its credential in process memory.
+
+To run browser and real stdio acceptance together, use
+`SMOKE_PRODUCT_EVENTS_MCP=1 make starter-smoke` from the repository root. The
+default instance enables the pilot and the topbar instance checks the disabled
+configuration.

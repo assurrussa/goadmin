@@ -23,13 +23,14 @@ const (
 )
 
 type Options[T any] struct {
-	Key          string
-	Store        Store
-	CurrentAdmin func(fiber.Ctx) (int64, error)
-	SelectionID  func(T) string
-	LoadSelected func(context.Context, []string) ([]T, error)
-	BulkURL      string
-	BulkActions  []datagrid.WorkflowAction
+	Key           string
+	Store         Store
+	CurrentAdmin  func(fiber.Ctx) (int64, error)
+	SelectionID   func(T) string
+	LoadSelected  func(context.Context, []string) ([]T, error)
+	DisableExport bool
+	BulkURL       string
+	BulkActions   []datagrid.WorkflowAction
 }
 
 // Register mounts routes on an already authorized resource group. No I/O occurs
@@ -46,17 +47,20 @@ func Register[T any](router fiber.Router, grid *datagrid.Handler[T], options Opt
 	if cfg.Repository == nil || len(cfg.Columns) == 0 || !strings.HasPrefix(cfg.RoutePath, "/") {
 		return errors.New("table workflow requires repository, columns and route path")
 	}
-	grid.ConfigureWorkflow(&datagrid.WorkflowConfig{
+	metadata := &datagrid.WorkflowConfig{
 		Key:            options.Key,
 		PreferencesURL: cfg.RoutePath + "/table-preferences",
-		ExportURL:      cfg.RoutePath + "/table-export",
 		BulkURL:        options.BulkURL,
 		BulkActions:    options.BulkActions,
-	}, options.SelectionID)
+	}
 	w := workflow[T]{grid: grid, config: cfg, options: options, schema: newSchema(cfg)}
 	router.Get("/table-preferences", APIHandler(w.getPreferences))
 	router.Put("/table-preferences", APIHandler(w.putPreferences))
-	router.Get("/table-export", APIHandler(w.export))
+	if !options.DisableExport {
+		metadata.ExportURL = cfg.RoutePath + "/table-export"
+		router.Get("/table-export", APIHandler(w.export))
+	}
+	grid.ConfigureWorkflow(metadata, options.SelectionID)
 	return nil
 }
 

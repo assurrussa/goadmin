@@ -3,10 +3,13 @@ package crud
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/assurrussa/goadmin/toolkit/datagrid"
 )
 
 var (
@@ -17,34 +20,23 @@ var (
 )
 
 //nolint:gocognit,gocyclo // Constructor validation enumerates independent public contract invariants.
-func validate[R, C, U any](d Definition[R, C, U]) error {
+func validate[R, C, U any](d Definition[R, C, U], readOnly bool) error {
 	fail := func(s string) error { return fmt.Errorf("crud: %s", s) }
 	if !keyPattern.MatchString(d.Key) || !pathPattern.MatchString(d.BasePath) || strings.TrimSpace(d.Title) == "" {
 		return fail("invalid key, base path or title")
 	}
-	if d.List == nil ||
-		d.Get == nil ||
-		d.LoadSelected == nil ||
-		d.Create == nil ||
-		d.Update == nil ||
-		d.Delete == nil ||
-		d.Authorize == nil {
+	if d.List == nil || d.Get == nil || d.Authorize == nil ||
+		(!readOnly && (d.LoadSelected == nil || d.Create == nil || d.Update == nil || d.Delete == nil)) {
 		return fail("all scoped callbacks and record authorization are required")
 	}
-	for _, p := range []bool{
-		d.Permissions.Read.IsZero(),
-		d.Permissions.Create.IsZero(),
-		d.Permissions.Update.IsZero(),
-		d.Permissions.Delete.IsZero(),
-	} {
-		if p {
-			return fail("explicit permissions are required")
-		}
+	p := d.Permissions
+	if p.Read.IsZero() || (!readOnly && (p.Create.IsZero() || p.Update.IsZero() || p.Delete.IsZero())) {
+		return fail("explicit permissions are required")
 	}
 	if d.PageSize < 0 || d.PageSize > 100 {
 		return fail("page size must be 1..100 or zero")
 	}
-	if d.DefaultOrder != "" && d.DefaultOrder != "asc" && d.DefaultOrder != "desc" {
+	if d.DefaultOrder != "" && !validSortOrder(d.DefaultOrder) {
 		return fail("invalid default order")
 	}
 	row, err := jsonFields[R]()
@@ -61,14 +53,13 @@ func validate[R, C, U any](d Definition[R, C, U]) error {
 	}
 	fields := map[string]Field{}
 	for _, f := range d.Fields {
-		if !fieldPattern.MatchString(f.Key) ||
-			f.Key == "id" ||
-			f.Key == revisionKey ||
-			f.Key == "__proto__" ||
-			f.Key == "constructor" ||
-			f.Key == "prototype" ||
-			f.Key == "hasOwnProperty" ||
-			f.Label == "" {
+		if readOnly && (f.Create || f.Update || f.Required || f.MaxLength != nil || f.Minimum != nil) {
+			return fmt.Errorf("crud: read-only field %q cannot set Create, Update, Required, MaxLength or Minimum", f.Key)
+		}
+		if err := f.validateConstraintDefinition(); err != nil {
+			return fmt.Errorf("crud: field %q: %w", f.Key, err)
+		}
+		if !validFieldKey(f.Key) || f.Label == "" {
 			return fail("invalid or reserved field key or label")
 		}
 		if _, ok := fields[f.Key]; ok {
@@ -82,7 +73,7 @@ func validate[R, C, U any](d Definition[R, C, U]) error {
 			return fail("optional write-only update fields require pointer DTO fields")
 		}
 		switch f.Type {
-		case "text", "textarea", "number", "boolean", fieldDate:
+		case fieldText, fieldTextArea, fieldNumber, fieldBoolean, fieldDate:
 		case fieldSelect:
 			if len(f.Options) == 0 {
 				return fail("select requires fixed options")
@@ -148,19 +139,30 @@ func validate[R, C, U any](d Definition[R, C, U]) error {
 	for _, a := range d.Actions {
 		if slices.Contains([]string{
 			"view",
-			"edit",
+			editAction,
 			string(Delete),
 			string(Create),
 			string(Read),
 			string(Update),
 		},
-			a.Key) || !keyPattern.MatchString(a.Key) || a.Label == "" || a.Permission.IsZero() || a.Run == nil || actions[a.Key] {
+			a.Key) || !keyPattern.MatchString(a.Key) || a.Label == "" || a.Permission.IsZero() || actions[a.Key] {
 			return fail("invalid action")
+		}
+		if err := a.validateInput(); err != nil {
+			return fmt.Errorf("crud: action %q: %w", a.Key, err)
 		}
 		actions[a.Key] = true
 	}
 	return nil
 }
+
+func validFieldKey(key string) bool {
+	return fieldPattern.MatchString(key) && !slices.Contains([]string{
+		"id", revisionKey, "__proto__", "constructor", "prototype", "hasOwnProperty",
+	}, key)
+}
+
+func validSortOrder(order string) bool { return order == "asc" || order == "desc" }
 
 func jsonFields[T any]() (map[string]reflect.Type, error) { return structFields(reflect.TypeFor[T]()) }
 
@@ -193,9 +195,23 @@ func cloneDefinition[R, C, U any](d Definition[R, C, U]) Definition[R, C, U] {
 	d.Fields = slices.Clone(d.Fields)
 	for i := range d.Fields {
 		d.Fields[i].Options = slices.Clone(d.Fields[i].Options)
+		if bound := d.Fields[i].MaxLength; bound != nil {
+			d.Fields[i].MaxLength = new(*bound)
+		}
+		if bound := d.Fields[i].Minimum; bound != nil {
+			d.Fields[i].Minimum = new(*bound)
+		}
 	}
-	d.Columns = slices.Clone(d.Columns)
+	d.Columns = cloneColumns(d.Columns)
 	d.Actions = slices.Clone(d.Actions)
+	for i := range d.Actions {
+		d.Actions[i].Params = slices.Clone(d.Actions[i].Params)
+		for j := range d.Actions[i].Params {
+			if bound := d.Actions[i].Params[j].MaxLength; bound != nil {
+				d.Actions[i].Params[j].MaxLength = new(*bound)
+			}
+		}
+	}
 	d.ClientRequirements = slices.Clone(d.ClientRequirements)
 	if d.PageSize == 0 {
 		d.PageSize = 25
@@ -212,4 +228,21 @@ func cloneDefinition[R, C, U any](d Definition[R, C, U]) Definition[R, C, U] {
 		}
 	}
 	return d
+}
+
+func cloneColumns(columns []datagrid.Column) []datagrid.Column {
+	cloned := slices.Clone(columns)
+	for i, col := range cloned {
+		options := slices.Clone(col.FilterOptions)
+		for j, option := range options {
+			options[j] = maps.Clone(option)
+		}
+		cloned[i].FilterOptions = options
+		badges := maps.Clone(col.Badges)
+		for k, badge := range badges {
+			badges[k] = maps.Clone(badge)
+		}
+		cloned[i].Badges = badges
+	}
+	return cloned
 }

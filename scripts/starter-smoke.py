@@ -19,7 +19,7 @@ import urllib.request
 REPO = Path(__file__).resolve().parent.parent
 ARTIFACTS = REPO / 'output/playwright/starter-smoke'
 RUN_ID = re.compile(r'^\d{8}t\d{6}z-[a-f0-9]{8}$')
-MODULES = 'users,access,jobs,uploads,queues,notifications,realtime,products'
+MODULES = 'users,access,jobs,uploads,queues,notifications,realtime,products,product-events'
 MARKER = 'goadmin-starter-smoke-v1'
 
 
@@ -95,7 +95,11 @@ def snapshot(source, destination):
         shutil.copy2(entry, target, follow_symlinks=False)
 
 
-def spec(project, port, manifest, candidates):
+def case_modules(layout, enable_mcp):
+    return MODULES + (',product-events-mcp' if enable_mcp and layout == 'default' else '')
+
+
+def spec(project, port, manifest, candidates, modules=MODULES):
     return {'name': project, 'services': {
         'postgres': {'image': 'postgres:17-alpine',
                      'environment': {key: '${' + key + ':?required}' for key in
@@ -113,7 +117,7 @@ def spec(project, port, manifest, candidates):
                   'environment': {**{key: '${' + key + ':?required}' for key in (
                       'POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_DB', 'ADMIN_URL', 'CSRF_SECRET',
                       'FIRST_ADMIN_SETUP_TOKEN', 'GOAUTH_SIGNING_KEY', 'GOAUTH_TOKEN_KEY', 'GOAUTH_ENVELOPE_KEY')},
-                      'ADMIN_MODULES': MODULES, 'APP_ADMIN_CANONICAL_SESSION_BACKEND': 'pgsql',
+                      'ADMIN_MODULES': modules, 'APP_ADMIN_CANONICAL_SESSION_BACKEND': 'pgsql',
                       'STARTER_MIGRATE': '1', 'UPLOAD_ROOT': '/data/uploads'},
                   'ports': [f'127.0.0.1:{port}:8080'], 'volumes': ['uploads:/data/uploads']}},
         'volumes': {'postgres_data': {}, 'uploads': {}}}
@@ -234,7 +238,7 @@ def write_report(data, folder, collection_errors=None):
         report['error'] = data['error']
     for name, case in data['cases'].items():
         report['cases'][name] = {
-            'project': case['project'], 'url': case['url'],
+            'project': case['project'], 'url': case['url'], 'modules': case.get('modules', data['modules']),
             'dependencies': load(f'{name}.modules.json', resolved_modules, []),
             'images': load(f'{name}.images.json', image_identities, []),
             'scenarios': browser.get('cases', {}).get(name),
@@ -265,6 +269,9 @@ def down(data):
 
 def run():
     os.umask(0o077)
+    enable_mcp = os.environ.get('SMOKE_PRODUCT_EVENTS_MCP') == '1'
+    if enable_mcp and os.environ.get('SMOKE_RECORDS_ONLY') == '1':
+        raise ValueError('SMOKE_PRODUCT_EVENTS_MCP requires the full starter smoke profile')
     run_id = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dt%H%M%Sz-') + secrets.token_hex(4)
     folder = manifest_path(run_id).parent
     folder.mkdir(parents=True, mode=0o700)
@@ -272,7 +279,7 @@ def run():
         ['git', 'rev-parse', 'HEAD'], cwd=REPO, text=True).strip(),
         'dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=REPO)),
         'profile': 'record-editing' if os.environ.get('SMOKE_RECORDS_ONLY') == '1' else 'full',
-        'modules': MODULES.split(','), 'cases': {}, 'result': 'running'}
+        'modules': MODULES.split(','), 'productEventsMCP': enable_mcp, 'cases': {}, 'result': 'running'}
     candidates = folder / 'candidates'
     for dep in ('goauth', 'gonotify', 'gouploads', 'gowebsocket'):
         snapshot(REPO.parent / dep, candidates / dep)
@@ -291,9 +298,11 @@ def run():
         env_path = folder / f'{name}.env'
         protected_write(env_path, ''.join(f'{key}={value}\n' for key, value in env.items()))
         compose_path = folder / f'{name}.compose.json'
+        modules = case_modules(name, enable_mcp)
         protected_write(compose_path, json.dumps(spec(project, port,
-            'examples/theme-topbar/extension.json' if name == 'topbar' else '', candidates), indent=2))
-        data['cases'][name] = {'project': project, 'env': str(env_path), 'compose': str(compose_path), 'url': url}
+            'examples/theme-topbar/extension.json' if name == 'topbar' else '', candidates, modules), indent=2))
+        data['cases'][name] = {'project': project, 'env': str(env_path), 'compose': str(compose_path), 'url': url,
+                               'modules': modules.split(',')}
         protected_write(folder / f'{name}.credentials.json', json.dumps(
             {'url': url, 'setupToken': setup, 'email': f'smoke-{name}@example.test', 'password': password,
              'restrictedEmail': f'smoke-queues-{name}@example.test'}, indent=2))
@@ -301,6 +310,9 @@ def run():
     print(f'Starter smoke RUN_ID={run_id}\nArtifacts: {folder}', flush=True)
     keep = os.environ.get('KEEP') == '1'
     try:
+        if enable_mcp:
+            command(['go', 'build', '-o', str(folder / 'product-events-mcp'), './cmd/product-events-mcp'],
+                    cwd=REPO / 'examples/starter', output=folder / 'mcp-build.log')
         for name, case in data['cases'].items():
             print(f'Building and starting {name}: {case["url"]}', flush=True)
             compose(case, 'up', '--build', '-d', output=folder / f'{name}.build.log')

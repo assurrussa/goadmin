@@ -13,8 +13,12 @@ import (
 )
 
 const (
-	fieldDate   = "date"
-	fieldSelect = "select"
+	fieldText     = "text"
+	fieldTextArea = "textarea"
+	fieldNumber   = "number"
+	fieldBoolean  = "boolean"
+	fieldDate     = "date"
+	fieldSelect   = "select"
 )
 
 func scalarType(t reflect.Type) reflect.Type {
@@ -35,11 +39,11 @@ func fieldTypeAllowed(kind string, t reflect.Type) bool {
 	}
 	k := t.Kind()
 	switch kind {
-	case "text", "textarea", fieldDate, fieldSelect:
+	case fieldText, fieldTextArea, fieldDate, fieldSelect:
 		return k == reflect.String
-	case "boolean":
+	case fieldBoolean:
 		return k == reflect.Bool
-	case "number":
+	case fieldNumber:
 		return numericKind(k)
 	case "custom":
 		return k == reflect.String || k == reflect.Bool || numericKind(k)
@@ -48,42 +52,79 @@ func fieldTypeAllowed(kind string, t reflect.Type) bool {
 }
 
 func validateFieldValue(f Field, t reflect.Type, raw json.RawMessage) error {
-	invalid := func() error { return errors.New("invalid field value") }
+	if raw == nil {
+		if f.Required {
+			return errors.New("This field is required") //nolint:staticcheck // Existing user-facing message for an omitted key.
+		}
+		if f.Minimum != nil && t.Kind() != reflect.Pointer {
+			// The decoder gives an omitted non-pointer number its zero value.
+			return f.ValidateConstraints(0)
+		}
+		return nil
+	}
+	v, err := decodeScalar(f, t, raw)
+	if err != nil {
+		return err
+	}
+	if number, ok := v.(json.Number); ok && f.Minimum == nil {
+		return validateNumericValue(number, nil)
+	}
+	return f.ValidateConstraints(v)
+}
+
+// fieldValue preserves the DTO's scalar contract and returns transport-neutral
+// values for readers. An omitted key remains distinct from a present null.
+func fieldValue(f Field, t reflect.Type, raw json.RawMessage) (any, error) {
+	value, err := decodeScalar(f, t, raw)
+	if err != nil {
+		return nil, err
+	}
+	number, numeric := value.(json.Number)
+	if !numeric {
+		return value, nil
+	}
+	if err := validateNumericValue(number, nil); err != nil {
+		return nil, err
+	}
+	if integer, err := number.Int64(); err == nil {
+		return integer, nil
+	}
+	// Preserve the validated decimal token through JSON and CSV projection.
+	return number, nil
+}
+
+func decodeScalar(f Field, t reflect.Type, raw json.RawMessage) (any, error) {
 	if t == nil {
-		return invalid()
+		return nil, errors.New("invalid field type")
 	}
 	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
 		if !f.Required && t.Kind() == reflect.Pointer {
-			return nil
+			return nil, nil //nolint:nilnil // JSON null is a valid value for an optional pointer field.
 		}
-		return invalid()
+		return nil, errors.New("invalid null value")
 	}
 	var value any
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.UseNumber()
-	if decoder.Decode(&value) != nil {
-		return invalid()
+	if err := decoder.Decode(&value); err != nil {
+		return nil, errors.New("invalid field value")
 	}
 	expected := scalarType(t).Kind()
 	switch v := value.(type) {
 	case string:
-		if expected != reflect.String {
-			return invalid()
+		if expected == reflect.String {
+			return v, validateStringValue(f, v)
 		}
-		return validateStringValue(f, v)
 	case bool:
-		if expected != reflect.Bool {
-			return invalid()
+		if expected == reflect.Bool {
+			return v, nil
 		}
 	case json.Number:
-		if !numericKind(expected) {
-			return invalid()
+		if numericKind(expected) {
+			return v, nil
 		}
-		return validateNumericValue(v)
-	default:
-		return invalid()
 	}
-	return nil
+	return nil, errors.New("invalid field value")
 }
 
 func validateStringValue(f Field, value string) error {
@@ -110,7 +151,7 @@ func validateStringValue(f Field, value string) error {
 	return nil
 }
 
-func validateNumericValue(value json.Number) error {
+func validateNumericValue(value json.Number, minimum *float64) error {
 	number, err := strconv.ParseFloat(string(value), 64)
 	if err != nil || math.IsInf(number, 0) || math.IsNaN(number) {
 		return errors.New("invalid field value")
@@ -122,11 +163,21 @@ func validateNumericValue(value json.Number) error {
 		if strings.Trim(mantissa, "-+.0") != "" {
 			return errors.New("number cannot be represented safely")
 		}
-		return nil
+		value = "0"
 	}
 	exact, ok := new(big.Rat).SetString(string(value))
-	if !ok || new(big.Rat).Abs(exact).Cmp(new(big.Rat).SetInt64(9007199254740991)) > 0 {
+	if !ok || new(big.Rat).Abs(exact).Cmp(new(big.Rat).SetInt64(maxSafeNumber)) > 0 {
 		return errors.New("number exceeds the safe range")
+	}
+	if minimum != nil {
+		// Compare with the same decimal bound published in the form metadata.
+		bound, valid := new(big.Rat).SetString(strconv.FormatFloat(*minimum, 'g', -1, 64))
+		if !valid {
+			return errors.New("invalid Minimum")
+		}
+		if exact.Cmp(bound) < 0 {
+			return errBelowMinimum
+		}
 	}
 	return nil
 }

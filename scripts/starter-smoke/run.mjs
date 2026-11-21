@@ -11,6 +11,8 @@ import { dashboardAcceptance } from './dashboard.mjs'
 import { tableWorkflowAcceptance } from './table-workflow.mjs'
 import { appearanceAcceptance } from './appearance.mjs'
 import { crudAcceptance } from './crud.mjs'
+import { journalMCPAcceptance, journalMCPDisabled } from './mcp-acceptance.mjs'
+import { productEventsAcceptance } from './product-events.mjs'
 
 const expect = baseExpect.configure({ timeout: 20000 })
 
@@ -513,6 +515,8 @@ async function runCase(name, config) {
     assert.equal(await navigationLink(page, '/admins'), null, 'restricted admin must not see admins in any navigation group')
     const denied = await context.request.get('/admins', { maxRedirects: 0 })
     assert.equal(denied.status(), 403, 'real restricted session must be denied by server guard')
+    assert.equal(await navigationLink(page, '/product-events'), null, 'event journal is hidden without its read permission')
+    assert.equal((await context.request.get('/product-events/data', { maxRedirects: 0 })).status(), 403)
     result.restrictedAccess = { granted: '/queues', denied: '/admins', status: denied.status(), role: slug }
     await page.screenshot({ path: path.join(folder, `${name}-restricted-queues.png`), fullPage: true })
     const restrictedSnapshot = page.waitForResponse((r) => new URL(r.url()).pathname === '/dashboard/data')
@@ -526,6 +530,11 @@ async function runCase(name, config) {
     await logout(page)
     await login(page, credentials.email, credentials.password)
     check('UI-created admin and queues:read role assignment; real restricted login, menu filtering, server 403 and logout protection')
+    const journalLink = await navigationLink(page, '/product-events')
+    assert.ok(journalLink, 'an authorized operator can open product activity from the menu')
+    await journalLink.click()
+    await expect(page).toHaveURL(/\/product-events(?:\?.*)?$/)
+    await expect(page.getByRole('heading', { name: 'No data', exact: true })).toBeVisible()
     // A direct protected link starts on the anonymous auth page. Accepted actor
     // identity must reach the grid before setup, not clear its props on success.
     await logout(page)
@@ -540,6 +549,20 @@ async function runCase(name, config) {
     result.loginRedirect = { destination: '/products', acceptedProps: true, noReload: true }
     await crudAcceptance({ page, context, config, folder, name, expect, language, result })
     check('Products CRUD, views/CSV, two-tab conflict resolution and save-and-return to the filtered second page')
+    await productEventsAcceptance({ page, context, browser, config, folder, name, expect, result, ownedSQL })
+    check('Product activity: deleted product, exact search, saved view, same-page return and identical UTC times on desktop and mobile')
+    if (manifest.productEventsMCP) {
+      if (config.modules.includes('product-events-mcp')) {
+        result.productEventsMCP = await journalMCPAcceptance({ browser, config, credentials, ownedSQL, expect,
+          login, logout, roleSlug: result.restrictedAccess.role, product: result.productEvents.archivedProduct,
+          reasons: [result.crud.unpublish.listReason, result.crud.unpublish.cardReason],
+          binary: path.join(folder, 'product-events-mcp') })
+        check('Product journal MCP: two stdio tools, browser parity, owner isolation, preview, live permission loss, revocation and logout')
+      } else {
+        await journalMCPDisabled(context, config.url)
+        check('Product journal MCP routes are unavailable in this layout')
+      }
+    }
     await tableWorkflowAcceptance({ page, context, config, credentials, ownedSQL, folder, name, expect, language, login, logout, result })
     check('table workflows: view CRUD/dirty/relogin, native CSRF/RBAC/preview/owner isolation, both CSV modes on six grids, cross-page cap100, real conflict, bulk results and server queue counters')
     await appearanceAcceptance({ page, context, browser, config, credentials, folder, name, expect, login, logout, result })

@@ -106,6 +106,7 @@ type Service struct {
 	states            browserstate.Store
 	localLoginStates  browserstate.Store
 	realtimeSessions  realtimesession.Registry
+	delegatedReads    *delegatedReadPolicy
 }
 
 func NewService(store *session.Store, roles roleService, options ...Option) *Service {

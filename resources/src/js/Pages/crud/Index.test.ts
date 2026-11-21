@@ -1,11 +1,16 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, nextTick } from 'vue'
 import Index from './Index.vue'
+import Show from './Show.vue'
+import type { CrudResource } from '@/crud'
+import plainResource from './no-business-actions.test.json'
 import type { ApiResponse } from '@/composables/useDataGrid'
 import { applyLocale } from '@/i18n'
+import { router } from '@inertiajs/vue3'
 
 vi.mock('@inertiajs/vue3', () => ({
-  usePage: () => ({ props: {} }),
+  usePage: () => ({ props: {}, url: '/people/records/42' }),
+  Link: defineComponent({ render: () => null }),
   router: { on: () => () => {}, get: vi.fn() },
   Head: defineComponent({ render: () => null }),
 }))
@@ -23,6 +28,53 @@ afterEach(() => {
 const settle = async () => {
   for (let i = 0; i < 16; i++) await nextTick()
 }
+
+it('opens a journal event from its filtered list without selection or export controls', async () => {
+  const basePath = '/product-events'
+  const query = 'search=17'
+  window.history.replaceState({}, '', basePath + '?' + query)
+  const fetch = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      owner: '7',
+      version: 0,
+      payload: { schemaVersion: 1, columns: ['name'], views: [] },
+    }),
+  })
+  vi.stubGlobal('fetch', fetch)
+  const id = '9007199254740993'
+  const root = document.createElement('div')
+  document.body.append(root)
+  const props = {
+    resource: { key: 'product_events', basePath, title: 'Events', fields: [], actions: [] },
+    data: {
+      data: [
+        {
+          item: { id, name: 'Product 17' },
+          selectionId: id,
+          actions: [{ key: 'view', label: 'Просмотр' }],
+        },
+      ],
+      config: {
+        routePath: basePath,
+        columns: [{ key: 'name', label: 'Name', title: 'Name' }],
+        workflow: { key: 'product_events', preferencesUrl: basePath + '/table-preferences' },
+      },
+      meta: { title: 'Events', description: '', requestQuery: query, filters: { _search: '17' } },
+    },
+  }
+  app = createApp(Index, props)
+  app.mount(root)
+  await settle()
+  expect(root.textContent).toContain('Product 17')
+  expect(root.textContent).toContain('Сохранить столбцы')
+  expect(root.textContent).not.toMatch(/Выбрано:|CSV|Снять выделение/)
+  expect(root.querySelector('table [role="checkbox"], table input[type="checkbox"]')).toBeNull()
+  root.querySelector<HTMLButtonElement>('button[aria-label="Просмотр"]')!.click()
+  const href = new URL(vi.mocked(router.get).mock.lastCall![0] as string, window.location.origin)
+  expect(href.pathname).toBe(basePath + '/records/' + id)
+  expect(href.searchParams.get('returnTo')).toBe(window.location.pathname + window.location.search)
+})
 it.each([
   ['ru', 'Обновить'],
   ['en', 'Refresh'],
@@ -94,3 +146,34 @@ it.each([
   expect(root.textContent).toContain('After refresh')
   expect(root.textContent).not.toContain('Before refresh')
 })
+
+it.each(['index', 'show'])(
+  'renders the Go page resource without business actions on %s',
+  async (screen) => {
+    const resource = plainResource as CrudResource
+    const root = document.createElement('div')
+    document.body.append(root)
+    const data = {
+      config: { routePath: '/people', columns: [{ key: 'name', label: 'Name', title: 'Name' }] },
+      meta: { title: 'People', description: '', filters: {} },
+      data: [{ item: { id: '42', name: 'Alice' }, actions: [] }],
+    }
+    app =
+      screen === 'index'
+        ? createApp(Index, { resource, data })
+        : createApp(Show, {
+            resource,
+            record: {
+              id: '42',
+              revision: 'v1',
+              data: { name: 'Alice' },
+              actions: ['edit', 'delete'],
+            },
+            permissions: { create: true, update: true, delete: true },
+          })
+    app.mount(root)
+    await settle()
+    expect(root.textContent).toContain('Alice')
+    expect(root.querySelector('[data-crud-action-dialog]')).toBeNull()
+  },
+)

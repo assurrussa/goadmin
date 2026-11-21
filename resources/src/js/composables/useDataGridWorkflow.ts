@@ -1,6 +1,6 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { adminFetch, AdminFetchNotSentError, sessionCoordinator } from '@/http'
-import type { useDataGrid } from './useDataGrid'
+import { type useDataGrid, workflowHasSelection } from './useDataGrid'
 
 export interface GridViewState {
   search: string
@@ -92,7 +92,9 @@ export function useDataGridWorkflow(
     ),
     behaviour: {
       ...grid.config.value.behaviour,
-      selectable: workflow.value ? true : grid.config.value.behaviour?.selectable,
+      selectable: workflow.value
+        ? workflowHasSelection(workflow.value)
+        : grid.config.value.behaviour?.selectable,
     },
   }))
   const reset = () => {
@@ -408,7 +410,7 @@ export function useDataGridWorkflow(
   }
   const exportCSV = async (scope: 'selected' | 'filtered') => {
     if (
-      !workflow.value ||
+      !workflow.value?.exportUrl ||
       busy.value ||
       grid.loading.value ||
       grid.loadError.value ||

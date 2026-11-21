@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 import { t } from '@/i18n'
 import AppHead from '@/components/layout/AppHead.vue'
+import ActionDialog from '@/crud/ActionDialog.vue'
 import DataGrid from '@/components/datagrid/DataGrid.vue'
 import type { ApiResponse } from '@/composables/useDataGrid'
 import { recordListHref } from '@/composables/useRecordNavigation'
@@ -12,6 +13,7 @@ import { useConfirmation } from '@/composables/useConfirmation'
 const props = defineProps<{ resource: CrudResource; data: ApiResponse }>()
 const page = usePage()
 const grid = ref<InstanceType<typeof DataGrid> | null>(null)
+const actionDialog = ref<InstanceType<typeof ActionDialog>>()
 const mutating = ref(false)
 const confirming = ref(false)
 const confirm = useConfirmation()
@@ -36,8 +38,13 @@ async function action(key: string, row: Record<string, unknown>) {
   const command = props.resource.actions.find((item) => item.key === key)
   if (key !== 'delete' && !command) return
   const basePath = props.resource.basePath
-  const revision = String(row._revision)
+  const revision = row._revision
+  if (typeof revision !== 'string' || !revision) return
   const returnTo = source()
+  if (command?.params?.length) {
+    actionDialog.value?.open(command, { id, revision, data: row }, returnTo)
+    return
+  }
   confirming.value = true
   try {
     await confirm(
@@ -76,6 +83,11 @@ async function action(key: string, row: Record<string, unknown>) {
 </script>
 <template>
   <AppHead :title="resource.title" />
+  <ActionDialog
+    v-if="resource.actions.some((item) => item.params?.length)"
+    ref="actionDialog"
+    :resource="resource"
+  />
   <p v-if="error" role="alert" class="mb-4 text-error">{{ t(error) }}</p>
   <div :inert="mutating || undefined" :aria-busy="mutating">
     <DataGrid

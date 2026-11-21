@@ -1,0 +1,26 @@
+{
+  "key": "people",
+  "basePath": "/people",
+  "title": "People",
+  "fields": [
+    {
+      "key": "name",
+      "label": "Name",
+      "type": "text",
+      "read": true,
+      "create": true,
+      "update": true,
+      "required": true
+    },
+    {
+      "key": "readOnly",
+      "label": "Read only",
+      "type": "text",
+      "read": true,
+      "create": false,
+      "update": false,
+      "required": false
+    }
+  ],
+  "actions": []
+}

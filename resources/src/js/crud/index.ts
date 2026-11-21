@@ -9,6 +9,8 @@ export interface CrudField {
   create: boolean
   update: boolean
   required?: boolean
+  maxLength?: number
+  minimum?: number
   options?: Array<{ value: string | number; label: string }>
   component?: string
 }
@@ -30,13 +32,29 @@ export interface CrudResource {
   basePath: string
   title: string
   fields: CrudField[]
-  actions: Array<{ key: string; label: string; confirmation?: string }>
+  actions: CrudAction[]
 }
-export interface CrudRecord {
+export interface CrudAction {
+  key: string
+  label: string
+  confirmation?: string
+  params?: Array<{
+    key: string
+    label: string
+    type: 'text' | 'textarea'
+    required?: boolean
+    trimSpace?: boolean
+    maxLength?: number
+  }>
+}
+export interface CrudViewRecord {
   id: string
-  revision: string
+  revision?: string
   data: Record<string, unknown>
   actions?: string[]
+}
+export interface CrudRecord extends CrudViewRecord {
+  revision: string
 }
 export interface CrudPermissions {
   create: boolean

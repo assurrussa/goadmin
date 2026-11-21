@@ -454,13 +454,16 @@ func (h *Handler[T]) previewActionAllowed(ctx context.Context, action string) bo
 	}
 	domain := strings.Split(strings.Trim(h.config.RoutePath, "/"), "/")[0]
 	switch action {
-	case "view":
+	case "view", "read":
+		if h.config.CanViewInPreview != nil {
+			return h.config.CanViewInPreview(ctx)
+		}
 		action = "read"
 	case "edit":
 		action = "update"
 	case "restore":
 		action = "delete"
-	case "create", "read", "update", "delete":
+	case "create", "update", "delete":
 		// These keys already name canonical actions.
 	default:
 		// Custom action keys do not declare a canonical permission contract.
