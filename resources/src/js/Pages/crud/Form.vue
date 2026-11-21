@@ -428,6 +428,9 @@ onUnmounted(() => {
     :submit-disabled="mode === 'update' && submitDisabled"
     @submit="submit"
   >
+    <p v-if="resource.description" class="mb-4 text-sm text-text-secondary">
+      {{ t(resource.description) }}
+    </p>
     <template
       v-for="{ field, dispute, heldSecret, showEditor } in fieldsWithChoices"
       :key="`${identity}:${field.key}`"

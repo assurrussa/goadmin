@@ -15,12 +15,13 @@ import (
 // ActionParam declares one text or textarea command argument. Its Key is the
 // explicit JSON tag on a string field in the action's input struct.
 type ActionParam struct {
-	Key       string `json:"key"`
-	Label     string `json:"label"`
-	Type      string `json:"type"`
-	Required  bool   `json:"required,omitempty"`
-	TrimSpace bool   `json:"trimSpace,omitempty"`
-	MaxLength *int   `json:"maxLength,omitempty"`
+	Key         string `json:"key"`
+	Label       string `json:"label"`
+	Description string `json:"description,omitempty"`
+	Type        string `json:"type"`
+	Required    bool   `json:"required,omitempty"`
+	TrimSpace   bool   `json:"trimSpace,omitempty"`
+	MaxLength   *int   `json:"maxLength,omitempty"`
 }
 
 // Normalize returns the value that can be persisted by the host. White_Space

@@ -49,7 +49,9 @@ async function action(key: string, row: Record<string, unknown>) {
   try {
     await confirm(
       {
+        title: command?.description ? command.confirmation || command.label : undefined,
         message:
+          command?.description ||
           command?.confirmation ||
           (key === 'delete'
             ? 'Вы уверены, что хотите удалить запись?'
@@ -88,6 +90,9 @@ async function action(key: string, row: Record<string, unknown>) {
     ref="actionDialog"
     :resource="resource"
   />
+  <p v-if="resource.description" class="mb-4 text-sm text-text-secondary">
+    {{ t(resource.description) }}
+  </p>
   <p v-if="error" role="alert" class="mb-4 text-error">{{ t(error) }}</p>
   <div :inert="mutating || undefined" :aria-busy="mutating">
     <DataGrid

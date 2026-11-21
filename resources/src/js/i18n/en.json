@@ -1,4 +1,8 @@
 {
+  "The product name appears in the catalog and in its activity history.": "The product name appears in the catalog and in its activity history.",
+  "Explain why you are removing this product. The reason remains in the activity entry after deletion.": "Explain why you are removing this product. The reason remains in the activity entry after deletion.",
+  "Manage your catalog and review publication changes in Product activity.": "Manage your catalog and review publication changes in Product activity.",
+  "The product will become a draft. This action and its reason are recorded in Product activity.": "The product will become a draft. This action and its reason are recorded in Product activity.",
   "Вы уверены, что хотите выполнить действие?": "Are you sure you want to perform this action?",
   "Вы уверены, что хотите удалить запись?": "Are you sure you want to delete the record?",
   "Подтвердите действие": "Confirm action",

@@ -1,11 +1,11 @@
 {
-  "_ActionDialog.vue_vue_type_script_setup_true_lang-BJ-wW7tE.js": {
-    "file": "js/ActionDialog.vue_vue_type_script_setup_true_lang-BJ-wW7tE.js",
+  "_ActionDialog.vue_vue_type_script_setup_true_lang-CqaQ7FdB.js": {
+    "file": "js/ActionDialog.vue_vue_type_script_setup_true_lang-CqaQ7FdB.js",
     "name": "ActionDialog.vue_vue_type_script_setup_true_lang",
     "imports": [
       "_editor-DHjMAgj7.js",
       "src/js/app.ts",
-      "_display-DRzKiSJT.js"
+      "_display-BiGblxMx.js"
     ]
   },
   "_AdminForm.vue_vue_type_script_setup_true_lang-DQubEtqQ.js": {
@@ -269,8 +269,8 @@
       "src/js/app.ts"
     ]
   },
-  "_display-DRzKiSJT.js": {
-    "file": "js/display-DRzKiSJT.js",
+  "_display-BiGblxMx.js": {
+    "file": "js/display-BiGblxMx.js",
     "name": "display",
     "imports": [
       "src/js/app.ts",
@@ -615,7 +615,7 @@
     ]
   },
   "src/js/Pages/crud/Form.vue": {
-    "file": "js/Form-DlwtRddp.js",
+    "file": "js/Form-YnhpBZLO.js",
     "name": "Form",
     "src": "src/js/Pages/crud/Form.vue",
     "isDynamicEntry": true,
@@ -623,7 +623,7 @@
       "src/js/app.ts",
       "_AppHead.vue_vue_type_script_setup_true_lang-BKzE8imW.js",
       "_RecordEditForm.vue_vue_type_script_setup_true_lang-DoAi1F6n.js",
-      "_display-DRzKiSJT.js",
+      "_display-BiGblxMx.js",
       "_editor-DHjMAgj7.js",
       "_AdminForm.vue_vue_type_script_setup_true_lang-DQubEtqQ.js",
       "_FormButton.vue_vue_type_script_setup_true_lang-Dwd6xpq_.js",
@@ -637,17 +637,17 @@
     ]
   },
   "src/js/Pages/crud/Index.vue": {
-    "file": "js/Index-Wj_h3N5K.js",
+    "file": "js/Index-tj7DthRC.js",
     "name": "Index",
     "src": "src/js/Pages/crud/Index.vue",
     "isDynamicEntry": true,
     "imports": [
       "src/js/app.ts",
       "_AppHead.vue_vue_type_script_setup_true_lang-BKzE8imW.js",
-      "_ActionDialog.vue_vue_type_script_setup_true_lang-BJ-wW7tE.js",
+      "_ActionDialog.vue_vue_type_script_setup_true_lang-CqaQ7FdB.js",
       "_DataGrid.vue_vue_type_script_setup_true_lang-Dk4yU5N7.js",
       "_useRecordNavigation-BB9o4Pu1.js",
-      "_display-DRzKiSJT.js",
+      "_display-BiGblxMx.js",
       "_editor-DHjMAgj7.js",
       "_useDataGrid-ByW_qZLU.js",
       "_AppInput.vue_vue_type_script_setup_true_lang-Dy1H6VOi.js",
@@ -663,7 +663,7 @@
     ]
   },
   "src/js/Pages/crud/Show.vue": {
-    "file": "js/Show-Cun9g2W_.js",
+    "file": "js/Show-BKTByQqM.js",
     "name": "Show",
     "src": "src/js/Pages/crud/Show.vue",
     "isDynamicEntry": true,
@@ -671,8 +671,8 @@
       "src/js/app.ts",
       "_AppHead.vue_vue_type_script_setup_true_lang-BKzE8imW.js",
       "_PageActionBar.vue_vue_type_script_setup_true_lang-BPmqfUJs.js",
-      "_display-DRzKiSJT.js",
-      "_ActionDialog.vue_vue_type_script_setup_true_lang-BJ-wW7tE.js",
+      "_display-BiGblxMx.js",
+      "_ActionDialog.vue_vue_type_script_setup_true_lang-CqaQ7FdB.js",
       "_editor-DHjMAgj7.js",
       "_LocalizedDatePicker-juXDP4iw.js",
       "_useRecordNavigation-BB9o4Pu1.js",

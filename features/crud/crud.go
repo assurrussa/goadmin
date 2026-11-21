@@ -39,13 +39,14 @@ type Option struct {
 // Field explicitly opts a JSON key into each supported mode. Undeclared and
 // unreadable row fields are never sent to the browser or exported.
 type Field struct {
-	Key      string `json:"key"`
-	Label    string `json:"label"`
-	Type     string `json:"type"`
-	Read     bool   `json:"read"`
-	Create   bool   `json:"create"`
-	Update   bool   `json:"update"`
-	Required bool   `json:"required"`
+	Key         string `json:"key"`
+	Label       string `json:"label"`
+	Description string `json:"description,omitempty"`
+	Type        string `json:"type"`
+	Read        bool   `json:"read"`
+	Create      bool   `json:"create"`
+	Update      bool   `json:"update"`
+	Required    bool   `json:"required"`
 	// MaxLength counts Unicode code points in writable text and textarea fields.
 	MaxLength *int `json:"maxLength,omitempty"`
 	// Minimum is an inclusive bound on writable numbers. A nil bound is absent.
@@ -58,6 +59,7 @@ type (
 	Action[T any] struct {
 		Key          string                                                  `json:"key"`
 		Label        string                                                  `json:"label"`
+		Description  string                                                  `json:"description,omitempty"`
 		Confirmation string                                                  `json:"confirmation,omitempty"`
 		Params       []ActionParam                                           `json:"params,omitempty"`
 		Permission   host.PermissionKey                                      `json:"-"`
@@ -72,6 +74,7 @@ type (
 // record gate; its presence does not make a tenant-unscoped repository safe.
 type Definition[R, C, U any] struct {
 	Key, BasePath, Title      string
+	Description               string
 	Menu                      host.Menu
 	Permissions               Permissions
 	Fields                    []Field

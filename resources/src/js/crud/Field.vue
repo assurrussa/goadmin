@@ -32,8 +32,13 @@ const hint = computed(() => {
 const message = computed(() => props.constraintError || (props.error && t(props.error)))
 const describedBy = computed(
   () =>
-    [hint.value && `${id}-hint`, message.value && `${id}-error`].filter(Boolean).join(' ') ||
-    undefined,
+    [
+      props.field.description && `${id}-description`,
+      hint.value && `${id}-hint`,
+      message.value && `${id}-error`,
+    ]
+      .filter(Boolean)
+      .join(' ') || undefined,
 )
 function customChange(value: unknown) {
   if (!props.disabled && !props.readonly) emit('update:modelValue', crudValue(value))
@@ -63,16 +68,21 @@ function change(event: Event) {
 }
 </script>
 <template>
-  <component
-    v-if="field.type === 'custom' && component"
-    :is="component"
-    :field="field"
-    :model-value="modelValue"
-    :error="error"
-    :disabled="!!disabled"
-    :readonly="!!readonly"
-    @update:model-value="customChange"
-  />
+  <template v-if="field.type === 'custom' && component">
+    <component
+      :aria-describedby="describedBy"
+      :is="component"
+      :field="field"
+      :model-value="modelValue"
+      :error="error"
+      :disabled="!!disabled"
+      :readonly="!!readonly"
+      @update:model-value="customChange"
+    />
+    <p v-if="field.description" :id="`${id}-description`" class="text-sm text-text-secondary">
+      {{ t(field.description) }}
+    </p>
+  </template>
   <div v-else class="space-y-2">
     <label
       v-if="field.type === 'boolean'"
@@ -86,7 +96,7 @@ function change(event: Event) {
         :checked="modelValue === true"
         :disabled="disabled || readonly"
         :aria-invalid="!!error"
-        :aria-describedby="error ? `${id}-error` : undefined"
+        :aria-describedby="describedBy"
         class="h-5 w-5 rounded border-border-primary accent-primary"
         @change="change"
       />
@@ -117,7 +127,7 @@ function change(event: Event) {
       :disabled="disabled || readonly"
       :required="field.required"
       :aria-invalid="!!error"
-      :aria-describedby="error ? `${id}-error` : undefined"
+      :aria-describedby="describedBy"
       class="appearance-select w-full rounded-lg border border-border-primary bg-card px-3 text-text-primary"
       @change="change"
     >
@@ -158,10 +168,13 @@ function change(event: Event) {
       :disabled="disabled"
       :readonly="readonly"
       :error="error"
-      :describedby="error ? `${id}-error` : undefined"
+      :describedby="describedBy"
       @update:model-value="customChange"
       @update:valid="emit('update:valid', $event)"
     />
+    <p v-if="field.description" :id="`${id}-description`" class="text-sm text-text-secondary">
+      {{ t(field.description) }}
+    </p>
     <p v-if="hint" :id="`${id}-hint`" class="text-sm text-text-secondary">{{ hint }}</p>
     <p v-if="message" :id="`${id}-error`" class="text-sm text-error">{{ message }}</p>
   </div>
