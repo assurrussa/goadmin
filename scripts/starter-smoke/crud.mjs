@@ -61,7 +61,9 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await expect(field('name')).not.toHaveAttribute('maxlength', /.*/)
   await expect(field('stock')).toHaveAttribute('min', '0')
   await expect(page.locator('form')).toHaveJSProperty('noValidate', true)
-  await expect(field('name')).toHaveAccessibleDescription('Up to 200 characters')
+  await expect(field('name')).toHaveAccessibleDescription(
+    'The product name appears in the catalog and in its activity history. Up to 200 characters',
+  )
   await expect(field('stock')).toHaveAccessibleDescription('Minimum: 0')
   await field('description').fill('First paragraph\nSecond paragraph')
   await field('active').check()
