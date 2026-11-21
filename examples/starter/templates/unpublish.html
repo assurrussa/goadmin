@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}</title>
+<style nonce="{{.Nonce}}">
+  :root { color-scheme: light dark; font: 16px/1.55 system-ui, sans-serif; }
+  body { margin: 0; background: Canvas; color: CanvasText; }
+  main { max-width: 43rem; margin: clamp(1rem, 8vh, 5rem) auto; padding: 0 1.25rem 2rem; }
+  h1 { line-height: 1.2; margin: 1.5rem 0 1rem; }
+  h2 { font-size: 1.2rem; }
+  a { color: LinkText; }
+  label, dt { display: block; font-weight: 650; }
+  dd { margin: 0 0 1rem; overflow-wrap: anywhere; white-space: pre-wrap; }
+  input, button { font: inherit; padding: .45rem .75rem; }
+  input { max-width: 100%; width: 14rem; box-sizing: border-box; }
+  button { cursor: pointer; }
+  button[value=approve] { color: white; background: #872619; border: 1px solid #872619; border-radius: .3rem; }
+  #connect-button { background: #1a4e7b; border-color: #1a4e7b; }
+  .actions { display: flex; flex-wrap: wrap; gap: .65rem; margin: 1rem 0; }
+  ul { padding-inline-start: 1.25rem; }
+  li { margin-block: .5rem; }
+</style>
+</head>
+<body>
+<main>
+<a href="/products">К товарам</a>
+<h1>{{.Title}}</h1>
+{{if .Connect}}
+<p>Введите код из локального MCP-клиента. В течение 15 минут клиент сможет предлагать снятие товаров с публикации и узнавать результат. Каждый запрос подтверждается отдельно в этом браузере.</p>
+<form method="post" action="{{.Action}}" data-csrf="{{.CSRF}}">
+  <label for="pair-code">Код</label>
+  <input id="pair-code" name="code" maxlength="11" required autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCDE-FGHIJ">
+  <div class="actions"><button id="connect-button" name="decision" value="approve">Подключить</button></div>
+</form>
+{{if .Connections}}
+<h2>Подключения в этом сеансе</h2>
+<ul>
+{{range .Connections}}
+  <li>
+    <form method="post" action="{{$.Action}}" data-csrf="{{$.CSRF}}">
+      <input type="hidden" name="connection_id" value="{{.}}">
+      <button name="decision" value="revoke">Отключить</button>
+    </form>
+  </li>
+{{end}}
+</ul>
+{{end}}
+{{else if eq .Request.State "pending"}}
+<dl>
+  <dt>Товар</dt><dd>{{.Request.ProductName}} · № {{.Request.ProductID}}</dd>
+  <dt>Статус</dt><dd>Опубликован → Черновик</dd>
+  <dt>Причина</dt><dd>{{.Request.Reason}}</dd>
+</dl>
+<p>При подтверждении эта причина сохранится в журнале действий с товаром.</p>
+<form method="post" action="{{.Action}}" data-csrf="{{.CSRF}}">
+  <div class="actions">
+    <button name="decision" value="approve">Снять с публикации</button>
+    <button name="decision" value="decline">Отклонить</button>
+  </div>
+</form>
+{{else if eq .Request.State "succeeded"}}
+<p>Товар снят с публикации. Запись в журнале № {{.Request.EventID}}.</p>
+{{else if eq .Request.State "declined"}}
+<p>Запрос отклонён.</p>
+{{else if eq .Request.State "conflict"}}
+<p>Товар изменился после подачи запроса. Откройте карточку товара, чтобы проверить текущий статус.</p>
+{{else if eq .Request.State "expired"}}
+<p>Срок запроса истёк или исходное подключение завершилось. Для подтверждения потребуется новый запрос.</p>
+{{end}}
+<p id="result" role="status" aria-live="polite"></p>
+</main>
+<script nonce="{{.Nonce}}">
+  const result = document.getElementById('result');
+  let busy = false;
+  document.addEventListener('submit', async (event) => {
+    const form = event.target;
+    if (!form.matches('form[data-csrf]')) return;
+    event.preventDefault();
+    if (busy || !event.submitter) return;
+    busy = true;
+    result.textContent = 'Отправляем…';
+    const data = Object.fromEntries(new FormData(form));
+    data.decision = event.submitter.value;
+    const buttons = Array.from(document.querySelectorAll('form button'));
+    buttons.forEach((button) => { button.disabled = true; });
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST', mode: 'same-origin', credentials: 'same-origin', redirect: 'manual',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': form.dataset.csrf },
+        body: JSON.stringify(data)
+      });
+      if (response.ok) {
+        location.reload();
+        return;
+      }
+      if (response.status === 404 && data.code) {
+        result.textContent = 'Код недействителен или срок его действия истёк.';
+      } else if (response.type === 'opaqueredirect' || response.status === 419) {
+        result.textContent = 'Обновите страницу и повторите действие.';
+      } else if (response.status >= 500) {
+        result.textContent = 'Результат пока неизвестен. Обновите страницу, чтобы проверить состояние.';
+        return;
+      } else {
+        result.textContent = 'Действие отклонено. Проверьте подключение и права доступа.';
+      }
+    } catch {
+      result.textContent = 'Результат пока неизвестен. Обновите страницу, чтобы проверить состояние.';
+      return;
+    }
+    busy = false;
+    buttons.forEach((button) => { button.disabled = false; });
+  });
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) location.reload();
+  });
+</script>
+</body>
+</html>

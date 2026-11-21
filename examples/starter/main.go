@@ -45,7 +45,7 @@ func run() error {
 			continue
 		}
 		switch key {
-		case "users", "access", "jobs", "uploads", "queues", "notifications", "realtime", "authmail", "products", "product-events", "product-events-mcp":
+		case "users", "access", "jobs", "uploads", "queues", "notifications", "realtime", "authmail", "products", "product-events", "product-events-mcp", unpublishModuleKey:
 			selected[key] = true
 		default:
 			return fmt.Errorf("unknown admin module %q", key)
@@ -53,6 +53,9 @@ func run() error {
 	}
 	if selected["product-events-mcp"] && !selected["product-events"] {
 		return errors.New("product-events-mcp requires explicit product-events module")
+	}
+	if selected[unpublishModuleKey] && !selected["products"] {
+		return errors.New("product-unpublish-mcp requires explicit products module")
 	}
 	baseURL, err := required("ADMIN_URL")
 	if err != nil {
@@ -62,22 +65,21 @@ func run() error {
 	if err != nil || parsedURL.Host == "" || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
 		return errors.New("ADMIN_URL must be an absolute http(s) URL")
 	}
+	trustedProxyValue := ""
+	if selected["product-events-mcp"] || selected[unpublishModuleKey] {
+		trustedProxyValue = os.Getenv("MCP_PAIRING_TRUSTED_PROXY_IP")
+	}
+	trustedProxy, err := mcp.ParseTrustedProxy(trustedProxyValue)
+	if err != nil {
+		return fmt.Errorf("MCP_PAIRING_TRUSTED_PROXY_IP: %w", err)
+	}
 	var agentAdapter *crud.ReadOnlyAdapter
 	if selected["product-events-mcp"] {
-		trustedProxy, err := mcp.ParseTrustedProxy(os.Getenv("MCP_PAIRING_TRUSTED_PROXY_IP"))
-		if err != nil {
-			return fmt.Errorf("MCP_PAIRING_TRUSTED_PROXY_IP: %w", err)
-		}
 		adapter, err := mcp.Adapter(mcp.Config{Origin: baseURL, TrustedProxy: trustedProxy}, productEventsResource())
 		if err != nil {
 			return err
 		}
 		agentAdapter = &adapter
-	}
-	// Staging uses embedded templates/assets while keeping HTTP cookies usable on localhost.
-	adminEnv := "staging"
-	if parsedURL.Scheme == "https" {
-		adminEnv = "production"
 	}
 	csrfSecret, err := required("CSRF_SECRET")
 	if err != nil {
@@ -137,14 +139,13 @@ func run() error {
 		uploadRoot = "/data/uploads"
 	}
 	const csrfCookieName = "csrf_token"
-	adminInput := host.AdminConfigInput{
-		Env: adminEnv, BaseDomain: parsedURL.Hostname(), BaseDomainURL: baseURL,
+	adminCfg := starterAdminConfig(parsedURL, host.AdminConfigInput{
+		BaseDomain: parsedURL.Hostname(), BaseDomainURL: baseURL,
 		Domain: parsedURL.Hostname(), DomainURL: baseURL, Addr: ":8080",
 		CSRFTokenName: csrfCookieName, CSRFTokenTTL: 24 * time.Hour,
 		SessionInactiveTTL: 24 * time.Hour, SessionTTL: 7 * 24 * time.Hour,
-		SessionName: "goadmin_session", StaticDataRoot: filepath.Dir(uploadRoot),
-	}
-	adminCfg := host.BuildConfig(adminInput, host.PathDefaults{})
+		StaticDataRoot: filepath.Dir(uploadRoot),
+	})
 	adminCfg.CanonicalSessionBackend = "pgsql"
 	deps := host.Dependencies{Database: db, TxManager: tx, Logger: lg}
 	if os.Getenv("APP_ADMIN_CANONICAL_SESSION_BACKEND") == "redis" {
@@ -166,6 +167,12 @@ func run() error {
 		Auth: goauth.Config{Signing: goauth.SigningConfig{Issuer: baseURL, Audience: "goadmin", Keys: signing}, TokenHMACKeys: token, OutboxAEADKeys: envelope, URLBuilder: goauth.URLBuilderFunc(func(_ context.Context, token string) (string, error) {
 			return baseURL + "/auth/reset-password?token=" + url.QueryEscape(token), nil
 		})},
+	}
+	if selected[unpublishModuleKey] {
+		deps.CSRF, err = host.NewCSRFService(cfg.CSRF, lg)
+		if err != nil {
+			return err
+		}
 	}
 	modules := make([]host.Module, 0, len(selected)+1)
 	if selected["users"] {
@@ -223,6 +230,13 @@ func run() error {
 			}
 			modules = append(modules, products)
 		}
+		if selected[unpublishModuleKey] {
+			unpublish, moduleErr := productUnpublishModule(productDB, parsedURL, trustedProxy, deps.CSRF, adminCfg)
+			if moduleErr != nil {
+				return moduleErr
+			}
+			modules = append(modules, unpublish)
+		}
 		if selected["product-events"] {
 			events, moduleErr := productEventsModule(productDB, agentAdapter)
 			if moduleErr != nil {
@@ -245,6 +259,16 @@ func run() error {
 	}
 	defer func() { _ = runtime.Close() }()
 	return runtime.Run(ctx)
+}
+
+func starterAdminConfig(origin *url.URL, input host.AdminConfigInput) host.AdminConfig {
+	// Give the native store and the MCP observer the same wire name. GoAdmin
+	// preserves an explicit __Host- name when applying its production policy.
+	input.Env, input.SessionName = "staging", "goadmin_session"
+	if origin.Scheme == "https" {
+		input.Env, input.SessionName = "production", "__Host-goadmin_session"
+	}
+	return host.BuildConfig(input, host.PathDefaults{})
 }
 
 func required(name string) (string, error) {

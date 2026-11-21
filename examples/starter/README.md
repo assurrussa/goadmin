@@ -287,3 +287,16 @@ To run browser and real stdio acceptance together, use
 `SMOKE_PRODUCT_EVENTS_MCP=1 make starter-smoke` from the repository root. The
 default instance enables the pilot and the topbar instance checks the disabled
 configuration.
+
+## Propose a product withdrawal through MCP
+
+Enable `ADMIN_MODULES=products,product-unpublish-mcp` and run the starter migration. The example requires a single starter process. From `examples/starter`, build the client with `GOWORK=off go build -o /tmp/product-unpublish-mcp ./cmd/product-unpublish-mcp`. Configure your MCP client to launch it with `-admin-url` set to the starter origin. Use HTTPS for remote connections.
+
+1. Before the first call, generate and save a lowercase UUID for this proposal. Call `propose_unpublish` with `request_id`, a decimal `product_id` string and a required `reason` of up to 500 Unicode characters. The first call returns a verification URL and a code.
+2. In your native admin login, enter the code and select **Подключить**. You need the `products:unpublish` permission. The connection lasts up to 15 minutes. Repeat the same call to get the proposal's review URL.
+3. Open that URL in the same login. Check the product name, ID, transition from published to draft and exact reason. **Снять с публикации** immediately changes the product and records the reason. To change the wording, choose **Отклонить** and have the client submit a new proposal with a fresh UUID.
+4. Call `get_unpublish_request` with the original `request_id`. A successful receipt includes its product journal event ID. If a response is lost, look up the same UUID. Once the server is reachable, a pending request can be reviewed again. A repeated proposal with a different product or reason is rejected.
+
+Reapplying requires a new proposal after a change to the product, a rejection or expiry. On logout, connection revocation or a server restart, pending proposals from that connection can no longer be approved. An authorized operator can pair again to retrieve completed receipts, including after deletion of the product. The connection and the journal reader have separate pairing codes and permissions.
+
+To repeat acceptance, install the existing smoke dependencies with `npm ci` and `npx playwright install firefox` in `scripts/starter-smoke`. Run `python3 scripts/starter-smoke/product-unpublish.py` from the repository root with Docker available. It creates an isolated Compose project, builds the starter against its published GoAdmin pin and drives Firefox and the stdio executable. By default the fixture moves a pending request's database deadline into the past. Set `QA_NATURAL_EXPIRY=1` to wait for the actual 15-minute connection deadline. Set `QA_FIREFOX` to use an existing Playwright Firefox executable.
