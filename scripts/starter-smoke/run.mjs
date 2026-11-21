@@ -13,6 +13,7 @@ import { appearanceAcceptance } from './appearance.mjs'
 import { crudAcceptance } from './crud.mjs'
 import { journalMCPAcceptance, journalMCPDisabled } from './mcp-acceptance.mjs'
 import { productEventsAcceptance } from './product-events.mjs'
+import { permissionCheckbox, roleEditorAcceptance } from './role-editor.mjs'
 
 const expect = baseExpect.configure({ timeout: 20000 })
 
@@ -92,7 +93,16 @@ async function runCase(name, config) {
   page.setDefaultTimeout(20000)
   page.setDefaultNavigationTimeout(45000)
   page.on('pageerror', (error) => result.pageErrors.push(error.message))
-  page.on('console', (message) => { if (message.type() === 'error') result.consoleErrors.push(message.text()) })
+  let expectedRoleConflict = ''
+  page.on('console', (message) => {
+    if (message.type() !== 'error') return
+    if (expectedRoleConflict && message.location().url === config.url + expectedRoleConflict &&
+        message.text().includes('the server responded with a status of 409')) {
+      expectedRoleConflict = ''
+      return
+    }
+    result.consoleErrors.push(message.text())
+  })
   page.on('response', (response) => {
     const url = new URL(response.url())
     if (url.origin === config.url) result.requests.push({ method: response.request().method(),
@@ -448,6 +458,9 @@ async function runCase(name, config) {
       await page.screenshot({ path: path.join(folder, `${name}-${resource}-workflow.png`), fullPage: true })
     }
     check('users/admins filtered second-page view/edit, Enter save, dirty leave confirmation and save-and-return with one PUT and one flash')
+    await roleEditorAcceptance({ page, context, config, expect, folder, name, result,
+      expectConflict: (requestPath) => { expectedRoleConflict = requestPath } })
+    check('roles retain filtered second-page navigation and draft across competing metadata and permission writes; explicit reapply uses the new revision')
     if (process.argv.includes('--records-only')) {
       assert.deepEqual(result.pageErrors, [], 'uncaught browser errors')
       assert.deepEqual(result.consoleErrors, [], 'browser console errors')
@@ -463,10 +476,8 @@ async function runCase(name, config) {
     await page.goto('/roles/create')
     const slug = `smoke-queues-${name}`
     await fill(page, { slug, name: `Smoke Queue Reader ${name}`, description: 'Automated real restricted session' })
-    const queueCard = page.getByText('queues', { exact: true }).locator('xpath=ancestor::div[.//label][1]')
-    await queueCard.locator('label').filter({ has: page.getByText('read', { exact: true }) }).getByRole('checkbox').click()
-    const dashboardPermission = page.getByText('dashboard', { exact: true }).locator('xpath=ancestor::div[.//label][1]')
-    await dashboardPermission.locator('label').filter({ has: page.getByText('read', { exact: true }) }).getByRole('checkbox').click()
+    await permissionCheckbox(page, 'queues:read').click()
+    await permissionCheckbox(page, 'dashboard:read').click()
     await submit(page, '/roles')
     await page.goto('/roles')
     const roleRow = page.getByRole('row').filter({ hasText: slug })
@@ -478,7 +489,7 @@ async function runCase(name, config) {
     ])
     assert.ok(assignedRead.ok(), 'mounted role page must load assigned admins')
     assert.ok(searchRead.ok(), 'mounted role page must load admin search')
-    await expect(page).toHaveURL(/\/roles\/\d+$/)
+    await expect(page).toHaveURL(/\/roles\/\d+(?:\?returnTo=.*)?$/)
     await page.goBack()
     await expect(page).toHaveURL(/\/roles(?:\?.*)?$/)
     await expect(roleRow).toBeVisible()

@@ -4,6 +4,7 @@ package host //nolint:testpackage // verifies canonical versus borrowed checker 
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -71,6 +72,22 @@ func TestAssemblyRoleMutationsWithSuppliedPermissionChecker(t *testing.T) {
 	require.Same(t, originalGuard, checker.guard)
 	require.NoError(t, checker.CheckPermission(t.Context(), account.Subject.ID.String(), NewPermissionKey("roles", "assign")))
 
+	// Exercise the normal editor with an independently constructed action checker.
+	editor := adminapp.Must(adminapp.NewOptions(
+		inertiat.NewForTest(""), deps.System.PermissionGuard, deps.Repos.RolesService,
+		deps.System.AdminAuthService, input.Services.SessionStore, nil, nil, tx,
+		DiscardLogger(), "stage", "https://files.example.test",
+	))
+	editorCases, err := roleshandler.BuildUseCases(deps.Repos.RolesManager, deps.Repos.RolesRepo, adapter.admins)
+	require.NoError(t, err)
+	editorApp := fiber.New()
+	editorApp.Use(func(c fiber.Ctx) error {
+		c.Locals(adminsession.AuthAdminKey.String(), &models.SessionAdmin{ID: admin.ID, SubjectID: account.Subject.ID})
+		return c.Next()
+	})
+	roleshandler.NewHandler(editor, adapter.admins, editorCases).RegisterGroupRoutes(editorApp)
+	checkSuppliedRoleEditor(t, editorApp, regular.ID)
+
 	// The supported checker constructor has no custom-policy injection. Still
 	// exercise a stricter private test double: canonical state checks must never
 	// replace the supplied action guard or turn its denial into a grant.
@@ -108,6 +125,34 @@ func TestAssemblyRoleMutationsWithSuppliedPermissionChecker(t *testing.T) {
 	remaining, err := roles.SubjectRoles(t.Context(), account.Subject.ID)
 	require.NoError(t, err)
 	require.Len(t, remaining, 2, "supplied action denial must preserve both assignments")
+}
+
+func checkSuppliedRoleEditor(t *testing.T, app *fiber.App, roleID int64) {
+	t.Helper()
+	path := fmt.Sprintf("/roles/%d", roleID)
+	get := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path+"/edit", nil)
+	get.Header.Set("X-Inertia", "true")
+	page, err := app.Test(get)
+	require.NoError(t, err)
+	defer page.Body.Close()
+	require.Equal(t, http.StatusOK, page.StatusCode)
+	var data struct {
+		Props struct {
+			Role struct {
+				Revision string `json:"revision"`
+				Slug     string `json:"slug"`
+			} `json:"role"`
+		} `json:"props"`
+	}
+	require.NoError(t, json.NewDecoder(page.Body).Decode(&data))
+	role := data.Props.Role
+	payload := fmt.Sprintf(`{"name":"Edited role","slug":%q,"revision":%q,"permissions":[]}`, role.Slug, role.Revision)
+	put := httptest.NewRequestWithContext(t.Context(), http.MethodPut, path, strings.NewReader(payload))
+	put.Header.Set("Content-Type", "application/json")
+	written, err := app.Test(put)
+	require.NoError(t, err)
+	defer written.Body.Close()
+	require.Equal(t, http.StatusOK, written.StatusCode)
 }
 
 type deniedAssemblyRoles struct{ assignChecked bool }

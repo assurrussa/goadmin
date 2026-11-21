@@ -5,6 +5,7 @@
     ref="dataGridRef"
     :api-url="apiUrl"
     :initial-data="apiResponseData"
+    :format-cell="formatPermissionCell"
     @action-table="handleAction"
     @action-row="handleDataAction"
   />
@@ -19,6 +20,7 @@ import { router } from '@inertiajs/vue3'
 import AppHead from '@/components/layout/AppHead.vue'
 import DataGrid from '@/components/datagrid/DataGrid.vue'
 import type { ApiResponse } from '@/composables/useDataGrid'
+import { actionLabel, domainLabel } from '@/components/roles/permissionLabels'
 
 const props = defineProps({
   title: {
@@ -36,6 +38,12 @@ const dataGridRef = ref<InstanceType<typeof DataGrid> | null>(null)
 const apiUrl = computed(() => {
   return props.data?.config?.routePath || '/permissions'
 })
+
+function formatPermissionCell(key: string, value: unknown) {
+  if (typeof value !== 'string') return
+  if (key === 'domain') return `${domainLabel(value)} (${value})`
+  if (key === 'action') return `${actionLabel(value)} (${value})`
+}
 
 const isValidApiResponse = (data: unknown): data is ApiResponse => {
   return !!(

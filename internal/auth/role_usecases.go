@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 )
 
 type ListRolesRequest struct {
@@ -46,6 +47,7 @@ type GetRoleResponse struct {
 	IsSystem    bool                `json:"isSystem"`
 	Description *string             `json:"description,omitempty"`
 	Permissions []GetRolePermission `json:"permissions,omitempty"`
+	UpdatedAt   time.Time           `json:"-"`
 }
 
 type CreateRoleRequest struct {
@@ -273,6 +275,7 @@ func (u *GetRoleUseCase) Handle(ctx context.Context, request GetRoleRequest) (Ge
 	}
 	response := GetRoleResponse{
 		ID: role.ID, UUID: role.UUID, Slug: role.Slug, Name: role.Name, IsSystem: role.IsSystem,
+		UpdatedAt: role.UpdatedAt,
 	}
 	if role.Description.Valid {
 		description := role.Description.String

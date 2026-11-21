@@ -19,6 +19,7 @@ type RoleService struct {
 	transactionActive func(context.Context) (bool, error)
 	service           *rbac.Service
 	roleTransaction   func(context.Context, []goauth.SubjectID, func(context.Context) error) error
+	roleEditTx        func(context.Context, int64, func(context.Context) error) error
 }
 
 // Service is retained as a host-local name while goadmin handlers migrate;

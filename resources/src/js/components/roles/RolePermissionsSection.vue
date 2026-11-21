@@ -19,7 +19,7 @@
         <div :class="domainHeaderClass(domain)">
           <div>
             <p class="text-xs uppercase tracking-widest text-text-tertiary">{{ t('Домен') }}</p>
-            <p class="text-base font-semibold text-text-primary">{{ domain }}</p>
+            <p class="text-base font-semibold text-text-primary">{{ domainLabel(domain) }}</p>
             <p v-if="domainHint" class="text-xs text-text-secondary mt-0.5">{{ domainHint }}</p>
           </div>
           <div class="flex flex-wrap items-center justify-end gap-2">
@@ -60,8 +60,9 @@
                     isPermissionSelected(perm.key) ? 'text-success' : 'text-text-primary',
                   ]"
                 >
-                  {{ perm.action }}
+                  {{ actionLabel(perm.action) }}
                 </span>
+                <code class="block break-all text-xs text-text-secondary">{{ perm.key }}</code>
                 <span
                   :class="[
                     'block text-xs transition-colors',
@@ -92,8 +93,9 @@
                     isPermissionSelected(perm.key) ? 'text-success' : 'text-text-primary',
                   ]"
                 >
-                  {{ perm.action }}
+                  {{ actionLabel(perm.action) }}
                 </span>
+                <code class="block break-all text-xs text-text-secondary">{{ perm.key }}</code>
                 <span
                   :class="[
                     'block text-xs transition-colors',
@@ -125,17 +127,11 @@ import { computed } from 'vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import { Checkbox } from '@/components/ui/checkbox'
-
-interface PermissionItem {
-  domain: string
-  action: string
-  description?: string | null
-  key?: string
-}
+import { actionLabel, domainLabel, permissionKey, type RolePermission } from './permissionLabels'
 
 const props = defineProps({
   permissions: {
-    type: Array as () => PermissionItem[],
+    type: Array as () => RolePermission[],
     default: () => [],
   },
   modelValue: {
@@ -184,9 +180,7 @@ const isEditable = computed(() =>
   typeof props.editable === 'boolean' ? props.editable : Array.isArray(props.modelValue),
 )
 
-const fallbackSelectedKeys = computed(() =>
-  props.permissions.map((perm) => perm.key || `${perm.domain}:${perm.action}`),
-)
+const fallbackSelectedKeys = computed(() => props.permissions.map(permissionKey))
 
 const selectedKeys = computed(() =>
   Array.isArray(props.modelValue) ? props.modelValue : fallbackSelectedKeys.value,
@@ -198,13 +192,14 @@ const setSelectedKeys = (value: string[]) => {
 }
 
 const groupedPermissions = computed(() => {
-  const groups: Record<string, { key: string; action: string; description?: string | null }[]> = {}
+  const groups: Record<string, { key: string; action: string; description?: string | null }[]> =
+    Object.create(null)
   props.permissions.forEach((perm) => {
     const domain = perm.domain || 'default'
     if (!groups[domain]) {
       groups[domain] = []
     }
-    const key = perm.key || `${perm.domain}:${perm.action}`
+    const key = permissionKey(perm)
     groups[domain].push({
       key,
       action: perm.action,

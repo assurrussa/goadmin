@@ -248,6 +248,7 @@ interface Props {
   selectedItems: (string | number)[]
   allSelected: boolean
   selectionDisabled?: boolean
+  formatCell?: (key: string, value: unknown) => string | undefined
 }
 
 // Define props with defaults
@@ -301,6 +302,8 @@ const getColumnValue = (item: DataItem, columnKey: string): unknown => {
 
 const formatValue = (value: unknown, column: Column): string => {
   if (value === null || value === undefined || value === '') return ''
+  const formatted = props.formatCell?.(column.key, value)
+  if (formatted !== undefined) return formatted
 
   if (column.type === 'date' && column.format) {
     // Go's sql.NullTime is serialized as { Time, Valid }. Keep this shape

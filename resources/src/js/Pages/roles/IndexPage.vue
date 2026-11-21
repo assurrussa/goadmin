@@ -36,6 +36,7 @@ import { router } from '@inertiajs/vue3'
 import AppHead from '@/components/layout/AppHead.vue'
 import DataGrid from '@/components/datagrid/DataGrid.vue'
 import type { ApiResponse } from '@/composables/useDataGrid'
+import { useRecordNavigation } from '@/composables/useRecordNavigation'
 
 const props = defineProps({
   title: {
@@ -51,6 +52,7 @@ const props = defineProps({
 const dataGridRef = ref<InstanceType<typeof DataGrid> | null>(null)
 
 const apiUrl = computed(() => props.data?.config?.routePath || '/roles')
+const { recordHref } = useRecordNavigation('/roles')
 
 const isValidApiResponse = (data: unknown): data is ApiResponse => {
   return !!(
@@ -84,20 +86,20 @@ function handleCreate() {
 }
 
 async function handleRowAction(actionKey: string, item: Record<string, unknown>) {
-  const roleId = item.id
-  const baseUrl = apiUrl.value
+  const roleId = item.idExact || item.id
   if (!roleId) {
     return
   }
 
   switch (actionKey) {
     case 'view':
-      router.get(`${baseUrl}/${roleId}`)
+      router.get(recordHref(roleId))
       break
     case 'edit':
-      router.get(`${baseUrl}/${roleId}/edit`)
+      router.get(recordHref(roleId, true))
       break
-    case 'delete':
+    case 'delete': {
+      const target = `${apiUrl.value}/${roleId}`
       await confirm(
         {
           message: 'Удалить роль #{id}?',
@@ -106,10 +108,11 @@ async function handleRowAction(actionKey: string, item: Record<string, unknown>)
           variant: 'danger',
         },
         () => {
-          router.delete(`${baseUrl}/${roleId}`)
+          router.delete(target)
         },
       )
       break
+    }
     default:
       console.warn('Unknown row action:', actionKey, item)
   }
