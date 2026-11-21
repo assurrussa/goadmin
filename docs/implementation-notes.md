@@ -2805,3 +2805,9 @@ acceptance target for this pilot. See the starter guide for setup and checks.
 The release starts from PR #98. The acceptance hosts are the Products journal and the exercise DataGrid in site. The host expressly registers each resource. Operator consent lasts at most 15 minutes and belongs to the approving login. AuthHub browser renewals within that same login preserve consent; the next local logout or revoke denies further reads. Provider-only logout is observed at the existing proof deadline, at most five minutes after issue. Store grants in one server process.
 
 A stale role form must show the entered and saved values, including permissions, before an operator can reapply a change. The revision covers both role fields and the permission set. Candidate checks, independent review and the published consumer gate are tracked separately from the baseline checks on PR #98.
+
+## Starter pilot for proposed product withdrawals
+
+A native operator pairs a client to propose withdrawals of their own published products. A proposal captures the product revision and normalized reason. Only the browser that approved the connection can confirm an individual proposal. Closing a connection prevents its pending requests from being executed. A newly authorized connection for the same operator can read their historical receipts.
+
+The request UUID belongs to the operator. An identical retry returns the existing request, a different product or reason conflicts, and a stale revision requires a fresh proposal. Confirmation moves the product to draft and records the reason, event number and successful receipt in one transaction. After an indeterminate commit, the caller looks up the original UUID. The starter owns these semantics and storage.

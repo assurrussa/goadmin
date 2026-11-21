@@ -53,7 +53,11 @@ var (
 	unpublishReason   = crud.ActionParam{Key: "reason", Label: "Причина", Description: "Explain why you are removing this product. The reason remains in the activity entry after deletion.", Type: "textarea", Required: true, TrimSpace: true, MaxLength: new(500)}
 )
 
-const productColumns = "id::text, revision::text, name, description, stock, active, available, category, status"
+const (
+	productColumns         = "id::text, revision::text, name, description, stock, active, available, category, status"
+	productAuditInsert     = "INSERT INTO starter_product_events(owner_admin_id,product_id,action,reason) VALUES($1,$2,$3,$4)"
+	unpublishProductUpdate = "UPDATE starter_products SET status='draft',revision=revision+1 WHERE owner_admin_id=$1 AND id::text=$2 AND revision::text=$3 AND status='published'"
+)
 
 func productScan(scanner interface{ Scan(...any) error }) (crud.Record[productData], error) {
 	var r crud.Record[productData]
@@ -162,7 +166,7 @@ func validProductText(value string) bool {
 }
 
 func productAudit(ctx context.Context, tx *sql.Tx, actor host.Actor, id, action string, reason *string) error {
-	_, err := tx.ExecContext(ctx, "INSERT INTO starter_product_events(owner_admin_id,product_id,action,reason) VALUES($1,$2,$3,$4)", actor.AdminID, id, action, reason)
+	_, err := tx.ExecContext(ctx, productAuditInsert, actor.AdminID, id, action, reason)
 	return err
 }
 
@@ -231,8 +235,7 @@ func (r productRepo) unpublish(ctx context.Context, a host.Actor, id, revision s
 	if err != nil {
 		return crud.FieldErrors{unpublishReason.Key: {err.Error()}}
 	}
-	const query = "UPDATE starter_products SET status='draft',revision=revision+1 WHERE owner_admin_id=$1 AND id::text=$2 AND revision::text=$3 AND status='published'"
-	return r.applyCommand(ctx, a, id, revision, query, "unpublish", &reason)
+	return r.applyCommand(ctx, a, id, revision, unpublishProductUpdate, "unpublish", &reason)
 }
 
 func (r productRepo) applyCommand(ctx context.Context, a host.Actor, id, revision, query, action string, reason *string) error {
@@ -359,6 +362,7 @@ func migrateProducts(ctx context.Context, dsn string) error {
 		}},
 		{2, []string{"ALTER TABLE starter_products ADD COLUMN IF NOT EXISTS category text NOT NULL DEFAULT ''"}},
 		{3, []string{"ALTER TABLE starter_product_events ADD COLUMN reason text"}},
+		{4, []string{createUnpublishRequests}},
 	}
 	for _, change := range changes {
 		var installed bool

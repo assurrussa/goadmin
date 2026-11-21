@@ -45,7 +45,7 @@ func run() error {
 			continue
 		}
 		switch key {
-		case "users", "access", "jobs", "uploads", "queues", "notifications", "realtime", "authmail", "products", "product-events", "product-events-mcp":
+		case "users", "access", "jobs", "uploads", "queues", "notifications", "realtime", "authmail", "products", "product-events", "product-events-mcp", unpublishModuleKey:
 			selected[key] = true
 		default:
 			return fmt.Errorf("unknown admin module %q", key)
@@ -53,6 +53,9 @@ func run() error {
 	}
 	if selected["product-events-mcp"] && !selected["product-events"] {
 		return errors.New("product-events-mcp requires explicit product-events module")
+	}
+	if selected[unpublishModuleKey] && !selected["products"] {
+		return errors.New("product-unpublish-mcp requires explicit products module")
 	}
 	baseURL, err := required("ADMIN_URL")
 	if err != nil {
@@ -62,12 +65,16 @@ func run() error {
 	if err != nil || parsedURL.Host == "" || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
 		return errors.New("ADMIN_URL must be an absolute http(s) URL")
 	}
+	trustedProxyValue := ""
+	if selected["product-events-mcp"] || selected[unpublishModuleKey] {
+		trustedProxyValue = os.Getenv("MCP_PAIRING_TRUSTED_PROXY_IP")
+	}
+	trustedProxy, err := mcp.ParseTrustedProxy(trustedProxyValue)
+	if err != nil {
+		return fmt.Errorf("MCP_PAIRING_TRUSTED_PROXY_IP: %w", err)
+	}
 	var agentAdapter *crud.ReadOnlyAdapter
 	if selected["product-events-mcp"] {
-		trustedProxy, err := mcp.ParseTrustedProxy(os.Getenv("MCP_PAIRING_TRUSTED_PROXY_IP"))
-		if err != nil {
-			return fmt.Errorf("MCP_PAIRING_TRUSTED_PROXY_IP: %w", err)
-		}
 		adapter, err := mcp.Adapter(mcp.Config{Origin: baseURL, TrustedProxy: trustedProxy}, productEventsResource())
 		if err != nil {
 			return err
@@ -167,6 +174,12 @@ func run() error {
 			return baseURL + "/auth/reset-password?token=" + url.QueryEscape(token), nil
 		})},
 	}
+	if selected[unpublishModuleKey] {
+		deps.CSRF, err = host.NewCSRFService(cfg.CSRF, lg)
+		if err != nil {
+			return err
+		}
+	}
 	modules := make([]host.Module, 0, len(selected)+1)
 	if selected["users"] {
 		modules = append(modules, host.FeatureModule(users.NewFeature()))
@@ -222,6 +235,13 @@ func run() error {
 				return moduleErr
 			}
 			modules = append(modules, products)
+		}
+		if selected[unpublishModuleKey] {
+			unpublish, moduleErr := productUnpublishModule(productDB, parsedURL, trustedProxy, deps.CSRF, adminCfg)
+			if moduleErr != nil {
+				return moduleErr
+			}
+			modules = append(modules, unpublish)
 		}
 		if selected["product-events"] {
 			events, moduleErr := productEventsModule(productDB, agentAdapter)
