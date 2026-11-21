@@ -117,7 +117,9 @@ export async function productEventsAcceptance({ page, context, browser, config, 
   const reasons = []
   for (const removal of removals) {
     await page.goto(journal + '/records/' + removal.id)
-    const text = page.locator('dl > div').filter({ has: page.getByText('Reason', { exact: true }) }).locator('dd')
+    const term = page.locator('dt').filter({ hasText: /^Reason/ })
+    await expect(term).toContainText('Reason entered by the operator when unpublishing, if recorded.')
+    const text = page.locator('dl > div').filter({ has: term }).locator('dd')
     await expect(text).toBeVisible()
     reasons.push(await text.textContent())
   }

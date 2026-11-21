@@ -66,7 +66,9 @@ async function compareDetail(client, browserPage, row, expect) {
   assert.deepEqual(detail, { ...row, reason: detail.reason })
   assert.ok(detail.reason === null || typeof detail.reason === 'string')
   await browserPage.goto(journal + '/records/' + row.id)
-  const field = browserPage.locator('dl > div').filter({ has: browserPage.getByText(/^(Reason|Причина)$/) }).locator('dd')
+  const field = browserPage.locator('dl > div').filter({
+    has: browserPage.locator('dt').filter({ hasText: /^(Reason|Причина)/ }),
+  }).locator('dd')
   await expect(field).toBeVisible()
   assert.equal(await field.textContent(), detail.reason ?? '—')
   return detail.reason
