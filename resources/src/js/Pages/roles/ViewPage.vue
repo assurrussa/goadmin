@@ -1,6 +1,11 @@
 <template>
   <AppHead :title="props.title" />
-  <PageActionBar back-href="/roles" :label="t('Просмотр')" />
+  <PageActionBar
+    :back-href="listHref"
+    :back-text="t('К списку')"
+    :label="t('Просмотр')"
+    :use-history="false"
+  />
 
   <div class="space-y-6">
     <div
@@ -10,7 +15,7 @@
         <dl class="divide-y divide-border-secondary">
           <div class="py-4 grid grid-cols-3 gap-4">
             <dt class="text-sm font-medium text-text-secondary">ID</dt>
-            <dd class="mt-0 text-sm text-text-primary col-span-2">{{ props.role.id }}</dd>
+            <dd class="mt-0 text-sm text-text-primary col-span-2">{{ roleId }}</dd>
           </div>
           <div class="py-4 grid grid-cols-3 gap-4">
             <dt class="text-sm font-medium text-text-secondary">Slug</dt>
@@ -235,7 +240,9 @@
 import { adminFetch } from '@/http'
 import { t } from '@/i18n'
 import { useRolePreviewAction } from '@/composables/useRolePreviewAction'
+import { useRecordNavigation } from '@/composables/useRecordNavigation'
 const canAssignInPreview = useRolePreviewAction('roles', 'assign')
+const { listHref } = useRecordNavigation('/roles')
 
 import { computed, onMounted, ref, watch } from 'vue'
 import { useForm } from '@inertiajs/vue3'
@@ -267,6 +274,7 @@ interface AdminOption extends RoleAssignedAdmin {
 
 interface RoleDetail {
   id: number
+  idExact?: string
   slug: string
   name: string
   description?: string | null
@@ -325,7 +333,7 @@ watch(
   { immediate: true },
 )
 
-const roleId = computed(() => props.role.id)
+const roleId = computed(() => props.role.idExact || props.role.id)
 
 const loadAssignedAdmins = async () => {
   if (assignedLoading.value) {

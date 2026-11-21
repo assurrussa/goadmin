@@ -576,9 +576,9 @@ func TestHandler_EditFormSuperAdminBlocked(t *testing.T) {
 			IsSystem: true,
 		}, nil).
 		Times(1)
-	ts.listPermMock.EXPECT().
-		Handle(gomock.Any(), integrationroles.ListPermissionsRequest{}).
-		Return(integrationroles.ListPermissionsResponse{}, nil).
+	ts.testApp.MockRoleService.EXPECT().
+		IsSuperAdmin(gomock.Any(), int64(1)).
+		Return(false).
 		Times(1)
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/roles/1/edit", nil)
@@ -588,7 +588,7 @@ func TestHandler_EditFormSuperAdminBlocked(t *testing.T) {
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	require.Equal(t, fiber.StatusForbidden, resp.StatusCode)
 }
 
 func TestHandler_UpdateSuperAdminBlocked(t *testing.T) {

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { connectProductEventsMCP } from './mcp-client.mjs'
+import { permissionCheckbox } from './role-editor.mjs'
 
 const journal = '/product-events'
 const gateway = '/agent/product-events'
@@ -73,13 +74,12 @@ async function compareDetail(client, browserPage, row, expect) {
 
 async function setJournalPermission(page, id, enabled, expect) {
   await page.goto('/roles/' + id + '/edit')
-  const section = page.getByText('product_events', { exact: true }).locator('xpath=ancestor::div[.//label][1]')
-  const permission = section.locator('label').filter({ has: page.getByText('read', { exact: true }) }).getByRole('checkbox')
+  const permission = permissionCheckbox(page, 'product_events:read')
   await expect(permission).toHaveAttribute('aria-checked', String(!enabled))
   await permission.click()
   const [saved] = await Promise.all([
     page.waitForResponse(r => new URL(r.url()).pathname === '/roles/' + id && r.request().method() === 'PUT'),
-    page.locator('form button[type="submit"]').click(),
+    page.getByRole('button', { name: /^(Сохранить|Save)$/ }).click(),
   ])
   assert.ok(saved.status() < 400, 'role editor saved the journal permission')
   await expect(page.locator('form[aria-busy="true"]')).toHaveCount(0)

@@ -2,7 +2,9 @@ package auth
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
 	"slices"
 
 	"github.com/assurrussa/goauth"
@@ -33,6 +35,15 @@ func (s *RoleService) InSubjectRoleTransaction(ctx context.Context, subjects []s
 	return s.roleTransaction(ctx, parsed, fn)
 }
 
+// InRoleEditTransaction orders an editor snapshot or compare-and-write against
+// GoAuth's role metadata and permission writers on the canonical role row.
+func (s *RoleService) InRoleEditTransaction(ctx context.Context, roleID int64, fn func(context.Context) error) error {
+	if s == nil || s.roleEditTx == nil {
+		return errors.New("goadmin role editor transaction is required")
+	}
+	return s.roleEditTx(ctx, roleID, fn)
+}
+
 func configureRoleTransaction(service *RoleService, runtime *postgres.Runtime, pool *pgxpool.Pool) error {
 	accounts, err := postgres.NewStore(runtime.Database())
 	if err != nil {
@@ -53,6 +64,23 @@ func configureRoleTransaction(service *RoleService, runtime *postgres.Runtime, p
 				}
 			}
 			return fn(txCtx)
+		})
+	}
+	service.roleEditTx = func(ctx context.Context, roleID int64, fn func(context.Context) error) error {
+		return runtime.InOwnedAuthTransaction(ctx, func(txCtx context.Context) error {
+			executor, err := runtime.SQLExecutor(txCtx)
+			if err != nil {
+				return err
+			}
+			var locked int64
+			err = executor.QueryRowContext(txCtx, `SELECT id FROM auth_roles WHERE id = $1 FOR UPDATE`, roleID).Scan(&locked)
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrRoleNotFound
+			}
+			if err != nil {
+				return fmt.Errorf("lock canonical role for editing: %w", err)
+			}
+			return fn(admintx.WithExecutor(txCtx, executor, pool))
 		})
 	}
 	return nil

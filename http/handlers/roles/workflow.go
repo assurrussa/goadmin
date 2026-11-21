@@ -31,10 +31,11 @@ func (h *Handler) registerWorkflow(router fiber.Router) {
 			for _, role := range response.Roles {
 				if wanted[role.ID] {
 					rows = append(rows, roleGridItem{
-						ID:   role.ID,
-						UUID: role.UUID,
-						Slug: role.Slug,
-						Name: role.Name,
+						ID:      role.ID,
+						IDExact: strconv.FormatInt(role.ID, 10),
+						UUID:    role.UUID,
+						Slug:    role.Slug,
+						Name:    role.Name,
 						Scope: roleScope(role.Slug,
 							role.IsSystem),
 						IsSystem: role.IsSystem,

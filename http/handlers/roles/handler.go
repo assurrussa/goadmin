@@ -112,6 +112,7 @@ type UseCases struct {
 	SetPermissions       setPermissionsUseCase
 	AssignAdminRoles     assignAdminRolesUseCase
 	AdminRoleTransaction adminRoleTransaction
+	roleEditTx           func(context.Context, int64, func(context.Context) error) error
 	ListPermissions      listPermissionsUseCase
 	ListRolePermissions  listRolePermissionsUseCase
 	ListAdminRoles       listAdminRolesUseCase
@@ -135,6 +136,7 @@ type Handler struct {
 	setPermissions       setPermissionsUseCase
 	assignAdminRoles     assignAdminRolesUseCase
 	adminRoleTransaction adminRoleTransaction
+	roleEditTx           func(context.Context, int64, func(context.Context) error) error
 	listPermissions      listPermissionsUseCase
 	listRolePermissions  listRolePermissionsUseCase
 	listAdminRoles       listAdminRolesUseCase
@@ -246,6 +248,7 @@ func NewHandler(
 		setPermissions:       useCases.SetPermissions,
 		assignAdminRoles:     useCases.AssignAdminRoles,
 		adminRoleTransaction: useCases.AdminRoleTransaction,
+		roleEditTx:           useCases.roleEditTx,
 		listPermissions:      useCases.ListPermissions,
 		listRolePermissions:  useCases.ListRolePermissions,
 		listAdminRoles:       useCases.ListAdminRoles,
@@ -360,8 +363,20 @@ func (h *Handler) EditForm(c fiber.Ctx) error {
 		return goinertia.NewError(fiber.StatusBadRequest, err.Error())
 	}
 
-	detail, err := h.fetchRoleDetail(c, roleID, true)
+	adminID := adminmiddleware.MustGetAdminAuth(c).ID
+	var detail roleDetail
+	err = h.withRoleEdit(c, roleID, func(ctx context.Context) error {
+		if h.roleEditTx != nil && h.roleEditorAccess(ctx, adminID) != roleEditAllowed {
+			return fiber.ErrForbidden
+		}
+		var loadErr error
+		detail, loadErr = h.loadRoleEdit(ctx, roleID, adminID)
+		return loadErr
+	})
 	if err != nil {
+		if errors.Is(err, fiber.ErrForbidden) {
+			return goinertia.NewError(fiber.StatusForbidden, "Редактирование этой роли недоступно.", err)
+		}
 		if errors.Is(err, integrationroles.ErrRoleNotFound) {
 			return goinertia.NewError(fiber.StatusNotFound, "Роль не найдена", err)
 		}
@@ -409,15 +424,19 @@ func (h *Handler) Update(c fiber.Ctx) error {
 		return goinertia.NewError(fiber.StatusBadRequest, err.Error())
 	}
 
-	roleDetail, handled, err := h.ensureRoleMutable(c, roleID, "load role for update")
-	if handled {
-		return err
-	}
-
 	var payload updateRolePayload
 	if err := c.Bind().Body(&payload); err != nil {
 		h.adminApp.HTTPManager().WithFlashError(c, "Некорректные данные формы")
 		return h.adminApp.HTTPManager().RedirectBack(c)
+	}
+
+	if payload.Revision != nil {
+		return h.updateRoleEdit(c, roleID, payload)
+	}
+
+	roleDetail, handled, err := h.ensureRoleMutable(c, roleID, "load role for update")
+	if handled {
+		return err
 	}
 
 	if err := h.checkSuperRole(c, roleDetail.Slug, adminmiddleware.MustGetAdminAuth(c).ID); err != nil {
@@ -426,22 +445,11 @@ func (h *Handler) Update(c fiber.Ctx) error {
 
 	h.rememberUpdatePayload(c, payload)
 
-	slug := strings.TrimSpace(payload.Slug)
 	if roleDetail.Slug == integrationroles.SuperAdminRole {
 		h.adminApp.HTTPManager().WithFlashWarning(c, "Нельзя менять slug у супер админа")
-		slug = integrationroles.SuperAdminRole
 	}
 
-	req := integrationroles.UpdateRoleRequest{
-		ID:             roleID,
-		Slug:           slug,
-		Name:           strings.TrimSpace(payload.Name),
-		Description:    payload.Description,
-		IsSystem:       payload.IsSystem,
-		PermissionKeys: payload.Permissions,
-	}
-
-	if _, err := h.updateRole.Handle(c, req); err != nil {
+	if _, err := h.updateRole.Handle(c, payload.request(roleID, roleDetail.Slug)); err != nil {
 		h.flashDomainError(c, err, "Не удалось обновить роль")
 		return h.adminApp.HTTPManager().RedirectBack(c)
 	}
@@ -791,6 +799,7 @@ func (h *Handler) flashDomainError(c fiber.Ctx, err error, fallback string) {
 
 type roleGridItem struct {
 	ID       int64  `json:"id"`
+	IDExact  string `json:"idExact"`
 	UUID     string `json:"uuid"`
 	Slug     string `json:"slug"`
 	Name     string `json:"name"`
@@ -831,6 +840,7 @@ func (r *rolesGridRepository) GetList(ctx context.Context, filtered datagrid.Fil
 	for _, role := range resp.Roles {
 		items = append(items, roleGridItem{
 			ID:       role.ID,
+			IDExact:  strconv.FormatInt(role.ID, 10),
 			UUID:     role.UUID,
 			Slug:     role.Slug,
 			Name:     role.Name,
@@ -973,6 +983,8 @@ type roleDetail struct {
 	IsSystem    bool                `json:"isSystem"`
 	Permissions []permissionDetail  `json:"permissions,omitempty"`
 	Admins      []roleAssignedAdmin `json:"admins,omitempty"`
+	Revision    string              `json:"revision,omitempty"`
+	IDExact     string              `json:"idExact"`
 }
 
 type permissionDetail struct {
@@ -1013,6 +1025,7 @@ type updateRolePayload struct {
 	Description *string   `json:"description"`
 	IsSystem    *bool     `json:"isSystem"`
 	Permissions *[]string `json:"permissions"`
+	Revision    *string   `json:"revision"`
 }
 
 type setPermissionsPayload struct {
@@ -1043,6 +1056,7 @@ type permissionRecord struct {
 func mapRoleDetail(resp integrationroles.GetRoleResponse) roleDetail {
 	detail := roleDetail{
 		ID:       resp.ID,
+		IDExact:  strconv.FormatInt(resp.ID, 10),
 		UUID:     resp.UUID,
 		Slug:     resp.Slug,
 		Name:     resp.Name,

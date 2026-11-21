@@ -48,6 +48,12 @@ func BuildUseCases(service UseCaseService, repo UseCaseRepository, adminRepo adm
 
 	assignSubjectRoles := integrationroles.MustAssignSubjectRolesUseCase(service)
 	listSubjectRoles := integrationroles.MustListSubjectRolesUseCase(service)
+	var roleEditTx func(context.Context, int64, func(context.Context) error) error
+	if editor, ok := service.(interface {
+		InRoleEditTransaction(ctx context.Context, roleID int64, fn func(context.Context) error) error
+	}); ok {
+		roleEditTx = editor.InRoleEditTransaction
+	}
 
 	return UseCases{
 		ListRoles:            integrationroles.MustListRolesUseCase(service),
@@ -58,6 +64,7 @@ func BuildUseCases(service UseCaseService, repo UseCaseRepository, adminRepo adm
 		SetPermissions:       integrationroles.MustSetRolePermissionsUseCase(service),
 		AssignAdminRoles:     newAssignAdminRolesAdapter(adminRepo, assignSubjectRoles),
 		AdminRoleTransaction: &adminRoleTransactionAdapter{admins: adminRepo, service: service},
+		roleEditTx:           roleEditTx,
 		ListPermissions:      integrationroles.MustListPermissionsUseCase(service),
 		ListRolePermissions:  integrationroles.MustListRolePermissionsUseCase(service),
 		ListAdminRoles:       newListAdminRolesAdapter(adminRepo, listSubjectRoles),

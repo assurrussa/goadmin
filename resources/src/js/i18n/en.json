@@ -933,5 +933,20 @@
   "The code is invalid, expired or already used.": "The code is invalid, expired or already used.",
   "Reading allowed.": "Reading allowed.",
   "Access closed.": "Access closed.",
-  "Reload this page to check connection status.": "Reload this page to check connection status."
+  "Reload this page to check connection status.": "Reload this page to check connection status.",
+  "Служебные операции": "Maintenance operations",
+  "Оформление": "Appearance",
+  "Удаление": "Delete",
+  "Назначение": "Assign",
+  "Синхронизация": "Synchronize",
+  "Роль изменилась после открытия формы": "The role changed after you opened the form",
+  "Сравните сохранённую роль с черновиком. После выбора черновика проверьте его и сохраните снова.": "Compare the saved role with your draft. If you keep your draft, review it and save again.",
+  "Ваш черновик": "Your draft",
+  "Права только в сохранённой роли": "Permissions only in the saved role",
+  "Права только в черновике": "Permissions only in your draft",
+  "Принять сохранённую версию": "Use the saved version",
+  "Оставить мой черновик": "Keep my draft",
+  "Редактирование этой роли недоступно.": "You can no longer edit this role.",
+  "Не удалось отправить изменения роли. Повторите попытку.": "The role changes could not be sent. Try again.",
+  "Некорректная версия роли": "Invalid role revision"
 }

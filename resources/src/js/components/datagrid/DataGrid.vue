@@ -47,6 +47,7 @@
       :selected-items="selectedItems"
       :all-selected="allSelected"
       :selection-disabled="selectionDisabled"
+      :format-cell="formatCell"
       :show-inline-create="config.behaviour?.inlineCreatable && items.length > 0"
       @sort="handleSort"
       @toggle-select-all="toggleSelectAll"
@@ -126,6 +127,7 @@ interface Props {
   initialData?: ApiResponse | null
   syncWithUrl?: boolean
   navigationMode?: 'browser' | 'inertia'
+  formatCell?: (key: string, value: unknown) => string | undefined
 }
 
 // Define props with defaults
