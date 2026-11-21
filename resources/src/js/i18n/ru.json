@@ -240,6 +240,7 @@
   "Revoke": "Отозвать",
   "The code is invalid, expired or already used.": "Код неверен, истёк или уже использован.",
   "Reading allowed.": "Чтение разрешено.",
+  "Return to your MCP client and repeat the request.": "Вернитесь в MCP-клиент и повторите запрос.",
   "Access closed.": "Доступ закрыт.",
   "Reload this page to check connection status.": "Обновите страницу, чтобы проверить состояние подключения."
 }

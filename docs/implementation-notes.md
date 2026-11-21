@@ -2858,3 +2858,17 @@ lease on PostgreSQL or Redis. For Redis the server reads the value and TTL
 together and anchors the remaining time to the PostgreSQL decision clock.
 The browser response keeps the host result in its own object so an existing
 result field named `receiptLink` can coexist with the navigation link.
+
+## Returning to the MCP client after pairing
+
+The consent page tells the operator to repeat the request in the same MCP
+client after approving read access or connecting a confirmed action. A
+revocation shows the closure message.
+
+The PostgreSQL integration test `TestReadOnlyResourcesKeepIndependentGrantsUntilBrowserLogout`
+mounts two resources with different permissions in one host. Revoking one
+connection keeps the other usable. Native logout ends reads through both.
+`TestConfirmedActionNativeLogoutRevokesGrant` covers the action middleware
+around the native logout handler, including a failed database cleanup after
+logout. In that case the response reports the failure while the session
+cookie is cleared and the grant has been revoked.
