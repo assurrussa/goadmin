@@ -529,7 +529,7 @@ func (disabledRoleCache) AllRolePermissions([]Role) map[int64]map[int64]Permissi
 
 func (s *GuardService) useAuthorizationCache(ctx context.Context) bool {
 	_, managed := admintx.Executor(ctx)
-	if s.authorization == nil || managed {
+	if s.authorization == nil || managed || requiresCanonicalAuthorization(ctx) {
 		return false
 	}
 	if s.transactionActive != nil {

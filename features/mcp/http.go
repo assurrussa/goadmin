@@ -142,19 +142,23 @@ func (h *resourceHandler) actor(c fiber.Ctx) (context.Context, host.Actor, error
 	if !ok {
 		return nil, host.Actor{}, host.ErrReadSessionEnded
 	}
-	ctx, actor, err := h.resolveRead(c.Context(), grant.binding)
+	ctx, actor, err := h.resolveRead(integrationroles.WithCanonicalAuthorization(c.Context()), grant.binding)
 	if err != nil {
 		return nil, host.Actor{}, err
 	}
 	if actor != grant.owner {
 		return nil, host.Actor{}, host.ErrReadSessionEnded
 	}
-	permission := h.resource.Permission
-	if !integrationroles.RolePreviewAllows(ctx, permission) ||
-		!h.app.Unwrap().RolesService().AdminCan(ctx, actor.AdminID, permission.Domain, permission.Action) {
+	if !h.canRead(ctx, actor) {
 		return nil, host.Actor{}, host.ErrReadSessionDenied
 	}
 	return ctx, actor, nil
+}
+
+func (h *resourceHandler) canRead(ctx context.Context, actor host.Actor) bool {
+	permission := h.resource.Permission
+	return integrationroles.RolePreviewAllows(ctx, permission) &&
+		h.app.Unwrap().RolesService().AdminCan(ctx, actor.AdminID, permission.Domain, permission.Action)
 }
 
 func agentFailure(c fiber.Ctx, err error) error {
@@ -257,9 +261,10 @@ func project(row Record, fields []Field) (map[string]any, bool) {
 
 func (h *resourceHandler) registerBrowser(app *fiber.App) {
 	permission := h.resource.Permission
-	group := app.Group(h.connectPath(), h.app.Guard(permission.Domain, permission.Action))
-	group.Get("", h.connect)
-	group.Post("", h.decide)
+	group := app.Group(h.connectPath())
+	guard := h.app.Guard(permission.Domain, permission.Action)
+	group.Get("", h.connect, guard, h.connectWithPermission)
+	group.Post("", h.decide, guard, h.approve)
 }
 
 func (h *resourceHandler) connect(c fiber.Ctx) error {
@@ -267,6 +272,24 @@ func (h *resourceHandler) connect(c fiber.Ctx) error {
 	if !ok {
 		return fiber.ErrUnauthorized
 	}
+	// An operator can still inspect or close their own existing grants
+	// after losing permission to read the resource.
+	if grants := h.grants.active(actor); len(grants) != 0 {
+		return h.renderConnect(c, grants)
+	}
+	c.SetContext(integrationroles.WithCanonicalAuthorization(c.Context()))
+	return c.Next()
+}
+
+func (h *resourceHandler) connectWithPermission(c fiber.Ctx) error {
+	actor, ok := h.app.CurrentActor(c)
+	if !ok || !h.canRead(c.Context(), actor) {
+		return fiber.ErrForbidden
+	}
+	return h.renderConnect(c, h.grants.active(actor))
+}
+
+func (h *resourceHandler) renderConnect(c fiber.Ctx, grants []string) error {
 	consent := h.resource.Consent
 	if consent.Title == "" {
 		consent.Title = h.resource.Name
@@ -275,12 +298,14 @@ func (h *resourceHandler) connect(c fiber.Ctx) error {
 		consent.Description = h.resource.Description
 	}
 	c.Set("Cache-Control", "no-store")
-	c.Set("Referrer-Policy", "no-referrer")
+	c.Set("Referrer-Policy", "same-origin")
 	return h.app.Render(c, approvalPage, map[string]any{
-		"grants": h.grants.active(actor), "connectPath": h.connectPath(), "title": consent.Title,
+		"grants": grants, "connectPath": h.connectPath(), "title": consent.Title,
 		"description": consent.Description, "backHref": consent.BackHref, "backText": consent.BackText,
 	})
 }
+
+type approvalCodeKey struct{}
 
 func (h *resourceHandler) decide(c fiber.Ctx) error {
 	c.Set("Cache-Control", "no-store")
@@ -299,15 +324,9 @@ func (h *resourceHandler) decide(c fiber.Ctx) error {
 	var updated bool
 	switch request.Decision {
 	case "approve":
-		bind := h.app.BindDelegatedRead
-		if h.resource.AllowExternalSessions {
-			bind = h.app.BindDelegatedReadWithExternal
-		}
-		binding, err := bind(c)
-		if err != nil {
-			return agentFailure(c, err)
-		}
-		updated = h.grants.decide(code, true, actor, binding)
+		c.SetContext(integrationroles.WithCanonicalAuthorization(c.Context()))
+		c.Locals(approvalCodeKey{}, code)
+		return c.Next()
 	case "deny":
 		updated = h.grants.decide(code, false, actor, host.ReadSessionBinding{})
 	case "revoke":
@@ -315,6 +334,30 @@ func (h *resourceHandler) decide(c fiber.Ctx) error {
 	default:
 		return agentJSON(c, 422, "invalid_request")
 	}
+	return h.decisionResult(c, actor, updated)
+}
+
+func (h *resourceHandler) approve(c fiber.Ctx) error {
+	actor, ok := h.app.CurrentActor(c)
+	if !ok {
+		return agentFailure(c, host.ErrReadSessionDenied)
+	}
+	bind := h.app.BindDelegatedRead
+	if h.resource.AllowExternalSessions {
+		bind = h.app.BindDelegatedReadWithExternal
+	}
+	binding, err := bind(c)
+	if err != nil {
+		return agentFailure(c, err)
+	}
+	if !h.canRead(c.Context(), actor) {
+		return agentFailure(c, host.ErrReadSessionDenied)
+	}
+	code, _ := c.Locals(approvalCodeKey{}).(string)
+	return h.decisionResult(c, actor, h.grants.decide(code, true, actor, binding))
+}
+
+func (h *resourceHandler) decisionResult(c fiber.Ctx, actor host.Actor, updated bool) error {
 	if !updated {
 		return agentJSON(c, 404, "not_found")
 	}
