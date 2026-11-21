@@ -12,7 +12,6 @@ import (
 	"net/netip"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -21,15 +20,21 @@ import (
 	"github.com/assurrussa/goauth"
 	"github.com/assurrussa/goauth/postgres"
 	"github.com/assurrussa/goauth/rbac"
+	"github.com/gofiber/fiber/v3/middleware/adaptor"
 
 	"github.com/assurrussa/goadmin/host"
 )
 
-const unpublishTestOrigin = "http://localhost:18768"
+const (
+	unpublishTestOrigin      = "http://localhost:18768"
+	unpublishTestSessionName = "goadmin_session"
+)
 
 type unpublishTestHTTP struct {
 	t       *testing.T
 	runtime *host.Runtime
+	origin  string
+	do      func(*http.Request) (*http.Response, error)
 }
 
 type unpublishTestCookies map[string]*http.Cookie
@@ -44,7 +49,10 @@ func (s unpublishTestHTTP) request(method, path string, body any, jar unpublishT
 			s.t.Fatal(err)
 		}
 	}
-	req := httptest.NewRequestWithContext(s.t.Context(), method, unpublishTestOrigin+path, bytes.NewReader(content))
+	req, err := http.NewRequestWithContext(s.t.Context(), method, s.origin+path, bytes.NewReader(content))
+	if err != nil {
+		s.t.Fatal(err)
+	}
 	for header, values := range headers {
 		req.Header[header] = values
 	}
@@ -54,7 +62,7 @@ func (s unpublishTestHTTP) request(method, path string, body any, jar unpublishT
 	for _, cookie := range jar {
 		req.AddCookie(cookie)
 	}
-	resp, err := s.runtime.App().Test(req)
+	resp, err := s.do(req)
 	if err != nil {
 		s.t.Fatalf("%s %s: %v", method, path, err)
 	}
@@ -82,12 +90,17 @@ func (s unpublishTestHTTP) login(email string) unpublishTestCookies {
 	s.t.Helper()
 	jar := unpublishTestCookies{}
 	s.request("GET", "/auth/login", nil, jar, http.Header{"X-Inertia": {"true"}}, http.StatusOK)
-	s.request("POST", "/auth/login", map[string]string{"email": email, "password": "Test-only-Pairing-Secret-47!"}, jar, unpublishFormHeaders(jar), http.StatusFound)
+	s.request("POST", "/auth/login", map[string]string{"email": email, "password": "Test-only-Pairing-Secret-47!"}, jar, s.formHeaders(jar), http.StatusFound)
 	return jar
 }
 
-func unpublishFormHeaders(jar unpublishTestCookies) http.Header {
-	return http.Header{"Origin": {unpublishTestOrigin}, "X-Csrf-Token": {jar["csrf_token"].Value}}
+func (s unpublishTestHTTP) formHeaders(jar unpublishTestCookies) http.Header {
+	s.t.Helper()
+	csrf := jar["csrf_token"]
+	if csrf == nil || csrf.Value == "" {
+		s.t.Fatal("browser did not receive a CSRF cookie")
+	}
+	return http.Header{"Origin": {s.origin}, "X-Csrf-Token": {csrf.Value}}
 }
 
 func (s unpublishTestHTTP) pair(jar unpublishTestCookies) string {
@@ -98,13 +111,13 @@ func (s unpublishTestHTTP) pair(jar unpublishTestCookies) string {
 		URL    string `json:"verification_url"`
 	}
 	body := s.request("POST", unpublishAgentPath+"/pair", struct{}{}, nil, nil, http.StatusOK)
-	if err := json.Unmarshal(body, &pairing); err != nil || pairing.URL != unpublishTestOrigin+unpublishConnectPath {
+	if err := json.Unmarshal(body, &pairing); err != nil || pairing.URL != s.origin+unpublishConnectPath {
 		s.t.Fatalf("pairing response could not be decoded: %v", err)
 	}
 	poll := map[string]string{"device_secret": pairing.Secret}
 	s.request("POST", unpublishAgentPath+"/token", poll, nil, nil, http.StatusAccepted)
 	s.request("GET", unpublishConnectPath, nil, jar, nil, http.StatusOK)
-	s.request("POST", unpublishConnectPath, map[string]string{"code": pairing.Code, "decision": "approve"}, jar, unpublishFormHeaders(jar), http.StatusOK)
+	s.request("POST", unpublishConnectPath, map[string]string{"code": pairing.Code, "decision": "approve"}, jar, s.formHeaders(jar), http.StatusOK)
 	var exchange struct {
 		Token   string `json:"access_token"`
 		Seconds int    `json:"expires_in"`
@@ -137,37 +150,40 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = pg.Close() })
-	origin, _ := url.Parse(unpublishTestOrigin)
-	admin := host.BuildConfig(host.AdminConfigInput{
-		Env: "staging", Domain: origin.Hostname(), DomainURL: origin.String(),
-		BaseDomain: origin.Hostname(), BaseDomainURL: origin.String(), Addr: ":8080",
-		CSRFTokenName: "csrf_token", CSRFTokenTTL: time.Hour, SessionName: "goadmin_session",
-		SessionTTL: time.Hour, SessionInactiveTTL: time.Hour,
-	}, host.PathDefaults{})
-	admin.CanonicalSessionBackend = "pgsql"
-	cfg := host.Config{
-		Admin: admin, Server: host.ServerConfig{Addr: ":8080", AllowOrigins: []string{origin.String()}},
-		CSRF: host.CSRFConfig{AppDomain: origin.Hostname(), SecretKey: strings.Repeat("c", 32), AllowedOrigins: []string{origin.String()}},
-		Auth: goauth.Config{
-			Signing:              goauth.SigningConfig{Issuer: origin.String(), Audience: "goadmin"},
-			NotificationDelivery: goauth.NotificationDeliveryDisabled,
-		},
-	}
-	for name, target := range map[string]*goauth.KeyRing{
-		"GOAUTH_SIGNING_KEY": &cfg.Auth.Signing.Keys, "GOAUTH_TOKEN_KEY": &cfg.Auth.TokenHMACKeys, "GOAUTH_ENVELOPE_KEY": &cfg.Auth.OutboxAEADKeys,
-	} {
-		*target, err = keyRing(name)
+	newHTTP := func(t *testing.T, rawOrigin string) unpublishTestHTTP {
+		t.Helper()
+		origin, err := url.Parse(rawOrigin)
 		if err != nil {
 			t.Fatal(err)
 		}
-	}
-	csrf, err := host.NewCSRFService(cfg.CSRF, lg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	deps := host.Dependencies{Database: pg, TxManager: host.NewTxManager(pg), Logger: lg, CSRF: csrf}
-	newHTTP := func() unpublishTestHTTP {
-		t.Helper()
+		admin := starterAdminConfig(origin, host.AdminConfigInput{
+			Domain: origin.Hostname(), DomainURL: rawOrigin,
+			BaseDomain: origin.Hostname(), BaseDomainURL: rawOrigin, Addr: ":8080",
+			CSRFTokenName: "csrf_token", CSRFTokenTTL: time.Hour,
+			SessionTTL: time.Hour, SessionInactiveTTL: time.Hour,
+		})
+		admin.CanonicalSessionBackend = "pgsql"
+		cfg := host.Config{
+			Admin: admin, Server: host.ServerConfig{Addr: ":8080", AllowOrigins: []string{rawOrigin}},
+			CSRF: host.CSRFConfig{AppDomain: origin.Hostname(), SecretKey: strings.Repeat("c", 32), AllowedOrigins: []string{rawOrigin}},
+			Auth: goauth.Config{
+				Signing:              goauth.SigningConfig{Issuer: rawOrigin, Audience: "goadmin"},
+				NotificationDelivery: goauth.NotificationDeliveryDisabled,
+			},
+		}
+		for name, target := range map[string]*goauth.KeyRing{
+			"GOAUTH_SIGNING_KEY": &cfg.Auth.Signing.Keys, "GOAUTH_TOKEN_KEY": &cfg.Auth.TokenHMACKeys, "GOAUTH_ENVELOPE_KEY": &cfg.Auth.OutboxAEADKeys,
+		} {
+			*target, err = keyRing(name)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		csrf, err := host.NewCSRFService(cfg.CSRF, lg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		deps := host.Dependencies{Database: pg, TxManager: host.NewTxManager(pg), Logger: lg, CSRF: csrf}
 		products, err := productsModule(db)
 		if err != nil {
 			t.Fatal(err)
@@ -181,9 +197,11 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { _ = runtime.Close() })
-		return unpublishTestHTTP{t: t, runtime: runtime}
+		return unpublishTestHTTP{t: t, runtime: runtime, origin: rawOrigin, do: func(req *http.Request) (*http.Response, error) {
+			return runtime.App().Test(req)
+		}}
 	}
-	httpServer := newHTTP()
+	httpServer := newHTTP(t, unpublishTestOrigin)
 	roles, err := postgres.NewRBAC(db, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -276,8 +294,9 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		}
 	})
 	repo := productRepo{db}
-	publish := func() string {
+	publish := func(t *testing.T) string {
 		t.Helper()
+		ctx := t.Context()
 		product, err := repo.create(ctx, actor, productInput{Name: "<Review product>"})
 		if err != nil {
 			t.Fatal(err)
@@ -294,7 +313,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 	httpServer.request("GET", unpublishConnectPath, nil, other, nil, http.StatusOK)
 	const requestID = "d1f23610-53d6-4262-bb60-c343b578c01c"
 	path := unpublishRequestPath + requestID
-	id := publish()
+	id := publish(t)
 	proposal := map[string]string{"request_id": requestID, "product_id": id, "reason": "<script>immutable reason</script>"}
 	statusInput := map[string]string{"request_id": requestID}
 	httpServer.agent("/propose", "invalid", proposal, http.StatusUnauthorized)
@@ -308,8 +327,8 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 	}
 	httpServer.request("GET", path, nil, other, nil, http.StatusNotFound)
 	approval := map[string]string{"decision": "approve"}
-	httpServer.request("POST", path, approval, other, unpublishFormHeaders(other), http.StatusNotFound)
-	missingOrigin := unpublishFormHeaders(jar)
+	httpServer.request("POST", path, approval, other, httpServer.formHeaders(other), http.StatusNotFound)
+	missingOrigin := httpServer.formHeaders(jar)
 	missingOrigin.Del("Origin")
 	missingOrigin.Set("Referer", unpublishTestOrigin+path)
 	httpServer.request("POST", path, approval, jar, missingOrigin, http.StatusForbidden)
@@ -318,7 +337,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		t.Fatalf("failed attempts or GET changed request to %q", got.Status)
 	}
 	for range 2 {
-		httpServer.request("POST", path, approval, jar, unpublishFormHeaders(jar), http.StatusOK)
+		httpServer.request("POST", path, approval, jar, httpServer.formHeaders(jar), http.StatusOK)
 	}
 	receipt := httpServer.agent("/status", token, statusInput, http.StatusOK)
 	if receipt.Status != unpublishSucceeded || receipt.EventID == "" {
@@ -330,11 +349,11 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 	}
 
 	pendingAfterRestart := map[string]string{"request_id": "d1f23610-53d6-4262-bb60-c343b578c02c"}
-	httpServer.agent("/propose", token, map[string]string{"request_id": pendingAfterRestart["request_id"], "product_id": publish(), "reason": "restart"}, http.StatusOK)
+	httpServer.agent("/propose", token, map[string]string{"request_id": pendingAfterRestart["request_id"], "product_id": publish(t), "reason": "restart"}, http.StatusOK)
 	if err := httpServer.runtime.Close(); err != nil {
 		t.Fatal(err)
 	}
-	httpServer = newHTTP()
+	httpServer = newHTTP(t, unpublishTestOrigin)
 	httpServer.agent("/status", token, statusInput, http.StatusUnauthorized)
 	token = httpServer.pair(jar)
 	if got := httpServer.agent("/status", token, statusInput, http.StatusOK); got != receipt {
@@ -348,28 +367,102 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pendingPreview := map[string]string{"request_id": "d1f23610-53d6-4262-bb60-c343b578c03c"}
-	httpServer.agent("/propose", token, map[string]string{"request_id": pendingPreview["request_id"], "product_id": publish(), "reason": "preview"}, http.StatusOK)
-	for _, roleID := range []int64{previewCandidate.ID, 0} {
-		httpServer.request("POST", "/auth/role-preview", map[string]json.RawMessage{"roleId": json.RawMessage(strconv.FormatInt(roleID, 10))},
-			jar, unpublishFormHeaders(jar), http.StatusOK)
+	checkPreview := func(s unpublishTestHTTP, jar unpublishTestCookies, token, requestID string) string {
+		s.t.Helper()
+		ctx := s.t.Context()
+		id := publish(s.t)
+		before, err := repo.get(ctx, actor, id)
+		if err != nil {
+			s.t.Fatal(err)
+		}
+		input := map[string]string{"request_id": requestID}
+		proposal := map[string]string{"request_id": requestID, "product_id": id, "reason": "preview"}
+		if got := s.agent("/propose", token, proposal, http.StatusOK); got.Status != unpublishPending || got.ReviewURL != s.origin+unpublishRequestPath+requestID {
+			s.t.Fatalf("expected a pending proposal for the configured origin: %+v", got)
+		}
+		headers := s.formHeaders(jar)
+		headers.Set("Accept", "application/json")
+		s.request("POST", "/auth/role-preview", map[string]int64{"roleId": -1}, jar, headers, http.StatusBadRequest)
+		if got := s.agent("/status", token, input, http.StatusOK); got.Status != unpublishPending {
+			s.t.Fatalf("failed preview transition changed the pending review: %+v", got)
+		}
+		s.request("POST", "/auth/role-preview", map[string]int64{"roleId": previewCandidate.ID}, jar, s.formHeaders(jar), http.StatusOK)
+		// Only the native transitions may retire the grant between these requests.
+		s.request("POST", "/auth/role-preview", map[string]int64{"roleId": 0}, jar, s.formHeaders(jar), http.StatusOK)
+		s.agent("/status", token, input, http.StatusUnauthorized)
+		freshToken := s.pair(jar)
+		if got := s.agent("/status", freshToken, input, http.StatusOK); got.Status != unpublishExpired {
+			s.t.Fatalf("preview did not retire the pending review: %+v", got)
+		}
+		after, err := repo.get(ctx, actor, id)
+		if err != nil || after.Revision != before.Revision || after.Data != before.Data || after.Data.Status != "published" {
+			s.t.Fatalf("role preview changed the published product: %+v (%v)", after, err)
+		}
+		return freshToken
 	}
-	httpServer.agent("/status", token, pendingPreview, http.StatusUnauthorized)
-	token = httpServer.pair(jar)
-	if got := httpServer.agent("/status", token, pendingPreview, http.StatusOK); got.Status != unpublishExpired {
-		t.Fatalf("preview did not retire the pending review: %+v", got)
-	}
+	token = checkPreview(httpServer, jar, token, "d1f23610-53d6-4262-bb60-c343b578c03c")
+	t.Run("production_role_preview", func(t *testing.T) {
+		server := httptest.NewUnstartedServer(nil)
+		defer server.Close()
+		production := newHTTP(t, "https://"+server.Listener.Addr().String())
+		server.Config.Handler = adaptor.FiberApp(production.runtime.App())
+		server.StartTLS()
+		client := server.Client()
+		client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		production.do = client.Do
+		jar := production.login(email)
+		session := jar["__Host-"+unpublishTestSessionName]
+		if session == nil || session.Value == "" || !session.Secure || !session.HttpOnly ||
+			session.Domain != "" || session.Path != "/" || session.SameSite != http.SameSiteLaxMode {
+			t.Fatal("production login did not issue a Secure, HttpOnly, host-only session cookie with Path=/ and SameSite=Lax")
+		}
+		if _, ok := jar[unpublishTestSessionName]; ok {
+			t.Fatal("production login issued an unprefixed session cookie")
+		}
+		otherLogin := production.pair(production.login(email))
+		current := checkPreview(production, jar, production.pair(jar), "d1f23610-53d6-4262-bb60-c343b578c07c")
+		if got := production.agent("/status", otherLogin, statusInput, http.StatusOK); got != receipt {
+			t.Fatalf("role preview affected another login: %+v", got)
+		}
+
+		// In this disposable database a foreign key makes deletion of this one
+		// login fail. The native logout handler redirects on both outcomes.
+		if _, err := db.ExecContext(t.Context(), `CREATE TABLE test_keep_login (id text REFERENCES goadmin_browser_auth_state(id))`); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.ExecContext(t.Context(), `INSERT INTO test_keep_login VALUES ($1)`, session.Value); err != nil {
+			t.Fatal(err)
+		}
+		logout := func() {
+			t.Helper()
+			headers := production.formHeaders(jar)
+			headers.Set("Referer", production.origin+"/auth/profile")
+			production.request(http.MethodDelete, "/auth/logout", nil, jar, headers, http.StatusFound)
+		}
+		logout()
+		if got := production.agent("/status", current, statusInput, http.StatusOK); got != receipt {
+			t.Fatalf("failed logout revoked the connection: %+v", got)
+		}
+		if _, err := db.ExecContext(t.Context(), `DROP TABLE test_keep_login`); err != nil {
+			t.Fatal(err)
+		}
+		logout()
+		if jar[session.Name] != nil {
+			t.Fatal("successful logout did not expire the native session cookie")
+		}
+		production.agent("/status", current, statusInput, http.StatusUnauthorized)
+	})
 
 	// Share native state with a second runtime, so the first runtime's
 	// transition observer cannot know about this preview until it resolves it.
-	peer := newHTTP()
-	peer.request("POST", "/auth/role-preview", map[string]int64{"roleId": owner.ID}, jar, unpublishFormHeaders(jar), http.StatusOK)
+	peer := newHTTP(t, unpublishTestOrigin)
+	peer.request("POST", "/auth/role-preview", map[string]int64{"roleId": owner.ID}, jar, peer.formHeaders(jar), http.StatusOK)
 	httpServer.agent("/status", token, statusInput, http.StatusForbidden)
-	peer.request("POST", "/auth/role-preview", map[string]int64{"roleId": 0}, jar, unpublishFormHeaders(jar), http.StatusOK)
+	peer.request("POST", "/auth/role-preview", map[string]int64{"roleId": 0}, jar, peer.formHeaders(jar), http.StatusOK)
 	token = httpServer.pair(jar)
 
 	pendingPermission := map[string]string{"request_id": "d1f23610-53d6-4262-bb60-c343b578c04c"}
-	httpServer.agent("/propose", token, map[string]string{"request_id": pendingPermission["request_id"], "product_id": publish(), "reason": "permission"}, http.StatusOK)
+	httpServer.agent("/propose", token, map[string]string{"request_id": pendingPermission["request_id"], "product_id": publish(t), "reason": "permission"}, http.StatusOK)
 	if err := roles.ReplaceRolePermissions(ctx, owner.ID, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -384,7 +477,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 
 	browserDenied := "d1f23610-53d6-4262-bb60-c343b578c06c"
 	browserDeniedPath := unpublishRequestPath + browserDenied
-	httpServer.agent("/propose", token, map[string]string{"request_id": browserDenied, "product_id": publish(), "reason": "browser lost permission"}, http.StatusOK)
+	httpServer.agent("/propose", token, map[string]string{"request_id": browserDenied, "product_id": publish(t), "reason": "browser lost permission"}, http.StatusOK)
 	if err := roles.ReplaceRolePermissions(ctx, owner.ID, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -399,7 +492,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 	}
 
 	blockedID := "d1f23610-53d6-4262-bb60-c343b578c05c"
-	blockedProduct := publish()
+	blockedProduct := publish(t)
 	httpServer.agent("/propose", token, map[string]string{"request_id": blockedID, "product_id": blockedProduct, "reason": "revoked"}, http.StatusOK)
 	connectPage := httpServer.request("GET", unpublishConnectPath, nil, jar, nil, http.StatusOK)
 	connectionID := regexp.MustCompile(`name="connection_id" value="([A-Z2-7]+)"`).FindSubmatch(connectPage)
@@ -417,7 +510,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 	}
 	review := httptest.NewRequestWithContext(ctx, http.MethodPost, unpublishTestOrigin+unpublishRequestPath+blockedID,
 		strings.NewReader(`{"decision":"approve"}`))
-	review.Header = unpublishFormHeaders(jar)
+	review.Header = httpServer.formHeaders(jar)
 	review.Header.Set("Content-Type", "application/json")
 	for _, cookie := range jar {
 		review.AddCookie(cookie)
@@ -457,7 +550,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	httpServer.request("POST", unpublishConnectPath, map[string]string{"decision": "revoke", "connection_id": string(connectionID[1])},
-		jar, unpublishFormHeaders(jar), http.StatusOK)
+		jar, httpServer.formHeaders(jar), http.StatusOK)
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}

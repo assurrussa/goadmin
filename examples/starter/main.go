@@ -81,11 +81,6 @@ func run() error {
 		}
 		agentAdapter = &adapter
 	}
-	// Staging uses embedded templates/assets while keeping HTTP cookies usable on localhost.
-	adminEnv := "staging"
-	if parsedURL.Scheme == "https" {
-		adminEnv = "production"
-	}
 	csrfSecret, err := required("CSRF_SECRET")
 	if err != nil {
 		return err
@@ -144,14 +139,13 @@ func run() error {
 		uploadRoot = "/data/uploads"
 	}
 	const csrfCookieName = "csrf_token"
-	adminInput := host.AdminConfigInput{
-		Env: adminEnv, BaseDomain: parsedURL.Hostname(), BaseDomainURL: baseURL,
+	adminCfg := starterAdminConfig(parsedURL, host.AdminConfigInput{
+		BaseDomain: parsedURL.Hostname(), BaseDomainURL: baseURL,
 		Domain: parsedURL.Hostname(), DomainURL: baseURL, Addr: ":8080",
 		CSRFTokenName: csrfCookieName, CSRFTokenTTL: 24 * time.Hour,
 		SessionInactiveTTL: 24 * time.Hour, SessionTTL: 7 * 24 * time.Hour,
-		SessionName: "goadmin_session", StaticDataRoot: filepath.Dir(uploadRoot),
-	}
-	adminCfg := host.BuildConfig(adminInput, host.PathDefaults{})
+		StaticDataRoot: filepath.Dir(uploadRoot),
+	})
 	adminCfg.CanonicalSessionBackend = "pgsql"
 	deps := host.Dependencies{Database: db, TxManager: tx, Logger: lg}
 	if os.Getenv("APP_ADMIN_CANONICAL_SESSION_BACKEND") == "redis" {
@@ -265,6 +259,16 @@ func run() error {
 	}
 	defer func() { _ = runtime.Close() }()
 	return runtime.Run(ctx)
+}
+
+func starterAdminConfig(origin *url.URL, input host.AdminConfigInput) host.AdminConfig {
+	// Give the native store and the MCP observer the same wire name. GoAdmin
+	// preserves an explicit __Host- name when applying its production policy.
+	input.Env, input.SessionName = "staging", "goadmin_session"
+	if origin.Scheme == "https" {
+		input.Env, input.SessionName = "production", "__Host-goadmin_session"
+	}
+	return host.BuildConfig(input, host.PathDefaults{})
 }
 
 func required(name string) (string, error) {

@@ -59,12 +59,20 @@ func (h *unpublishHandler) nativeTransitions(c fiber.Ctx) error {
 	browser := host.CSRFSessionBinding(cookie)
 	release := h.fences.acquire(browser)
 	defer release()
-	err := c.Next()
-	status := c.Response().StatusCode()
-	if err == nil && (preview && status == http.StatusOK || logout && status >= 300 && status < 400) {
+	if err := c.Next(); err != nil {
+		return err
+	}
+	if preview && c.Response().StatusCode() == http.StatusOK || logout && h.clearedSessionCookie(c) {
 		h.pairings.revoke(browser, "")
 	}
-	return err
+	return nil
+}
+
+func (h *unpublishHandler) clearedSessionCookie(c fiber.Ctx) bool {
+	// Native logout can redirect after a storage error while the login is
+	// still active. It expires the session cookie when it clears the login.
+	cookie, err := http.ParseSetCookie(string(c.Response().Header.PeekCookie(h.sessionName)))
+	return err == nil && cookie.Value == "" && cookie.MaxAge < 0
 }
 
 type unpublishBrowser struct {
