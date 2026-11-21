@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/assurrussa/goauth"
+	"github.com/jackc/pgx/v5"
+
+	"github.com/assurrussa/goadmin/internal/admintx"
 )
 
 type Postgres struct {
@@ -21,9 +24,15 @@ func NewPostgres(db *sql.DB, keys goauth.KeyRing) *Postgres {
 func (s *Postgres) Load(ctx context.Context, id string) (Record, bool, error) {
 	var raw []byte
 	var expiresAt time.Time
-	err := s.db.QueryRowContext(ctx, `SELECT record,expires_at FROM goadmin_browser_auth_state
-        WHERE id=$1 AND expires_at>now()`, id).Scan(&raw, &expiresAt)
-	if errors.Is(err, sql.ErrNoRows) {
+	const query = `SELECT record,expires_at FROM goadmin_browser_auth_state
+        WHERE id=$1 AND expires_at>clock_timestamp()`
+	var err error
+	if tx := admintx.SessionReadTx(ctx); tx != nil {
+		err = tx.QueryRow(ctx, query+" FOR SHARE", id).Scan(&raw, &expiresAt)
+	} else {
+		err = s.db.QueryRowContext(ctx, query, id).Scan(&raw, &expiresAt)
+	}
+	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 		return Record{}, false, nil
 	}
 	if err != nil {

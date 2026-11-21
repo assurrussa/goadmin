@@ -2,16 +2,24 @@
 
 This module is published as `github.com/assurrussa/goadmin`.
 
-## v0.31.0 candidate
+## v0.32.0 candidate
 
-This candidate adds operator-facing CRUD descriptions, conflict-aware role
-editing and the opt-in `features/mcp` package. The optional stdio command is
-`github.com/assurrussa/goadmin/cmd/goadmin-mcp`. Products retains its existing
-tool names. The site exercise integration uses the same library and explicitly
-enables SSO-bound reads. GoAdmin's public consumer probe exercises the MCP
-adapter. Before tagging, run the Products and external-host browser scenarios
-and `make publish-readiness VERSION=v0.31.0`. After tagging, validate the exact
-published version with `make release-readiness VERSION=v0.31.0`.
+This release adds confirmed actions to the existing `features/mcp` package.
+The starter withdraws an owned product and records the operator's reason.
+Sportsite publishes a reviewed draft exercise behind an independent flag.
+
+Before creating the single tag, run `make publish-readiness VERSION=v0.32.0`.
+Complete the local HTTPS Firefox and stdio scenarios for both hosts. Use a
+single application process, canonical PostgreSQL and Redis sessions, and the
+same candidate revision for both hosts. The starter commands are in its
+[withdrawal guide](examples/starter/README.md#confirmed-product-withdrawal).
+Obtain the required GitHub review and verify the merged revision.
+
+After tagging, run `make release-readiness VERSION=v0.32.0` and the starter
+HTTPS smoke with `--published v0.32.0`. Pin that published version in
+Sportsite, validate with its workspace disabled and deploy with exercise
+writes off. Verify Sportsite's actual HTTPS ingress, trusted proxy address,
+pairing and native operator login before enabling the write flag.
 
 ## Current Baseline
 

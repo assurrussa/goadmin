@@ -1,4 +1,4 @@
-package main
+package mcp //nolint:testpackage // Test private login fences and pairing state.
 
 import (
 	"net/http"
@@ -9,13 +9,13 @@ import (
 	"github.com/assurrussa/goadmin/host"
 )
 
-func TestUnpublishPairingLifetimeAndSingleExchange(t *testing.T) {
-	pairs := newUnpublishPairings()
+func TestActionPairingLifetimeAndSingleExchange(t *testing.T) {
+	pairs := newActionPairings()
 	now := time.Unix(100, 0)
 	pairs.now = func() time.Time { return now }
 	source := netip.MustParseAddr("2001:db8::1")
 	code, secret, ok := pairs.start(source)
-	if !ok || !unpublishCodePattern.MatchString(code) {
+	if !ok || !codePattern.MatchString(code) {
 		t.Fatal("pairing did not start")
 	}
 	if _, _, _, status := pairs.exchange(secret); status != http.StatusAccepted {
@@ -24,7 +24,7 @@ func TestUnpublishPairingLifetimeAndSingleExchange(t *testing.T) {
 	now = now.Add(4 * time.Minute)
 	approvedAt := now
 	browser := host.CSRFSessionBinding("synthetic-browser-session")
-	grant := unpublishGrant{actor: host.Actor{AdminID: 1}, browser: browser}
+	grant := actionGrant{actor: host.Actor{AdminID: 1}, browser: browser}
 	if !pairs.approve(code, grant) || pairs.approve(code, grant) {
 		t.Fatal("the code must be approved only once")
 	}
@@ -49,13 +49,13 @@ func TestUnpublishPairingLifetimeAndSingleExchange(t *testing.T) {
 	}
 }
 
-func TestUnpublishLostExchangeCannotEraseAnotherPairing(t *testing.T) {
-	pairs := newUnpublishPairings()
+func TestActionLostExchangeCannotEraseAnotherPairing(t *testing.T) {
+	pairs := newActionPairings()
 	source := netip.MustParseAddr("127.0.0.1")
 	code, secret, _ := pairs.start(source)
 	_, unrelated, _ := pairs.start(source)
 	browser := host.CSRFSessionBinding("synthetic-revoked-login")
-	pairs.approve(code, unpublishGrant{browser: browser})
+	pairs.approve(code, actionGrant{browser: browser})
 	exchanged, token, _, status := pairs.exchange(secret)
 	if status != http.StatusOK || exchanged.browser != browser {
 		t.Fatal("exchange did not capture the approved browser")

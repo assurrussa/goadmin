@@ -14,8 +14,9 @@ const props = defineProps<{
   description: string
   backHref?: string
   backText?: string
+  confirmedAction?: boolean
 }>()
-const connections = ref(props.grants)
+const connections = ref(props.grants ?? [])
 const code = ref('')
 const busy = ref(false)
 const notice = ref('')
@@ -30,7 +31,11 @@ async function decide(decision: Decision, value: string) {
     const response = await adminFetch(props.connectPath, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ code: value.trim().toUpperCase(), decision }),
+      body: JSON.stringify(
+        props.confirmedAction && decision === 'revoke'
+          ? { connection_id: value, decision }
+          : { code: value.trim().toUpperCase(), decision },
+      ),
       redirect: 'error',
     })
     if (response.status === 404 || response.status === 422) {
@@ -39,7 +44,12 @@ async function decide(decision: Decision, value: string) {
     }
     if (!response.ok) throw new Error()
     connections.value = (await response.json()).grants
-    notice.value = decision === 'approve' ? 'Reading allowed.' : 'Access closed.'
+    notice.value =
+      decision === 'approve'
+        ? props.confirmedAction
+          ? 'Connection approved.'
+          : 'Reading allowed.'
+        : 'Access closed.'
     code.value = ''
   } catch {
     message.value = 'Reload this page to check connection status.'
@@ -61,6 +71,9 @@ async function decide(decision: Decision, value: string) {
   <section class="max-w-xl space-y-5 rounded-xl border border-border-primary bg-card p-6">
     <h1 v-if="!backHref" class="text-lg font-semibold">{{ t(title) }}</h1>
     <p>{{ t(description) }}</p>
+    <p v-if="confirmedAction">
+      {{ t('Each proposal requires your confirmation in this browser.') }}
+    </p>
     <p class="text-sm text-text-secondary">
       {{ t('Access lasts up to 15 minutes and ends when you sign out.') }}
     </p>
@@ -68,16 +81,17 @@ async function decide(decision: Decision, value: string) {
       <FormInput
         v-model="code"
         name="code"
-        label="Connection code"
+        :label="confirmedAction ? 'Code' : 'Connection code'"
         autocomplete="off"
         placeholder="ABCDE-FGHIJ"
         :required="true"
       />
       <div class="flex flex-wrap gap-3">
         <AppButton type="submit" :disabled="busy || !code.trim()">{{
-          t('Allow reading')
+          t(confirmedAction ? 'Connect' : 'Allow reading')
         }}</AppButton>
         <AppButton
+          v-if="!confirmedAction"
           type="button"
           variant="secondary"
           :disabled="busy || !code.trim()"

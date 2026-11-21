@@ -208,8 +208,8 @@
       "_editor-DHjMAgj7.js"
     ]
   },
-  "_ReadAccess.vue_vue_type_script_setup_true_lang-C9WAPro4.js": {
-    "file": "js/ReadAccess.vue_vue_type_script_setup_true_lang-C9WAPro4.js",
+  "_ReadAccess.vue_vue_type_script_setup_true_lang-d9jbpZ2Y.js": {
+    "file": "js/ReadAccess.vue_vue_type_script_setup_true_lang-d9jbpZ2Y.js",
     "name": "ReadAccess.vue_vue_type_script_setup_true_lang",
     "imports": [
       "_editor-DHjMAgj7.js",
@@ -477,13 +477,24 @@
       "_AppInput.vue_vue_type_script_setup_true_lang-Dy1H6VOi.js"
     ]
   },
+  "src/js/Pages/agent/ActionReview.vue": {
+    "file": "js/ActionReview-CKPio2I2.js",
+    "name": "ActionReview",
+    "src": "src/js/Pages/agent/ActionReview.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_AppHead.vue_vue_type_script_setup_true_lang-BKzE8imW.js",
+      "src/js/app.ts",
+      "_editor-DHjMAgj7.js"
+    ]
+  },
   "src/js/Pages/agent/ProductEventsAccess.vue": {
-    "file": "js/ProductEventsAccess-CRLlvhz5.js",
+    "file": "js/ProductEventsAccess-DOsuSboC.js",
     "name": "ProductEventsAccess",
     "src": "src/js/Pages/agent/ProductEventsAccess.vue",
     "isDynamicEntry": true,
     "imports": [
-      "_ReadAccess.vue_vue_type_script_setup_true_lang-C9WAPro4.js",
+      "_ReadAccess.vue_vue_type_script_setup_true_lang-d9jbpZ2Y.js",
       "_editor-DHjMAgj7.js",
       "_AppHead.vue_vue_type_script_setup_true_lang-BKzE8imW.js",
       "src/js/app.ts",
@@ -493,12 +504,12 @@
     ]
   },
   "src/js/Pages/agent/ReadAccess.vue": {
-    "file": "js/ReadAccess-CRjenjOk.js",
+    "file": "js/ReadAccess-BlEUU5ZM.js",
     "name": "ReadAccess",
     "src": "src/js/Pages/agent/ReadAccess.vue",
     "isDynamicEntry": true,
     "imports": [
-      "_ReadAccess.vue_vue_type_script_setup_true_lang-C9WAPro4.js",
+      "_ReadAccess.vue_vue_type_script_setup_true_lang-d9jbpZ2Y.js",
       "_editor-DHjMAgj7.js",
       "_AppHead.vue_vue_type_script_setup_true_lang-BKzE8imW.js",
       "src/js/app.ts",
@@ -1154,6 +1165,7 @@
       "src/js/Pages/admin/IndexPage.vue",
       "src/js/Pages/admin/ViewPage.vue",
       "src/js/Pages/admission/IndexPage.vue",
+      "src/js/Pages/agent/ActionReview.vue",
       "src/js/Pages/agent/ProductEventsAccess.vue",
       "src/js/Pages/agent/ReadAccess.vue",
       "src/js/Pages/auth/AdmissionWaitingPage.vue",

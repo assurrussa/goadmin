@@ -4,16 +4,13 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
 	"net/url"
-	"regexp"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -29,6 +26,21 @@ const (
 	unpublishTestOrigin      = "http://localhost:18768"
 	unpublishTestSessionName = "goadmin_session"
 )
+
+const (
+	unpublishConnectPath = unpublishAgentPath + "/connect"
+	unpublishRequestPath = unpublishAgentPath + "/requests/"
+	unpublishPending     = "pending"
+	unpublishExpired     = "expired"
+	unpublishSucceeded   = "succeeded"
+)
+
+type unpublishOutput struct {
+	RequestID string `json:"request_id"`
+	Status    string `json:"status"`
+	ReviewURL string `json:"review_url,omitempty"`
+	EventID   string `json:"event_id,omitempty"`
+}
 
 type unpublishTestHTTP struct {
 	t       *testing.T
@@ -188,7 +200,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		unpublish, err := productUnpublishModule(db, origin, netip.Addr{}, csrf, admin)
+		unpublish, err := productUnpublishModule(origin, netip.Addr{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -231,68 +243,6 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 	if err := roles.ReplaceSubjectRoles(ctx, account.Subject.ID, []int64{owner.ID}); err != nil {
 		t.Fatal(err)
 	}
-	t.Run("effective grant stays locked through the product transaction", func(t *testing.T) {
-		decision, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer decision.Rollback()
-		if err := lockUnpublishAuthority(ctx, decision, actor); err != nil {
-			t.Fatal(err)
-		}
-		short, cancel := context.WithTimeout(ctx, 250*time.Millisecond)
-		defer cancel()
-		if err := roles.ReplaceRolePermissions(short, owner.ID, nil); err == nil || short.Err() == nil {
-			t.Fatalf("concurrent revocation did not wait for the decision: %v", err)
-		}
-		if err := decision.Commit(); err != nil {
-			t.Fatal(err)
-		}
-		if err := roles.ReplaceRolePermissions(ctx, owner.ID, nil); err != nil {
-			t.Fatalf("revocation after commit: %v", err)
-		}
-		if err := roles.ReplaceRolePermissions(ctx, owner.ID, permission); err != nil {
-			t.Fatal(err)
-		}
-	})
-	t.Run("logout can lock its subject while confirmation waits for the native login", func(t *testing.T) {
-		h := &unpublishHandler{}
-		browser := unpublishBrowser{actor: actor, csrf: host.CSRFRequest{SessionID: "fixture-login"}}
-		endLogout := h.fences.acquire(browser.csrf.SessionID)
-		var releaseOnce sync.Once
-		defer releaseOnce.Do(endLogout)
-		decision, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer decision.Rollback()
-		finished := make(chan error, 1)
-		go func() {
-			release, err := h.lockBrowserAuthority(ctx, decision, browser)
-			release()
-			finished <- err
-		}()
-		until := time.Now().Add(3 * time.Second)
-		for {
-			h.fences.mu.Lock()
-			waiting := h.fences.logins[browser.csrf.SessionID].refs == 2
-			h.fences.mu.Unlock()
-			if waiting {
-				break
-			}
-			if time.Now().After(until) {
-				t.Fatal("confirmation never reached the held login mutex")
-			}
-			time.Sleep(5 * time.Millisecond)
-		}
-		if _, err := db.ExecContext(ctx, "SELECT id FROM auth_subjects WHERE id=$1 FOR UPDATE NOWAIT", actor.SubjectID); err != nil {
-			t.Fatalf("confirmation already holds the subject needed to finish logout: %v", err)
-		}
-		releaseOnce.Do(endLogout)
-		if err := <-finished; err != nil {
-			t.Fatal(err)
-		}
-	})
 	repo := productRepo{db}
 	publish := func(t *testing.T) string {
 		t.Helper()
@@ -321,9 +271,21 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 	if pending.Status != unpublishPending || pending.ReviewURL != unpublishTestOrigin+path {
 		t.Fatalf("unexpected proposal status: %+v", pending)
 	}
-	if html := string(httpServer.request("GET", path, nil, jar, nil, http.StatusOK)); !strings.Contains(html, "&lt;script&gt;immutable reason&lt;/script&gt;") ||
-		!strings.Contains(html, "&lt;Review product&gt;") || !strings.Contains(html, "Опубликован → Черновик") {
-		t.Fatal("review did not escape and display the immutable proposal")
+	var reviewPage struct {
+		Props struct {
+			Fields []struct{ Label, Value string }
+		}
+	}
+	view := httpServer.request("GET", path, nil, jar, http.Header{"X-Inertia": {"true"}}, http.StatusOK)
+	if err := json.Unmarshal(view, &reviewPage); err != nil {
+		t.Fatal(err)
+	}
+	reviewFields := map[string]string{}
+	for _, f := range reviewPage.Props.Fields {
+		reviewFields[f.Label] = f.Value
+	}
+	if reviewFields["Товар"] != "<Review product>" || reviewFields["Причина"] != "<script>immutable reason</script>" || reviewFields["Переход"] != "Опубликован → Черновик" {
+		t.Fatalf("unexpected immutable fields: %v", reviewFields)
 	}
 	httpServer.request("GET", path, nil, other, nil, http.StatusNotFound)
 	approval := map[string]string{"decision": "approve"}
@@ -494,9 +456,9 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 	blockedID := "d1f23610-53d6-4262-bb60-c343b578c05c"
 	blockedProduct := publish(t)
 	httpServer.agent("/propose", token, map[string]string{"request_id": blockedID, "product_id": blockedProduct, "reason": "revoked"}, http.StatusOK)
-	connectPage := httpServer.request("GET", unpublishConnectPath, nil, jar, nil, http.StatusOK)
-	connectionID := regexp.MustCompile(`name="connection_id" value="([A-Z2-7]+)"`).FindSubmatch(connectPage)
-	if len(connectionID) != 2 {
+	connectPage := httpServer.request("GET", unpublishConnectPath, nil, jar, http.Header{"X-Inertia": {"true"}}, http.StatusOK)
+	var connections struct{ Props struct{ Grants []string } }
+	if err := json.Unmarshal(connectPage, &connections); err != nil || len(connections.Props.Grants) != 1 {
 		t.Fatal("connection management did not render the active connection")
 	}
 	tx, err := db.BeginTx(ctx, nil)
@@ -549,7 +511,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	httpServer.request("POST", unpublishConnectPath, map[string]string{"decision": "revoke", "connection_id": string(connectionID[1])},
+	httpServer.request("POST", unpublishConnectPath, map[string]string{"decision": "revoke", "connection_id": connections.Props.Grants[0]},
 		jar, httpServer.formHeaders(jar), http.StatusOK)
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)

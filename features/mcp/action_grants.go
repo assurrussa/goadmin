@@ -1,4 +1,4 @@
-package main
+package mcp
 
 import (
 	"crypto/rand"
@@ -14,12 +14,12 @@ import (
 )
 
 const (
-	unpublishPairTTL     = 5 * time.Minute
-	unpublishPairLimit   = 128
-	unpublishSourceLimit = 4
+	actionPairTTL     = 5 * time.Minute
+	actionPairLimit   = 128
+	actionSourceLimit = 4
 )
 
-type unpublishGrant struct {
+type actionGrant struct {
 	id       string
 	actor    host.Actor
 	browser  string
@@ -27,29 +27,29 @@ type unpublishGrant struct {
 	deadline time.Time
 }
 
-type unpublishPairing struct {
+type actionPairing struct {
 	code     string
 	source   netip.Addr
 	deadline time.Time
-	grant    unpublishGrant
+	grant    actionGrant
 }
 
-type unpublishPairings struct {
+type actionPairings struct {
 	mu      sync.Mutex
 	now     func() time.Time
-	pending map[[32]byte]unpublishPairing
-	active  map[[32]byte]unpublishGrant
+	pending map[[32]byte]actionPairing
+	active  map[[32]byte]actionGrant
 }
 
-func newUnpublishPairings() *unpublishPairings {
-	return &unpublishPairings{
-		now: time.Now, pending: make(map[[32]byte]unpublishPairing), active: make(map[[32]byte]unpublishGrant),
+func newActionPairings() *actionPairings {
+	return &actionPairings{
+		now: time.Now, pending: make(map[[32]byte]actionPairing), active: make(map[[32]byte]actionGrant),
 	}
 }
 
-func unpublishSecretKey(secret string) [32]byte { return sha256.Sum256([]byte(secret)) }
+func actionSecretKey(secret string) [32]byte { return sha256.Sum256([]byte(secret)) }
 
-func (p *unpublishPairings) prune(now time.Time) {
+func (p *actionPairings) prune(now time.Time) {
 	for key, pair := range p.pending {
 		if !now.Before(pair.deadline) {
 			delete(p.pending, key)
@@ -62,12 +62,12 @@ func (p *unpublishPairings) prune(now time.Time) {
 	}
 }
 
-func (p *unpublishPairings) start(source netip.Addr) (string, string, bool) {
+func (p *actionPairings) start(source netip.Addr) (pairCode, deviceSecret string, started bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	now := p.now()
 	p.prune(now)
-	if len(p.pending)+len(p.active) >= unpublishPairLimit {
+	if len(p.pending)+len(p.active) >= actionPairLimit {
 		return "", "", false
 	}
 	if source.Is6() {
@@ -81,7 +81,7 @@ func (p *unpublishPairings) start(source netip.Addr) (string, string, bool) {
 			sameSource++
 		}
 	}
-	if sameSource >= unpublishSourceLimit {
+	if sameSource >= actionSourceLimit {
 		return "", "", false
 	}
 	for {
@@ -89,13 +89,13 @@ func (p *unpublishPairings) start(source netip.Addr) (string, string, bool) {
 		code := raw[:5] + "-" + raw[5:]
 		if !codes[code] {
 			secret := rand.Text()
-			p.pending[unpublishSecretKey(secret)] = unpublishPairing{code: code, source: source, deadline: now.Add(unpublishPairTTL)}
+			p.pending[actionSecretKey(secret)] = actionPairing{code: code, source: source, deadline: now.Add(actionPairTTL)}
 			return code, secret, true
 		}
 	}
 }
 
-func (p *unpublishPairings) approve(code string, grant unpublishGrant) bool {
+func (p *actionPairings) approve(code string, grant actionGrant) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	now := p.now()
@@ -103,7 +103,7 @@ func (p *unpublishPairings) approve(code string, grant unpublishGrant) bool {
 	for key, pair := range p.pending {
 		if pair.code == code && pair.grant.id == "" {
 			grant.id = rand.Text()
-			grant.deadline = now.Add(unpublishMaxLifetime)
+			grant.deadline = now.Add(grantLifetime)
 			pair.grant = grant
 			p.pending[key] = pair
 			return true
@@ -112,34 +112,34 @@ func (p *unpublishPairings) approve(code string, grant unpublishGrant) bool {
 	return false
 }
 
-func (p *unpublishPairings) exchange(secret string) (unpublishGrant, string, int, int) {
+func (p *actionPairings) exchange(secret string) (approved actionGrant, bearer string, remaining, status int) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	now := p.now()
 	p.prune(now)
-	key := unpublishSecretKey(secret)
+	key := actionSecretKey(secret)
 	pair, ok := p.pending[key]
 	if !ok {
-		return unpublishGrant{}, "", 0, http.StatusGone
+		return actionGrant{}, "", 0, http.StatusGone
 	}
 	if pair.grant.id == "" {
-		return unpublishGrant{}, "", 0, http.StatusAccepted
+		return actionGrant{}, "", 0, http.StatusAccepted
 	}
 	delete(p.pending, key)
 	token := rand.Text()
-	p.active[unpublishSecretKey(token)] = pair.grant
+	p.active[actionSecretKey(token)] = pair.grant
 	return pair.grant, token, int(pair.grant.deadline.Sub(now).Seconds()), http.StatusOK
 }
 
-func (p *unpublishPairings) bearer(token string) (unpublishGrant, bool) {
+func (p *actionPairings) bearer(token string) (actionGrant, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.prune(p.now())
-	grant, ok := p.active[unpublishSecretKey(token)]
+	grant, ok := p.active[actionSecretKey(token)]
 	return grant, ok
 }
 
-func (p *unpublishPairings) bound(id string) (unpublishGrant, bool) {
+func (p *actionPairings) bound(id string) (actionGrant, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.prune(p.now())
@@ -148,14 +148,14 @@ func (p *unpublishPairings) bound(id string) (unpublishGrant, bool) {
 			return grant, true
 		}
 	}
-	return unpublishGrant{}, false
+	return actionGrant{}, false
 }
 
-func (p *unpublishPairings) connections(browser string) []string {
+func (p *actionPairings) connections(browser string) []string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.prune(p.now())
-	var ids []string
+	ids := make([]string, 0)
 	for _, pair := range p.pending {
 		if pair.grant.browser == browser {
 			ids = append(ids, pair.grant.id)
@@ -172,7 +172,7 @@ func (p *unpublishPairings) connections(browser string) []string {
 
 // An empty id closes all connections for a browser. A nonempty id is private
 // connection metadata, never accepted as a device secret or an access token.
-func (p *unpublishPairings) revoke(browser, id string) {
+func (p *actionPairings) revoke(browser, id string) {
 	if browser == "" {
 		return
 	}
@@ -193,24 +193,24 @@ func (p *unpublishPairings) revoke(browser, id string) {
 // The fence for one authenticated login only covers already-locked database
 // mutations and native session changes. A disconnect can win while a review
 // is still waiting on a product/request lock. Idle fences are discarded.
-type unpublishLoginFences struct {
+type actionLoginFences struct {
 	mu     sync.Mutex
-	logins map[string]*unpublishLoginFence
+	logins map[string]*actionLoginFence
 }
 
-type unpublishLoginFence struct {
+type actionLoginFence struct {
 	mu   sync.Mutex
 	refs int
 }
 
-func (f *unpublishLoginFences) acquire(browser string) func() {
+func (f *actionLoginFences) acquire(browser string) func() {
 	f.mu.Lock()
 	if f.logins == nil {
-		f.logins = make(map[string]*unpublishLoginFence)
+		f.logins = make(map[string]*actionLoginFence)
 	}
 	fence := f.logins[browser]
 	if fence == nil {
-		fence = &unpublishLoginFence{}
+		fence = &actionLoginFence{}
 		f.logins[browser] = fence
 	}
 	fence.refs++

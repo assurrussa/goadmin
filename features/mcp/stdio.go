@@ -28,6 +28,9 @@ func RunStdio(ctx context.Context, origin, resourcePath string) error {
 		return errors.New("mcp: incompatible resource description")
 	}
 	server := sdk.NewServer(&sdk.Implementation{Name: d.Name, Version: "1.0.0"}, &sdk.ServerOptions{Instructions: d.Description})
+	if d.Action != nil {
+		addActionTools(server, gateway, d)
+	}
 	if s := d.Search; s != nil {
 		addReadTool(server, s.ToolName, s.Description, searchInput(*s),
 			searchSchema(d.ID, s.Fields),
@@ -65,18 +68,26 @@ func addReadTool(
 	input, output *jsonschema.Schema, valid func(map[string]json.RawMessage) bool,
 	read func(context.Context, map[string]json.RawMessage) (any, *toolProblem),
 ) {
+	addAdminTool(server, name, description, input, output, true, valid, read)
+}
+
+func addAdminTool(
+	server *sdk.Server, name, description string,
+	input, output *jsonschema.Schema, readOnly bool, valid func(map[string]json.RawMessage) bool,
+	call func(context.Context, map[string]json.RawMessage) (any, *toolProblem),
+) {
 	problemSchema := objectSchema()
 	for _, parameter := range []Parameter{
-		{Name: "error", Description: "Machine-readable problem code.", Kind: Text, Required: true},
+		{Name: fieldError, Description: "Machine-readable problem code.", Kind: Text, Required: true},
 		{Name: "message", Description: "Operator-facing explanation.", Kind: Text, Required: true},
-		{Name: "verification_url", Description: "Admin page for the operator.", Kind: Text},
-		{Name: "code", Description: "Pairing code shown to the operator.", Kind: Text},
+		{Name: fieldVerificationURL, Description: "Admin page for the operator.", Kind: Text},
+		{Name: fieldCode, Description: "Pairing code shown to the operator.", Kind: Text},
 	} {
 		addParameter(problemSchema, parameter)
 	}
 	server.AddTool(&sdk.Tool{
 		Name: name, Description: description, InputSchema: input,
-		Annotations:  &sdk.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: new(false)},
+		Annotations:  &sdk.ToolAnnotations{ReadOnlyHint: readOnly, OpenWorldHint: new(false)},
 		OutputSchema: &jsonschema.Schema{Type: "object", AnyOf: []*jsonschema.Schema{output, problemSchema}},
 	}, func(ctx context.Context, request *sdk.CallToolRequest) (*sdk.CallToolResult, error) {
 		raw := request.Params.Arguments
@@ -86,9 +97,9 @@ func addReadTool(
 		var in map[string]json.RawMessage
 		if len(raw) > maxRequestSize || !bytes.HasPrefix(bytes.TrimSpace(raw), []byte("{")) ||
 			json.Unmarshal(raw, &in) != nil || !valid(in) {
-			return result(nil, &toolProblem{Error: "invalid_input", Message: "Check the declared tool parameters."})
+			return result(nil, &toolProblem{Error: problemInvalidInput, Message: "Check the declared tool parameters."})
 		}
-		value, problem := read(ctx, in)
+		value, problem := call(ctx, in)
 		return result(value, problem)
 	})
 }

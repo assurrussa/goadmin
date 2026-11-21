@@ -168,6 +168,27 @@ func TestReadOnlyMCPAdapter(t *testing.T) {
 	}
 }
 
+func TestConfirmedMCPAction(t *testing.T) {
+	action := mcp.Action{
+		Namespace: "library", Key: "archive", Version: "1", Path: "/agent/archive",
+		Title: "Archive document", Description: "Propose archiving a selected document.", ConfirmLabel: "Archive",
+		ProposeTool: "propose_archive", StatusTool: "get_archive_request",
+		Permissions: []adminhost.PermissionKey{adminhost.NewPermissionKey("documents", "archive")},
+		Parameters: []mcp.Parameter{{Name: "reference", Kind: mcp.Text, Required: true, Description: "Document reference."}},
+		ResultFields: []mcp.Field{{Key: "archive_ref", Kind: mcp.Text, Description: "Archive reference."}},
+		Normalize: func(_ string, in map[string]json.RawMessage) (json.RawMessage, error) { return json.Marshal(in) },
+		Inspect: func(context.Context, mcp.ActionTx, adminhost.Actor, json.RawMessage, bool) (mcp.ActionSnapshot, error) {
+			return mcp.ActionSnapshot{}, mcp.ErrActionNotFound
+		},
+		Apply: func(context.Context, mcp.ActionTx, adminhost.Actor, json.RawMessage, mcp.ActionSnapshot, string) (map[string]string, error) {
+			return nil, mcp.ErrActionNotFound
+		},
+	}
+	if _, err := mcp.ConfirmedModule(mcp.Config{Origin: "https://admin.example.org"}, action); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestWritableFieldConstraints(t *testing.T) {
 	name := crud.Field{Key: "name", Label: "Name", Type: "text", Create: true, Update: true, MaxLength: new(2)}
 	amount := crud.Field{Key: "amount", Label: "Amount", Type: "number", Create: true, Update: true, Minimum: new(0.5)}

@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/jackc/pgx/v5"
 
 	sessioncore "github.com/assurrussa/goadmin/infrastructure/core/session"
+	"github.com/assurrussa/goadmin/internal/admintx"
 )
 
 // Storage borrows its database. Construction does not start maintenance workers.
@@ -40,8 +42,17 @@ func (s *Storage) GetWithContext(ctx context.Context, key string) ([]byte, error
 		return nil, nil
 	}
 	var value []byte
-	err := s.db.QueryRowContext(ctx, `SELECT payload FROM goadmin_browser_sessions
-WHERE id = $1 AND (expires_at IS NULL OR expires_at > statement_timestamp())`, key).Scan(&value)
+	const query = `SELECT payload FROM goadmin_browser_sessions
+WHERE id = $1 AND (expires_at IS NULL OR expires_at > clock_timestamp())`
+	if tx := admintx.SessionReadTx(ctx); tx != nil {
+		err := tx.QueryRow(ctx, query+" FOR SHARE", key).Scan(&value)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		// Fiber decodes the payload. Leave repair to a normal store read.
+		return value, err
+	}
+	err := s.db.QueryRowContext(ctx, query, key).Scan(&value)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
