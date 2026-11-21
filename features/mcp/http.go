@@ -18,6 +18,25 @@ import (
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 )
 
+const (
+	propTitle            = "title"
+	fieldRequestID       = "request_id"
+	fieldStatus          = "status"
+	fieldReviewURL       = "review_url"
+	fieldExpiresAt       = "expires_at"
+	fieldError           = "error"
+	fieldCode            = "code"
+	fieldVerificationURL = "verification_url"
+	fieldDeviceSecret    = "device_secret"
+	fieldExpiresIn       = "expires_in"
+	decisionApprove      = "approve"
+	propGrants           = "grants"
+	propDescription      = "description"
+	problemExpired       = "authorization_expired"
+	problemDenied        = "denied"
+	problemInvalidInput  = "invalid_input"
+)
+
 type resourceHandler struct {
 	app          *host.App
 	resource     Resource
@@ -44,7 +63,7 @@ func (h *resourceHandler) extension() *host.Extension {
 func (h *resourceHandler) connectPath() string { return h.resource.Path + "/connect" }
 
 func agentJSON(c fiber.Ctx, status int, code string) error {
-	return c.Status(status).JSON(fiber.Map{"error": code})
+	return c.Status(status).JSON(fiber.Map{fieldError: code})
 }
 
 func (h *resourceHandler) registerDevice(app *fiber.App) {
@@ -73,7 +92,7 @@ func (h *resourceHandler) deviceOnly(c fiber.Ctx) error {
 	c.Set("Cache-Control", "no-store")
 	if !strings.EqualFold(c.Get("Host"), h.originHost) ||
 		c.Get("Origin") != "" || c.Get("Cookie") != "" || c.Get("Sec-Fetch-Site") != "" {
-		return agentJSON(c, 403, "denied")
+		return agentJSON(c, 403, problemDenied)
 	}
 	if len(c.Body()) > maxRequestSize {
 		return agentJSON(c, 413, "invalid_request")
@@ -104,8 +123,8 @@ func (h *resourceHandler) start(c fiber.Ctx) error {
 		return agentJSON(c, 429, "too_many_requests")
 	}
 	return c.JSON(fiber.Map{
-		"code": code, "device_secret": secret,
-		"verification_url": h.origin + h.connectPath(), "expires_in": int(pairLifetime.Seconds()),
+		fieldCode: code, fieldDeviceSecret: secret,
+		fieldVerificationURL: h.origin + h.connectPath(), fieldExpiresIn: int(pairLifetime.Seconds()),
 	})
 }
 
@@ -119,11 +138,11 @@ func (h *resourceHandler) token(c fiber.Ctx) error {
 	token, seconds, status := h.grants.exchange(request.Secret)
 	switch status {
 	case http.StatusOK:
-		return c.JSON(fiber.Map{"access_token": token, "expires_in": seconds})
+		return c.JSON(fiber.Map{"access_token": token, fieldExpiresIn: seconds})
 	case http.StatusAccepted:
 		return agentJSON(c, status, "authorization_pending")
 	case http.StatusForbidden:
-		return agentJSON(c, status, "denied")
+		return agentJSON(c, status, problemDenied)
 	default:
 		return agentJSON(c, status, "expired")
 	}
@@ -169,7 +188,7 @@ func agentFailure(c fiber.Ctx, err error) error {
 	case errors.Is(err, host.ErrReadSessionEnded):
 		return agentJSON(c, 401, "authorization_required")
 	case errors.Is(err, host.ErrReadSessionDenied), errors.Is(err, crud.ErrDenied):
-		return agentJSON(c, 403, "denied")
+		return agentJSON(c, 403, problemDenied)
 	case errors.Is(err, crud.ErrNotFound):
 		return agentJSON(c, 404, "not_found")
 	case errors.Is(err, crud.ErrInvalidQuery), errors.As(err, &fields):
@@ -300,8 +319,8 @@ func (h *resourceHandler) renderConnect(c fiber.Ctx, grants []string) error {
 	c.Set("Cache-Control", "no-store")
 	c.Set("Referrer-Policy", "same-origin")
 	return h.app.Render(c, approvalPage, map[string]any{
-		"grants": grants, "connectPath": h.connectPath(), "title": consent.Title,
-		"description": consent.Description, "backHref": consent.BackHref, "backText": consent.BackText,
+		propGrants: grants, "connectPath": h.connectPath(), propTitle: consent.Title,
+		propDescription: consent.Description, "backHref": consent.BackHref, "backText": consent.BackText,
 	})
 }
 
@@ -311,7 +330,7 @@ func (h *resourceHandler) decide(c fiber.Ctx) error {
 	c.Set("Cache-Control", "no-store")
 	actor, ok := h.app.CurrentActor(c)
 	if !ok || c.Get("Origin") != h.origin {
-		return agentJSON(c, 403, "denied")
+		return agentJSON(c, 403, problemDenied)
 	}
 	var request struct {
 		Code     string `json:"code"`
@@ -323,7 +342,7 @@ func (h *resourceHandler) decide(c fiber.Ctx) error {
 	code := strings.ToUpper(request.Code)
 	var updated bool
 	switch request.Decision {
-	case "approve":
+	case decisionApprove:
 		c.SetContext(integrationroles.WithCanonicalAuthorization(c.Context()))
 		c.Locals(approvalCodeKey{}, code)
 		return c.Next()
@@ -361,5 +380,5 @@ func (h *resourceHandler) decisionResult(c fiber.Ctx, actor host.Actor, updated 
 	if !updated {
 		return agentJSON(c, 404, "not_found")
 	}
-	return c.JSON(fiber.Map{"grants": h.grants.active(actor)})
+	return c.JSON(fiber.Map{propGrants: h.grants.active(actor)})
 }

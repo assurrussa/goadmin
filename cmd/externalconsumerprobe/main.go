@@ -94,6 +94,11 @@ func run(ctx context.Context, args []string) error {
 		return fmt.Errorf("write probe test: %w", err)
 	}
 
+	archivePath := filepath.Join(workdir, "archive_action_test.go")
+	if err := os.WriteFile(archivePath, []byte(cfg.BuildArchiveTest()), 0o600); err != nil {
+		return fmt.Errorf("write archive action test: %w", err)
+	}
+
 	if err := downloadGraph(ctx, workdir, *goModCache, *timeout); err != nil {
 		return err
 	}

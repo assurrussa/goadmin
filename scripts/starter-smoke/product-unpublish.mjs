@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
+import { cpSync, mkdtempSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { firefox, expect } from 'playwright/test'
 import { connectProductEventsMCP as connectStdio } from './mcp-client.mjs'
@@ -10,10 +12,14 @@ import { permissionCheckbox } from './role-editor.mjs'
 const { ADMIN_URL: origin, UNPUBLISH_QA_PROJECT: project, UNPUBLISH_QA_CLI: binary } = process.env
 assert.match(project, /^goadmin-unpublish-[a-f0-9]{12}$/)
 const compose = (...args) =>
-  execFileSync('docker', ['compose', '-p', project, '-f', 'compose.yaml', ...args], {
-    encoding: 'utf8',
-    timeout: 120000,
-  }).trim()
+  execFileSync(
+    'docker',
+    ['compose', '-p', project, '-f', process.env.UNPUBLISH_QA_COMPOSE || 'compose.yaml', ...args],
+    {
+      encoding: 'utf8',
+      timeout: 120000,
+    },
+  ).trim()
 const sql = (stmt) =>
   compose(
     'exec',
@@ -30,7 +36,10 @@ const sql = (stmt) =>
     '-c',
     stmt,
   )
-const browser = await firefox.launch({ executablePath: process.env.QA_FIREFOX || undefined })
+const options = { executablePath: process.env.QA_FIREFOX || undefined }
+const profile = process.env.UNPUBLISH_QA_PROFILE
+const browser = profile ? undefined : await firefox.launch(options)
+const contexts = []
 const clients = []
 const password = randomBytes(24).toString('base64url') + 'Aa1!'
 const email = 'owner@example.invalid'
@@ -40,7 +49,19 @@ const decline = 'Отклонить'
 let stage = 'register owner'
 
 async function newPage() {
-  const ctx = await browser.newContext({ baseURL: origin })
+  let ctx
+  if (profile) {
+    const isolated = mkdtempSync(join(dirname(profile), 'login-'))
+    cpSync(profile, isolated, { recursive: true })
+    ctx = await firefox.launchPersistentContext(isolated, {
+      ...options,
+      baseURL: origin,
+      locale: 'ru-RU',
+    })
+  } else {
+    ctx = await browser.newContext({ baseURL: origin })
+  }
+  contexts.push(ctx)
   return ctx.newPage()
 }
 async function fill(page, values) {
@@ -96,7 +117,11 @@ async function tool(cli, name, args, expectedError) {
   return result.structuredContent
 }
 function input(product) {
-  return { request_id: randomUUID(), product_id: product, reason: 'Причина проверена оператором' }
+  return {
+    request_id: randomUUID(),
+    product_id: product,
+    reason: 'Причина проверена оператором',
+  }
 }
 const propose = (cli, args, err) => tool(cli, 'propose_unpublish', args, err)
 const status = (cli, args, err) =>
@@ -106,8 +131,8 @@ async function pair(page, cli) {
   const instruction = await status(cli, key, 'authorization_required')
   assert.equal(instruction.verification_url, origin + connectPath)
   await page.goto(instruction.verification_url)
-  await page.getByLabel('Код', { exact: true }).fill(instruction.code)
-  await submit(page, connectPath, page.getByRole('button', { name: 'Подключить' }))
+  await page.locator('input[name="code"]').fill(instruction.code)
+  await submit(page, connectPath, page.getByRole('button', { name: /^(Подключить|Connect)$/ }))
   await status(cli, key, 'not_found')
 }
 async function review(page, req, action) {
@@ -121,6 +146,34 @@ async function review(page, req, action) {
   )
   await expect(page.getByRole('button', { name: approve, exact: true })).toHaveCount(0)
 }
+async function checkActionAppearance(page, reviewURL) {
+  const original = page.viewportSize()
+  for (const colorScheme of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme })
+    await page.setViewportSize({ width: colorScheme === 'dark' ? 390 : 1280, height: 844 })
+    for (const route of [connectPath, reviewURL]) {
+      await page.goto(route)
+      await expect(page.locator('html')).toHaveAttribute('data-theme-mode', colorScheme)
+      assert.ok(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+      )
+      if (route === connectPath) {
+        const input = page.locator('input[name="code"]')
+        await input.fill('ABCDE-FGHIJ')
+        await input.press('Tab')
+        await expect(page.getByRole('button', { name: /^(Подключить|Connect)$/ })).toBeFocused()
+      } else {
+        const button = page.getByRole('button', { name: approve, exact: true })
+        await button.focus()
+        await page.keyboard.press('Tab')
+        await expect(page.getByRole('button', { name: decline, exact: true })).toBeFocused()
+      }
+    }
+  }
+  if (original) await page.setViewportSize(original)
+  await page.emulateMedia({ colorScheme: null })
+}
+
 async function restrictedOperator(owner) {
   const address = 'operator@example.invalid'
   const slug = 'unpublish-pilot-operator'
@@ -135,7 +188,11 @@ async function restrictedOperator(owner) {
   await submit(owner, '/admins/create')
   await expect(owner).toHaveURL(/\/admins\/\d+$/)
   await owner.goto('/roles/create')
-  await fill(owner, { name: 'Fixture operator', slug, description: 'Unpublish permission test' })
+  await fill(owner, {
+    name: 'Fixture operator',
+    slug,
+    description: 'Unpublish permission test',
+  })
   await permissionCheckbox(owner, 'dashboard:read').click()
   await permissionCheckbox(owner, 'products:unpublish').click()
   await submit(owner, '/roles')
@@ -178,6 +235,12 @@ try {
   await submit(page, '/auth/register')
   await expect(page.locator('[data-profile-menu-trigger]')).toBeVisible()
   const owner = await actorID(page)
+  if (profile) {
+    const cookie = (await page.context().cookies()).find((c) => c.name === '__Host-goadmin_session')
+    assert.ok(
+      cookie?.secure && cookie.httpOnly && cookie.path === '/' && cookie.domain === 'localhost',
+    )
+  }
   const first = await newClient()
   assert.deepEqual((await first.listTools()).tools.map((t) => t.name).sort(), [
     'get_unpublish_request',
@@ -196,7 +259,16 @@ try {
   await login(otherLogin)
   const wrong = await otherLogin.goto(req.review_url)
   assert.ok([403, 404].includes(wrong.status()))
+  if (profile) await checkActionAppearance(page, req.review_url)
   await review(page, req, approve)
+  if (process.env.UNPUBLISH_QA_JOURNAL) {
+    const journal = page.locator('[role="status"] ~ a[href="/product-events"]')
+    await expect(journal).toBeVisible()
+    await page.reload()
+    await expect(journal).toBeVisible()
+    await journal.click()
+    await expect(page).toHaveURL(/\/product-events$/)
+  }
   const receipt = await status(first, args)
   assert.equal(receipt.status, 'succeeded')
   assert.ok(/^[1-9]\d*$/.test(receipt.event_id))
@@ -232,7 +304,9 @@ try {
   await expect
     .poll(
       async () => {
-        const reply = await first.callTool('get_unpublish_request', { request_id: args.request_id })
+        const reply = await first.callTool('get_unpublish_request', {
+          request_id: args.request_id,
+        })
         if (reply.isError) assert.equal(reply.structuredContent.error, 'outcome_unknown')
         return reply.structuredContent
       },
@@ -258,6 +332,13 @@ try {
   const operatorID = await actorID(restricted.page)
   const restrictedClient = await newClient()
   await pair(restricted.page, restrictedClient)
+  if (process.env.UNPUBLISH_QA_JOURNAL) {
+    const permitted = await propose(restrictedClient, input(seed(operatorID)))
+    await review(restricted.page, permitted, approve)
+    await expect(
+      restricted.page.locator('[role="status"] ~ a[href="/product-events"]'),
+    ).toHaveCount(0)
+  }
   const scoped = input(seed(operatorID))
   await propose(restrictedClient, args, 'not_found')
   const original = await propose(restrictedClient, scoped)
@@ -303,7 +384,7 @@ try {
     console.log('Waiting for the original 15-minute connection deadline')
     await delay(901000)
   } else {
-    sql(`UPDATE starter_product_unpublish_requests SET created_at=statement_timestamp()-interval '16 minutes',
+    sql(`UPDATE admin_confirmed_actions SET created_at=statement_timestamp()-interval '16 minutes',
       expires_at=statement_timestamp()-interval '1 minute' WHERE request_id='${deadline.request_id}'`)
   }
   await page.reload()
@@ -335,5 +416,6 @@ try {
   throw error
 } finally {
   for (const c of clients) await c.close()
-  await browser.close()
+  for (const ctx of contexts) await ctx.close()
+  await browser?.close()
 }

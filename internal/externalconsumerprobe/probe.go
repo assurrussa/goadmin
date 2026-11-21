@@ -1,6 +1,7 @@
 package externalconsumerprobe
 
 import (
+	_ "embed"
 	"errors"
 	"path/filepath"
 	"strconv"
@@ -116,6 +117,15 @@ func (c Config) BuildProbeTest() (string, error) {
 	content = strings.ReplaceAll(content, DefaultGoauthModulePath, cfg.GoauthModulePath)
 
 	return content, nil
+}
+
+//go:embed testdata/archive_action_test.go
+var archiveActionTest string
+
+func (c Config) BuildArchiveTest() string {
+	cfg := c.normalized()
+	content := strings.ReplaceAll(archiveActionTest, DefaultModulePath, cfg.ModulePath)
+	return strings.ReplaceAll(content, DefaultGoauthModulePath, cfg.GoauthModulePath)
 }
 
 const runnableProbeTest = `package probe

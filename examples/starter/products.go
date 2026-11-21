@@ -235,7 +235,21 @@ func (r productRepo) unpublish(ctx context.Context, a host.Actor, id, revision s
 	if err != nil {
 		return crud.FieldErrors{unpublishReason.Key: {err.Error()}}
 	}
-	return r.applyCommand(ctx, a, id, revision, unpublishProductUpdate, "unpublish", &reason)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	_, err = withdrawProduct(ctx, func(ctx context.Context, sql string, args ...any) withdrawalRow {
+		return tx.QueryRowContext(ctx, sql, args...)
+	}, a, id, revision, reason)
+	if err != nil {
+		return err
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("%w: %v", crud.ErrUnknown, err)
+	}
+	return nil
 }
 
 func (r productRepo) applyCommand(ctx context.Context, a host.Actor, id, revision, query, action string, reason *string) error {
@@ -363,6 +377,7 @@ func migrateProducts(ctx context.Context, dsn string) error {
 		{2, []string{"ALTER TABLE starter_products ADD COLUMN IF NOT EXISTS category text NOT NULL DEFAULT ''"}},
 		{3, []string{"ALTER TABLE starter_product_events ADD COLUMN reason text"}},
 		{4, []string{createUnpublishRequests}},
+		{5, nil},
 	}
 	for _, change := range changes {
 		var installed bool
@@ -374,6 +389,11 @@ func migrateProducts(ctx context.Context, dsn string) error {
 		}
 		for _, statement := range change.statements {
 			if _, err = tx.ExecContext(ctx, statement); err != nil {
+				return err
+			}
+		}
+		if change.version == 5 {
+			if err = migrateUnpublishHistory(ctx, tx); err != nil {
 				return err
 			}
 		}

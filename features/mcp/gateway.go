@@ -105,18 +105,18 @@ func (g *gateway) read(ctx context.Context, route string, in, out any) *toolProb
 			g.token = ""
 		}
 		g.mu.Unlock()
-		return &toolProblem{Error: "authorization_expired", Message: "Access ended. Request a new connection to continue."}
+		return &toolProblem{Error: problemExpired, Message: "Access ended. Request a new connection to continue."}
 	case http.StatusConflict:
 		return &toolProblem{
 			Error: "browser_refresh_required", VerificationURL: g.connectURL(),
 			Message: "Ask the operator to open or refresh the admin page in the same browser session, then retry.",
 		}
 	case http.StatusForbidden:
-		return &toolProblem{Error: "denied", Message: "Access to the resource is denied."}
+		return &toolProblem{Error: problemDenied, Message: "Access to the resource is denied."}
 	case http.StatusNotFound:
 		return &toolProblem{Error: "not_found", Message: "The record was not found."}
 	case http.StatusUnprocessableEntity, http.StatusBadRequest:
-		return &toolProblem{Error: "invalid_input", Message: "The admin server rejected the input."}
+		return &toolProblem{Error: problemInvalidInput, Message: "The admin server rejected the input."}
 	default:
 		return gatewayUnavailable()
 	}
@@ -149,7 +149,7 @@ func (g *gateway) credential(ctx context.Context) (string, *toolProblem) {
 		Token     string `json:"access_token"` //nolint:tagliatelle // Existing device protocol.
 		ExpiresIn int    `json:"expires_in"`   //nolint:tagliatelle // Existing device protocol.
 	}
-	status, err := g.post(ctx, "token", "", map[string]string{"device_secret": g.pending.DeviceSecret}, &grant)
+	status, err := g.post(ctx, "token", "", map[string]string{fieldDeviceSecret: g.pending.DeviceSecret}, &grant)
 	if err != nil {
 		return "", gatewayUnavailable()
 	}
@@ -165,11 +165,11 @@ func (g *gateway) credential(ctx context.Context) (string, *toolProblem) {
 		return g.token, nil
 	case http.StatusForbidden:
 		g.pending = gatewayPairing{}
-		return "", &toolProblem{Error: "denied", Message: "The operator denied this connection request."}
+		return "", &toolProblem{Error: problemDenied, Message: "The operator denied this connection request."}
 	case http.StatusGone:
 		g.pending = gatewayPairing{}
 		return "", &toolProblem{
-			Error: "authorization_expired", Message: "This connection request has expired. Request a new connection to continue.",
+			Error: problemExpired, Message: "This connection request has expired. Request a new connection to continue.",
 		}
 	default:
 		return "", gatewayUnavailable()

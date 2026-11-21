@@ -61,13 +61,14 @@ For appearance, notifications and custom Inertia pages, use the
 The [standalone starter](examples/starter/README.md) runs the embedded admin,
 PostgreSQL with Docker Compose. Redis is an optional profile. Mail modules use
 NotifyHub when explicitly enabled. For the published example, check out the
-v0.31.0 tag. In that checkout's `examples/starter`, copy `.env.example` to
+v0.32.0 tag. In that checkout's `examples/starter`, copy `.env.example` to
 `.env`, fill the required values, and run
-`GOADMIN_VERSION=v0.31.0 docker compose up --build`. This uses the release's
-embedded UI and requires no sibling checkouts. For this checkout's product
-event journal and unpublish reason, use source mode below. Open
+`GOADMIN_VERSION=v0.32.0 docker compose up --build`. This uses the release's
+embedded UI and requires no sibling checkouts. For a local release candidate, use source mode below. Open
 `http://localhost:8080`. The login page offers first-admin registration until
 an administrator exists. No administrator password is bundled.
+
+The [confirmed action guide](docs/confirmed-actions.md) covers operator consent, proposal replay and host-owned transactions.
 
 For source candidates, run `bash ../../scripts/starter-local.sh up --build` from
 `examples/starter` to build this checkout and its embedded UI together.

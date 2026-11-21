@@ -164,7 +164,7 @@ func TestProductsPostgresCASIsolationAndAuditRollback(t *testing.T) {
 		"ALTER TABLE starter_products DROP COLUMN category",
 		"ALTER TABLE starter_product_events DROP COLUMN reason",
 		"DROP TABLE starter_product_unpublish_requests",
-		"DELETE FROM starter_product_migrations WHERE version IN (2,3,4)",
+		"DELETE FROM starter_product_migrations WHERE version IN (2,3,4,5)",
 	} {
 		if _, err := db.ExecContext(ctx, statement); err != nil {
 			t.Fatal(err)

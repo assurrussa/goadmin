@@ -834,3 +834,5 @@ Unlike ordinary RBAC snapshot reads, this mutation/recovery guard deliberately
 uses SQL, including when authorization snapshots are enabled. Hosts must not put
 it on ordinary client requests: customer recovery has its own policy and must
 route before this administrative guard. No schema or default cache mode changes.
+
+Confirmed writes use the [public confirmed action contract](confirmed-actions.md). Each action has its own native browser grant and uses the host transaction for its mutation, audit, outbox and durable receipt.

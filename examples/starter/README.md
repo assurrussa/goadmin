@@ -14,21 +14,21 @@ when only GoAuth and GoNotify paths are selected.
 
 Prerequisites: Git, Docker Engine with Docker Compose, and OpenSSL for generating
 local secrets. No sibling repositories or Node.js installation are needed for
-this mode. Use the starter source from the **GoAdmin v0.31.0** tag with the
+this mode. Use the starter source from the **GoAdmin v0.32.0** tag with the
 published library and embedded UI from that release.
 
 ```sh
-git clone --branch v0.31.0 --depth 1 https://github.com/assurrussa/goadmin.git
+git clone --branch v0.32.0 --depth 1 https://github.com/assurrussa/goadmin.git
 cd goadmin/examples/starter
 cp .env.example .env
 # Fill the required values below before starting.
-GOADMIN_VERSION=v0.31.0 docker compose up --build
+GOADMIN_VERSION=v0.32.0 docker compose up --build
 ```
 
 This command pins both the starter source and published library. Keep the same
 version in your private `.env` for subsequent runs. When upgrading, check out the matching starter revision, read
 the release notes and run the published-consumer check from the repository root:
-`make externalconsumer-published VERSION=v0.31.0`. That check needs the repository's
+`make externalconsumer-published VERSION=v0.32.0`. That check needs the repository's
 Go toolchain; it does not replace running this starter in a browser.
 
 For either mode, copy `.env.example` to `.env` in the checkout you will run.
@@ -288,15 +288,33 @@ To run browser and real stdio acceptance together, use
 default instance enables the pilot and the topbar instance checks the disabled
 configuration.
 
-## Propose a product withdrawal through MCP
+## Confirmed product withdrawal
 
-Enable `ADMIN_MODULES=products,product-unpublish-mcp` and run the starter migration. The example requires a single starter process. From `examples/starter`, build the client with `GOWORK=off go build -o /tmp/product-unpublish-mcp ./cmd/product-unpublish-mcp`. Configure your MCP client to launch it with `-admin-url` set to the starter origin. Use HTTPS for remote connections.
+Enable `ADMIN_MODULES=products,product-unpublish-mcp` and run the starter migration. The example requires a single starter process. Use the standard `goadmin-mcp -admin-url <origin> -resource-path /agent/product-unpublish` command. With a published checkout, install the exact client using `GOWORK=off go install github.com/assurrussa/goadmin/cmd/goadmin-mcp@v0.32.0`. The original `./cmd/product-unpublish-mcp` command still selects this action automatically. Use HTTPS for remote connections.
 
 1. Before the first call, generate and save a lowercase UUID for this proposal. Call `propose_unpublish` with `request_id`, a decimal `product_id` string and a required `reason` of up to 500 Unicode characters. The first call returns a verification URL and a code.
 2. In your native admin login, enter the code and select **Подключить**. You need the `products:unpublish` permission. The connection lasts up to 15 minutes. Repeat the same call to get the proposal's review URL.
 3. Open that URL in the same login. Check the product name, ID, transition from published to draft and exact reason. **Снять с публикации** immediately changes the product and records the reason. To change the wording, choose **Отклонить** and have the client submit a new proposal with a fresh UUID.
-4. Call `get_unpublish_request` with the original `request_id`. A successful receipt includes its product journal event ID. If a response is lost, look up the same UUID. Once the server is reachable, a pending request can be reviewed again. A repeated proposal with a different product or reason is rejected.
+4. Call `get_unpublish_request` with the original `request_id`. A successful receipt includes its product journal event ID. With `product-events` installed and `product_events:read` granted, the browser also links to the journal. If a response is lost, look up the same UUID. Once the server is reachable, a pending request can be reviewed again. A repeated proposal with a different product or reason is rejected.
 
 Reapplying requires a new proposal after a change to the product, a rejection or expiry. On logout, connection revocation or a server restart, pending proposals from that connection can no longer be approved. An authorized operator can pair again to retrieve completed receipts, including after deletion of the product. The connection and the journal reader have separate pairing codes and permissions.
 
-To repeat acceptance, install the existing smoke dependencies with `npm ci` and `npx playwright install firefox` in `scripts/starter-smoke`. Run `python3 scripts/starter-smoke/product-unpublish.py` from the repository root with Docker available. It creates an isolated Compose project, builds the starter against its published GoAdmin pin and drives Firefox and the stdio executable. By default the fixture moves a pending request's database deadline into the past. Set `QA_NATURAL_EXPIRY=1` to wait for the actual 15-minute connection deadline. Set `QA_FIREFOX` to use an existing Playwright Firefox executable.
+The upgrade imports earlier receipts into the common ledger. Existing pending
+proposals expire because their grants belonged to the old process. The old
+table is retained. Disable the write module before rolling back the application.
+
+From `scripts/starter-smoke`, run `npm ci` and `npx playwright install firefox`.
+From the repository root, run the following with Docker, OpenSSL and NSS
+`certutil` available. Each run creates a private starter, database, proxy,
+test CA and Firefox profiles and removes them on exit.
+
+```sh
+python3 scripts/starter-smoke/confirmed-https.py --candidate
+python3 scripts/starter-smoke/confirmed-https.py --candidate --sessions redis
+python3 scripts/starter-smoke/confirmed-https.py --published v0.32.0
+```
+
+The published mode builds the starter and stdio client with all source overrides removed.
+Set `QA_NATURAL_EXPIRY=1` to wait for the actual 15-minute grant deadline and
+`QA_FIREFOX` for an existing Playwright Firefox executable. The default expiry
+check advances only the isolated proposal's database deadline.

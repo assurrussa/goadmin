@@ -81,7 +81,16 @@ type persistentCookieStorage struct {
 	persistentTTL time.Duration
 }
 
-var _ sessioncore.RecordEditFlashStorage = (*persistentCookieStorage)(nil)
+var (
+	_ sessioncore.RecordEditFlashStorage = (*persistentCookieStorage)(nil)
+	_ sessioncore.StorageLeaseReader     = (*persistentCookieStorage)(nil)
+)
+
+func (s *persistentCookieStorage) GetSessionWithExpiry(
+	ctx context.Context, key string, base time.Time,
+) ([]byte, time.Time, error) {
+	return sessioncore.GetSessionWithExpiry(ctx, s.Storage, key, base)
+}
 
 func (s *persistentCookieStorage) SetRecordEditFlash(ctx context.Context, key string, payload []byte, ttl time.Duration) error {
 	return sessioncore.SetRecordEditFlash(ctx, s.Storage, key, payload, ttl)
@@ -123,7 +132,49 @@ type storage struct {
 	conn redisv9.UniversalClient
 }
 
-var _ sessioncore.RecordEditFlashStorage = (*storage)(nil)
+var (
+	_ sessioncore.RecordEditFlashStorage = (*storage)(nil)
+	_ sessioncore.StorageLeaseReader     = (*storage)(nil)
+)
+
+var readSessionLease = redisv9.NewScript(`
+	local value = redis.call('GET', KEYS[1])
+	if not value then return {false, -2} end
+	return {value, redis.call('PTTL', KEYS[1])}
+`)
+
+func (s *storage) GetSessionWithExpiry(ctx context.Context, key string, base time.Time) ([]byte, time.Time, error) {
+	if key == "" {
+		return nil, time.Time{}, nil
+	}
+	// The PostgreSQL receipt clock was sampled before the Redis round trip.
+	// Anchor the relative TTL there and allow for Redis millisecond precision.
+	if base.IsZero() {
+		return nil, time.Time{}, errors.New("browser session lease clock is unavailable")
+	}
+	values, err := readSessionLease.Run(ctx, s.conn, []string{sessionKeyPrefix + key}).Slice()
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	if len(values) != 2 {
+		return nil, time.Time{}, errors.New("invalid Redis browser session lease response")
+	}
+	ttl, ok := values[1].(int64)
+	if !ok || ttl < -2 {
+		return nil, time.Time{}, errors.New("invalid Redis browser session TTL")
+	}
+	if ttl == -2 {
+		return nil, time.Time{}, nil
+	}
+	value, ok := values[0].(string)
+	if !ok {
+		return nil, time.Time{}, errors.New("invalid Redis browser session payload")
+	}
+	if ttl == -1 {
+		return []byte(value), time.Time{}, nil
+	}
+	return []byte(value), base.Add(time.Duration(ttl-1) * time.Millisecond), nil
+}
 
 func (s *storage) SetRecordEditFlash(ctx context.Context, key string, payload []byte, ttl time.Duration) error {
 	if !strings.HasPrefix(key, sessioncore.RecordEditFlashKeyPrefix) || len(payload) == 0 || ttl <= 0 {

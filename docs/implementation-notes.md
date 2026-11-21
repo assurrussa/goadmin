@@ -2811,3 +2811,50 @@ A stale role form must show the entered and saved values, including permissions,
 A native operator pairs a client to propose withdrawals of their own published products. A proposal captures the product revision and normalized reason. Only the browser that approved the connection can confirm an individual proposal. Closing a connection prevents its pending requests from being executed. A newly authorized connection for the same operator can read their historical receipts.
 
 The request UUID belongs to the operator. An identical retry returns the existing request, a different product or reason conflicts, and a stale revision requires a fresh proposal. Confirmation moves the product to draft and records the reason, event number and successful receipt in one transaction. After an indeterminate commit, the caller looks up the original UUID. The starter owns these semantics and storage.
+
+## Confirmed actions candidate
+
+The candidate moves the pilot into `features/mcp` for the starter withdrawal
+and Sportsite exercise publication. A native login pairs one action for up to
+15 minutes. Proposing saves a snapshot without changing the record. Only the
+original login may confirm that snapshot. A decline, stale record, expired
+grant, logout or successful role preview closes the proposal. A different
+login cannot assume it. After a restart an authorized operator can pair
+again and read a completed receipt. Reusing the same operator-scoped UUID
+returns the original result or a conflict if the action or arguments differ.
+
+Commit the transition, audit, host outbox entries and receipt in one
+PostgreSQL transaction. Terminal requests retain an identity and outcome.
+Temporary exercise text and media leave the review store when the request
+closes. The deploy contract is one active process, with Redis or PostgreSQL
+canonical native sessions. Roll back the starter with proposal writes
+disabled. Before the single library tag, verify both hosts behind trusted
+local HTTPS proxies with a browser and the standard stdio client. Verify both
+published consumers after the tag. The owner runs the Sportsite production
+release and verifies its Dokploy ingress before enabling exercise publication.
+
+The review found three timing and retention cases. The action now records
+success before its original database deadline or rolls back its host writes.
+The core expiry worker clears unattended reviews even with action routes off.
+Delegated Fiber session inspection observes absolute expiry without deleting
+a row held by its own transaction. PostgreSQL integration tests cover each
+case, including recovery of the original event after a lost commit reply.
+The previous Products ledger remains available for rollback with writes off.
+
+The review follow-up exercises a second external host in the generated Go
+module. Its native operator approves archiving a document identified by text.
+The integration gate compares the transaction IDs on the document and its
+receipt, then reads the original archive reference on replay. Changed receipt
+schemas can be registered by version. A client reports an unknown outcome if
+the receipt lacks a required field. Sportsite loads long draft content for the
+original browser login at the reviewed revision, keeping it out of the ledger
+and the stdio response.
+
+Local acceptance for this change uses both PostgreSQL and Redis native
+sessions on each host. The single GoAdmin tag follows the required PR review.
+
+The confirmation deadline includes the Fiber absolute cutoff and the storage
+lease on PostgreSQL or Redis. For Redis the server reads the value and TTL
+together and anchors the remaining time to the PostgreSQL decision clock.
+The browser response keeps the host result in its own object so an existing
+result field named `receiptLink` can coexist with the navigation link.

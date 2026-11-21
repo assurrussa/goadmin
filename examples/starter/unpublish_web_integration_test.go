@@ -4,23 +4,27 @@ package main
 
 import (
 	"bytes"
-	"context"
+	"encoding/gob"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
 	"net/url"
-	"regexp"
+	"os"
+	"reflect"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/assurrussa/goauth"
 	"github.com/assurrussa/goauth/postgres"
 	"github.com/assurrussa/goauth/rbac"
+	"github.com/assurrussa/outbox/backends/pgsql/storage/pgsqlclient"
+	"github.com/assurrussa/outbox/backends/pgsql/storage/pgsqlinit"
+	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/adaptor"
+	"github.com/google/uuid"
 
 	"github.com/assurrussa/goadmin/host"
 )
@@ -29,6 +33,22 @@ const (
 	unpublishTestOrigin      = "http://localhost:18768"
 	unpublishTestSessionName = "goadmin_session"
 )
+
+const (
+	unpublishConnectPath = unpublishAgentPath + "/connect"
+	unpublishRequestPath = unpublishAgentPath + "/requests/"
+	unpublishPending     = "pending"
+	unpublishExpired     = "expired"
+	unpublishSucceeded   = "succeeded"
+)
+
+type unpublishOutput struct {
+	RequestID string    `json:"request_id"`
+	Status    string    `json:"status"`
+	ReviewURL string    `json:"review_url,omitempty"`
+	EventID   string    `json:"event_id,omitempty"`
+	ExpiresAt time.Time `json:"expires_at,omitempty"`
+}
 
 type unpublishTestHTTP struct {
 	t       *testing.T
@@ -150,7 +170,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = pg.Close() })
-	newHTTP := func(t *testing.T, rawOrigin string) unpublishTestHTTP {
+	buildHTTP := func(t *testing.T, rawOrigin string, client host.StoragePgsqlClient, redis host.RedisClient) unpublishTestHTTP {
 		t.Helper()
 		origin, err := url.Parse(rawOrigin)
 		if err != nil {
@@ -163,6 +183,9 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 			SessionTTL: time.Hour, SessionInactiveTTL: time.Hour,
 		})
 		admin.CanonicalSessionBackend = "pgsql"
+		if redis != nil {
+			admin.CanonicalSessionBackend = "redis"
+		}
 		cfg := host.Config{
 			Admin: admin, Server: host.ServerConfig{Addr: ":8080", AllowOrigins: []string{rawOrigin}},
 			CSRF: host.CSRFConfig{AppDomain: origin.Hostname(), SecretKey: strings.Repeat("c", 32), AllowedOrigins: []string{rawOrigin}},
@@ -183,12 +206,12 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		deps := host.Dependencies{Database: pg, TxManager: host.NewTxManager(pg), Logger: lg, CSRF: csrf}
+		deps := host.Dependencies{Database: client, TxManager: host.NewTxManager(client), Logger: lg, CSRF: csrf, SessionRedis: redis}
 		products, err := productsModule(db)
 		if err != nil {
 			t.Fatal(err)
 		}
-		unpublish, err := productUnpublishModule(db, origin, netip.Addr{}, csrf, admin)
+		unpublish, err := productUnpublishModule(origin, netip.Addr{}, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -198,8 +221,12 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		}
 		t.Cleanup(func() { _ = runtime.Close() })
 		return unpublishTestHTTP{t: t, runtime: runtime, origin: rawOrigin, do: func(req *http.Request) (*http.Response, error) {
-			return runtime.App().Test(req)
+			return runtime.App().Test(req, fiber.TestConfig{Timeout: 15 * time.Second})
 		}}
+	}
+	newHTTP := func(t *testing.T, rawOrigin string) unpublishTestHTTP {
+		t.Helper()
+		return buildHTTP(t, rawOrigin, pg, nil)
 	}
 	httpServer := newHTTP(t, unpublishTestOrigin)
 	roles, err := postgres.NewRBAC(db, nil)
@@ -231,68 +258,6 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 	if err := roles.ReplaceSubjectRoles(ctx, account.Subject.ID, []int64{owner.ID}); err != nil {
 		t.Fatal(err)
 	}
-	t.Run("effective grant stays locked through the product transaction", func(t *testing.T) {
-		decision, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer decision.Rollback()
-		if err := lockUnpublishAuthority(ctx, decision, actor); err != nil {
-			t.Fatal(err)
-		}
-		short, cancel := context.WithTimeout(ctx, 250*time.Millisecond)
-		defer cancel()
-		if err := roles.ReplaceRolePermissions(short, owner.ID, nil); err == nil || short.Err() == nil {
-			t.Fatalf("concurrent revocation did not wait for the decision: %v", err)
-		}
-		if err := decision.Commit(); err != nil {
-			t.Fatal(err)
-		}
-		if err := roles.ReplaceRolePermissions(ctx, owner.ID, nil); err != nil {
-			t.Fatalf("revocation after commit: %v", err)
-		}
-		if err := roles.ReplaceRolePermissions(ctx, owner.ID, permission); err != nil {
-			t.Fatal(err)
-		}
-	})
-	t.Run("logout can lock its subject while confirmation waits for the native login", func(t *testing.T) {
-		h := &unpublishHandler{}
-		browser := unpublishBrowser{actor: actor, csrf: host.CSRFRequest{SessionID: "fixture-login"}}
-		endLogout := h.fences.acquire(browser.csrf.SessionID)
-		var releaseOnce sync.Once
-		defer releaseOnce.Do(endLogout)
-		decision, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer decision.Rollback()
-		finished := make(chan error, 1)
-		go func() {
-			release, err := h.lockBrowserAuthority(ctx, decision, browser)
-			release()
-			finished <- err
-		}()
-		until := time.Now().Add(3 * time.Second)
-		for {
-			h.fences.mu.Lock()
-			waiting := h.fences.logins[browser.csrf.SessionID].refs == 2
-			h.fences.mu.Unlock()
-			if waiting {
-				break
-			}
-			if time.Now().After(until) {
-				t.Fatal("confirmation never reached the held login mutex")
-			}
-			time.Sleep(5 * time.Millisecond)
-		}
-		if _, err := db.ExecContext(ctx, "SELECT id FROM auth_subjects WHERE id=$1 FOR UPDATE NOWAIT", actor.SubjectID); err != nil {
-			t.Fatalf("confirmation already holds the subject needed to finish logout: %v", err)
-		}
-		releaseOnce.Do(endLogout)
-		if err := <-finished; err != nil {
-			t.Fatal(err)
-		}
-	})
 	repo := productRepo{db}
 	publish := func(t *testing.T) string {
 		t.Helper()
@@ -305,6 +270,19 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 			t.Fatal(err)
 		}
 		return product.ID
+	}
+	assertScrubbed := func(t *testing.T, requestID string) {
+		t.Helper()
+		var state string
+		var scrubbed bool
+		if err := db.QueryRowContext(t.Context(), `
+			SELECT state, normalized_input IS NULL AND review_fields IS NULL AND binding_id IS NULL
+			FROM admin_confirmed_actions WHERE request_id=$1`, requestID).Scan(&state, &scrubbed); err != nil {
+			t.Fatal(err)
+		}
+		if state != unpublishExpired || !scrubbed {
+			t.Fatalf("action %s cleanup state=%q scrubbed=%t", requestID, state, scrubbed)
+		}
 	}
 
 	jar := httpServer.login(email)
@@ -321,9 +299,21 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 	if pending.Status != unpublishPending || pending.ReviewURL != unpublishTestOrigin+path {
 		t.Fatalf("unexpected proposal status: %+v", pending)
 	}
-	if html := string(httpServer.request("GET", path, nil, jar, nil, http.StatusOK)); !strings.Contains(html, "&lt;script&gt;immutable reason&lt;/script&gt;") ||
-		!strings.Contains(html, "&lt;Review product&gt;") || !strings.Contains(html, "Опубликован → Черновик") {
-		t.Fatal("review did not escape and display the immutable proposal")
+	var reviewPage struct {
+		Props struct {
+			Fields []struct{ Label, Value string }
+		}
+	}
+	view := httpServer.request("GET", path, nil, jar, http.Header{"X-Inertia": {"true"}}, http.StatusOK)
+	if err := json.Unmarshal(view, &reviewPage); err != nil {
+		t.Fatal(err)
+	}
+	reviewFields := map[string]string{}
+	for _, f := range reviewPage.Props.Fields {
+		reviewFields[f.Label] = f.Value
+	}
+	if reviewFields["Товар"] != "<Review product>" || reviewFields["Причина"] != "<script>immutable reason</script>" || reviewFields["Переход"] != "Опубликован → Черновик" {
+		t.Fatalf("unexpected immutable fields: %v", reviewFields)
 	}
 	httpServer.request("GET", path, nil, other, nil, http.StatusNotFound)
 	approval := map[string]string{"decision": "approve"}
@@ -387,6 +377,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 			s.t.Fatalf("failed preview transition changed the pending review: %+v", got)
 		}
 		s.request("POST", "/auth/role-preview", map[string]int64{"roleId": previewCandidate.ID}, jar, s.formHeaders(jar), http.StatusOK)
+		assertScrubbed(s.t, requestID)
 		// Only the native transitions may retire the grant between these requests.
 		s.request("POST", "/auth/role-preview", map[string]int64{"roleId": 0}, jar, s.formHeaders(jar), http.StatusOK)
 		s.agent("/status", token, input, http.StatusUnauthorized)
@@ -401,6 +392,83 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		return freshToken
 	}
 	token = checkPreview(httpServer, jar, token, "d1f23610-53d6-4262-bb60-c343b578c03c")
+	smallPoolWorkflow := func(t *testing.T, loginServer unpublishTestHTTP, redis host.RedisClient) {
+		t.Helper()
+		single, err := pgsqlinit.Create(t.Context(), dsn,
+			pgsqlclient.WithMinConnectionsCount(1), pgsqlclient.WithMaxConnectionsCount(1))
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = single.Close() })
+		server := buildHTTP(t, unpublishTestOrigin, single, redis)
+		browser := loginServer.login(email)
+		bearer := checkPreview(server, browser, server.pair(browser), uuid.NewString())
+		approveID := uuid.NewString()
+		server.agent("/propose", bearer, map[string]string{
+			"request_id": approveID, "product_id": publish(t), "reason": "single connection",
+		}, http.StatusOK)
+		server.request(http.MethodPost, unpublishRequestPath+approveID, approval, browser, server.formHeaders(browser), http.StatusOK)
+		if got := server.agent("/status", bearer, map[string]string{"request_id": approveID}, http.StatusOK); got.Status != unpublishSucceeded {
+			t.Fatalf("single connection confirmation returned %+v", got)
+		}
+		pendingID := uuid.NewString()
+		product := publish(t)
+		key := browser[unpublishTestSessionName].Value
+		const lease = 45 * time.Second
+		var earliest, latest time.Time
+		if redis == nil {
+			err := db.QueryRowContext(t.Context(), `UPDATE goadmin_browser_sessions
+				SET expires_at=clock_timestamp()+interval '45 seconds' WHERE id=$1 RETURNING expires_at`, key).Scan(&latest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			earliest = latest
+		} else {
+			key = "goadmin:session:" + key
+			earliest = time.Now().Add(lease - 2*time.Second)
+			if ok, err := redis.PExpire(t.Context(), key, lease).Result(); err != nil || !ok {
+				t.Fatalf("set Redis browser lease: %t (%v)", ok, err)
+			}
+			latest = time.Now().Add(lease)
+		}
+		proposal := server.agent("/propose", bearer, map[string]string{
+			"request_id": pendingID, "product_id": product, "reason": "logout cleanup",
+		}, http.StatusOK)
+		if proposal.ExpiresAt.Before(earliest) || proposal.ExpiresAt.After(latest) {
+			t.Fatalf("proposed expiry %v outside browser storage lease [%v, %v]", proposal.ExpiresAt, earliest, latest)
+		}
+		if redis != nil {
+			if ttl, err := redis.PTTL(t.Context(), key).Result(); err != nil || ttl <= 0 || ttl > lease {
+				t.Fatalf("delegated check changed Redis browser lease: %v (%v)", ttl, err)
+			}
+		} else {
+			var actual time.Time
+			err := db.QueryRowContext(t.Context(), "SELECT expires_at FROM goadmin_browser_sessions WHERE id=$1", key).Scan(&actual)
+			if err != nil || !actual.Equal(latest) {
+				t.Fatalf("delegated check changed PostgreSQL browser lease: %v (%v)", actual, err)
+			}
+		}
+		headers := server.formHeaders(browser)
+		headers.Set("Referer", server.origin+"/auth/profile")
+		server.request(http.MethodDelete, "/auth/logout", nil, browser, headers, http.StatusFound)
+		assertScrubbed(t, pendingID)
+		server.agent("/status", bearer, map[string]string{"request_id": pendingID}, http.StatusUnauthorized)
+	}
+	t.Run("single_connection_native_transitions_pgsql", func(t *testing.T) {
+		smallPoolWorkflow(t, httpServer, nil)
+	})
+	t.Run("single_connection_native_transitions_redis", func(t *testing.T) {
+		addr := os.Getenv("GOAUTH_TEST_REDIS_ADDRESS")
+		if addr == "" {
+			t.Skip("GOAUTH_TEST_REDIS_ADDRESS must name an isolated Redis test server")
+		}
+		client, err := host.NewRedisClient(t.Context(), host.RedisConfig{Addrs: []string{addr}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = client.Close() })
+		smallPoolWorkflow(t, buildHTTP(t, unpublishTestOrigin, pg, client), client)
+	})
 	t.Run("production_role_preview", func(t *testing.T) {
 		server := httptest.NewUnstartedServer(nil)
 		defer server.Close()
@@ -453,6 +521,55 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		production.agent("/status", current, statusInput, http.StatusUnauthorized)
 	})
 
+	t.Run("absolute browser expiry while the SQL row is live", func(t *testing.T) {
+		live := httpServer.login(email)
+		grant := httpServer.pair(live)
+		key := live[unpublishTestSessionName].Value
+		var raw []byte
+		if err := db.QueryRowContext(ctx, "SELECT payload FROM goadmin_browser_sessions WHERE id=$1", key).Scan(&raw); err != nil {
+			t.Fatal(err)
+		}
+		var values map[any]any
+		if err := gob.NewDecoder(bytes.NewReader(raw)).Decode(&values); err != nil {
+			t.Fatal(err)
+		}
+		var absoluteKey any
+		for k := range values {
+			if reflect.TypeOf(k).Name() == "absExpirationKeyType" {
+				absoluteKey = k
+			}
+		}
+		if absoluteKey == nil {
+			t.Fatal("fixture has no Fiber absolute deadline")
+		}
+		setAbsolute := func(expires time.Time) {
+			t.Helper()
+			values[absoluteKey] = expires
+			var encoded bytes.Buffer
+			if err := gob.NewEncoder(&encoded).Encode(values); err != nil {
+				t.Fatal(err)
+			}
+			_, err := db.ExecContext(ctx, "UPDATE goadmin_browser_sessions SET payload=$1 WHERE id=$2", encoded.Bytes(), key)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		cutoff := time.Now().Add(time.Minute).Truncate(time.Microsecond)
+		setAbsolute(cutoff)
+		pending := httpServer.agent("/propose", grant, map[string]string{
+			"request_id": uuid.NewString(), "product_id": publish(t), "reason": "absolute browser expiry",
+		}, http.StatusOK)
+		if !pending.ExpiresAt.Equal(cutoff) {
+			t.Fatalf("proposed expiry %v differs from Fiber cutoff %v", pending.ExpiresAt, cutoff)
+		}
+		setAbsolute(time.Now().Add(-time.Minute))
+		httpServer.agent("/status", grant, statusInput, http.StatusUnauthorized)
+		var retained bool
+		if err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM goadmin_browser_sessions WHERE id=$1)", key).Scan(&retained); err != nil || !retained {
+			t.Fatalf("delegated observation modified the native session: %t %v", retained, err)
+		}
+	})
+
 	// Share native state with a second runtime, so the first runtime's
 	// transition observer cannot know about this preview until it resolves it.
 	peer := newHTTP(t, unpublishTestOrigin)
@@ -494,9 +611,9 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 	blockedID := "d1f23610-53d6-4262-bb60-c343b578c05c"
 	blockedProduct := publish(t)
 	httpServer.agent("/propose", token, map[string]string{"request_id": blockedID, "product_id": blockedProduct, "reason": "revoked"}, http.StatusOK)
-	connectPage := httpServer.request("GET", unpublishConnectPath, nil, jar, nil, http.StatusOK)
-	connectionID := regexp.MustCompile(`name="connection_id" value="([A-Z2-7]+)"`).FindSubmatch(connectPage)
-	if len(connectionID) != 2 {
+	connectPage := httpServer.request("GET", unpublishConnectPath, nil, jar, http.Header{"X-Inertia": {"true"}}, http.StatusOK)
+	var connections struct{ Props struct{ Grants []string } }
+	if err := json.Unmarshal(connectPage, &connections); err != nil || len(connections.Props.Grants) != 1 {
 		t.Fatal("connection management did not render the active connection")
 	}
 	tx, err := db.BeginTx(ctx, nil)
@@ -522,7 +639,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 	}
 	finished := make(chan pendingHTTP, 1)
 	go func() {
-		resp, err := httpServer.runtime.App().Test(review)
+		resp, err := httpServer.runtime.App().Test(review, fiber.TestConfig{Timeout: 15 * time.Second})
 		if err != nil {
 			finished <- pendingHTTP{err: err}
 			return
@@ -549,8 +666,9 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	httpServer.request("POST", unpublishConnectPath, map[string]string{"decision": "revoke", "connection_id": string(connectionID[1])},
+	httpServer.request("POST", unpublishConnectPath, map[string]string{"decision": "revoke", "connection_id": connections.Props.Grants[0]},
 		jar, httpServer.formHeaders(jar), http.StatusOK)
+	assertScrubbed(t, blockedID)
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}

@@ -1,4 +1,4 @@
-// Package mcp exposes explicitly configured read-only admin resources to local MCP clients.
+// Package mcp exposes selected reads and operator-confirmed actions to local MCP clients.
 package mcp
 
 import (
@@ -248,12 +248,13 @@ func (r Resource) snapshot() Resource {
 }
 
 type description struct {
-	Version     int     `json:"version"`
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	ID          string  `json:"recordIdDescription"`
-	Search      *Search `json:"search,omitempty"`
-	Detail      *Detail `json:"detail,omitempty"`
+	Version     int                `json:"version"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	ID          string             `json:"recordIdDescription"`
+	Search      *Search            `json:"search,omitempty"`
+	Detail      *Detail            `json:"detail,omitempty"`
+	Action      *actionDescription `json:"action,omitempty"`
 }
 
 func (r Resource) description() description {
@@ -264,6 +265,12 @@ func (r Resource) description() description {
 }
 
 func (d description) validate() error {
+	if d.Action != nil {
+		if d.Version != 2 || !namePattern.MatchString(d.Name) || !hasDescription(d.Description) || d.Search != nil || d.Detail != nil {
+			return errors.New("mcp: invalid confirmed action description")
+		}
+		return d.Action.validate()
+	}
 	if d.Version != 1 || !namePattern.MatchString(d.Name) || !hasDescription(d.Description) || !hasDescription(d.ID) ||
 		(d.Search == nil && d.Detail == nil) {
 		return errors.New("mcp: a named resource, description, record ID description and at least one read operation are required")

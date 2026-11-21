@@ -231,7 +231,7 @@ func run() error {
 			modules = append(modules, products)
 		}
 		if selected[unpublishModuleKey] {
-			unpublish, moduleErr := productUnpublishModule(productDB, parsedURL, trustedProxy, deps.CSRF, adminCfg)
+			unpublish, moduleErr := productUnpublishModule(parsedURL, trustedProxy, selected["product-events"])
 			if moduleErr != nil {
 				return moduleErr
 			}
