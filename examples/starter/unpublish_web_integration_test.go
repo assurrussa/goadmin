@@ -203,7 +203,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		unpublish, err := productUnpublishModule(origin, netip.Addr{})
+		unpublish, err := productUnpublishModule(origin, netip.Addr{}, false)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -192,6 +192,10 @@ func (h *actionHandler) sendResult(c fiber.Ctx, actor host.Actor, r actionReques
 	if err != nil {
 		return actionFailure(c, err)
 	}
+	return c.JSON(h.wireResult(r))
+}
+
+func (h *actionHandler) wireResult(r actionRequest) fiber.Map {
 	out := fiber.Map{fieldRequestID: r.RequestID, fieldStatus: r.State}
 	if r.State == actionPending {
 		out[fieldReviewURL] = h.origin.String() + h.action.Path + "/requests/" + r.RequestID
@@ -200,7 +204,7 @@ func (h *actionHandler) sendResult(c fiber.Ctx, actor host.Actor, r actionReques
 	for key, value := range h.resultFields(r) {
 		out[key] = value
 	}
-	return c.JSON(out)
+	return out
 }
 
 func (h *actionHandler) resultFields(r actionRequest) map[string]string {

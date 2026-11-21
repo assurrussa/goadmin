@@ -52,7 +52,9 @@ the exact configured Origin.
   same domain transition used by the native UI, its history and any outbox
   entries through that transaction. Use the request UUID for host correlations.
   Schedule externally visible work in the outbox after commit. Return only
-  declared result keys suitable for a durable receipt.
+  declared result keys suitable for a durable receipt. For an installed host page,
+  set the optional browser-only `ReceiptLink` to a local path, label and required
+  permission. The destination must enforce its normal access checks.
 - Terminal receipts retain the operator, request ID, contract, normalized
   input hash, record identity, reviewed revision, outcome and declared result.
   Confirmation clears the raw input, binding and review fields in the same

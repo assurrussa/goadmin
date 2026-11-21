@@ -17,10 +17,12 @@ const props = defineProps<{
   revision: string
   fields: { label: string; value: string }[] | null
   result: Record<string, string> | null
+  receiptLink?: { href: string; label: string } | null
 }>()
 const busy = ref(false)
 const status = ref(props.status)
 const result = ref(props.result)
+const receiptLink = ref(props.receiptLink)
 const notice = ref('')
 const labels: Record<string, string> = {
   succeeded: 'Action completed.',
@@ -44,6 +46,8 @@ async function decide(decision: 'approve' | 'decline') {
     if (data.request_id !== props.requestID || !Object.hasOwn(labels, data.status))
       throw new Error()
     status.value = data.status
+    receiptLink.value = data.receiptLink
+    delete data.receiptLink
     delete data.request_id
     delete data.status
     result.value = data
@@ -88,6 +92,9 @@ async function decide(decision: 'approve' | 'decline') {
         <dd>{{ value }}</dd>
       </div>
     </dl>
+    <a v-if="status === 'succeeded' && receiptLink" :href="receiptLink.href" class="underline">
+      {{ t(receiptLink.label) }}
+    </a>
     <p v-if="notice" role="alert">{{ t(notice) }}</p>
     <p class="break-all text-sm text-text-secondary">UUID {{ requestID }}</p>
   </section>

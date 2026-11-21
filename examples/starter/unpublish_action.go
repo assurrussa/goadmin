@@ -42,8 +42,8 @@ func normalizeWithdrawal(version string, in map[string]json.RawMessage) (json.Ra
 	return json.Marshal(input)
 }
 
-func productUnpublishModule(origin *url.URL, trustedProxy netip.Addr) (host.Module, error) {
-	return mcp.ConfirmedModule(mcp.Config{Origin: origin.String(), TrustedProxy: trustedProxy}, mcp.Action{
+func productUnpublishModule(origin *url.URL, trustedProxy netip.Addr, showJournal bool) (host.Module, error) {
+	action := mcp.Action{
 		Namespace: "starter", Key: "product-unpublish", Version: "1", Path: unpublishAgentPath, Requires: []string{"crud.products"},
 		Title: "Снятие товара с публикации", Description: "Клиент сможет предлагать снятие ваших товаров с публикации. После подтверждения товар перейдёт в черновик, а причина останется в журнале.",
 		ConfirmLabel: "Снять с публикации", ProposeTool: "propose_unpublish", StatusTool: "get_unpublish_request",
@@ -51,7 +51,14 @@ func productUnpublishModule(origin *url.URL, trustedProxy netip.Addr) (host.Modu
 		Parameters:   []mcp.Parameter{{Name: "product_id", Kind: mcp.PositiveID, Required: true, Description: "Published product ID."}, {Name: "reason", Kind: mcp.Text, Required: true, Description: "Required reason for withdrawal, up to 500 Unicode characters."}},
 		ResultFields: []mcp.Field{{Key: "event_id", Kind: mcp.PositiveID, Description: "ID of the product journal entry."}},
 		Normalize:    normalizeWithdrawal, Inspect: inspectWithdrawal, Apply: applyWithdrawal,
-	})
+	}
+	if showJournal {
+		action.ReceiptLink = &mcp.ReceiptLink{
+			Href: productEventsPath, Label: productEventsTitle,
+			Permission: host.NewPermissionKey(productEventsPermission, "read"),
+		}
+	}
+	return mcp.ConfirmedModule(mcp.Config{Origin: origin.String(), TrustedProxy: trustedProxy}, action)
 }
 
 func inspectWithdrawal(ctx context.Context, tx mcp.ActionTx, actor host.Actor, raw json.RawMessage, lock bool) (mcp.ActionSnapshot, error) {

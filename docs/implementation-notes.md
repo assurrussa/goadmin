@@ -2832,3 +2832,11 @@ disabled. Before the single library tag, verify both hosts behind trusted
 local HTTPS proxies with a browser and the standard stdio client. Verify both
 published consumers after the tag. The owner runs the Sportsite production
 release and verifies its Dokploy ingress before enabling exercise publication.
+
+The review found three timing and retention cases. The action now records
+success before its original database deadline or rolls back its host writes.
+The core expiry worker clears unattended reviews even with action routes off.
+Delegated Fiber session inspection observes absolute expiry without deleting
+a row held by its own transaction. PostgreSQL integration tests cover each
+case, including recovery of the original event after a lost commit reply.
+The previous Products ledger remains available for rollback with writes off.

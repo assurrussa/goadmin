@@ -31,6 +31,7 @@ type Action struct {
 	Permissions  []host.PermissionKey
 	Parameters   []Parameter
 	ResultFields []Field
+	ReceiptLink  *ReceiptLink
 
 	// Requires lists other host modules that must be installed with this action.
 	Requires []string
@@ -47,6 +48,14 @@ type Action struct {
 	Apply func(
 		ctx context.Context, tx ActionTx, actor host.Actor, input json.RawMessage, snapshot ActionSnapshot, requestID string,
 	) (map[string]string, error)
+}
+
+// ReceiptLink is an optional browser-only link to an installed, permission-guarded
+// host page such as the product journal. Href must be a local route.
+type ReceiptLink struct {
+	Href       string
+	Label      string
+	Permission host.PermissionKey
 }
 
 // ActionTx provides access to the action's transaction without ownership of

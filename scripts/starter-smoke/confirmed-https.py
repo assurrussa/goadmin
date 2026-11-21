@@ -73,7 +73,7 @@ def exercise(work, root, args):
     database = dict(POSTGRES_USER="fixture", POSTGRES_DB="fixture", POSTGRES_PASSWORD=secrets.token_hex(24))
     setup = secrets.token_hex(32)
     admin = dict(database, ADMIN_URL=origin, FIRST_ADMIN_SETUP_TOKEN=setup, CSRF_SECRET=secrets.token_hex(32),
-                 ADMIN_MODULES="access,users,products,product-unpublish-mcp", STARTER_MIGRATE="1",
+                 ADMIN_MODULES="access,users,products,product-events,product-unpublish-mcp", STARTER_MIGRATE="1",
                  APP_ADMIN_CANONICAL_SESSION_BACKEND=args.sessions, REDIS_DSN="redis://redis:6379/0",
                  MCP_PAIRING_TRUSTED_PROXY_IP="${QA_EDGE_IP:-}", UPLOAD_ROOT="/tmp/uploads")
     for key in ("GOAUTH_SIGNING_KEY", "GOAUTH_TOKEN_KEY", "GOAUTH_ENVELOPE_KEY"):
@@ -99,7 +99,7 @@ def exercise(work, root, args):
         ip = run("docker", "inspect", "--format", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
                  edge, capture=True).strip()
         env = dict(os.environ, QA_EDGE_IP=ip, ADMIN_URL=origin, FIRST_ADMIN_SETUP_TOKEN=setup,
-                   UNPUBLISH_QA_PROFILE=str(work / "firefox"), UNPUBLISH_QA_COMPOSE=str(composefile),
+                   UNPUBLISH_QA_JOURNAL="1", UNPUBLISH_QA_PROFILE=str(work / "firefox"), UNPUBLISH_QA_COMPOSE=str(composefile),
                    NODE_EXTRA_CA_CERTS=str(work / "ca.pem"), UNPUBLISH_QA_PROJECT=project,
                    UNPUBLISH_QA_CLI=str(work / "client"))
         (work / "client").write_text("#!/bin/sh\nexec docker exec -i -e SSL_CERT_FILE=/qa/ca.pem " +

@@ -159,6 +159,7 @@ func (h *actionHandler) reviewPage(c fiber.Ctx) error {
 		propTitle: h.action.Title, "confirmLabel": h.action.ConfirmLabel, propDescription: h.action.Description,
 		"path": h.action.Path + "/requests/" + id, "requestID": id, fieldStatus: r.State, "expiresAt": r.ExpiresAt,
 		"recordID": r.Snapshot.RecordID, "revision": r.Snapshot.Revision, "fields": r.Snapshot.Fields, "result": h.resultFields(r),
+		"receiptLink": h.receiptLink(c.Context(), b.actor, r),
 	})
 }
 
@@ -195,5 +196,19 @@ func (h *actionHandler) decide(c fiber.Ctx) error {
 	if err != nil {
 		return actionFailure(c, err)
 	}
-	return h.sendResult(c, b.actor, r)
+	out := h.wireResult(r)
+	out["receiptLink"] = h.receiptLink(c.Context(), b.actor, r)
+	return c.JSON(out)
+}
+
+func (h *actionHandler) receiptLink(ctx context.Context, actor host.Actor, r actionRequest) map[string]string {
+	link := h.action.ReceiptLink
+	if link == nil || r.State != actionSucceeded {
+		return nil
+	}
+	p := link.Permission
+	if !h.app.Unwrap().RolesService().AdminCan(ctx, actor.AdminID, p.Domain, p.Action) {
+		return nil
+	}
+	return map[string]string{"href": link.Href, "label": link.Label}
 }

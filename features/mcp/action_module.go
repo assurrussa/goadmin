@@ -87,6 +87,14 @@ func ConfirmedModule(cfg Config, action Action) (host.Module, error) {
 	if err := action.describe().validate(); err != nil {
 		return host.Module{}, err
 	}
+	if action.ReceiptLink != nil {
+		link := *action.ReceiptLink
+		if !pathPattern.MatchString(link.Href) || !hasDescription(link.Label) || link.Permission.IsZero() ||
+			integrationroles.ParsePermissionKey(link.Permission.String()) != link.Permission {
+			return host.Module{}, errors.New("mcp: invalid confirmed action receipt link")
+		}
+		action.ReceiptLink = &link
+	}
 	action.Parameters = slices.Clone(action.Parameters)
 	for i := range action.Parameters {
 		action.Parameters[i].Enum = slices.Clone(action.Parameters[i].Enum)

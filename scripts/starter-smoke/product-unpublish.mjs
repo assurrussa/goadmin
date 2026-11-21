@@ -146,6 +146,34 @@ async function review(page, req, action) {
   )
   await expect(page.getByRole('button', { name: approve, exact: true })).toHaveCount(0)
 }
+async function checkActionAppearance(page, reviewURL) {
+  const original = page.viewportSize()
+  for (const colorScheme of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme })
+    await page.setViewportSize({ width: colorScheme === 'dark' ? 390 : 1280, height: 844 })
+    for (const route of [connectPath, reviewURL]) {
+      await page.goto(route)
+      await expect(page.locator('html')).toHaveAttribute('data-theme-mode', colorScheme)
+      assert.ok(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+      )
+      if (route === connectPath) {
+        const input = page.locator('input[name="code"]')
+        await input.fill('ABCDE-FGHIJ')
+        await input.press('Tab')
+        await expect(page.getByRole('button', { name: /^(Подключить|Connect)$/ })).toBeFocused()
+      } else {
+        const button = page.getByRole('button', { name: approve, exact: true })
+        await button.focus()
+        await page.keyboard.press('Tab')
+        await expect(page.getByRole('button', { name: decline, exact: true })).toBeFocused()
+      }
+    }
+  }
+  if (original) await page.setViewportSize(original)
+  await page.emulateMedia({ colorScheme: null })
+}
+
 async function restrictedOperator(owner) {
   const address = 'operator@example.invalid'
   const slug = 'unpublish-pilot-operator'
@@ -231,7 +259,16 @@ try {
   await login(otherLogin)
   const wrong = await otherLogin.goto(req.review_url)
   assert.ok([403, 404].includes(wrong.status()))
+  if (profile) await checkActionAppearance(page, req.review_url)
   await review(page, req, approve)
+  if (process.env.UNPUBLISH_QA_JOURNAL) {
+    const journal = page.locator('[role="status"] ~ a[href="/product-events"]')
+    await expect(journal).toBeVisible()
+    await page.reload()
+    await expect(journal).toBeVisible()
+    await journal.click()
+    await expect(page).toHaveURL(/\/product-events$/)
+  }
   const receipt = await status(first, args)
   assert.equal(receipt.status, 'succeeded')
   assert.ok(/^[1-9]\d*$/.test(receipt.event_id))
@@ -295,6 +332,13 @@ try {
   const operatorID = await actorID(restricted.page)
   const restrictedClient = await newClient()
   await pair(restricted.page, restrictedClient)
+  if (process.env.UNPUBLISH_QA_JOURNAL) {
+    const permitted = await propose(restrictedClient, input(seed(operatorID)))
+    await review(restricted.page, permitted, approve)
+    await expect(
+      restricted.page.locator('[role="status"] ~ a[href="/product-events"]'),
+    ).toHaveCount(0)
+  }
   const scoped = input(seed(operatorID))
   await propose(restrictedClient, args, 'not_found')
   const original = await propose(restrictedClient, scoped)
