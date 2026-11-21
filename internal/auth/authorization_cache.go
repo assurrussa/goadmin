@@ -19,6 +19,24 @@ import (
 // config preserves the database-backed policy.
 type AuthorizationCacheConfig = authsnapshot.Config
 
+type canonicalAuthorizationKey struct{}
+
+// WithCanonicalAuthorization requires fresh database authorization for this
+// operation, even when ordinary browser requests use bounded snapshots.
+func WithCanonicalAuthorization(ctx context.Context) context.Context {
+	return context.WithValue(ctx, canonicalAuthorizationKey{}, true)
+}
+
+func requiresCanonicalAuthorization(ctx context.Context) bool {
+	if request, ok := ctx.(interface{ Context() context.Context }); ok {
+		// Fiber carries request-scoped context values separately from Locals.
+		required, _ := request.Context().Value(canonicalAuthorizationKey{}).(bool)
+		return required
+	}
+	required, _ := ctx.Value(canonicalAuthorizationKey{}).(bool)
+	return required
+}
+
 type cachedMemberships struct {
 	AdminMemberships
 	cache   *authsnapshot.Cache
@@ -42,6 +60,9 @@ func (m *cachedMemberships) HasAdminMembership(ctx context.Context, id goauth.Su
 			}
 			return m.AdminMemberships.HasAdminMembership(admintx.WithExecutor(ctx, q, m.pool), id)
 		}
+	}
+	if requiresCanonicalAuthorization(ctx) {
+		return m.AdminMemberships.HasAdminMembership(ctx, id)
 	}
 	v, err := m.cache.View(ctx)
 	if err != nil {

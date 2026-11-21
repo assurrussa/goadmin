@@ -1,4 +1,9 @@
 {
+  "Number of the product to which the event belongs.": "Номер товара, к которому относится событие.",
+  "Journaled operation, such as unpublish.": "Сохранённое действие, например снятие с публикации.",
+  "When the event happened, in UTC.": "Время события по UTC.",
+  "Reason entered by the operator when unpublishing, if recorded.": "Причина снятия с публикации, если оператор указал её при выполнении действия.",
+  "Read the operator's product event journal.": "Здесь собраны события по вашим товарам.",
   "The product name appears in the catalog and in its activity history.": "Название отображается в каталоге и в истории действий с товаром.",
   "Explain why you are removing this product. The reason remains in the activity entry after deletion.": "Укажите причину снятия с публикации. Она останется в карточке события даже после удаления товара.",
   "Manage your catalog and review publication changes in Product activity.": "Здесь вы управляете каталогом. История публикаций доступна в журнале действий с товарами.",

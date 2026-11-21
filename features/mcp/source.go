@@ -1,4 +1,4 @@
-package main
+package mcp
 
 import (
 	"errors"
@@ -7,13 +7,13 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-func pairingTrustedProxy(raw string) (netip.Addr, error) {
+func ParseTrustedProxy(raw string) (netip.Addr, error) {
 	if raw == "" {
 		return netip.Addr{}, nil
 	}
 	ip, ok := pairingIP(raw)
 	if !ok {
-		return netip.Addr{}, errors.New("MCP_PAIRING_TRUSTED_PROXY_IP must be a single proxy IP address")
+		return netip.Addr{}, errors.New("mcp: configure one trusted proxy IP address")
 	}
 	return ip, nil
 }
@@ -29,7 +29,7 @@ func pairingIP(raw string) (netip.Addr, bool) {
 
 // Only the explicitly trusted socket peer can supply the client address. It
 // must overwrite X-Real-IP with exactly one address on every request.
-func (h *journalAgent) pairingSource(c fiber.Ctx) (netip.Addr, bool) {
+func (h *resourceHandler) pairingSource(c fiber.Ctx) (netip.Addr, bool) {
 	peer, ok := netip.AddrFromSlice(c.RequestCtx().RemoteIP())
 	if !ok {
 		return netip.Addr{}, false

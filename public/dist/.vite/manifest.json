@@ -208,6 +208,17 @@
       "_editor-DHjMAgj7.js"
     ]
   },
+  "_ReadAccess.vue_vue_type_script_setup_true_lang-C9WAPro4.js": {
+    "file": "js/ReadAccess.vue_vue_type_script_setup_true_lang-C9WAPro4.js",
+    "name": "ReadAccess.vue_vue_type_script_setup_true_lang",
+    "imports": [
+      "_editor-DHjMAgj7.js",
+      "_AppHead.vue_vue_type_script_setup_true_lang-BKzE8imW.js",
+      "_PageActionBar.vue_vue_type_script_setup_true_lang-BPmqfUJs.js",
+      "_FormInput.vue_vue_type_script_setup_true_lang-IR4zFBQw.js",
+      "src/js/app.ts"
+    ]
+  },
   "_RecordEditForm.vue_vue_type_script_setup_true_lang-DoAi1F6n.js": {
     "file": "js/RecordEditForm.vue_vue_type_script_setup_true_lang-DoAi1F6n.js",
     "name": "RecordEditForm.vue_vue_type_script_setup_true_lang",
@@ -467,16 +478,32 @@
     ]
   },
   "src/js/Pages/agent/ProductEventsAccess.vue": {
-    "file": "js/ProductEventsAccess-BZZ1RuYi.js",
+    "file": "js/ProductEventsAccess-CRLlvhz5.js",
     "name": "ProductEventsAccess",
     "src": "src/js/Pages/agent/ProductEventsAccess.vue",
     "isDynamicEntry": true,
     "imports": [
+      "_ReadAccess.vue_vue_type_script_setup_true_lang-C9WAPro4.js",
       "_editor-DHjMAgj7.js",
       "_AppHead.vue_vue_type_script_setup_true_lang-BKzE8imW.js",
+      "src/js/app.ts",
       "_PageActionBar.vue_vue_type_script_setup_true_lang-BPmqfUJs.js",
       "_FormInput.vue_vue_type_script_setup_true_lang-IR4zFBQw.js",
+      "_AppInput.vue_vue_type_script_setup_true_lang-Dy1H6VOi.js"
+    ]
+  },
+  "src/js/Pages/agent/ReadAccess.vue": {
+    "file": "js/ReadAccess-CRjenjOk.js",
+    "name": "ReadAccess",
+    "src": "src/js/Pages/agent/ReadAccess.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_ReadAccess.vue_vue_type_script_setup_true_lang-C9WAPro4.js",
+      "_editor-DHjMAgj7.js",
+      "_AppHead.vue_vue_type_script_setup_true_lang-BKzE8imW.js",
       "src/js/app.ts",
+      "_PageActionBar.vue_vue_type_script_setup_true_lang-BPmqfUJs.js",
+      "_FormInput.vue_vue_type_script_setup_true_lang-IR4zFBQw.js",
       "_AppInput.vue_vue_type_script_setup_true_lang-Dy1H6VOi.js"
     ]
   },
@@ -1128,6 +1155,7 @@
       "src/js/Pages/admin/ViewPage.vue",
       "src/js/Pages/admission/IndexPage.vue",
       "src/js/Pages/agent/ProductEventsAccess.vue",
+      "src/js/Pages/agent/ReadAccess.vue",
       "src/js/Pages/auth/AdmissionWaitingPage.vue",
       "src/js/Pages/auth/ForgotPasswordPage.vue",
       "src/js/Pages/auth/LoginPage.vue",

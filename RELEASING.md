@@ -2,6 +2,17 @@
 
 This module is published as `github.com/assurrussa/goadmin`.
 
+## v0.31.0 candidate
+
+This candidate adds operator-facing CRUD descriptions, conflict-aware role
+editing and the opt-in `features/mcp` package. The optional stdio command is
+`github.com/assurrussa/goadmin/cmd/goadmin-mcp`. Products retains its existing
+tool names. The site exercise integration uses the same library and explicitly
+enables SSO-bound reads. GoAdmin's public consumer probe exercises the MCP
+adapter. Before tagging, run the Products and external-host browser scenarios
+and `make publish-readiness VERSION=v0.31.0`. After tagging, validate the exact
+published version with `make release-readiness VERSION=v0.31.0`.
+
 ## Current Baseline
 
 - The [latest GitHub release](https://github.com/assurrussa/goadmin/releases/latest)
@@ -319,6 +330,7 @@ The supported embedding surface is intentionally narrow:
 - `github.com/assurrussa/goadmin/features/realtime`
 - `github.com/assurrussa/goadmin/features/authmail`
 - `github.com/assurrussa/goadmin/features/crud`
+- `github.com/assurrussa/goadmin/features/mcp`
 - `github.com/assurrussa/goadmin/features/users`
 - `github.com/assurrussa/goadmin/toolkit/datagrid`
 - `github.com/assurrussa/goadmin/toolkit/formvalidator`

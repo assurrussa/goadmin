@@ -1,4 +1,9 @@
 {
+  "Number of the product to which the event belongs.": "Number of the product to which the event belongs.",
+  "Journaled operation, such as unpublish.": "Journaled operation, such as unpublish.",
+  "When the event happened, in UTC.": "When the event happened, in UTC.",
+  "Reason entered by the operator when unpublishing, if recorded.": "Reason entered by the operator when unpublishing, if recorded.",
+  "Read the operator's product event journal.": "Read the operator's product event journal.",
   "The product name appears in the catalog and in its activity history.": "The product name appears in the catalog and in its activity history.",
   "Explain why you are removing this product. The reason remains in the activity entry after deletion.": "Explain why you are removing this product. The reason remains in the activity entry after deletion.",
   "Manage your catalog and review publication changes in Product activity.": "Manage your catalog and review publication changes in Product activity.",

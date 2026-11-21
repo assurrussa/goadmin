@@ -61,9 +61,9 @@ For appearance, notifications and custom Inertia pages, use the
 The [standalone starter](examples/starter/README.md) runs the embedded admin,
 PostgreSQL with Docker Compose. Redis is an optional profile. Mail modules use
 NotifyHub when explicitly enabled. For the published example, check out the
-v0.30.0 tag. In that checkout's `examples/starter`, copy `.env.example` to
+v0.31.0 tag. In that checkout's `examples/starter`, copy `.env.example` to
 `.env`, fill the required values, and run
-`GOADMIN_VERSION=v0.30.0 docker compose up --build`. This uses the release's
+`GOADMIN_VERSION=v0.31.0 docker compose up --build`. This uses the release's
 embedded UI and requires no sibling checkouts. For this checkout's product
 event journal and unpublish reason, use source mode below. Open
 `http://localhost:8080`. The login page offers first-admin registration until
@@ -192,6 +192,7 @@ must not rewrite another namespace into `/public` after compression selection.
 - `github.com/assurrussa/goadmin/features/realtime`
 - `github.com/assurrussa/goadmin/features/authmail`
 - `github.com/assurrussa/goadmin/features/crud`
+- `github.com/assurrussa/goadmin/features/mcp`
 - `github.com/assurrussa/goadmin/features/users`
 - `github.com/assurrussa/goadmin/toolkit/datagrid` ([guide and runnable example](toolkit/datagrid/README.md))
 - `github.com/assurrussa/goadmin/toolkit/formvalidator`

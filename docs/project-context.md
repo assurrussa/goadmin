@@ -57,6 +57,7 @@ Stable reusable feature packages:
 - `github.com/assurrussa/goadmin/features/realtime`
 - `github.com/assurrussa/goadmin/features/authmail`
 - `github.com/assurrussa/goadmin/features/crud`
+- `github.com/assurrussa/goadmin/features/mcp`
 - `github.com/assurrussa/goadmin/features/users`
 
 Stable host-support toolkits:
@@ -174,6 +175,14 @@ starter module demonstrates an immutable journal with no CSV or domain writes.
 The optional `product-events-mcp` starter pilot binds this same reader to a
 local stdio client. Each call resolves a grant tied to the approving native
 session and checks current role preview, resource permission and ownership.
+
+The optional public `features/mcp` module registers explicitly selected read
+operations. Its shared stdio client discovers the declared tools and projections
+at the configured resource path. AuthHub-capable resources opt in separately.
+Delegated reads recheck the canonical link, login lineage and current external
+proof without refreshing it. Browser renewal in that login preserves the original
+consent deadline. Configuration and an independent host example are in
+[CRUD resources](crud.md#offer-read-access-to-an-mcp-client).
 
 ## Dashboard summaries
 

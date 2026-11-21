@@ -14,26 +14,21 @@ when only GoAuth and GoNotify paths are selected.
 
 Prerequisites: Git, Docker Engine with Docker Compose, and OpenSSL for generating
 local secrets. No sibling repositories or Node.js installation are needed for
-this mode. Use the starter source from the **GoAdmin v0.30.0** tag with the
+this mode. Use the starter source from the **GoAdmin v0.31.0** tag with the
 published library and embedded UI from that release.
 
 ```sh
-git clone --branch v0.30.0 --depth 1 https://github.com/assurrussa/goadmin.git
+git clone --branch v0.31.0 --depth 1 https://github.com/assurrussa/goadmin.git
 cd goadmin/examples/starter
 cp .env.example .env
 # Fill the required values below before starting.
-GOADMIN_VERSION=v0.30.0 docker compose up --build
+GOADMIN_VERSION=v0.31.0 docker compose up --build
 ```
 
-This command pins both the starter source and published library. The release
-snapshot may contain an older `.env.example` version value; the explicit
-`GOADMIN_VERSION=v0.30.0` command overrides it. Set the same value in your private
-`.env` for subsequent runs. This documentation branch also pins it in the template.
-Do not select an arbitrary older
-release with newer starter source: the source may use APIs that did not exist
-in that release. When upgrading, check out the matching starter revision, read
+This command pins both the starter source and published library. Keep the same
+version in your private `.env` for subsequent runs. When upgrading, check out the matching starter revision, read
 the release notes and run the published-consumer check from the repository root:
-`make externalconsumer-published VERSION=v0.30.0`. That check needs the repository's
+`make externalconsumer-published VERSION=v0.31.0`. That check needs the repository's
 Go toolchain; it does not replace running this starter in a browser.
 
 For either mode, copy `.env.example` to `.env` in the checkout you will run.
@@ -43,8 +38,7 @@ Generate each key with `openssl rand -base64 32`. Keep `.env` private and untrac
 
 ### Run the current source
 
-For the Products form constraints, unpublish reason and event journal, use the
-current checkout and the four sibling checkouts listed above. In
+To run local changes, use the current checkout and the four sibling checkouts listed above. In
 `examples/starter`, configure `.env` as above, set
 `ADMIN_MODULES=products,product-events`, and run
 `bash ../../scripts/starter-local.sh up --build`. This builds the checkout's
@@ -54,10 +48,11 @@ The default core uses PostgreSQL for browser and canonical auth sessions; it
 needs no Redis or SMTP. The login page offers first-admin registration until an
 administrator exists. Enter the setup token from `.env` in that form.
 
-`ADMIN_MODULES` selects comma-separated modules: `users,access,jobs,uploads,queues,
-notifications,realtime,authmail,products`. Empty means core only. Select `products`
-for [your first CRUD resource](../../docs/first-crud.md). In source mode this
-checkout also provides `product-events` for the [product event journal](#product-event-journal).
+`ADMIN_MODULES` accepts a comma-separated selection from `users`, `access`,
+`jobs`, `uploads`, `queues`, `notifications`, `realtime`, `authmail`, `products`,
+`product-events` and `product-events-mcp`. Empty means core only. Select `products`
+for [your first CRUD resource](../../docs/first-crud.md). Select `product-events`
+for the [product event journal](#product-event-journal).
 Uploads, queues and notifications require jobs.
 For notifications or authmail, set `NOTIFYHUB_URL` and `NOTIFYHUB_PROJECT_KEY`
 for an existing NotifyHub gateway. Both modules reuse one client and project key;
@@ -194,8 +189,6 @@ manifest validation and the same pinned client/backend sources.
 
 ## Declarative Products example
 
-The following describes this checkout in source mode.
-
 Add `products` to `ADMIN_MODULES` to enable the host-owned example at `/products`.
 `STARTER_MIGRATE=1` or the explicit `migrate` command installs its own Products
 schema/ledger after the core migrations. Disabling the module retains its data.
@@ -219,8 +212,8 @@ renderer without a Vue extension. See [CRUD resources](../../docs/crud.md).
 
 Add `product-events` to `ADMIN_MODULES` and grant the operator
 `product_events:read`. Either product module uses the same starter-owned
-migration. To try both, set `ADMIN_MODULES=products,product-events`, start in
-source mode and create or change a product. Open `/product-events` and search
+migration. To try both, set `ADMIN_MODULES=products,product-events`, start the
+starter and create or change a product. Open `/product-events` and search
 for the exact product number. Events show the action and UTC time, newest
 first, and remain available after deletion. Open an Unpublished event to read
 the full reason. Events created before starter migration v3 have no recorded
@@ -231,7 +224,7 @@ for the public host contract.
 
 ## Connect a local MCP client to Product activity
 
-In this checkout's source mode, enable
+Enable
 `ADMIN_MODULES=products,product-events,product-events-mcp`. The MCP option
 requires `product-events`. The operator signs in with a native starter account
 that has `product_events:read`. Each admin instance owns its connections in
@@ -251,7 +244,7 @@ address from that peer. For every other peer, the starter uses the socket
 address. Leaving the setting empty groups connections through a proxy under
 the proxy's own quota.
 
-Build the local stdio program from `examples/starter`:
+Build the supplied Products launcher from `examples/starter`:
 
 ```sh
 go build -o /tmp/product-events-mcp ./cmd/product-events-mcp
@@ -266,6 +259,8 @@ starter listening on the default local port, the server configuration is:
   "args": ["-admin-url", "http://localhost:8080"]
 }
 ```
+
+From the GoAdmin root, the general-purpose client is `go build -o /tmp/goadmin-mcp ./cmd/goadmin-mcp`. Its equivalent arguments are `-admin-url http://localhost:8080 -resource-path /agent/product-events`. The same executable serves another registered resource by changing the path.
 
 Use the origin configured as `ADMIN_URL`. Plain HTTP is supported on loopback;
 use HTTPS for a remote starter. The client needs no database credentials.

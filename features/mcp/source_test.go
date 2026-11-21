@@ -1,4 +1,4 @@
-package main
+package mcp //nolint:testpackage // Exercise the unexported MCP transport and grant state.
 
 import (
 	"net"
@@ -17,13 +17,13 @@ func TestPairingTrustedProxy(t *testing.T) {
 		"2001:db8::10":      netip.MustParseAddr("2001:db8::10"),
 		"::ffff:192.0.2.10": netip.MustParseAddr("192.0.2.10"),
 	} {
-		ip, err := pairingTrustedProxy(value)
+		ip, err := ParseTrustedProxy(value)
 		if err != nil || ip != want {
 			t.Errorf("trusted proxy %q: got %v, %v; want %v", value, ip, err, want)
 		}
 	}
 	for _, value := range []string{"proxy.example", "192.0.2.0/24", "192.0.2.10:443", "0.0.0.0", "::", "fe80::1%lo0"} {
-		if _, err := pairingTrustedProxy(value); err == nil {
+		if _, err := ParseTrustedProxy(value); err == nil {
 			t.Errorf("accepted invalid trusted proxy %q", value)
 		}
 	}
@@ -50,11 +50,11 @@ func TestPairingSource(t *testing.T) {
 		{"duplicate", proxy, proxy, []string{client, client}, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			trusted, err := pairingTrustedProxy(tc.trusted)
+			trusted, err := ParseTrustedProxy(tc.trusted)
 			if err != nil {
 				t.Fatal(err)
 			}
-			agent := journalAgent{trustedProxy: trusted}
+			agent := resourceHandler{trustedProxy: trusted}
 			app := fiber.New()
 			app.Get("/", func(c fiber.Ctx) error {
 				c.RequestCtx().SetRemoteAddr(&net.TCPAddr{IP: net.ParseIP(tc.peer), Port: 54321})
@@ -68,7 +68,7 @@ func TestPairingSource(t *testing.T) {
 				}
 				return c.SendStatus(http.StatusNoContent)
 			})
-			req := httptest.NewRequest(http.MethodGet, "http://localhost/", nil)
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "http://localhost/", nil)
 			req.Header.Set("X-Forwarded-For", client)
 			for _, value := range tc.headers {
 				req.Header.Add("X-Real-IP", value)
