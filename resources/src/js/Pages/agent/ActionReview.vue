@@ -47,10 +47,7 @@ async function decide(decision: 'approve' | 'decline') {
       throw new Error()
     status.value = data.status
     receiptLink.value = data.receiptLink
-    delete data.receiptLink
-    delete data.request_id
-    delete data.status
-    result.value = data
+    result.value = data.result
   } catch {
     status.value = 'unknown'
     notice.value = 'Reload this page to check the original request.'

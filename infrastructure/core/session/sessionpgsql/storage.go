@@ -23,6 +23,7 @@ type Storage struct{ db *sql.DB }
 var (
 	_ fiber.Storage                      = (*Storage)(nil)
 	_ sessioncore.RecordEditFlashStorage = (*Storage)(nil)
+	_ sessioncore.StorageLeaseReader     = (*Storage)(nil)
 )
 
 // New creates storage backed by an existing, host-owned database handle.
@@ -38,26 +39,9 @@ func (s *Storage) Get(key string) ([]byte, error) { return s.GetWithContext(cont
 
 // GetWithContext reads a non-expired, Fiber-compatible session payload.
 func (s *Storage) GetWithContext(ctx context.Context, key string) ([]byte, error) {
-	if key == "" || strings.HasPrefix(key, sessioncore.RecordEditFlashKeyPrefix) {
-		return nil, nil
-	}
-	var value []byte
-	const query = `SELECT payload FROM goadmin_browser_sessions
-WHERE id = $1 AND (expires_at IS NULL OR expires_at > clock_timestamp())`
-	if tx := admintx.SessionReadTx(ctx); tx != nil {
-		err := tx.QueryRow(ctx, query+" FOR SHARE", key).Scan(&value)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
-		}
-		// Fiber decodes the payload. Leave repair to a normal store read.
+	value, _, err := s.GetSessionWithExpiry(ctx, key, time.Time{})
+	if value == nil || err != nil || admintx.SessionReadTx(ctx) != nil {
 		return value, err
-	}
-	err := s.db.QueryRowContext(ctx, query, key).Scan(&value)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
 	}
 	// Match Fiber's gob decoder and discard only the observed incompatible value.
 	// A concurrent valid replacement must survive this compatibility cleanup.
@@ -67,6 +51,27 @@ WHERE id = $1 AND (expires_at IS NULL OR expires_at > clock_timestamp())`
 		return nil, err
 	}
 	return value, nil
+}
+
+// GetSessionWithExpiry reads the physical lease without modifying the payload.
+func (s *Storage) GetSessionWithExpiry(ctx context.Context, key string, _ time.Time) ([]byte, time.Time, error) {
+	if key == "" || strings.HasPrefix(key, sessioncore.RecordEditFlashKeyPrefix) {
+		return nil, time.Time{}, nil
+	}
+	var value []byte
+	var expires sql.NullTime
+	const query = `SELECT payload, expires_at FROM goadmin_browser_sessions
+WHERE id = $1 AND (expires_at IS NULL OR expires_at > clock_timestamp())`
+	var err error
+	if tx := admintx.SessionReadTx(ctx); tx != nil {
+		err = tx.QueryRow(ctx, query+" FOR SHARE", key).Scan(&value, &expires)
+	} else {
+		err = s.db.QueryRowContext(ctx, query, key).Scan(&value, &expires)
+	}
+	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
+		return nil, time.Time{}, nil
+	}
+	return value, expires.Time, err
 }
 
 // Set saves a session payload with its storage lifetime.

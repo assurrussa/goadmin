@@ -259,13 +259,14 @@ func (h *actionHandler) decide(c fiber.Ctx) error {
 	if err != nil {
 		return actionFailure(c, err)
 	}
-	out, err := h.wireResult(r)
+	result, err := h.resultFields(r)
 	if err != nil {
 		return actionFailure(c, err)
 	}
-	delete(out, receiptSchemaKey) // Only the stdio transport negotiates receipt schemas.
-	out["receiptLink"] = h.receiptLink(c.Context(), b.actor, r)
-	return c.JSON(out)
+	return c.JSON(fiber.Map{
+		fieldRequestID: r.RequestID, fieldStatus: r.State, "result": result,
+		"receiptLink": h.receiptLink(c.Context(), b.actor, r),
+	})
 }
 
 func (h *actionHandler) receiptLink(ctx context.Context, actor host.Actor, r actionRequest) map[string]string {

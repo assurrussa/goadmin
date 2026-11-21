@@ -13,7 +13,8 @@ import (
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 )
 
-const receiptSchemaKey = "receipt_schema"
+// The transport key is outside the host field-name grammar.
+const receiptSchemaKey = "$receiptSchema"
 
 type actionDescription struct {
 	Version        string             `json:"version"`
@@ -53,7 +54,6 @@ func validateReceiptFields(fields []Field) error {
 	seen := map[string]bool{
 		fieldRequestID: true, fieldStatus: true, fieldReviewURL: true, fieldExpiresAt: true,
 		fieldError: true, "message": true, fieldCode: true, fieldVerificationURL: true,
-		receiptSchemaKey: true, "receiptLink": true,
 	}
 	for _, f := range fields {
 		if seen[f.Key] || !namePattern.MatchString(f.Key) || !hasDescription(f.Description) ||

@@ -2852,3 +2852,9 @@ and the stdio response.
 
 Local acceptance for this change uses both PostgreSQL and Redis native
 sessions on each host. The single GoAdmin tag follows the required PR review.
+
+The confirmation deadline includes the Fiber absolute cutoff and the storage
+lease on PostgreSQL or Redis. For Redis the server reads the value and TTL
+together and anchors the remaining time to the PostgreSQL decision clock.
+The browser response keeps the host result in its own object so an existing
+result field named `receiptLink` can coexist with the navigation link.

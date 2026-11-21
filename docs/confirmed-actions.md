@@ -23,7 +23,9 @@ permissions, request arguments, review and result of one such action.
 
 Grants last up to 15 minutes and authorize exactly one declared action. The
 server verifies the original session and current permissions at proposal and
-execution. Logout, successful role preview, explicit revocation and restart
+execution. A successful decision must fit within both the grant and the native
+session lifetime, including its storage lease. Reading a proposal or receipt
+does not renew that lease. Logout, successful role preview, explicit revocation and restart
 end the grant. A separately authorized login of the same operator can retrieve
 a terminal receipt. It cannot confirm a pending proposal from the original
 login. Keep one active web process. Use a canonical PostgreSQL or Redis native

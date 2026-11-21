@@ -43,10 +43,11 @@ const (
 )
 
 type unpublishOutput struct {
-	RequestID string `json:"request_id"`
-	Status    string `json:"status"`
-	ReviewURL string `json:"review_url,omitempty"`
-	EventID   string `json:"event_id,omitempty"`
+	RequestID string    `json:"request_id"`
+	Status    string    `json:"status"`
+	ReviewURL string    `json:"review_url,omitempty"`
+	EventID   string    `json:"event_id,omitempty"`
+	ExpiresAt time.Time `json:"expires_at,omitempty"`
 }
 
 type unpublishTestHTTP struct {
@@ -411,9 +412,42 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 			t.Fatalf("single connection confirmation returned %+v", got)
 		}
 		pendingID := uuid.NewString()
-		server.agent("/propose", bearer, map[string]string{
-			"request_id": pendingID, "product_id": publish(t), "reason": "logout cleanup",
+		product := publish(t)
+		key := browser[unpublishTestSessionName].Value
+		const lease = 45 * time.Second
+		var earliest, latest time.Time
+		if redis == nil {
+			err := db.QueryRowContext(t.Context(), `UPDATE goadmin_browser_sessions
+				SET expires_at=clock_timestamp()+interval '45 seconds' WHERE id=$1 RETURNING expires_at`, key).Scan(&latest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			earliest = latest
+		} else {
+			key = "goadmin:session:" + key
+			earliest = time.Now().Add(lease - 2*time.Second)
+			if ok, err := redis.PExpire(t.Context(), key, lease).Result(); err != nil || !ok {
+				t.Fatalf("set Redis browser lease: %t (%v)", ok, err)
+			}
+			latest = time.Now().Add(lease)
+		}
+		proposal := server.agent("/propose", bearer, map[string]string{
+			"request_id": pendingID, "product_id": product, "reason": "logout cleanup",
 		}, http.StatusOK)
+		if proposal.ExpiresAt.Before(earliest) || proposal.ExpiresAt.After(latest) {
+			t.Fatalf("proposed expiry %v outside browser storage lease [%v, %v]", proposal.ExpiresAt, earliest, latest)
+		}
+		if redis != nil {
+			if ttl, err := redis.PTTL(t.Context(), key).Result(); err != nil || ttl <= 0 || ttl > lease {
+				t.Fatalf("delegated check changed Redis browser lease: %v (%v)", ttl, err)
+			}
+		} else {
+			var actual time.Time
+			err := db.QueryRowContext(t.Context(), "SELECT expires_at FROM goadmin_browser_sessions WHERE id=$1", key).Scan(&actual)
+			if err != nil || !actual.Equal(latest) {
+				t.Fatalf("delegated check changed PostgreSQL browser lease: %v (%v)", actual, err)
+			}
+		}
 		headers := server.formHeaders(browser)
 		headers.Set("Referer", server.origin+"/auth/profile")
 		server.request(http.MethodDelete, "/auth/logout", nil, browser, headers, http.StatusFound)
@@ -499,23 +533,36 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 		if err := gob.NewDecoder(bytes.NewReader(raw)).Decode(&values); err != nil {
 			t.Fatal(err)
 		}
-		found := false
+		var absoluteKey any
 		for k := range values {
 			if reflect.TypeOf(k).Name() == "absExpirationKeyType" {
-				values[k] = time.Now().Add(-time.Minute)
-				found = true
+				absoluteKey = k
 			}
 		}
-		if !found {
+		if absoluteKey == nil {
 			t.Fatal("fixture has no Fiber absolute deadline")
 		}
-		var encoded bytes.Buffer
-		if err := gob.NewEncoder(&encoded).Encode(values); err != nil {
-			t.Fatal(err)
+		setAbsolute := func(expires time.Time) {
+			t.Helper()
+			values[absoluteKey] = expires
+			var encoded bytes.Buffer
+			if err := gob.NewEncoder(&encoded).Encode(values); err != nil {
+				t.Fatal(err)
+			}
+			_, err := db.ExecContext(ctx, "UPDATE goadmin_browser_sessions SET payload=$1 WHERE id=$2", encoded.Bytes(), key)
+			if err != nil {
+				t.Fatal(err)
+			}
 		}
-		if _, err := db.ExecContext(ctx, "UPDATE goadmin_browser_sessions SET payload=$1 WHERE id=$2", encoded.Bytes(), key); err != nil {
-			t.Fatal(err)
+		cutoff := time.Now().Add(time.Minute).Truncate(time.Microsecond)
+		setAbsolute(cutoff)
+		pending := httpServer.agent("/propose", grant, map[string]string{
+			"request_id": uuid.NewString(), "product_id": publish(t), "reason": "absolute browser expiry",
+		}, http.StatusOK)
+		if !pending.ExpiresAt.Equal(cutoff) {
+			t.Fatalf("proposed expiry %v differs from Fiber cutoff %v", pending.ExpiresAt, cutoff)
 		}
+		setAbsolute(time.Now().Add(-time.Minute))
 		httpServer.agent("/status", grant, statusInput, http.StatusUnauthorized)
 		var retained bool
 		if err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM goadmin_browser_sessions WHERE id=$1)", key).Scan(&retained); err != nil || !retained {

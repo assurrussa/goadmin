@@ -79,7 +79,15 @@ func TestActionReplaysTheOriginalResultSchema(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "document-B", wire["archive_ref"])
 	require.Equal(t, "v2", wire[receiptSchemaKey])
-	for _, reserved := range []string{"receiptLink", receiptSchemaKey} {
-		require.Error(t, validateReceiptFields([]Field{{Key: reserved, Description: "Reserved.", Kind: Text}}))
+	// Host fields and transport metadata occupy distinct namespaces even
+	// when replaying schemas issued before receipt versioning was added.
+	for _, key := range []string{"receiptLink", "receipt_schema"} {
+		h.action.PreviousResultFields = map[string][]Field{"v1": {{Key: key, Kind: Text, Description: "Original host value."}}}
+		require.NoError(t, validateReceiptFields(h.action.PreviousResultFields["v1"]))
+		receipt.Result = map[string]string{key: "stored"}
+		wire, err = h.wireResult(receipt)
+		require.NoError(t, err)
+		require.Equal(t, "stored", wire[key])
+		require.Equal(t, "v1", wire[receiptSchemaKey])
 	}
 }

@@ -123,7 +123,7 @@ func (s *Service) bindDelegatedRead(
 // ResolveDelegatedRead never refreshes tokens, saves a Fiber session or
 // extends an idle/absolute deadline. The caller still checks resource rights.
 func (s *Service) ResolveDelegatedRead(ctx context.Context, b ReadSessionBinding) (context.Context, models.Admin, error) {
-	sess, err := s.openDelegatedSession(ctx, b)
+	sess, err := s.openDelegatedSession(ctx, b, nil)
 	if err != nil {
 		return ctx, models.Admin{}, err
 	}
@@ -151,7 +151,9 @@ func (s *Service) ResolveDelegatedRead(ctx context.Context, b ReadSessionBinding
 	return ctx, admin, nil
 }
 
-func (s *Service) openDelegatedSession(ctx context.Context, b ReadSessionBinding) (*session.Session, error) {
+func (s *Service) openDelegatedSession(
+	ctx context.Context, b ReadSessionBinding, lease *delegatedSessionLease,
+) (*session.Session, error) {
 	if s == nil || s.delegatedReads == nil || s.store == nil || s.states == nil || s.identityLinkSessions == nil ||
 		s.admins == nil || b.storageKey == "" || b.adminID <= 0 || b.loginID == "" || b.subject.IsZero() {
 		return nil, ErrReadSessionEnded
@@ -167,7 +169,7 @@ func (s *Service) openDelegatedSession(ctx context.Context, b ReadSessionBinding
 	// Keep Fiber's decoding and absolute deadline check. A delegated reader
 	// must not delete a session while its own transaction holds the row.
 	reader := session.Store{Config: s.store.Config}
-	reader.Storage = delegatedSessionStorage{reader.Storage}
+	reader.Storage = delegatedSessionStorage{Storage: reader.Storage, lease: lease}
 	sess, err := reader.GetByID(ctx, string(raw))
 	if errors.Is(err, session.ErrSessionIDNotFoundInStore) {
 		return nil, ErrReadSessionEnded
@@ -177,7 +179,24 @@ func (s *Service) openDelegatedSession(ctx context.Context, b ReadSessionBinding
 
 // GetByID calls DestroyWithContext on absolute expiry, using a background
 // context. Let the native session lifecycle delete the stored row.
-type delegatedSessionStorage struct{ fiber.Storage }
+type delegatedSessionStorage struct {
+	fiber.Storage
+	lease *delegatedSessionLease
+}
+
+type delegatedSessionLease struct {
+	base    time.Time
+	expires time.Time
+}
+
+func (s delegatedSessionStorage) GetWithContext(ctx context.Context, key string) ([]byte, error) {
+	if s.lease == nil {
+		return s.Storage.GetWithContext(ctx, key)
+	}
+	value, expiry, err := sessioncore.GetSessionWithExpiry(ctx, s.Storage, key, s.lease.base)
+	s.lease.expires = expiry
+	return value, err
+}
 
 func (delegatedSessionStorage) DeleteWithContext(context.Context, string) error { return nil }
 func (delegatedSessionStorage) Delete(string) error                             { return nil }

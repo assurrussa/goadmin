@@ -33,13 +33,14 @@ func (s *Service) ConfirmedActionDeadline(
 	}
 	ctx = admintx.WithSessionReadTx(ctx, tx)
 	var expires time.Time
-	const login = `SELECT l.expires_at FROM auth_subjects s
+	var lease delegatedSessionLease
+	const login = `SELECT l.expires_at,clock_timestamp() FROM auth_subjects s
 		JOIN administrations a ON a.subject_id=s.id
 		JOIN auth_sessions l ON l.subject_id=s.id
 		WHERE s.id=$1 AND a.id=$2 AND a.deleted_at IS NULL AND s.status='active' AND s.retired_at IS NULL
 		AND l.id=$3 AND l.realm='admin' AND l.scope='authenticated' AND l.revoked_at IS NULL
 		AND l.security_version=s.security_version FOR SHARE OF s,a,l`
-	if err := tx.QueryRow(ctx, login, b.subject.String(), b.adminID, b.loginID).Scan(&expires); err != nil {
+	if err := tx.QueryRow(ctx, login, b.subject.String(), b.adminID, b.loginID).Scan(&expires, &lease.base); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return time.Time{}, ErrReadSessionEnded
 		}
@@ -57,7 +58,7 @@ func (s *Service) ConfirmedActionDeadline(
 			return time.Time{}, err
 		}
 	}
-	sess, err := s.openDelegatedSession(ctx, b)
+	sess, err := s.openDelegatedSession(ctx, b, &lease)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -69,7 +70,11 @@ func (s *Service) ConfirmedActionDeadline(
 	if err != nil {
 		return time.Time{}, err
 	}
-	deadline := earliestMaintenanceExpiry(expires, browserExpires)
+	fiberExpires, err := fiberAbsoluteExpiry(sess, s.store.AbsoluteTimeout)
+	if err != nil {
+		return time.Time{}, err
+	}
+	deadline := earliestMaintenanceExpiry(expires, browserExpires, fiberExpires, lease.expires)
 	if !time.Now().Before(deadline) {
 		return time.Time{}, ErrReadSessionEnded
 	}
