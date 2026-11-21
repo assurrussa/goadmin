@@ -48,9 +48,9 @@ func (p productData) input() productInput {
 type productRepo struct{ db *sql.DB }
 
 var (
-	productNameField  = crud.Field{Key: "name", Label: "Name", Type: "text", Read: true, Create: true, Update: true, Required: true, MaxLength: new(200)}
+	productNameField  = crud.Field{Key: "name", Label: "Name", Description: "The product name appears in the catalog and in its activity history.", Type: "text", Read: true, Create: true, Update: true, Required: true, MaxLength: new(200)}
 	productStockField = crud.Field{Key: "stock", Label: "Stock", Type: "number", Read: true, Create: true, Update: true, Minimum: new(0.0)}
-	unpublishReason   = crud.ActionParam{Key: "reason", Label: "Причина", Type: "textarea", Required: true, TrimSpace: true, MaxLength: new(500)}
+	unpublishReason   = crud.ActionParam{Key: "reason", Label: "Причина", Description: "Explain why you are removing this product. The reason remains in the activity entry after deletion.", Type: "textarea", Required: true, TrimSpace: true, MaxLength: new(500)}
 )
 
 const productColumns = "id::text, revision::text, name, description, stock, active, available, category, status"
@@ -282,7 +282,7 @@ func productsModule(db *sql.DB) (host.Module, error) {
 		},
 	}
 	return crud.New(crud.Definition[productData, productInput, productInput]{
-		Key: "products", BasePath: "/products", Title: "Products", Fields: fields, PageSize: 20, DefaultSort: "name", DefaultOrder: "asc",
+		Key: "products", BasePath: "/products", Title: "Products", Description: "Manage your catalog and review publication changes in Product activity.", Fields: fields, PageSize: 20, DefaultSort: "name", DefaultOrder: "asc",
 		Columns: []datagrid.Column{
 			{Key: "name", Label: "Name", Type: "text", Sortable: true},
 			{Key: "stock", Label: "Stock", Type: "number", Sortable: true, Filterable: true},
@@ -325,7 +325,7 @@ func productsModule(db *sql.DB) (host.Module, error) {
 				return r.command(ctx, a, id, revision, "publish")
 			}},
 			crud.ActionWithParams[productData, UnpublishInput](
-				crud.Action[productData]{Key: "unpublish", Label: "Снять с публикации", Confirmation: "Снять этот товар с публикации?", Permission: permission("unpublish")},
+				crud.Action[productData]{Key: "unpublish", Label: "Снять с публикации", Description: "The product will become a draft. This action and its reason are recorded in Product activity.", Confirmation: "Снять этот товар с публикации?", Permission: permission("unpublish")},
 				[]crud.ActionParam{unpublishReason}, r.unpublish,
 			),
 		},

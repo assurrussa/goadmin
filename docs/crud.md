@@ -290,3 +290,7 @@ permission, row authorization, owner-scoped repository and field projection as
 the browser. The adapter receives projected fields and record identities.
 The [Products starter](../examples/starter/README.md#connect-a-local-mcp-client-to-product-activity)
 demonstrates session-bound delegation and two read-only MCP tools.
+
+## Explain a resource to operators
+
+Set the optional `Description` on a `crud.Definition` or `crud.ReadOnlyDefinition` to explain what the operator can do in that section. Set it on a `crud.Field` for field help and on a `crud.Action` or `crud.ActionParam` to explain the consequence of a command or the input it requires. The form displays the explanation alongside Go's validation constraints. The Products example tells the operator that the unpublish reason stays in Product activity after deletion.

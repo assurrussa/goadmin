@@ -26,14 +26,19 @@ export async function unpublishFromCard({ page, expect, recordPath, id, language
     await language(page, 'Русский', 'ru')
     await page.getByRole('button', { name: 'Снять с публикации', exact: true }).click()
     await expect(dialog(page)).toContainText(id)
-    await expect(reason(page)).toHaveAccessibleDescription('До 500 символов')
+    await expect(reason(page)).toHaveAccessibleDescription(
+      'Укажите причину снятия с публикации. Она останется в карточке события даже после удаления товара. До 500 символов',
+    )
     await reason(page).fill('Нужно уточнить описание товара.')
     await page.screenshot({ path: path.join(folder, name + '-unpublish-reason-ru.png') })
     await page.keyboard.press('Escape')
     await expect(dialog(page)).toHaveCount(0)
     await language(page, 'English', 'en')
     await open()
-    await expect(reason(page)).toHaveAccessibleDescription('Up to 500 characters')
+    await expect(dialog(page).getByText('The product will become a draft. This action and its reason are recorded in Product activity.')).toBeVisible()
+    await expect(reason(page)).toHaveAccessibleDescription(
+      'Explain why you are removing this product. The reason remains in the activity entry after deletion. Up to 500 characters',
+    )
     await expect(reason(page)).toHaveValue('')
     await reason(page).fill('\u0085  ')
     if (await accept(page).isEnabled()) await accept(page).click()

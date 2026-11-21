@@ -26,10 +26,12 @@ const action: CrudAction = {
   key: 'unpublish',
   label: 'Снять с публикации',
   confirmation: 'Снять этот товар с публикации?',
+  description: 'This action changes the publication status.',
   params: [
     {
       key: 'reason',
       label: 'Причина',
+      description: 'Explain the decision for the activity log.',
       type: 'textarea',
       required: true,
       maxLength: 500,
@@ -109,6 +111,11 @@ afterEach(async () => {
 })
 it('keeps the raw Unicode draft, rejects invalid input locally and sends one normalized command', async () => {
   expect(dialog()!.textContent).toContain('First product')
+  expect(dialog()!.textContent).toContain(action.description)
+  const ids = input().getAttribute('aria-describedby')?.split(' ') ?? []
+  expect(ids.map((id) => document.getElementById(id)?.textContent)).toContain(
+    action.params![0]!.description,
+  )
   expect(dialog()!.textContent).toContain('Up to 500 characters')
   for (const value of ['\u0085 \n', 'x\0x', '\uD800', '🙂'.repeat(501)]) {
     await write(value)

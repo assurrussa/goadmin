@@ -48,7 +48,9 @@ async function run(key: string) {
   try {
     await confirm(
       {
+        title: action?.description ? action.confirmation || action.label : undefined,
         message:
+          action?.description ||
           action?.confirmation ||
           (key === 'delete'
             ? 'Вы уверены, что хотите удалить запись?'
@@ -100,6 +102,9 @@ async function run(key: string) {
     :label="resource.title"
     :use-history="false"
   />
+  <p v-if="resource.description" class="mb-4 text-sm text-text-secondary">
+    {{ t(resource.description) }}
+  </p>
   <p v-if="error" role="alert" class="mb-4 text-error">{{ t(error) }}</p>
   <section class="space-y-6 rounded-xl border border-border-primary bg-card p-6">
     <dl class="grid gap-6 sm:grid-cols-2">
@@ -112,7 +117,10 @@ async function run(key: string) {
           disabled
         />
         <template v-else
-          ><dt class="text-sm text-text-secondary">{{ t(field.label) }}</dt>
+          ><dt class="text-sm text-text-secondary">
+            {{ t(field.label)
+            }}<span v-if="field.description" class="block text-xs">{{ t(field.description) }}</span>
+          </dt>
           <dd class="mt-1 whitespace-pre-wrap break-words">
             {{ displayFieldValue(field, record.data[field.key]) }}
           </dd></template

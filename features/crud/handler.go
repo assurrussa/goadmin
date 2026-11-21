@@ -311,15 +311,16 @@ func (h *handler[R, C, U]) props(c fiber.Ctx) (map[string]any, error) {
 		return !h.readOnly && !integrationroles.RolePreviewActive(c) &&
 			h.app.Unwrap().RolesService().AdminCan(c, a.AdminID, p.Domain, p.Action)
 	}
+	resource := map[string]any{
+		"key": description.Key, "basePath": h.d.BasePath, "title": description.Title,
+		"fields": fields, "actions": h.visibleActions(c),
+	}
+	if h.d.Description != "" {
+		resource["description"] = h.d.Description
+	}
 	return map[string]any{
-		"title": h.d.Title,
-		"resource": map[string]any{
-			"key":      description.Key,
-			"basePath": h.d.BasePath,
-			"title":    description.Title,
-			"fields":   fields,
-			"actions":  h.visibleActions(c),
-		},
+		"title":    h.d.Title,
+		"resource": resource,
 		"permissions": map[string]bool{
 			string(Create): h.canCreate(c),
 			string(Update): can(h.d.Permissions.Update),

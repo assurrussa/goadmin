@@ -2,6 +2,7 @@ import { markRaw, type Component } from 'vue'
 import { recordListHref } from '@/composables/useRecordNavigation'
 
 export interface CrudField {
+  description?: string
   key: string
   label: string
   type: 'text' | 'textarea' | 'number' | 'boolean' | 'date' | 'select' | 'custom'
@@ -28,6 +29,7 @@ export interface CrudFieldProps {
   readonly: boolean
 }
 export interface CrudResource {
+  description?: string
   key: string
   basePath: string
   title: string
@@ -35,10 +37,12 @@ export interface CrudResource {
   actions: CrudAction[]
 }
 export interface CrudAction {
+  description?: string
   key: string
   label: string
   confirmation?: string
   params?: Array<{
+    description?: string
     key: string
     label: string
     type: 'text' | 'textarea'

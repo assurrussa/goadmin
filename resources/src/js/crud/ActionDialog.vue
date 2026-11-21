@@ -289,6 +289,9 @@ onScopeDispose(() => {
         <DialogDescription class="break-words">
           {{ t(resource.title) }} #{{ request.record.id
           }}<template v-if="recordName"> · {{ recordName }}</template>
+          <span v-if="request.action.description" class="mt-1 block">{{
+            t(request.action.description)
+          }}</span>
           <span v-if="request.action.confirmation" class="mt-1 block">{{
             t(request.action.confirmation)
           }}</span>

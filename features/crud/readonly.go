@@ -20,6 +20,7 @@ type ReadOnlyRecord[R any] struct {
 // Fields use Read to expose values. Write flags and write constraints are invalid.
 type ReadOnlyDefinition[R any] struct {
 	Key, BasePath, Title      string
+	Description               string
 	Menu                      host.Menu
 	Permission                host.PermissionKey
 	Fields                    []Field
@@ -58,7 +59,7 @@ func newReadOnly[R any](d ReadOnlyDefinition[R], adapter *ReadOnlyAdapter) (host
 // same permission, validation, projection and HTTP paths.
 func (d ReadOnlyDefinition[R]) definition() Definition[R, struct{}, struct{}] {
 	return Definition[R, struct{}, struct{}]{
-		Key: d.Key, BasePath: d.BasePath, Title: d.Title, Menu: d.Menu,
+		Key: d.Key, BasePath: d.BasePath, Title: d.Title, Description: d.Description, Menu: d.Menu,
 		Permissions: Permissions{Read: d.Permission}, Fields: d.Fields, Columns: d.Columns,
 		DefaultSort: d.DefaultSort, DefaultOrder: d.DefaultOrder, PageSize: d.PageSize,
 		ClientRequirements: d.ClientRequirements,
