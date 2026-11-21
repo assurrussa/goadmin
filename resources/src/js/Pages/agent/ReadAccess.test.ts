@@ -34,11 +34,23 @@ it.each([
       ),
     )
 
+    if (!confirmedAction) {
+      input.value = 'KLMNO-PQRST'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      await nextTick()
+      vi.mocked(adminFetch).mockResolvedValueOnce(Response.json({ grants: ['connection'] }))
+      root.querySelector<HTMLButtonElement>('form button[type="button"]')!.click()
+      await vi.waitFor(() =>
+        expect(root.querySelector('[role="status"]')?.textContent?.trim()).toBe('Доступ закрыт.'),
+      )
+    }
+
     vi.mocked(adminFetch).mockResolvedValueOnce(Response.json({ grants: [] }))
     root.querySelector('li button')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await vi.waitFor(() =>
-      expect(root.querySelector('[role="status"]')?.textContent?.trim()).toBe('Доступ закрыт.'),
-    )
+    await vi.waitFor(() => {
+      expect(root.querySelector('li')).toBeNull()
+      expect(root.querySelector('[role="status"]')?.textContent?.trim()).toBe('Доступ закрыт.')
+    })
   } finally {
     app.unmount()
     vi.mocked(adminFetch).mockReset()

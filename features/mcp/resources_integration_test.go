@@ -218,15 +218,19 @@ func TestReadOnlyResourcesKeepIndependentGrantsUntilBrowserLogout(t *testing.T) 
 		require.JSONEq(t, `{"error":"authorization_required"}`, string(body))
 	}
 
-	allowRead(orders)
 	productsPair, ordersPair := start(products), start(orders)
 	decide(products, productsPair, "approve", productsPair.Code)
 	productsToken := token(products, productsPair)
+	read(products, productsToken, productsTitle)
 	require.JSONEq(t, `{"error":"authorization_pending"}`, string(exchange(orders, ordersPair, http.StatusAccepted)))
+
+	allowRead(orders)
 	decide(orders, ordersPair, "approve", ordersPair.Code)
 	ordersToken := token(orders, ordersPair)
 	read(products, productsToken, productsTitle)
 	read(orders, ordersToken, ordersTitle)
+	requireClosed(orders, productsToken)
+	requireClosed(products, ordersToken)
 
 	decide(products, productsPair, "revoke")
 	requireClosed(products, productsToken)
