@@ -144,9 +144,14 @@ proof of delivery. Check that users without permission cannot invoke its actions
 
 ### Authentication mail is a separate integration
 
-`features/authmail.New(host.AuthMailConfig{...})` / `host.AuthMailModule` accepts
-`Sender` (GoAuth's `NotificationSender`), optional `PasswordRecovery` routes and
-worker configuration. It does **not** use `NotificationManager` as its sender.
+GoAuth stores password-reset and email-confirmation messages in its own
+encrypted queue. Its delivery worker calls the configured `NotificationSender`.
+You can enable `authmail` with `jobs` and `notifications` both disabled.
+
+Pass the GoAuth sender in `host.AuthMailConfig.Sender` when using
+`features/authmail.New` or `host.AuthMailModule`. The config also accepts
+optional `PasswordRecovery` routes and worker settings. `NotificationManager`
+handles ordinary notifications.
 For borrowed Auth, the adapter must support managed mail; its sender/worker
 configuration belongs to that Auth. Do not supply a second sender configuration
 or claim a borrowed worker without borrowed Auth.
