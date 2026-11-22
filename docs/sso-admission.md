@@ -41,11 +41,13 @@ for every selected role. This is hierarchy-free: owning a role or a super-admin
 label is not a substitute for those checks. The super_admin bootstrap role is not
 enrollable through this component.
 
-The component contributes permission definitions for roles existing at assembly.
-For roles created later, register GrantRolePermission(role.PublicID) through the
-normal permission catalogue and grant it explicitly; restart/reassemble also
-discovers it. Defining a permission grants nothing. Do not auto-grant the catalogue
-to every existing administrator.
+At assembly, the admission component contributes one permission definition per
+eligible role. For a role created later, `admission.GrantRolePermission(role.PublicID)`
+returns the `admission:grant-<role UUID>` key. Register that key in the
+permission catalogue, or reassemble the component to discover the role.
+Through normal RBAC, give this permission only to operators authorized to
+assign that role during SSO admission. The role's own permissions, such as
+access to a CRUD resource, are configured separately.
 
 Invitation and approval retain immutable role IDs and an exact permission-set
 fingerprint. Acceptance rechecks the issuing actor's active membership, current
