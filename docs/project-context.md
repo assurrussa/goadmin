@@ -517,8 +517,8 @@ Use the Makefile from the repository root:
 
 - `make prepare`: mutating prep (`go mod tidy`, generation, formatting,
   lint-fix).
-- `make check`: non-mutating verification after prep, including one combined
-  Go race+coverage pass and resources build
+- `make check`: non-mutating verification after prep, including the first CRUD
+  guide's source excerpt, one combined Go race+coverage pass and resources build
   with non-mutating ESLint and Prettier checks.
 - `make integration-check`: run all `integration`-tagged Go tests; requires
   reachable test PostgreSQL and Redis services and fails when unavailable.

@@ -24,8 +24,10 @@ export async function unpublishFromCard({ page, expect, recordPath, id, language
   const explanation = 'Price under review\nVerify 🙂 before publishing again.'
   try {
     await language(page, 'Русский', 'ru')
+    await expect(page.getByText('Здесь вы управляете каталогом. История публикаций доступна в журнале действий с товарами.', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Снять с публикации', exact: true }).click()
     await expect(dialog(page)).toContainText(id)
+    await expect(dialog(page)).toContainText('Товар станет черновиком. Действие и его причина сохранятся в журнале.')
     await expect(reason(page)).toHaveAccessibleDescription(
       'Укажите причину снятия с публикации. Она останется в карточке события даже после удаления товара. До 500 символов',
     )
@@ -34,6 +36,7 @@ export async function unpublishFromCard({ page, expect, recordPath, id, language
     await page.keyboard.press('Escape')
     await expect(dialog(page)).toHaveCount(0)
     await language(page, 'English', 'en')
+    await expect(page.getByText('Manage your catalog and review publication changes in Product activity.', { exact: true })).toBeVisible()
     await open()
     await expect(dialog(page).getByText('The product will become a draft. This action and its reason are recorded in Product activity.')).toBeVisible()
     await expect(reason(page)).toHaveAccessibleDescription(

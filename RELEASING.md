@@ -2,6 +2,18 @@
 
 This module is published as `github.com/assurrussa/goadmin`.
 
+## v0.32.1 MCP pairing guidance
+
+See the [v0.32.1 changes](CHANGELOG.md#v0321). Before tagging the reviewed
+revision, run the starter's [candidate HTTPS scenarios](examples/starter/README.md#confirmed-product-withdrawal)
+with PostgreSQL and Redis sessions. Run `make publish-readiness VERSION=v0.32.1`
+on the merged commit and tag that commit when the checks pass.
+
+Once the tag resolves publicly, run `make release-readiness VERSION=v0.32.1`
+and `python3 scripts/starter-smoke/confirmed-https.py --published v0.32.1`.
+The latter builds the starter and stdio client against the published GoAdmin
+module and exercises the browser confirmation flow over HTTPS.
+
 ## v0.32.0 candidate
 
 This release adds confirmed actions to the existing `features/mcp` package.
@@ -361,6 +373,7 @@ This runs the mutating preparation phase and then verification:
 - `go generate ./...`
 - `go fmt`, `gofumpt`, and `gci`
 - `golangci-lint run --fix`
+- `python3 scripts/check-doc-snippets.py`
 - `go mod tidy -diff`
 - non-mutating `gofumpt` and `gci` checks
 - `go vet ./...`

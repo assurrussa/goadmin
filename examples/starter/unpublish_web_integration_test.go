@@ -202,11 +202,7 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		csrf, err := host.NewCSRFService(cfg.CSRF, lg)
-		if err != nil {
-			t.Fatal(err)
-		}
-		deps := host.Dependencies{Database: client, TxManager: host.NewTxManager(client), Logger: lg, CSRF: csrf, SessionRedis: redis}
+		deps := host.Dependencies{Database: client, TxManager: host.NewTxManager(client), Logger: lg, SessionRedis: redis}
 		products, err := productsModule(db)
 		if err != nil {
 			t.Fatal(err)
@@ -292,6 +288,10 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 	const requestID = "d1f23610-53d6-4262-bb60-c343b578c01c"
 	path := unpublishRequestPath + requestID
 	id := publish(t)
+	publishedProduct, err := repo.get(ctx, actor, id)
+	if err != nil {
+		t.Fatal(err)
+	}
 	proposal := map[string]string{"request_id": requestID, "product_id": id, "reason": "<script>immutable reason</script>"}
 	statusInput := map[string]string{"request_id": requestID}
 	httpServer.agent("/propose", "invalid", proposal, http.StatusUnauthorized)
@@ -323,6 +323,9 @@ func TestProductUnpublishNativeHTTP(t *testing.T) {
 	missingOrigin.Set("Referer", unpublishTestOrigin+path)
 	httpServer.request("POST", path, approval, jar, missingOrigin, http.StatusForbidden)
 	httpServer.request("POST", path, approval, jar, http.Header{"Origin": {unpublishTestOrigin}}, http.StatusFound)
+	if product, err := repo.get(ctx, actor, id); err != nil || product != publishedProduct {
+		t.Fatalf("confirmation without CSRF token changed the product: %+v (%v)", product, err)
+	}
 	if got := httpServer.agent("/status", token, statusInput, http.StatusOK); got.Status != unpublishPending {
 		t.Fatalf("failed attempts or GET changed request to %q", got.Status)
 	}

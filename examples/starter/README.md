@@ -14,21 +14,21 @@ when only GoAuth and GoNotify paths are selected.
 
 Prerequisites: Git, Docker Engine with Docker Compose, and OpenSSL for generating
 local secrets. No sibling repositories or Node.js installation are needed for
-this mode. Use the starter source from the **GoAdmin v0.32.0** tag with the
+this mode. Use the starter source from the **GoAdmin v0.32.1** tag with the
 published library and embedded UI from that release.
 
 ```sh
-git clone --branch v0.32.0 --depth 1 https://github.com/assurrussa/goadmin.git
+git clone --branch v0.32.1 --depth 1 https://github.com/assurrussa/goadmin.git
 cd goadmin/examples/starter
 cp .env.example .env
 # Fill the required values below before starting.
-GOADMIN_VERSION=v0.32.0 docker compose up --build
+GOADMIN_VERSION=v0.32.1 docker compose up --build
 ```
 
 This command pins both the starter source and published library. Keep the same
 version in your private `.env` for subsequent runs. When upgrading, check out the matching starter revision, read
 the release notes and run the published-consumer check from the repository root:
-`make externalconsumer-published VERSION=v0.32.0`. That check needs the repository's
+`make externalconsumer-published VERSION=v0.32.1`. That check needs the repository's
 Go toolchain; it does not replace running this starter in a browser.
 
 For either mode, copy `.env.example` to `.env` in the checkout you will run.
@@ -50,9 +50,12 @@ administrator exists. Enter the setup token from `.env` in that form.
 
 `ADMIN_MODULES` accepts a comma-separated selection from `users`, `access`,
 `jobs`, `uploads`, `queues`, `notifications`, `realtime`, `authmail`, `products`,
-`product-events` and `product-events-mcp`. Empty means core only. Select `products`
+`product-events`, `product-events-mcp` and `product-unpublish-mcp`. Empty means
+core only. Select `products`
 for [your first CRUD resource](../../docs/first-crud.md). Select `product-events`
-for the [product event journal](#product-event-journal).
+for the [product event journal](#product-event-journal). [Confirmed product
+withdrawal](#confirmed-product-withdrawal) requires both `products` and
+`product-unpublish-mcp`.
 Uploads, queues and notifications require jobs.
 For notifications or authmail, set `NOTIFYHUB_URL` and `NOTIFYHUB_PROJECT_KEY`
 for an existing NotifyHub gateway. Both modules reuse one client and project key;
@@ -290,7 +293,7 @@ configuration.
 
 ## Confirmed product withdrawal
 
-Enable `ADMIN_MODULES=products,product-unpublish-mcp` and run the starter migration. The example requires a single starter process. Use the standard `goadmin-mcp -admin-url <origin> -resource-path /agent/product-unpublish` command. With a published checkout, install the exact client using `GOWORK=off go install github.com/assurrussa/goadmin/cmd/goadmin-mcp@v0.32.0`. The original `./cmd/product-unpublish-mcp` command still selects this action automatically. Use HTTPS for remote connections.
+Enable `ADMIN_MODULES=products,product-unpublish-mcp` and run the starter migration. The example requires a single starter process. Use the standard `goadmin-mcp -admin-url <origin> -resource-path /agent/product-unpublish` command. With a published checkout, install the exact client using `GOWORK=off go install github.com/assurrussa/goadmin/cmd/goadmin-mcp@v0.32.1`. The original `./cmd/product-unpublish-mcp` command still selects this action automatically. Use HTTPS for remote connections.
 
 1. Before the first call, generate and save a lowercase UUID for this proposal. Call `propose_unpublish` with `request_id`, a decimal `product_id` string and a required `reason` of up to 500 Unicode characters. The first call returns a verification URL and a code.
 2. In your native admin login, enter the code and select **Подключить**. You need the `products:unpublish` permission. The connection lasts up to 15 minutes. Repeat the same call to get the proposal's review URL.
@@ -311,7 +314,7 @@ test CA and Firefox profiles and removes them on exit.
 ```sh
 python3 scripts/starter-smoke/confirmed-https.py --candidate
 python3 scripts/starter-smoke/confirmed-https.py --candidate --sessions redis
-python3 scripts/starter-smoke/confirmed-https.py --published v0.32.0
+python3 scripts/starter-smoke/confirmed-https.py --published v0.32.1
 ```
 
 The published mode builds the starter and stdio client with all source overrides removed.

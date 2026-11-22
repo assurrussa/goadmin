@@ -168,12 +168,6 @@ func run() error {
 			return baseURL + "/auth/reset-password?token=" + url.QueryEscape(token), nil
 		})},
 	}
-	if selected[unpublishModuleKey] {
-		deps.CSRF, err = host.NewCSRFService(cfg.CSRF, lg)
-		if err != nil {
-			return err
-		}
-	}
 	modules := make([]host.Module, 0, len(selected)+1)
 	if selected["users"] {
 		modules = append(modules, host.FeatureModule(users.NewFeature()))
