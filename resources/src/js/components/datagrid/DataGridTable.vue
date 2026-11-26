@@ -99,7 +99,11 @@
             >
               <!-- Badge for select type -->
               <AppStatus
-                v-if="(column.type === 'select' || column.type === 'badge') && column.badges"
+                v-if="
+                  (column.type === 'select' || column.type === 'badge') &&
+                  column.badges &&
+                  getColumnValue(item, column.key) != null
+                "
                 :variant="getBadgeVariant(getColumnValue(item, column.key), column.badges)"
                 class="inline-flex"
               >
@@ -364,7 +368,6 @@ const getBadgeVariant = (
   value: unknown,
   badges: Record<string | number, { label: string; variant: string }>,
 ): 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'outline' => {
-  if (value == null) return 'secondary'
   const safeValue = typeof value === 'string' || typeof value === 'number' ? value : String(value)
   const badge = badges[safeValue]
   if (!badge) return 'secondary'

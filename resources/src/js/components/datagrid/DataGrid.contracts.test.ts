@@ -712,6 +712,27 @@ describe('DataGridTable passing contracts: rendering, sort and identity', () => 
     },
   )
   it.each(['select', 'badge'] as const)(
+    'shows a %s status indicator for a configured empty string but leaves absent values blank',
+    (type) => {
+      const badges = { '': { label: 'Unassigned', variant: 'info' } }
+      const { element } = table(
+        [
+          row('empty', { item: { id: 'empty', status: '' }, actions: [] }),
+          row('nullable', { item: { id: 'nullable', status: null }, actions: [] }),
+          row('missing', { actions: [] }),
+        ],
+        { config: config({ columns: [column('status', { type, badges })] }) },
+      )
+      const cells = [...element.querySelectorAll('tbody td')]
+      expect(cells.map(text)).toEqual(['Unassigned', '', ''])
+      expect(cells.map((cell) => cell.querySelector('[data-part="indicator"]') !== null)).toEqual([
+        true,
+        false,
+        false,
+      ])
+    },
+  )
+  it.each(['select', 'badge'] as const)(
     'renders %s badge overrides, inherited option labels and unknown values',
     (type) => {
       const badges = { 0: { label: 'Zero status', variant: 'success' } }
