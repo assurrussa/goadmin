@@ -682,6 +682,36 @@ describe('DataGridTable passing contracts: rendering, sort and identity', () => 
     ])
   })
   it.each(['select', 'badge'] as const)(
+    'renders the empty-string %s option only for an explicitly stored empty string',
+    (type) => {
+      const options = [{ value: '', label: 'Unassigned' }]
+      const keys = ['empty', 'nullable', 'missing', 'computedEmpty', 'computedNull']
+      const { element } = table(
+        [
+          row('x', {
+            item: {
+              id: 'x',
+              empty: '',
+              nullable: null,
+              computedEmpty: 'assigned',
+              computedNull: '',
+            },
+            values: { computedEmpty: '', computedNull: null },
+            actions: [],
+          }),
+        ],
+        { config: config({ columns: keys.map((key) => column(key, { type, options })) }) },
+      )
+      expect(Array.from(element.querySelectorAll('tbody td'), text)).toEqual([
+        'Unassigned',
+        '',
+        '',
+        'Unassigned',
+        '',
+      ])
+    },
+  )
+  it.each(['select', 'badge'] as const)(
     'renders %s badge overrides, inherited option labels and unknown values',
     (type) => {
       const badges = { 0: { label: 'Zero status', variant: 'success' } }

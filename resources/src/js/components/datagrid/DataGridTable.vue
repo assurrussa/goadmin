@@ -107,7 +107,9 @@
               </AppStatus>
               <!-- Boolean values -->
               <span
-                v-else-if="column.type === 'boolean' && getColumnValue(item, column.key) === ''"
+                v-else-if="
+                  column.type === 'boolean' && (getColumnValue(item, column.key) ?? '') === ''
+                "
                 class="text-text-tertiary"
                 >—</span
               >
@@ -319,15 +321,15 @@ const getColumnValue = (item: DataItem, columnKey: string): unknown => {
   const hasComputedValue =
     item.values && Object.prototype.hasOwnProperty.call(item.values, columnKey)
   const source = hasComputedValue ? item.values! : item.item
-  return source[columnKey] ?? ''
+  return source[columnKey]
 }
 
 const formatValue = (value: unknown, column: Column): string => {
+  if (value == null) return ''
   const hasOptions = column.type === 'select' || column.type === 'badge'
   const badgeLabel = hasOptions && column.badges?.[String(value)]?.label
   if (badgeLabel) return t(badgeLabel)
-  if (value === null || value === undefined || value === '') return ''
-  const formatted = props.formatCell?.(column.key, value)
+  const formatted = value === '' ? undefined : props.formatCell?.(column.key, value)
   if (formatted !== undefined) return formatted
 
   if (hasOptions && (typeof value === 'string' || typeof value === 'number')) {
@@ -362,6 +364,7 @@ const getBadgeVariant = (
   value: unknown,
   badges: Record<string | number, { label: string; variant: string }>,
 ): 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'outline' => {
+  if (value == null) return 'secondary'
   const safeValue = typeof value === 'string' || typeof value === 'number' ? value : String(value)
   const badge = badges[safeValue]
   if (!badge) return 'secondary'
