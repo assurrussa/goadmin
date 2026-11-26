@@ -99,7 +99,7 @@
             >
               <!-- Badge for select type -->
               <AppStatus
-                v-if="column.type === 'select' && column.badges"
+                v-if="(column.type === 'select' || column.type === 'badge') && column.badges"
                 :variant="getBadgeVariant(getColumnValue(item, column.key), column.badges)"
                 class="inline-flex"
               >
@@ -219,7 +219,7 @@
 import { t, locale } from '@/i18n'
 import { Link } from '@inertiajs/vue3'
 
-import { dataGridRowId } from '~/composables/useDataGrid.ts'
+import { dataGridOption, dataGridRowId } from '~/composables/useDataGrid.ts'
 import type { Config, Column, DataItem, DataItemValue } from '~/composables/useDataGrid.ts'
 import { computed } from 'vue'
 import {
@@ -326,6 +326,11 @@ const formatValue = (value: unknown, column: Column): string => {
   if (value === null || value === undefined || value === '') return ''
   const formatted = props.formatCell?.(column.key, value)
   if (formatted !== undefined) return formatted
+
+  if (column.type === 'select' && (typeof value === 'string' || typeof value === 'number')) {
+    const option = dataGridOption(column, value)
+    if (option?.label) return t(option.label)
+  }
 
   if (column.type === 'date' && column.format) {
     // Go's sql.NullTime is serialized as { Time, Valid }. Keep this shape

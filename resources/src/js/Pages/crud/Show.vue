@@ -28,7 +28,9 @@ const mutating = ref(false)
 const confirming = ref(false)
 const confirm = useConfirmation()
 const actionDialog = ref<InstanceType<typeof ActionDialog>>()
-const listHref = computed(() => crudReturnHref(props.resource.basePath, page.url))
+const listHref = computed(() =>
+  crudReturnHref(props.resource.basePath, page.url, props.resource.returnToFilter),
+)
 const visibleCommands = computed(() =>
   props.resource.actions.filter((action) => props.record.actions?.includes(action.key)),
 )
@@ -141,11 +143,15 @@ async function run(key: string) {
       :inert="mutating || undefined"
       :aria-busy="mutating"
     >
-      <AppButton v-if="record.actions?.includes('edit')" as-child
-        ><Link :href="crudRecordHref(resource.basePath, record.id, true, listHref)">{{
-          t('Редактировать')
-        }}</Link></AppButton
-      >
+      <AppButton v-if="record.actions?.includes('edit')" as-child>
+        <Link
+          :href="
+            crudRecordHref(resource.basePath, record.id, true, listHref, resource.returnToFilter)
+          "
+        >
+          {{ t('Редактировать') }}
+        </Link>
+      </AppButton>
       <AppButton
         v-for="action in visibleCommands"
         :key="action.key"

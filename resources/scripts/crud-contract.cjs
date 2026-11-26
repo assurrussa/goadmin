@@ -1,18 +1,30 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const crypto = require('node:crypto')
-const roots = ['src/js/crud', 'src/js/Pages/crud', 'src/js/components/date', 'src/js/components/confirmation']
+const roots = [
+  'src/js/crud', 'src/js/Pages/crud', 'src/js/components/date',
+  'src/js/components/confirmation', 'src/js/components/datagrid',
+]
+const gridSources = [
+  'src/js/composables/useDataGrid.ts',
+  'src/js/composables/useDataGridWorkflow.ts',
+  'src/js/composables/useRecordNavigation.ts',
+]
 function crudFingerprint(resourceRoot = path.resolve(__dirname, '..')) {
   const hash = crypto.createHash('sha256')
+  function include(relative) {
+    hash.update(relative + '\0')
+    hash.update(fs.readFileSync(path.join(resourceRoot, relative)))
+    hash.update('\0')
+  }
   for (const root of roots) {
     const dir = path.join(resourceRoot, root)
     for (const name of fs.readdirSync(dir).sort()) {
       if (/\.(test|spec)\./.test(name)) continue
-      hash.update(root + '/' + name + '\0')
-      hash.update(fs.readFileSync(path.join(dir, name)))
-      hash.update('\0')
+      include(root + '/' + name)
     }
   }
+  for (const relative of gridSources) include(relative)
   return 'sha256:' + hash.digest('hex')
 }
 module.exports = { crudFingerprint }

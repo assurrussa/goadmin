@@ -75,6 +75,39 @@ func TestCommandResourceValidation(t *testing.T) {
 	}
 }
 
+func TestCommandDescriptorsRespectActorAndRecordPolicy(t *testing.T) {
+	d := commandDefinition()
+	d.Authorize = func(_ context.Context, _ host.Actor, op Operation, _ Record[testRow]) error {
+		if op == "archive" {
+			return ErrDenied
+		}
+		return nil
+	}
+	app := mountCommands(t, d, false, func(_ context.Context, _ int64, _ host.PermissionDomain, action host.PermissionAction) bool {
+		return action != "restore"
+	})
+
+	for path, want := range map[string][]string{
+		"/people":            {"publish"},
+		"/people/records/42": {},
+	} {
+		props := previewPage(t, app, path)
+		resource, ok := props["resource"].(map[string]any)
+		require.True(t, ok)
+		actions, ok := resource["actions"].([]any)
+		require.True(t, ok)
+		keys := make([]string, 0, len(actions))
+		for _, descriptor := range actions {
+			action, ok := descriptor.(map[string]any)
+			require.True(t, ok)
+			key, ok := action["key"].(string)
+			require.True(t, ok)
+			keys = append(keys, key)
+		}
+		require.Equal(t, want, keys, path)
+	}
+}
+
 func TestCommandResourceRouteAndPlacementContract(t *testing.T) {
 	d := commandDefinition()
 	app := mountCommands(t, d, false, nil)

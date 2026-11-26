@@ -54,6 +54,7 @@ export async function requestsAcceptance({ page, context, expect, result }) {
   const origin = locationOf(page.url())
   const links = page.locator('[data-part="table"]').getByRole('link', view)
   await expect(links).toHaveCount(2)
+  await expect(page.getByRole('cell', { name: 'Ожидает решения', exact: true })).toHaveCount(2)
   await expect(page.locator('[data-part="table"]').getByRole('checkbox')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /^(Одобрить|Отклонить)$/ })).toHaveCount(0)
   for (const link of await links.all()) {

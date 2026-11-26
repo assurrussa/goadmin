@@ -7,10 +7,14 @@ import plainResource from './no-business-actions.test.json'
 import type { ApiResponse } from '@/composables/useDataGrid'
 import { applyLocale } from '@/i18n'
 
-const mocks = vi.hoisted(() => ({ confirm: vi.fn(), post: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  confirm: vi.fn(),
+  post: vi.fn(),
+  page: { props: {}, url: '/people/records/42' },
+}))
 vi.mock('@inertiajs/vue3', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@inertiajs/vue3')>()),
-  usePage: () => ({ props: {}, url: '/people/records/42' }),
+  usePage: () => mocks.page,
   router: { on: () => () => {}, get: vi.fn(), post: mocks.post },
   Head: defineComponent({ render: () => null }),
 }))
@@ -21,6 +25,7 @@ afterEach(() => {
   app = undefined
   document.body.replaceChildren()
   window.history.replaceState({}, '', '/')
+  mocks.page.url = '/people/records/42'
   applyLocale('ru')
   vi.clearAllMocks()
   vi.restoreAllMocks()
@@ -88,6 +93,53 @@ it('opens a journal event from its filtered list without selection or export con
   }
   expect(clicks).toEqual([false, false, false, true])
   expect(visit.mock.calls.map(([target]) => target)).toEqual([link.getAttribute('href')])
+})
+
+it.each([true, false])('round-trips a declared returnTo filter (%s)', async (returnToFilter) => {
+  const basePath = '/requests'
+  const filter = 'https://example.invalid/path'
+  const query = new URLSearchParams({ sortOrder: 'desc', returnTo: filter }).toString()
+  const list = `${basePath}?${query}`
+  const root = document.createElement('div')
+  document.body.append(root)
+  window.history.replaceState({}, '', list)
+  const resource: CrudResource = {
+    key: 'requests',
+    basePath,
+    title: 'Requests',
+    fields: [],
+    actions: [],
+    returnToFilter,
+  }
+  const data: ApiResponse = {
+    data: [{ item: { id: '42' }, actions: [{ key: 'view', label: 'Просмотр' }] }],
+    config: {
+      routePath: basePath,
+      columns: [{ key: 'returnTo', label: 'Origin', title: 'Origin', filterable: returnToFilter }],
+    },
+    meta: { title: '', description: '', requestQuery: query, filters: { returnTo: filter } },
+  }
+  app = createApp(Index, { resource, data })
+  app.mount(root)
+  await settle()
+
+  const record = root.querySelector<HTMLAnchorElement>('a[aria-label="Просмотр"]')!
+  const expected = returnToFilter ? list : `${basePath}?sortOrder=desc`
+  expect(new URL(record.href).searchParams.get('returnTo')).toBe(expected)
+  mocks.page.url = record.getAttribute('href')!
+  app.unmount()
+  app = createApp(Show, {
+    resource,
+    record: { id: '42', revision: 'v1', data: {}, actions: ['edit'] },
+    permissions: { create: false, delete: false, update: true },
+  })
+  app.mount(root)
+  await settle()
+
+  const links = [...root.querySelectorAll<HTMLAnchorElement>('a')]
+  const edit = links.find((link) => new URL(link.href).pathname === `${basePath}/records/42/edit`)!
+  expect(new URL(edit.href).searchParams.get('returnTo')).toBe(expected)
+  expect(links.map((link) => link.getAttribute('href'))).toContain(expected)
 })
 
 it('runs a row command named show without replacing it with a detail link', async () => {

@@ -8,7 +8,7 @@ import (
 
 // ListColumn references a readable Field by key. Label and Type default to the
 // field declaration, with textarea and custom displayed as text by default.
-// Select filter options come from Field.Options.
+// Select display and filter options come from Field.Options.
 type ListColumn struct {
 	Key               string
 	Sortable          bool
@@ -53,7 +53,7 @@ func deriveColumns(fields []Field, list []ListColumn) ([]datagrid.Column, error)
 		if column.Filterable && column.Type == fieldSelect && len(field.Options) == 0 {
 			return nil, fmt.Errorf("crud: select filter %q requires field options", item.Key)
 		}
-		if column.Filterable && (column.Type == fieldSelect || column.Type == "badge") {
+		if column.Type == fieldSelect || (column.Filterable && column.Type == "badge") {
 			for _, option := range field.Options {
 				column.FilterOptions = append(column.FilterOptions, map[string]string{"value": option.Value, "label": option.Label})
 			}

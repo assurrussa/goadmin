@@ -354,6 +354,21 @@ describe('DataGridFilters passing contracts', () => {
       applyLocale('ru')
     }
   })
+  it('uses the badge filter options when declared and free text otherwise', async () => {
+    const { element } = mount(DataGridFilters, {
+      filterableColumns: [
+        column('status', { type: 'badge', options: [{ value: 'pending', label: 'Pending' }] }),
+        column('category', { type: 'badge' }),
+      ],
+      filters: { status: 'pending', category: 'custom' },
+    })
+    expect(button(element, 'Снять фильтр status: Pending')).toBeTruthy()
+    button(element, 'Фильтры (2)').click()
+    await vi.waitFor(() =>
+      expect(text(element.querySelector('[role="combobox"]')!)).toBe('Pending'),
+    )
+    expect(element.querySelector<HTMLInputElement>('input[type="text"]')?.value).toBe('custom')
+  })
   it('summarizes only editable filters and hides duplicate labels while the panel is open', async () => {
     const onFilterChange = vi.fn()
     const { element } = mount(DataGridFilters, {
@@ -645,21 +660,45 @@ describe('DataGridTable passing contracts: rendering, sort and identity', () => 
       applyLocale('ru')
     }
   })
-  it('renders select badge labels including a numeric zero key and falls back for unknown values', () => {
-    const { element } = table([row('x', { item: { id: 'x', status: 0, unknown: 'other' } })], {
+  it('renders select option labels with typed matches and preserves formatters and unknown values', () => {
+    const options = [
+      { value: 'pending', label: 'Ожидает решения' },
+      { value: 0, label: 'Numeric zero' },
+      { value: '0', label: 'String zero' },
+    ]
+    const values = { state: 'pending', numeric: 0, text: '0', other: 'future', custom: 'pending' }
+    const { element } = table([row('x', { item: { id: 'x', ...values } })], {
       config: config({
-        columns: [
-          column('status', {
-            type: 'select',
-            badges: { 0: { label: 'Zero status', variant: 'success' } },
-          }),
-          column('unknown', { type: 'select', badges: {} }),
-        ],
+        columns: Object.keys(values).map((key) => column(key, { type: 'select', options })),
       }),
+      formatCell: (key: string) => (key === 'custom' ? 'Host display' : undefined),
     })
-    expect(text(element.querySelectorAll('td')[0])).toBe('Zero status')
-    expect(text(element.querySelectorAll('td')[1])).toBe('other')
+    expect(Array.from(element.querySelectorAll('tbody td'), text).slice(0, 5)).toEqual([
+      'Ожидает решения',
+      'Numeric zero',
+      'String zero',
+      'future',
+      'Host display',
+    ])
   })
+  it.each(['select', 'badge'] as const)(
+    'renders %s badge labels and falls back for unknown values',
+    (type) => {
+      const { element } = table([row('x', { item: { id: 'x', status: 0, unknown: 'other' } })], {
+        config: config({
+          columns: [
+            column('status', {
+              type,
+              badges: { 0: { label: 'Zero status', variant: 'success' } },
+            }),
+            column('unknown', { type, badges: {} }),
+          ],
+        }),
+      })
+      expect(text(element.querySelectorAll('td')[0])).toBe('Zero status')
+      expect(text(element.querySelectorAll('td')[1])).toBe('other')
+    },
+  )
   it('renders plain text HTML characters literally without introducing DOM elements', () => {
     const { element } = table([
       row('x', { item: { id: 'x', name: '<b data-audit-plain>literal</b>' } }),

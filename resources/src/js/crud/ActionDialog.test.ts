@@ -168,6 +168,18 @@ function reread(actions: string[], actor = '17') {
     },
   })
 }
+it('keeps a declared returnTo filter when opening the record after a command', async () => {
+  dialog()!.querySelector<HTMLButtonElement>('[data-confirmation-cancel]')!.click()
+  dialogResource.returnToFilter = true
+  const returnTo = list + '&returnTo=https%3A%2F%2Fexample.invalid'
+  view.open(action, record, returnTo)
+  await settle()
+  await write('Note')
+  fetch.mockResolvedValueOnce(new Response(null, { status: 204 }))
+  accept()
+  const expected = '/products/records/9?' + new URLSearchParams({ returnTo })
+  await vi.waitFor(() => expect(router.get).toHaveBeenCalledWith(expected))
+})
 it('returns focus to the rejected reason and its linked error after a server validation failure', async () => {
   await write('  rejected draft  ')
   const confirm = dialog()!.querySelector<HTMLButtonElement>('[data-confirmation-accept]')!

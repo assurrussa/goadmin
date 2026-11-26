@@ -40,6 +40,15 @@ interface Column {
   badges?: Record<string | number, { label: string; variant: string }>
 }
 
+export const dataGridOption = (column: Column, value: unknown) => {
+  // URL values are strings even when the configured option has a numeric value.
+  const options = column.options ?? []
+  return (
+    options.find((option) => option.value === value) ??
+    options.find((option) => String(option.value) === String(value))
+  )
+}
+
 interface GridWorkflow {
   key: string
   preferencesUrl: string

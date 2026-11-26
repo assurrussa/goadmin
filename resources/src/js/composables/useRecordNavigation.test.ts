@@ -51,4 +51,9 @@ describe('resource list navigation', () => {
       '/admins?page=2',
     )
   })
+  it('treats returnTo as a list filter when explicitly declared', () => {
+    const query = 'page=2&returnTo=https%3A%2F%2Fexample.invalid'
+    expect(recordListHref('/users', '/users?' + query, true)).toBe('/users?' + query)
+    expect(recordListHref('/users', '/other/../users?' + query, true)).toBe('/users')
+  })
 })

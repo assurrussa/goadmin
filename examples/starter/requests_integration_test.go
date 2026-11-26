@@ -12,13 +12,38 @@ import (
 	"github.com/assurrussa/goadmin/toolkit/datagrid"
 )
 
-func TestRequestsLateEnableAndConcurrentMigration(t *testing.T) {
-	db, dsn, _ := productTestDatabase(t, "")
+func TestRequestsLateEnable(t *testing.T) {
+	db, _, _ := productTestDatabase(t, "")
 	ctx := t.Context()
 	var absent bool
 	if err := db.QueryRowContext(ctx, "SELECT to_regclass('starter_request_migrations') IS NULL").Scan(&absent); err != nil || !absent {
 		t.Fatalf("disabled requests installed storage: %v", err)
 	}
+	t.Setenv("ADMIN_MODULES", "requests")
+	oldArgs := os.Args
+	os.Args = []string{"starter", "migrate"}
+	defer func() { os.Args = oldArgs }()
+	if err := run(); err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM starter_requests").Scan(&count); err != nil || count != 6 {
+		t.Fatalf("seeds after enabling requests: %d, %v", count, err)
+	}
+	if _, err := db.ExecContext(ctx, "DELETE FROM starter_requests"); err != nil {
+		t.Fatal(err)
+	}
+	if err := run(); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM starter_requests").Scan(&count); err != nil || count != 0 {
+		t.Fatalf("re-enabled requests resurrected demo rows: %d, %v", count, err)
+	}
+}
+
+func TestRequestsConcurrentMigration(t *testing.T) {
+	db, dsn, _ := productTestDatabase(t, "")
+	ctx := t.Context()
 	var wg sync.WaitGroup
 	for range 2 {
 		wg.Go(func() {
@@ -32,18 +57,29 @@ func TestRequestsLateEnableAndConcurrentMigration(t *testing.T) {
 	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM starter_requests").Scan(&count); err != nil || count != 6 {
 		t.Fatalf("seeds after concurrent migration: %d, %v", count, err)
 	}
-	if _, err := db.ExecContext(ctx, "DELETE FROM starter_requests"); err != nil {
+}
+
+func TestRequestsAuditFailureRollsBackDecision(t *testing.T) {
+	db, _, actor := productTestDatabase(t, "requests")
+	ctx := t.Context()
+	repo := requestRepo{db}
+	rows, _, err := repo.list(ctx, actor, datagrid.Filters{Page: 1, Limit: 1})
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("load pending request: %d rows, %v", len(rows), err)
+	}
+	row := rows[0]
+	if _, err := db.ExecContext(ctx, "ALTER TABLE starter_request_decisions ADD CHECK (status <> 'approved')"); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("ADMIN_MODULES", "requests")
-	oldArgs := os.Args
-	os.Args = []string{"starter", "migrate"}
-	defer func() { os.Args = oldArgs }()
-	if err := run(); err != nil {
-		t.Fatal(err)
+	if err := repo.approve(ctx, actor, row.ID, row.Revision); err == nil {
+		t.Fatal("approval succeeded despite the failed audit insert")
 	}
-	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM starter_requests").Scan(&count); err != nil || count != 0 {
-		t.Fatalf("re-enabled requests resurrected demo rows: %d, %v", count, err)
+	got, err := repo.get(ctx, actor, row.ID)
+	if err != nil || got != row {
+		t.Fatalf("decision escaped rollback: before %+v, after %+v, %v", row, got, err)
+	}
+	if err := repo.reject(ctx, actor, row.ID, row.Revision, rejectRequestInput{"Missing details"}); err != nil {
+		t.Fatalf("subsequent decision at original revision: %v", err)
 	}
 }
 

@@ -29,6 +29,7 @@ import (
 )
 
 type testRow struct {
+	ReturnTo string  `json:"returnTo,omitempty"`
 	Name     string  `json:"name"`
 	Secret   string  `json:"secret"`
 	ReadOnly string  `json:"readOnly"`
@@ -62,6 +63,26 @@ func definition() Definition[testRow, testCreate, testUpdate] {
 	}, Create: func(context.Context, host.Actor, testCreate) (Record[testRow], error) { return row, nil }, Update: func(context.Context, host.Actor, string, string, testUpdate) (Record[testRow], error) {
 		return row, nil
 	}, Delete: func(context.Context, host.Actor, string, string) error { return nil }, Authorize: func(context.Context, host.Actor, Operation, Record[testRow]) error { return nil }}
+}
+
+func TestReturnToFilterProp(t *testing.T) {
+	for _, filterable := range []bool{true, false} {
+		d := definition()
+		d.Fields = append(d.Fields, Field{Key: "returnTo", Label: "Destination", Type: "text", Read: true})
+		d.Columns = append(d.Columns, datagrid.Column{Key: "returnTo", Filterable: filterable})
+		_, err := New(d)
+		require.NoError(t, err)
+		app := mounted(t, d, false, false)
+		for _, path := range []string{"/people", "/people/records/42"} {
+			resource, ok := previewPage(t, app, path)["resource"].(map[string]any)
+			require.True(t, ok)
+			if filterable {
+				require.Equal(t, true, resource["returnToFilter"], path)
+			} else {
+				require.NotContains(t, resource, "returnToFilter", path)
+			}
+		}
+	}
 }
 
 func mounted(t *testing.T, d Definition[testRow, testCreate, testUpdate], preview bool, deny bool, flash ...bool) *fiber.App {

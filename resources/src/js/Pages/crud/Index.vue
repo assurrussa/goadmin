@@ -19,12 +19,22 @@ const confirming = ref(false)
 const confirm = useConfirmation()
 const error = computed(() => (page.props.errors as Record<string, string> | undefined)?.form)
 function source() {
-  return recordListHref(props.resource.basePath, grid.value?.listLocation ?? null)
+  return recordListHref(
+    props.resource.basePath,
+    grid.value?.listLocation ?? null,
+    props.resource.returnToFilter,
+  )
 }
 function rowActionHref(key: string, row: Record<string, unknown>, listLocation: string) {
   if (key !== 'view' && key !== 'edit') return
   if (typeof row.id !== 'string' && typeof row.id !== 'number') return
-  return crudRecordHref(props.resource.basePath, String(row.id), key === 'edit', listLocation)
+  return crudRecordHref(
+    props.resource.basePath,
+    String(row.id),
+    key === 'edit',
+    listLocation,
+    props.resource.returnToFilter,
+  )
 }
 function create() {
   if (mutating.value) return

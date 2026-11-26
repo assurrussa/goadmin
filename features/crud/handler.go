@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/url"
 	"reflect"
+	"slices"
 	"strings"
 
 	logger "github.com/assurrussa/gologger"
@@ -143,7 +144,7 @@ func (h *handler[R, C, U]) RegisterGroupRoutes(router fiber.Router, _ ...fiber.H
 	})
 	cfg.PageComponent = func(c fiber.Ctx, data datagrid.Response[projected]) error {
 		coreinertia.ScopeCRUDRecordFlash(c, h.d.BasePath, coreinertia.CRUDRecordFlashIndexID(c), coreinertia.CRUDRecordIndex, false)
-		props, err := h.props(c, Row)
+		props, err := h.props(c, Row, nil)
 		if err != nil {
 			return h.failure(c, err, nil)
 		}
@@ -223,7 +224,7 @@ func (h *handler[R, C, U]) registerMutationRoutes(group fiber.Router) {
 		if err := h.d.Authorize(c, a, Create, Record[R]{}); err != nil {
 			return h.failure(c, err, nil)
 		}
-		props, err := h.props(c, Detail)
+		props, err := h.props(c, Detail, nil)
 		if err != nil {
 			return h.failure(c, err, nil)
 		}
@@ -297,7 +298,7 @@ func (h *handler[R, C, U]) registerActionRoutes(group fiber.Router) {
 	}
 }
 
-func (h *handler[R, C, U]) props(c fiber.Ctx, placement ActionPlacement) (map[string]any, error) {
+func (h *handler[R, C, U]) props(c fiber.Ctx, placement ActionPlacement, recordActions []string) (map[string]any, error) {
 	a, _ := h.app.CurrentActor(c)
 	description, err := h.reader().describe(readContext(c), a)
 	if err != nil {
@@ -313,7 +314,12 @@ func (h *handler[R, C, U]) props(c fiber.Ctx, placement ActionPlacement) (map[st
 	}
 	resource := map[string]any{
 		"key": description.Key, "basePath": h.d.BasePath, "title": description.Title,
-		"fields": fields, "actions": h.visibleActions(c, placement),
+		"fields": fields, "actions": h.visibleActions(readContext(c), a, placement, recordActions),
+	}
+	if slices.ContainsFunc(h.d.Columns, func(column datagrid.Column) bool {
+		return column.Key == "returnTo" && column.Filterable
+	}) {
+		resource["returnToFilter"] = true
 	}
 	if h.mode == commandResource {
 		resource["serverValidateActionParams"] = true
@@ -348,7 +354,7 @@ func (h *handler[R, C, U]) page(c fiber.Ctx, edit bool) error {
 		}
 		return h.failure(c, err, nil)
 	}
-	props, err := h.props(c, Detail)
+	props, err := h.props(c, Detail, r.Actions)
 	if err != nil {
 		return h.failure(c, err, nil)
 	}
@@ -746,15 +752,25 @@ func (h *handler[R, C, U]) listURL(c fiber.Ctx) string {
 	return h.d.BasePath + "?" + u.RawQuery
 }
 
-func (h *handler[R, C, U]) visibleActions(ctx context.Context, placement ActionPlacement) []Action[R] {
+func (h *handler[R, C, U]) visibleActions(
+	ctx context.Context, actor host.Actor, placement ActionPlacement, recordActions []string,
+) []Action[R] {
 	actions := []Action[R]{}
 	if integrationroles.RolePreviewActive(ctx) {
 		return actions
 	}
 	for _, action := range h.d.Actions {
-		if action.Placement.includes(placement) {
-			actions = append(actions, action)
+		if !action.Placement.includes(placement) {
+			continue
 		}
+		if placement == Detail {
+			if !slices.Contains(recordActions, action.Key) {
+				continue
+			}
+		} else if !h.reader().allowed(ctx, actor, action.Permission) {
+			continue
+		}
+		actions = append(actions, action)
 	}
 	return actions
 }

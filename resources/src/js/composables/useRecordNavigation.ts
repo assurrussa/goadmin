@@ -7,7 +7,11 @@ const listKeys = new Set(['page', 'limit', 'sortBy', 'sortOrder', 'search'])
 const maxReturnToBytes = 4096 // Same limit as the CRUD redirect handler.
 
 /** A return target is always a list in this resource, never a redirect destination. */
-export function recordListHref(basePath: string, target: string | null): string {
+export function recordListHref(
+  basePath: string,
+  target: string | null,
+  returnToFilter = false,
+): string {
   if (!target?.startsWith('/') || target.startsWith('//') || /[\\\u0000-\u0020]/.test(target))
     return basePath
   try {
@@ -17,7 +21,7 @@ export function recordListHref(basePath: string, target: string | null): string 
     if (url.origin !== origin || url.pathname !== basePath) return basePath
     const params = new URLSearchParams()
     for (const [key, value] of url.searchParams) {
-      if (key !== 'returnTo' && (listKeys.has(key) || isDataGridFilterKey(key)))
+      if ((key !== 'returnTo' || returnToFilter) && (listKeys.has(key) || isDataGridFilterKey(key)))
         params.set(key, value)
     }
     const query = params.toString()

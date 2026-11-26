@@ -103,7 +103,13 @@ function open(action: CrudAction, record: CrudRecord, returnTo: string) {
     action,
     record,
     actor,
-    href: crudRecordHref(props.resource.basePath, record.id, false, returnTo),
+    href: crudRecordHref(
+      props.resource.basePath,
+      record.id,
+      false,
+      returnTo,
+      props.resource.returnToFilter,
+    ),
     controller: new AbortController(),
   }
 }
