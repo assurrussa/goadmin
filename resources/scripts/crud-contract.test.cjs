@@ -23,6 +23,7 @@ test('shared CRUD renderer changes invalidate the fingerprint while tests do not
     'src/js/composables/useDataGrid.ts',
     'src/js/composables/useDataGridWorkflow.ts',
     'src/js/composables/useRecordNavigation.ts',
+    'src/js/lib/recordFieldValue.ts',
   ]
   for (const source of sources) {
     const file = path.join(root, source)

@@ -223,6 +223,7 @@
 
 <script setup lang="ts">
 import { t, locale } from '@/i18n'
+import { recordFieldValue } from '@/lib/recordFieldValue'
 import { Link } from '@inertiajs/vue3'
 
 import { dataGridOption, dataGridRowId } from '~/composables/useDataGrid.ts'
@@ -320,13 +321,8 @@ const getItemId = (item: DataItem, config: Config): string | number => {
   return typeof id === 'string' || typeof id === 'number' ? id : String(id)
 }
 
-// Helper function to safely get column value
-const getColumnValue = (item: DataItem, columnKey: string): unknown => {
-  const hasComputedValue =
-    item.values && Object.prototype.hasOwnProperty.call(item.values, columnKey)
-  const source = hasComputedValue ? item.values! : item.item
-  return source[columnKey]
-}
+const getColumnValue = (item: DataItem, columnKey: string) =>
+  recordFieldValue(item.item, columnKey, item.values)
 
 const formatValue = (value: unknown, column: Column): string => {
   if (value == null) return ''

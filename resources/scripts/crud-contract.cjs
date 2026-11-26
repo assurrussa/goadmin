@@ -5,10 +5,11 @@ const roots = [
   'src/js/crud', 'src/js/Pages/crud', 'src/js/components/date',
   'src/js/components/confirmation', 'src/js/components/datagrid',
 ]
-const gridSources = [
+const sharedSources = [
   'src/js/composables/useDataGrid.ts',
   'src/js/composables/useDataGridWorkflow.ts',
   'src/js/composables/useRecordNavigation.ts',
+  'src/js/lib/recordFieldValue.ts',
 ]
 function crudFingerprint(resourceRoot = path.resolve(__dirname, '..')) {
   const hash = crypto.createHash('sha256')
@@ -24,7 +25,7 @@ function crudFingerprint(resourceRoot = path.resolve(__dirname, '..')) {
       include(root + '/' + name)
     }
   }
-  for (const relative of gridSources) include(relative)
+  for (const relative of sharedSources) include(relative)
   return 'sha256:' + hash.digest('hex')
 }
 module.exports = { crudFingerprint }

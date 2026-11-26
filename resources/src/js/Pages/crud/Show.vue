@@ -3,6 +3,7 @@ defineOptions({ name: 'CrudShowPage' })
 import { computed, ref } from 'vue'
 import { Link, router, usePage } from '@inertiajs/vue3'
 import { t } from '@/i18n'
+import { recordFieldValue } from '@/lib/recordFieldValue'
 import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -117,7 +118,7 @@ async function run(key: string) {
         <Field
           v-if="field.type === 'custom'"
           :field="field"
-          :model-value="crudValue(record.data[field.key])"
+          :model-value="crudValue(recordFieldValue(record.data, field.key))"
           readonly
           disabled
         />
@@ -127,7 +128,7 @@ async function run(key: string) {
             }}<span v-if="field.description" class="block text-xs">{{ t(field.description) }}</span>
           </dt>
           <dd class="mt-1 whitespace-pre-wrap break-words">
-            {{ displayFieldValue(field, record.data[field.key]) }}
+            {{ displayFieldValue(field, recordFieldValue(record.data, field.key)) }}
           </dd></template
         >
       </div>

@@ -755,6 +755,44 @@ describe('DataGridTable passing contracts: rendering, sort and identity', () => 
       expect(text(element.querySelectorAll('td')[2])).toBe('other')
     },
   )
+  it.each([
+    ['toString', 'select'],
+    ['valueOf', 'badge'],
+  ] as const)(
+    'updates the indicator for the optional record field %s',
+    async (key: string, type) => {
+      const item = reactive<Record<string, unknown>>({ id: 'x' })
+      const values = reactive<Record<string, unknown>>({})
+      const badges = {
+        '': { label: 'Unassigned', variant: 'info' },
+        0: { label: 'Zero', variant: 'success' },
+      }
+      const { element } = table([row('x', { item, values, actions: [] })], {
+        config: config({ columns: [column(key, { type, badges })] }),
+      })
+      const cell = element.querySelector('tbody td')!
+      const check = (label: string) => {
+        expect(text(cell)).toBe(label)
+        expect(cell.querySelector('[data-part="indicator"]') !== null).toBe(label !== '')
+      }
+      check('')
+      item[key] = ''
+      await nextTick()
+      check('Unassigned')
+      values[key] = null
+      await nextTick()
+      check('')
+      values[key] = 0
+      await nextTick()
+      check('Zero')
+      delete values[key]
+      await nextTick()
+      check('Unassigned')
+      delete item[key]
+      await nextTick()
+      check('')
+    },
+  )
   it('renders plain text HTML characters literally without introducing DOM elements', () => {
     const { element } = table([
       row('x', { item: { id: 'x', name: '<b data-audit-plain>literal</b>' } }),
