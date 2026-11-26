@@ -48,6 +48,7 @@
       :all-selected="allSelected"
       :selection-disabled="selectionDisabled"
       :format-cell="formatCell"
+      :row-action-href="rowActionHref"
       :show-inline-create="config.behaviour?.inlineCreatable && items.length > 0"
       @sort="handleSort"
       @toggle-select-all="toggleSelectAll"
@@ -105,7 +106,16 @@ import { useAuthUserStore } from '@/stores/authUser'
 import { useDataGridWorkflow, type BulkResult } from '@/composables/useDataGridWorkflow'
 import DataGridWorkflow from './DataGridWorkflow.vue'
 import { isGridHistoryRestoration } from './historyRestoration'
-import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import {
+  computed,
+  getCurrentInstance,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  ref,
+  shallowRef,
+  watch,
+} from 'vue'
 import {
   type ApiResponse,
   type DataItemValue,
@@ -128,6 +138,7 @@ interface Props {
   syncWithUrl?: boolean
   navigationMode?: 'browser' | 'inertia'
   formatCell?: (key: string, value: unknown) => string | undefined
+  resolveRowActionHref?: (key: string, item: DataItemValue, source: string) => string | undefined
 }
 
 // Define props with defaults
@@ -228,6 +239,16 @@ async function resetEmptyQuery(): Promise<void> {
 
 let synchronizedLocation =
   typeof window === 'undefined' ? '' : window.location.pathname + window.location.search
+// The URL in the address bar may belong to a pending history restoration.
+const listSnapshot = shallowRef<{ rows: typeof items.value; href: string }>()
+const listLocation = computed(() => {
+  if (listSnapshot.value?.rows === items.value) return listSnapshot.value.href
+  const query = metaInfo.value?.requestQuery
+  return props.apiUrl + (query ? `?${query}` : '')
+})
+
+const rowActionHref = (key: string, item: DataItemValue) =>
+  props.resolveRowActionHref?.(key, item, listLocation.value)
 
 const updateURL = (): void => {
   if (
@@ -259,6 +280,7 @@ const updateURL = (): void => {
   const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`
   window.history.replaceState(window.history.state, '', newUrl)
   synchronizedLocation = window.location.pathname + window.location.search
+  listSnapshot.value = { rows: items.value, href: synchronizedLocation }
 }
 
 const handlePopState = (event: PopStateEvent): void => {
@@ -320,6 +342,7 @@ const refreshData = (): void => {
 // Expose метод для использования через ref
 defineExpose({
   refreshData,
+  listLocation,
 })
 
 onMounted(() => {

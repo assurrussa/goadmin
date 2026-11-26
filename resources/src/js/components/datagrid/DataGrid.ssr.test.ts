@@ -3,22 +3,32 @@ import { describe, expect, it, vi } from 'vitest'
 import { createSSRApp } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import DataGrid from './DataGrid.vue'
+import { recordActionHref } from '@/composables/useRecordNavigation'
 
 describe('server-only DataGrid rendering without browser globals', () => {
-  it('renders initial rows without starting transport', async () => {
+  it('renders initial rows and their list-aware links without starting transport', async () => {
     const fetch = vi.fn()
     vi.stubGlobal('fetch', fetch)
     try {
       const html = await renderToString(
         createSSRApp(DataGrid, {
           apiUrl: '/users',
+          resolveRowActionHref: (key: string, row: Record<string, unknown>, source: string) =>
+            recordActionHref('/users', row.idExact, key === 'edit', source),
           initialData: {
-            data: [{ item: { id: 1, name: 'Server-only row' }, actions: [] }],
+            data: [
+              {
+                item: { id: 1, idExact: '9007199254740993', name: 'Server-only row' },
+                actions: [{ key: 'view', label: 'View' }],
+              },
+            ],
             config: { columns: [{ key: 'name', label: 'Name', title: 'Name' }] },
+            meta: { title: '', description: '', requestQuery: 'search=Server' },
           },
         }),
       )
       expect(html).toContain('Server-only row')
+      expect(html).toContain('href="/users/9007199254740993?returnTo=%2Fusers%3Fsearch%3DServer"')
       expect(fetch).not.toHaveBeenCalled()
     } finally {
       vi.unstubAllGlobals()

@@ -121,6 +121,7 @@ models, repositories, migrations and services in your host.
 | --- | --- | --- |
 | Login, setup, basic profile and shell | `host.New` with no optional modules | No |
 | Standard entity list/detail/create/edit and guarded actions | `features/crud` | No, for standard fields/pages |
+| Application-owned records with operator decisions | [`crud.NewWithActions`](crud.md#review-records-created-by-the-application) | No |
 | A list with host-owned page and mutation flows | `toolkit/datagrid` | Yes, for your custom page |
 | A custom workflow or page | `host.Feature` and a client extension | Yes |
 | Built-in users, access, uploads or another optional capability | Its explicit feature package | No, with the embedded bundle |

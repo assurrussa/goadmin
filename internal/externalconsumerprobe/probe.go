@@ -215,6 +215,26 @@ func TestParameterizedActionContract(t *testing.T) {
 	}
 }
 
+func TestReadWithActionsContract(t *testing.T) {
+	type row struct { Subject string ` + "`json:\"subject\"`" + ` }
+	type record = crud.Record[row]
+	permission := adminhost.NewPermissionKey("requests", "approve")
+	var definition = crud.WithActionsDefinition[row]{
+		Key: "requests", BasePath: "/requests", Title: "Requests",
+		Permission: adminhost.NewPermissionKey("requests", "read"),
+		Fields: []crud.Field{{Key: "subject", Label: "Subject", Type: "text", Read: true}},
+		ListColumns: []crud.ListColumn{{Key: "subject", Sortable: true}},
+		List: func(context.Context, adminhost.Actor, datagrid.Filtered) ([]record, int, error) { return nil, 0, nil },
+		Get: func(context.Context, adminhost.Actor, string) (record, error) { return record{}, crud.ErrNotFound },
+		Authorize: func(context.Context, adminhost.Actor, crud.Operation, record) error { return crud.ErrDenied },
+		Actions: []crud.Action[row]{{Key: "approve", Label: "Approve", Placement: crud.Detail, Permission: permission,
+			Run: func(context.Context, adminhost.Actor, string, string) error { return nil }}},
+	}
+	module, err := crud.NewWithActions(definition)
+	if err != nil { t.Fatal(err) }
+	if module.Descriptor().Key != "crud.requests" { t.Fatal("unexpected module key") }
+}
+
 func TestReadOnlyResourceContract(t *testing.T) {
 	type event struct {
 		Action string ` + "`json:\"action\"`" + `

@@ -145,9 +145,22 @@
               class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium sticky right-0 bg-card z-10"
             >
               <div v-if="item.actions?.length" class="flex items-center justify-end gap-1">
-                <template v-for="action in item.actions" :key="action.key">
+                <template v-for="{ action, href } in inlineActions(item)" :key="action.key">
                   <AppButton
-                    v-if="['edit', 'show', 'view', 'delete'].includes(action.key)"
+                    v-if="href"
+                    as-child
+                    variant="ghost"
+                    size="icon-sm"
+                    class="h-8 w-8 p-0"
+                    :class="getActionClass(action)"
+                  >
+                    <Link :href="href" :title="t(action.label)" :aria-label="t(action.label)">
+                      <Pencil v-if="action.key === 'edit'" class="h-4 w-4" />
+                      <Eye v-else class="h-4 w-4" />
+                    </Link>
+                  </AppButton>
+                  <AppButton
+                    v-else
                     variant="ghost"
                     size="icon-sm"
                     class="h-8 w-8 p-0"
@@ -204,6 +217,7 @@
 
 <script setup lang="ts">
 import { t, locale } from '@/i18n'
+import { Link } from '@inertiajs/vue3'
 
 import { dataGridRowId } from '~/composables/useDataGrid.ts'
 import type { Config, Column, DataItem, DataItemValue } from '~/composables/useDataGrid.ts'
@@ -249,6 +263,7 @@ interface Props {
   allSelected: boolean
   selectionDisabled?: boolean
   formatCell?: (key: string, value: unknown) => string | undefined
+  rowActionHref?: (key: string, item: DataItemValue) => string | undefined
 }
 
 // Define props with defaults
@@ -275,6 +290,13 @@ defineEmits<{
 const hasAnyActions = computed((): boolean => {
   return Object.values(props.items).some((item) => item.actions && item.actions.length > 0)
 })
+
+const inlineActions = (row: DataItem) =>
+  row.actions.flatMap((action) => {
+    if (action.key === 'delete') return [{ action, href: undefined }]
+    if (!['edit', 'show', 'view'].includes(action.key)) return []
+    return [{ action, href: props.rowActionHref?.(action.key, row.item) }]
+  })
 
 const getActionClass = (action: { key: string; variant?: string }) => {
   if (action.variant === 'danger' || action.key === 'delete') {

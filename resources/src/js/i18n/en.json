@@ -909,6 +909,7 @@
   "Проверить ещё раз": "Check again",
   "Unexpected parameter": "Unexpected parameter",
   "The record changed. Its current values could not be loaded.": "The record changed. Its current values could not be loaded.",
+  "The record changed. This action is no longer available.": "The record changed. This action is no longer available.",
   "The record changed. Review its current values and confirm again.": "The record changed. Review its current values and confirm again.",
   "The action was not performed. Confirm again after access is restored.": "The action was not performed. Confirm again after access is restored.",
   "The outcome is unknown. Check the record and its activity before trying again.": "The outcome is unknown. Check the record and its activity before trying again.",

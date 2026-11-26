@@ -10,6 +10,58 @@ only the separately guarded Publish/Unpublish commands change that status.
 Unpublish requires `products:unpublish` and an operator's reason. It returns
 the product to draft and records the reason in the same transaction.
 
+## Review records created by the application
+
+Use `crud.NewWithActions(crud.WithActionsDefinition[Row]{...})` for a shared queue
+such as [the starter requests](../examples/starter/requests.go). The application
+supplies an actor-scoped `List` (including its total), `Get`, `Authorize`, a
+read permission and at least one named action with its own permission. Return
+`crud.Record[Row]{ID: id, Revision: version, Data: row}` from the reader.
+The embedded UI provides search, personal views, a detail page and the declared
+single-record commands. List queries use the same scalar filter types and
+100-record limit as `NewReadOnly`. Creation of the business records belongs
+to the application.
+
+Set an action's `Placement` to `crud.Detail` for a decision that requires opening
+the record, or `crud.Row` for a command in an individual table row. The zero value
+and `crud.Both` show the command in both places. The server checks visibility for
+the actor and record. Placement affects where an authorized command is offered.
+
+On submission GoAdmin checks permissions and blocks role preview. It loads the
+record in the actor's scope and calls `Authorize(ctx, actor, crud.Read, record)`.
+For a well-formed request it compares the supplied revision, calls `Authorize`
+with the command key, validates any action parameters, then invokes the host.
+In `NewWithActions`, confirming a rejection with an empty reason reaches the server.
+An operator who still has access receives a conflict for a stale revision and a
+field error for a current revision. The operator reviews the new state before any
+further submission. The host must compare the revision and business state again
+in the transaction that records its decision and audit.
+
+### Choose list columns from the fields
+
+Supply an ordered `ListColumns` slice in any CRUD definition to reuse the labels,
+types and select options of readable fields. Example from the Products catalog:
+
+```go
+ListColumns: []crud.ListColumn{
+    {Key: "name", Sortable: true},
+    {Key: "category", Filterable: true},
+},
+```
+
+A column may override its label, grid type, format, filter placeholder or badges.
+Filtering a select uses the field's fixed options on the client and server. Fields
+omitted from the list remain available according to their read policy. To retain
+existing personal views, keep the resource key, column keys, sortability, filterability
+and option values stable. An existing explicit `Columns` declaration is also
+supported. Choose one of the two representations for each resource.
+
+The standard View and Edit links carry the current list query. Opening a record
+in another tab or copying its link preserves the return to the same search,
+filters, sort and page, including after a decision from the detail page. A return
+target must match the resource's exact list path and fit in 4096 bytes after query
+encoding. Otherwise the record links back to the base list.
+
 ## Connect a read-only section
 
 Use `crud.NewReadOnly` for a journal, directory or other resource with a list

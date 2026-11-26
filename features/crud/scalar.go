@@ -19,6 +19,7 @@ const (
 	fieldBoolean  = "boolean"
 	fieldDate     = "date"
 	fieldSelect   = "select"
+	fieldCustom   = "custom"
 )
 
 func scalarType(t reflect.Type) reflect.Type {
@@ -45,7 +46,7 @@ func fieldTypeAllowed(kind string, t reflect.Type) bool {
 		return k == reflect.Bool
 	case fieldNumber:
 		return numericKind(k)
-	case "custom":
+	case fieldCustom:
 		return k == reflect.String || k == reflect.Bool || numericKind(k)
 	}
 	return false

@@ -198,6 +198,7 @@
   "Проверить ещё раз": "Проверить ещё раз",
   "Unexpected parameter": "Неизвестный параметр действия.",
   "The record changed. Its current values could not be loaded.": "Запись изменилась. Не удалось загрузить актуальные данные.",
+  "The record changed. This action is no longer available.": "Запись изменилась. Это действие больше недоступно.",
   "The record changed. Review its current values and confirm again.": "Запись изменилась. Проверьте актуальные данные и подтвердите действие ещё раз.",
   "The action was not performed. Confirm again after access is restored.": "Действие не выполнено. После восстановления доступа подтвердите его ещё раз.",
   "The outcome is unknown. Check the record and its activity before trying again.": "Результат действия неизвестен. Перед повтором проверьте запись и журнал действий.",

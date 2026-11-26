@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -48,6 +49,10 @@ func (p productData) input() productInput {
 type productRepo struct{ db *sql.DB }
 
 var (
+	productCategoryField = crud.Field{
+		Key: "category", Label: "Category", Type: "select", Read: true, Create: true, Update: true,
+		Options: []crud.Option{{Value: "standard", Label: "Standard"}, {Value: "premium", Label: "Premium"}},
+	}
 	productNameField  = crud.Field{Key: "name", Label: "Name", Description: "The product name appears in the catalog and in its activity history.", Type: "text", Read: true, Create: true, Update: true, Required: true, MaxLength: new(200)}
 	productStockField = crud.Field{Key: "stock", Label: "Stock", Type: "number", Read: true, Create: true, Update: true, Minimum: new(0.0)}
 	unpublishReason   = crud.ActionParam{Key: "reason", Label: "Причина", Description: "Explain why you are removing this product. The reason remains in the activity entry after deletion.", Type: "textarea", Required: true, TrimSpace: true, MaxLength: new(500)}
@@ -152,7 +157,7 @@ func validateProduct(p productInput) error {
 			errs["available"] = []string{"Use YYYY-MM-DD"}
 		}
 	}
-	if p.Category != "" && p.Category != "standard" && p.Category != "premium" {
+	if p.Category != "" && !slices.ContainsFunc(productCategoryField.Options, func(o crud.Option) bool { return o.Value == p.Category }) {
 		errs["category"] = []string{"Choose a category"}
 	}
 	if len(errs) > 0 {
@@ -289,10 +294,7 @@ func productsModule(db *sql.DB) (host.Module, error) {
 		productStockField,
 		{Key: "active", Label: "Active", Type: "boolean", Read: true, Create: true, Update: true},
 		{Key: "available", Label: "Available", Type: "date", Read: true, Create: true, Update: true},
-		{
-			Key: "category", Label: "Category", Type: "select", Read: true, Create: true, Update: true,
-			Options: []crud.Option{{Value: "standard", Label: "Standard"}, {Value: "premium", Label: "Premium"}},
-		},
+		productCategoryField,
 		{
 			Key: "status", Label: "Status", Type: "select", Read: true,
 			Options: []crud.Option{{Value: "draft", Label: "Draft"}, {Value: "published", Label: "Published"}},
@@ -300,13 +302,13 @@ func productsModule(db *sql.DB) (host.Module, error) {
 	}
 	return crud.New(crud.Definition[productData, productInput, productInput]{
 		Key: "products", BasePath: "/products", Title: "Products", Description: "Manage your catalog and review publication changes in Product activity.", Fields: fields, PageSize: 20, DefaultSort: "name", DefaultOrder: "asc",
-		Columns: []datagrid.Column{
-			{Key: "name", Label: "Name", Type: "text", Sortable: true},
-			{Key: "stock", Label: "Stock", Type: "number", Sortable: true, Filterable: true},
-			{Key: "active", Label: "Active", Type: "boolean", Filterable: true},
-			{Key: "available", Label: "Available", Type: "date", Sortable: true, Filterable: true},
-			{Key: "category", Label: "Category", Type: "select", Filterable: true, FilterOptions: []map[string]string{{"value": "standard", "label": "Standard"}, {"value": "premium", "label": "Premium"}}},
-			{Key: "status", Label: "Status", Type: "select", Filterable: true, FilterOptions: []map[string]string{{"value": "draft", "label": "Draft"}, {"value": "published", "label": "Published"}}},
+		ListColumns: []crud.ListColumn{
+			{Key: "name", Sortable: true},
+			{Key: "stock", Sortable: true, Filterable: true},
+			{Key: "active", Filterable: true},
+			{Key: "available", Sortable: true, Filterable: true},
+			{Key: "category", Filterable: true},
+			{Key: "status", Filterable: true},
 		},
 		Permissions: crud.Permissions{Read: permission("read"), Create: permission("create"), Update: permission("update"), Delete: permission("delete")},
 		Menu:        host.Menu{Sections: []host.Section{{Key: "products", Title: "Products", Items: []host.Item{{Name: "Products", Href: "/products", Icon: "users", PermissionKey: permission("read")}}}}},

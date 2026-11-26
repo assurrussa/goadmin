@@ -137,7 +137,8 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   assert.equal(createWrites[0].available, '2026-11-07')
   report.calendar = { locales: ['en', 'ru'], isoPreserved: true, partialBlocked: true, leapValidation: true, clearOptional: true }
   await expect(page).toHaveURL(/\/products\/records\/[^/?]+\/edit(?:\?.*)?$/)
-  const editPath = new URL(page.url()).pathname
+  const editURL = page.url()
+  const editPath = new URL(editURL).pathname
   const recordPath = editPath.replace(/\/edit$/, '')
   const id = decodeURIComponent(recordPath.split('/').at(-1))
   assert.ok(id)
@@ -165,7 +166,7 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await field('active').uncheck()
   await setDate('2026-12-01')
   await save(recordPath, 'PUT')
-  await expect(page).toHaveURL(new RegExp(`${editPath}$`))
+  await expect(page).toHaveURL(editURL)
   await expect(field('name')).toHaveValue(updatedName)
   await expect(field('description')).toHaveValue('Edited description\nStill multiline')
   await expect(field('stock')).toHaveValue('27')
@@ -338,13 +339,15 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await page.goto(list)
   await ready()
   const rowActions = page.locator('[data-part="table"] tbody')
-  await language(page, 'Русский', 'ru')
-  for (const label of ['Просмотр', 'Редактировать', 'Удалить']) {
-    await expect(rowActions.getByRole('button', { name: label, exact: true })).toHaveAttribute('title', label)
-  }
-  await language(page, 'English', 'en')
-  for (const label of ['View', 'Edit', 'Delete']) {
-    await expect(rowActions.getByRole('button', { name: label, exact: true })).toHaveAttribute('title', label)
+  for (const [locale, languageName, view, edit, remove] of [
+    ['ru', 'Русский', 'Просмотр', 'Редактировать', 'Удалить'],
+    ['en', 'English', 'View', 'Edit', 'Delete'],
+  ]) {
+    await language(page, languageName, locale)
+    for (const label of [view, edit]) {
+      await expect(rowActions.getByRole('link', { name: label, exact: true })).toHaveAttribute('title', label)
+    }
+    await expect(rowActions.getByRole('button', { name: remove, exact: true })).toHaveAttribute('title', remove)
   }
   report.rowActionLocales = ['ru', 'en']
   const beforeRefresh = Object.fromEntries(new URL(page.url()).searchParams)
@@ -359,7 +362,10 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   report.refresh = { locales: ['ru', 'en'], requestStatus: 200, queryPreserved: true }
   const listURL = new URL(page.url())
   const returnTo = listURL.pathname + listURL.search
-  await page.locator('[data-part="table"] tbody').getByRole('button', { name: 'View', exact: true }).click()
+  const viewLink = page.locator('[data-part="table"] tbody').getByRole('link', { name: 'View', exact: true })
+  await expect(viewLink).toHaveAttribute('href', recordPath + '?' + new URLSearchParams({ returnTo }))
+  await viewLink.focus()
+  await page.keyboard.press('Enter')
   await expect(page).toHaveURL(new RegExp(`${recordPath}\\?`))
   assert.equal(new URL(page.url()).searchParams.get('returnTo'), returnTo)
   await page.getByRole('link', { name: 'Edit', exact: true }).click()
@@ -389,7 +395,7 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   const pageTwo = '/products?' + new URLSearchParams(conditions)
   const productRow = () => rowActions.getByRole('row').filter({ hasText: prefix })
   const editRow = async () => {
-    await productRow().getByRole('button', { name: 'Edit', exact: true }).click()
+    await productRow().getByRole('link', { name: 'Edit', exact: true }).click()
     await expect(field('name')).toBeVisible()
     const source = new URL(new URL(page.url()).searchParams.get('returnTo'), config.url)
     assert.equal(source.pathname, '/products')

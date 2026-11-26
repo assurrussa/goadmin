@@ -69,7 +69,7 @@ export async function confirmationAcceptance({ page, context, config, folder, na
           await selectTheme(target, expect, theme)
           await target.goto(`/products?search=${encodeURIComponent(prefix)}`)
           const before = intercepted
-          await target.getByRole('button', { name: code === 'ru' ? 'Просмотр' : 'View', exact: true }).click()
+          await target.getByRole('link', { name: code === 'ru' ? 'Просмотр' : 'View', exact: true }).click()
           await expect(target).toHaveURL(new RegExp(`${recordPath}(?:\\?.*)?$`))
           assert.ok(intercepted > before, 'Long prose must come from a genuine Inertia Show GET')
           for (const viewport of zoomed ? [null] : viewports) {

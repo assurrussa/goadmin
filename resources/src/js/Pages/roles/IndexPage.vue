@@ -19,6 +19,7 @@
       ref="dataGridRef"
       :api-url="apiUrl"
       :initial-data="apiResponseData"
+      :resolve-row-action-href="rowActionHref"
       @action-table="handleActionClick"
       @action-create="handleCreate"
       @action-row="handleRowAction"
@@ -36,7 +37,7 @@ import { router } from '@inertiajs/vue3'
 import AppHead from '@/components/layout/AppHead.vue'
 import DataGrid from '@/components/datagrid/DataGrid.vue'
 import type { ApiResponse } from '@/composables/useDataGrid'
-import { useRecordNavigation } from '@/composables/useRecordNavigation'
+import { recordActionHref } from '@/composables/useRecordNavigation'
 
 const props = defineProps({
   title: {
@@ -52,7 +53,6 @@ const props = defineProps({
 const dataGridRef = ref<InstanceType<typeof DataGrid> | null>(null)
 
 const apiUrl = computed(() => props.data?.config?.routePath || '/roles')
-const { recordHref } = useRecordNavigation('/roles')
 
 const isValidApiResponse = (data: unknown): data is ApiResponse => {
   return !!(
@@ -85,6 +85,10 @@ function handleCreate() {
   router.get(`${apiUrl.value}/create`)
 }
 
+function rowActionHref(key: string, row: Record<string, unknown>, source: string) {
+  return recordActionHref('/roles', row.idExact || row.id, key === 'edit', source)
+}
+
 async function handleRowAction(actionKey: string, item: Record<string, unknown>) {
   const roleId = item.idExact || item.id
   if (!roleId) {
@@ -92,12 +96,6 @@ async function handleRowAction(actionKey: string, item: Record<string, unknown>)
   }
 
   switch (actionKey) {
-    case 'view':
-      router.get(recordHref(roleId))
-      break
-    case 'edit':
-      router.get(recordHref(roleId, true))
-      break
     case 'delete': {
       const target = `${apiUrl.value}/${roleId}`
       await confirm(

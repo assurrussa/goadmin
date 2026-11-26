@@ -95,11 +95,14 @@ Its callbacks are stubs, not a persistence or authorization implementation.
 
 The following is the complete `productsModule` function, synchronized from
 [products.go](../examples/starter/products.go). In the same file, `productNameField`
-and `productStockField` define the form and write constraints. `unpublishReason`
+and `productStockField` define the form and write constraints. `productCategoryField`
+supplies the options used by the form, list filter and repository. The current
+source uses `ListColumns`; the tagged starter in step 1 uses explicit `Columns`.
+`unpublishReason`
 defines the required, trimmed reason and its 500-code-point limit for
 `UnpublishInput`. The function uses the file's DTOs and owner-scoped repository
 methods, plus `context`, `database/sql`, `errors`,
-`features/crud`, `host` and `toolkit/datagrid`. It is **not a standalone program**:
+`features/crud` and `host`. It is **not a standalone program**:
 run the starter above or keep the surrounding repository/migration code when
 adapting it. In particular, the small `Authorize` callback does not replace the
 owner checks in the repository reads and writes.
@@ -117,10 +120,7 @@ func productsModule(db *sql.DB) (host.Module, error) {
 		productStockField,
 		{Key: "active", Label: "Active", Type: "boolean", Read: true, Create: true, Update: true},
 		{Key: "available", Label: "Available", Type: "date", Read: true, Create: true, Update: true},
-		{
-			Key: "category", Label: "Category", Type: "select", Read: true, Create: true, Update: true,
-			Options: []crud.Option{{Value: "standard", Label: "Standard"}, {Value: "premium", Label: "Premium"}},
-		},
+		productCategoryField,
 		{
 			Key: "status", Label: "Status", Type: "select", Read: true,
 			Options: []crud.Option{{Value: "draft", Label: "Draft"}, {Value: "published", Label: "Published"}},
@@ -128,13 +128,13 @@ func productsModule(db *sql.DB) (host.Module, error) {
 	}
 	return crud.New(crud.Definition[productData, productInput, productInput]{
 		Key: "products", BasePath: "/products", Title: "Products", Description: "Manage your catalog and review publication changes in Product activity.", Fields: fields, PageSize: 20, DefaultSort: "name", DefaultOrder: "asc",
-		Columns: []datagrid.Column{
-			{Key: "name", Label: "Name", Type: "text", Sortable: true},
-			{Key: "stock", Label: "Stock", Type: "number", Sortable: true, Filterable: true},
-			{Key: "active", Label: "Active", Type: "boolean", Filterable: true},
-			{Key: "available", Label: "Available", Type: "date", Sortable: true, Filterable: true},
-			{Key: "category", Label: "Category", Type: "select", Filterable: true, FilterOptions: []map[string]string{{"value": "standard", "label": "Standard"}, {"value": "premium", "label": "Premium"}}},
-			{Key: "status", Label: "Status", Type: "select", Filterable: true, FilterOptions: []map[string]string{{"value": "draft", "label": "Draft"}, {"value": "published", "label": "Published"}}},
+		ListColumns: []crud.ListColumn{
+			{Key: "name", Sortable: true},
+			{Key: "stock", Sortable: true, Filterable: true},
+			{Key: "active", Filterable: true},
+			{Key: "available", Sortable: true, Filterable: true},
+			{Key: "category", Filterable: true},
+			{Key: "status", Filterable: true},
 		},
 		Permissions: crud.Permissions{Read: permission("read"), Create: permission("create"), Update: permission("update"), Delete: permission("delete")},
 		Menu:        host.Menu{Sections: []host.Section{{Key: "products", Title: "Products", Items: []host.Item{{Name: "Products", Href: "/products", Icon: "users", PermissionKey: permission("read")}}}}},

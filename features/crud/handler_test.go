@@ -71,6 +71,15 @@ func mounted(t *testing.T, d Definition[testRow, testCreate, testUpdate], previe
 
 func mountedPolicy(t *testing.T, d Definition[testRow, testCreate, testUpdate], preview bool, deny bool, can func(context.Context, int64, host.PermissionDomain, host.PermissionAction) bool, flash ...bool) *fiber.App {
 	t.Helper()
+	return mountResource(t, preview, deny, can, func(app *fiber.App, wrapped *host.App) {
+		(&handler[testRow, testCreate, testUpdate]{app: wrapped, d: cloneDefinition(d)}).RegisterGroupRoutes(app)
+	}, flash...)
+}
+
+func mountResource(t *testing.T, preview, deny bool, can func(context.Context, int64, host.PermissionDomain, host.PermissionAction) bool,
+	mount func(*fiber.App, *host.App), flash ...bool,
+) *fiber.App {
+	t.Helper()
 	fixture := hosttest.NewApp(t)
 	fixture.MockPermissionGuard.EXPECT().AdminGuard(gomock.Any()).DoAndReturn(func(key host.PermissionKey, _ ...integrationroles.PermissionGuardOption) fiber.Handler {
 		return func(c fiber.Ctx) error {
@@ -108,7 +117,7 @@ func mountedPolicy(t *testing.T, d Definition[testRow, testCreate, testUpdate], 
 			return c.Next()
 		})
 	}
-	(&handler[testRow, testCreate, testUpdate]{app: host.WrapApp(fixture.App), d: cloneDefinition(d)}).RegisterGroupRoutes(app)
+	mount(app, host.WrapApp(fixture.App))
 	return app
 }
 

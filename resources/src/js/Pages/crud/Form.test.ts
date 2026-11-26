@@ -265,13 +265,12 @@ it('exposes Save and return on edit and issues a single PUT before returning to 
   expect(get).toHaveBeenCalledExactlyOnceWith(listHref)
 })
 
-it('uses the confirmed response URL when the server drops an oversized return destination', async () => {
-  const oversized = `/products?search=${'x'.repeat(4096)}`
-  const { root, put, get, success } = render('update', false, oversized)
+it('uses the confirmed response URL when the server drops the requested return destination', async () => {
+  const { root, put, get, success } = render('update', false, listHref)
   input(root, 'name', 'Saved name')
   submit(root, true)
   expect(put.mock.lastCall?.[0]).toBe(
-    `/products/records/a?${new URLSearchParams({ returnTo: oversized })}`,
+    `/products/records/a?${new URLSearchParams({ returnTo: listHref })}`,
   )
   page.url = '/products/records/a/edit'
   await success('r2', { ...defaultValues, name: 'Saved name' })

@@ -95,7 +95,7 @@ func TestReadOnlyReader(t *testing.T) {
 	}
 	def := cloneDefinition(d.definition())
 	s := reader[eventRow, struct{}, struct{}]{
-		d: &def, readOnly: true,
+		d: &def, mode: readOnlyResource,
 		can: func(_ context.Context, id int64, domain host.PermissionDomain, action host.PermissionAction) bool {
 			return (id == 9 || id == 10) && host.NewPermissionKey(domain, action) == d.Permission
 		},
@@ -197,7 +197,7 @@ func TestReadOnlyHTTP(t *testing.T) {
 		return c.Next()
 	})
 	wrapped = host.WrapApp(f.App)
-	h := handler[eventRow, struct{}, struct{}]{app: wrapped, d: cloneDefinition(d.definition()), readOnly: true}
+	h := handler[eventRow, struct{}, struct{}]{app: wrapped, d: cloneDefinition(d.definition()), mode: readOnlyResource}
 	h.RegisterGroupRoutes(app)
 	for _, path := range []string{"/event-history", "/event-history/records/9"} {
 		props := previewPage(t, app, path)

@@ -35,6 +35,7 @@ export interface CrudResource {
   title: string
   fields: CrudField[]
   actions: CrudAction[]
+  serverValidateActionParams?: boolean
 }
 export interface CrudAction {
   description?: string

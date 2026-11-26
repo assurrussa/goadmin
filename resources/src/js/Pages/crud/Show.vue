@@ -29,6 +29,9 @@ const confirming = ref(false)
 const confirm = useConfirmation()
 const actionDialog = ref<InstanceType<typeof ActionDialog>>()
 const listHref = computed(() => crudReturnHref(props.resource.basePath, page.url))
+const visibleCommands = computed(() =>
+  props.resource.actions.filter((action) => props.record.actions?.includes(action.key)),
+)
 const error = computed(() => (page.props.errors as Record<string, string> | undefined)?.form)
 async function run(key: string) {
   if (mutating.value || confirming.value) return
@@ -128,7 +131,12 @@ async function run(key: string) {
       </div>
     </dl>
     <div
-      v-if="record.revision && record.actions?.length"
+      v-if="
+        record.revision &&
+        (visibleCommands.length ||
+          record.actions?.includes('edit') ||
+          record.actions?.includes('delete'))
+      "
       class="flex flex-wrap gap-3"
       :inert="mutating || undefined"
       :aria-busy="mutating"
@@ -139,7 +147,7 @@ async function run(key: string) {
         }}</Link></AppButton
       >
       <AppButton
-        v-for="action in resource.actions.filter((action) => record.actions?.includes(action.key))"
+        v-for="action in visibleCommands"
         :key="action.key"
         variant="secondary"
         :disabled="mutating"

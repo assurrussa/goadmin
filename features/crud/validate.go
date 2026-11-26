@@ -20,17 +20,17 @@ var (
 )
 
 //nolint:gocognit,gocyclo // Constructor validation enumerates independent public contract invariants.
-func validate[R, C, U any](d Definition[R, C, U], readOnly bool) error {
+func validate[R, C, U any](d Definition[R, C, U], mode resourceMode) error {
 	fail := func(s string) error { return fmt.Errorf("crud: %s", s) }
 	if !keyPattern.MatchString(d.Key) || !pathPattern.MatchString(d.BasePath) || strings.TrimSpace(d.Title) == "" {
 		return fail("invalid key, base path or title")
 	}
 	if d.List == nil || d.Get == nil || d.Authorize == nil ||
-		(!readOnly && (d.LoadSelected == nil || d.Create == nil || d.Update == nil || d.Delete == nil)) {
+		(mode == editableResource && (d.LoadSelected == nil || d.Create == nil || d.Update == nil || d.Delete == nil)) {
 		return fail("all scoped callbacks and record authorization are required")
 	}
 	p := d.Permissions
-	if p.Read.IsZero() || (!readOnly && (p.Create.IsZero() || p.Update.IsZero() || p.Delete.IsZero())) {
+	if p.Read.IsZero() || (mode == editableResource && (p.Create.IsZero() || p.Update.IsZero() || p.Delete.IsZero())) {
 		return fail("explicit permissions are required")
 	}
 	if d.PageSize < 0 || d.PageSize > 100 {
@@ -53,7 +53,7 @@ func validate[R, C, U any](d Definition[R, C, U], readOnly bool) error {
 	}
 	fields := map[string]Field{}
 	for _, f := range d.Fields {
-		if readOnly && (f.Create || f.Update || f.Required || f.MaxLength != nil || f.Minimum != nil) {
+		if mode != editableResource && (f.Create || f.Update || f.Required || f.MaxLength != nil || f.Minimum != nil) {
 			return fmt.Errorf("crud: read-only field %q cannot set Create, Update, Required, MaxLength or Minimum", f.Key)
 		}
 		if err := f.validateConstraintDefinition(); err != nil {
@@ -78,7 +78,7 @@ func validate[R, C, U any](d Definition[R, C, U], readOnly bool) error {
 			if len(f.Options) == 0 {
 				return fail("select requires fixed options")
 			}
-		case "custom":
+		case fieldCustom:
 			if !customComponentPattern.MatchString(f.Component) {
 				return fail("custom component must match extension/key")
 			}
@@ -135,6 +135,9 @@ func validate[R, C, U any](d Definition[R, C, U], readOnly bool) error {
 	if !sortable {
 		return fail("default sort must name a sortable column")
 	}
+	if mode == commandResource && len(d.Actions) == 0 {
+		return fail("at least one action is required")
+	}
 	actions := map[string]bool{}
 	for _, a := range d.Actions {
 		if slices.Contains([]string{
@@ -147,6 +150,11 @@ func validate[R, C, U any](d Definition[R, C, U], readOnly bool) error {
 		},
 			a.Key) || !keyPattern.MatchString(a.Key) || a.Label == "" || a.Permission.IsZero() || actions[a.Key] {
 			return fail("invalid action")
+		}
+		switch a.Placement {
+		case "", Row, Detail, Both:
+		default:
+			return fmt.Errorf("crud: action %q has invalid placement", a.Key)
 		}
 		if err := a.validateInput(); err != nil {
 			return fmt.Errorf("crud: action %q: %w", a.Key, err)

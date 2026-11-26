@@ -28,12 +28,21 @@ describe('resource list navigation', () => {
     '/admins?page=2',
     '/users/42',
     '/users/../admins',
+    '/admins/../users?page=3',
+    '/admins/%2e%2e/users?page=3',
     '/users\\evil',
     '/ users',
     'javascript:alert(1)',
     '/%75sers',
   ])('rejects a foreign or non-list target %s', (target) => {
     expect(recordListHref('/users', target)).toBe('/users')
+  })
+  it('bounds the serialized return target before a record is opened', () => {
+    const prefix = '/users?search='
+    const atLimit = prefix + 'x'.repeat(4096 - prefix.length)
+    expect(recordListHref('/users', atLimit)).toBe(atLimit)
+    expect(recordListHref('/users', atLimit + 'x')).toBe('/users')
+    expect(recordListHref('/users', prefix + 'я'.repeat(700))).toBe('/users')
   })
   it('falls back for direct links and removes nested return targets and fragments', () => {
     page.url = '/users/42/edit'
