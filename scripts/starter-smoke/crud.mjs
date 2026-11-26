@@ -441,16 +441,20 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await editRow()
   const pinned = await currentProduct()
   const localDraft = `${prefix}-local-unsaved`
+  const localStock = 27
   const description = 'Description from the second editor'
   const canonicalValues = { name: `${prefix}-canonical-new`, stock: 29 }
   await field('name').fill(localDraft)
+  await field('stock').fill(String(localStock))
   await field('description').fill(description)
 
   const colleague = await context.newPage()
   try {
     await colleague.goto(editPath)
+    await expect(colleague.locator('[name="stock"]')).toHaveValue(String(pinned.stock))
     await colleague.locator('[name="name"]').fill(canonicalValues.name)
     await colleague.locator('[name="stock"]').fill(String(canonicalValues.stock))
+    await colleague.locator('[name="active"]').check()
     const [returned] = await Promise.all([
       colleague.waitForRequest(request => request.method() === 'GET' && new URL(request.url()).pathname === '/products'),
       colleague.locator('button[data-save-and-return]').click(),
@@ -464,6 +468,7 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   assert.notEqual(canonical._revision, pinned._revision)
   assert.equal(canonical.name, canonicalValues.name)
   assert.equal(canonical.stock, canonicalValues.stock)
+  const eventsAfterFirstSave = await auditCount()
 
   await saveAndReturn.click()
   const nameDispute = page.getByRole('group', { name: 'Name', exact: true })
@@ -472,18 +477,26 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   await expect(latestChoice).toBeVisible()
   await expect(saveAndReturn).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
-  await expect(field('stock')).toHaveValue('29')
+  const stockDispute = page.getByRole('group', { name: 'Stock', exact: true })
+  const myStock = stockDispute.getByRole('radio', { name: `My value: ${localStock}`, exact: true })
+  await expect(myStock).toBeVisible()
+  await expect(stockDispute.getByRole('radio', { name: `Latest value: ${canonicalValues.stock}`, exact: true })).toBeVisible()
+  await expect(field('active')).toBeChecked()
   await expect(field('description')).toHaveValue(description)
   const toast = page.locator('.notification--error').filter({ hasText: 'This record has changed. Review your edits.' })
   await expect(toast).toHaveCount(1)
   await toast.getByRole('button', { name: 'Dismiss notification', exact: true }).click()
   await latestChoice.check()
+  await expect(saveAndReturn).toBeDisabled()
+  await myStock.check()
   await expect(saveAndReturn).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled()
   assert.deepEqual(await currentProduct(), canonical, 'Resolving a conflict must not write to the database')
+  assert.equal(await auditCount(), eventsAfterFirstSave, 'The stale save and field choices leave no audit entries')
   assert.equal(attempts.length, 3)
   assert.equal(attempts[2]._revision, pinned._revision)
   await saveAndReturn.click()
-  await assertReturned('29')
+  await assertReturned(String(localStock))
   assert.equal(attempts.length, 4)
   assert.equal(attempts[3]._revision, canonical._revision)
   page.off('request', recordWrite)
@@ -491,8 +504,10 @@ export async function crudAcceptance({ page, context, config, folder, name, expe
   assert.notEqual(merged._revision, canonical._revision)
   assert.equal(merged.name, canonicalValues.name)
   assert.equal(merged.description, description)
-  assert.equal(merged.stock, canonicalValues.stock)
-  report.uiConflict = { twoTabs: true, oneToastPerResponse: true, noImplicitWrite: true, reconciledAtRevision: canonical._revision }
+  assert.equal(merged.stock, localStock)
+  assert.equal(await auditCount(), eventsAfterFirstSave + 1, 'Explicit save records one update')
+  report.uiConflict = { twoTabs: true, oneToastPerResponse: true, noImplicitWrite: true, reconciledAtRevision: canonical._revision,
+    stock: { initial: pinned.stock, firstSave: canonical.stock, explicitSave: merged.stock } }
 
   await language(page, 'Русский', 'ru')
   await page.goto(`${recordPath}?${new URLSearchParams({ returnTo })}`)
