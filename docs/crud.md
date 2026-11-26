@@ -96,6 +96,7 @@ ListColumns: []crud.ListColumn{
 
 A column may override its label, grid type, format, filter placeholder or badges.
 A select cell displays its option label, including when filtering is off.
+Set a badge label to override the option label for an individual value.
 Filtering a select uses the option value on the client and server. Fields
 omitted from the list remain available according to their read policy. To retain
 existing personal views, keep the resource key, column keys, sortability, filterability

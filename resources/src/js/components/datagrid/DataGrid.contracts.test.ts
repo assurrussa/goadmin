@@ -682,21 +682,26 @@ describe('DataGridTable passing contracts: rendering, sort and identity', () => 
     ])
   })
   it.each(['select', 'badge'] as const)(
-    'renders %s badge labels and falls back for unknown values',
+    'renders %s badge overrides, inherited option labels and unknown values',
     (type) => {
-      const { element } = table([row('x', { item: { id: 'x', status: 0, unknown: 'other' } })], {
-        config: config({
-          columns: [
-            column('status', {
-              type,
-              badges: { 0: { label: 'Zero status', variant: 'success' } },
-            }),
-            column('unknown', { type, badges: {} }),
-          ],
-        }),
-      })
+      const badges = { 0: { label: 'Zero status', variant: 'success' } }
+      const options = [
+        { value: 0, label: 'Zero option' },
+        { value: 'pending', label: 'Ожидает решения' },
+      ]
+      const { element } = table(
+        [row('x', { item: { id: 'x', status: 0, pending: 'pending', unknown: 'other' } })],
+        {
+          config: config({
+            columns: ['status', 'pending', 'unknown'].map((key) =>
+              column(key, { type, badges, options }),
+            ),
+          }),
+        },
+      )
       expect(text(element.querySelectorAll('td')[0])).toBe('Zero status')
-      expect(text(element.querySelectorAll('td')[1])).toBe('other')
+      expect(text(element.querySelectorAll('td')[1])).toBe('Ожидает решения')
+      expect(text(element.querySelectorAll('td')[2])).toBe('other')
     },
   )
   it('renders plain text HTML characters literally without introducing DOM elements', () => {

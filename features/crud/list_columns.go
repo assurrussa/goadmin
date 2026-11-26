@@ -53,7 +53,7 @@ func deriveColumns(fields []Field, list []ListColumn) ([]datagrid.Column, error)
 		if column.Filterable && column.Type == fieldSelect && len(field.Options) == 0 {
 			return nil, fmt.Errorf("crud: select filter %q requires field options", item.Key)
 		}
-		if column.Type == fieldSelect || (column.Filterable && column.Type == "badge") {
+		if column.Type == fieldSelect || column.Type == "badge" {
 			for _, option := range field.Options {
 				column.FilterOptions = append(column.FilterOptions, map[string]string{"value": option.Value, "label": option.Label})
 			}

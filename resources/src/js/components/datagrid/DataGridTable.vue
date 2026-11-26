@@ -103,7 +103,7 @@
                 :variant="getBadgeVariant(getColumnValue(item, column.key), column.badges)"
                 class="inline-flex"
               >
-                {{ getBadgeLabel(getColumnValue(item, column.key), column.badges) }}
+                {{ formatValue(getColumnValue(item, column.key), column) }}
               </AppStatus>
               <!-- Boolean values -->
               <span
@@ -323,11 +323,14 @@ const getColumnValue = (item: DataItem, columnKey: string): unknown => {
 }
 
 const formatValue = (value: unknown, column: Column): string => {
+  const hasOptions = column.type === 'select' || column.type === 'badge'
+  const badgeLabel = hasOptions && column.badges?.[String(value)]?.label
+  if (badgeLabel) return t(badgeLabel)
   if (value === null || value === undefined || value === '') return ''
   const formatted = props.formatCell?.(column.key, value)
   if (formatted !== undefined) return formatted
 
-  if (column.type === 'select' && (typeof value === 'string' || typeof value === 'number')) {
+  if (hasOptions && (typeof value === 'string' || typeof value === 'number')) {
     const option = dataGridOption(column, value)
     if (option?.label) return t(option.label)
   }
@@ -377,14 +380,5 @@ const getBadgeVariant = (
   }
 
   return variants[badge.variant] || 'secondary'
-}
-
-const getBadgeLabel = (
-  value: unknown,
-  badges: Record<string | number, { label: string; variant: string }>,
-): string => {
-  const safeValue = typeof value === 'string' || typeof value === 'number' ? value : String(value)
-  const label = badges[safeValue]?.label
-  return label ? t(label) : String(value)
 }
 </script>

@@ -41,6 +41,10 @@ func TestListColumnsDeriveGridMetadata(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, displayOnly[0].Filterable)
 	require.Equal(t, selectColumn[0].FilterOptions, displayOnly[0].FilterOptions)
+	displayBadge, err := deriveColumns(fields, []ListColumn{{Key: "status", Type: "badge", Badges: badges}})
+	require.NoError(t, err)
+	require.False(t, displayBadge[0].Filterable)
+	require.Equal(t, selectColumn[0].FilterOptions, displayBadge[0].FilterOptions)
 }
 
 func TestConstructorsAcceptListColumns(t *testing.T) {
