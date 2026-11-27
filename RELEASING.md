@@ -14,8 +14,17 @@ after the checks pass.
 Once the tag resolves through the public Go proxy, run
 `make release-readiness VERSION=v0.33.0`. From a clean checkout of that tag,
 follow [Review a request](examples/starter/README.md#review-a-request) in
-published mode. Approve one request and reject another with a reason, then
-verify the decision history and return to the filtered queue.
+published mode. Approve one request and reject another with a reason. Check
+the status and rejection reason on the cards, then return to the filtered queue.
+From `examples/starter`, inspect the decisions in the demo database. Match the
+IDs from the two card URLs, and check the operator, decision time and reason.
+
+```sh
+docker compose exec -T postgres sh -c 'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
+SELECT request_id, status, admin_id, decided_at, reason
+FROM starter_request_decisions ORDER BY request_id;
+SQL
+```
 
 ## v0.32.1 MCP pairing guidance
 

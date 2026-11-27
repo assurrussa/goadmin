@@ -13,11 +13,13 @@ after a new tag and its clean-consumer checks complete.
 - `ListColumns` lets all three CRUD constructors reuse field labels, types and
   select options in a chosen column order. Existing `Columns` declarations
   remain supported. The Products starter keeps its saved-view column keys.
+  DataGrid GET filters for text, select and badge columns preserve leading
+  and trailing spaces when the value exactly matches a configured option.
 - Standard CRUD tables link directly to record pages. Operators can open
   records in another tab and return to the original search, filters and page
   after a decision.
-- The [integration recipes](docs/integration-recipes.md) clarify SSO role
-  assignment permissions and the delivery requirements for account email.
+- The guides clarify [SSO role assignment permissions](docs/sso-admission.md#local-authorization)
+  and [account email delivery](docs/integration-recipes.md#authentication-mail-is-a-separate-integration).
 
 ## v0.32.1
 

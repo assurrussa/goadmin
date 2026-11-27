@@ -142,8 +142,8 @@ make starter-smoke KEEP=1
 It builds the current source twice: the standard presentation at
 `http://localhost:18768` and the topbar reference at `http://127.0.0.1:18769`.
 The different hostnames isolate browser cookies when both are open together.
-Both instances enable core plus `users,access,jobs,uploads,queues,notifications,realtime`; each has
-its own fresh PostgreSQL and upload volumes. The command generates private test
+Both instances enable `users,access,jobs,uploads,queues,notifications,realtime,products,product-events,requests`
+and have their own fresh PostgreSQL and upload volumes. The command generates private test
 credentials and keys, without reading this starter's `.env`. The source smoke
 build alone selects the `starter_smoke` Go tag: it adds an example host dashboard
 card and a notification transport that rejects external delivery. In-app
