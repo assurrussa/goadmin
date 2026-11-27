@@ -268,6 +268,34 @@ func TestPublicGETAndPOSTValidateTypedFilterOptions(t *testing.T) {
 	}
 }
 
+func TestFixedStringFiltersPreserveConfiguredWhitespace(t *testing.T) {
+	for _, kind := range []string{"select", "badge", "text"} {
+		t.Run(kind, func(t *testing.T) {
+			var received any
+			cfg := auditConfig(func(_ context.Context, f datagrid.Filtered) ([]auditRow, int, error) {
+				received = f.GetFields()["status"]
+				return nil, 0, nil
+			})
+			for i := range cfg.Columns {
+				if cfg.Columns[i].Key == "status" {
+					cfg.Columns[i].Type = kind
+					cfg.Columns[i].FilterOptions = []map[string]string{{"value": " pending"}, {"value": "pending"}}
+				}
+			}
+			for _, tc := range []struct{ method, query, body, want string }{
+				{http.MethodGet, "?status=+pending", "", " pending"},
+				{http.MethodPost, "", `{"fields":{"status":" pending"}}`, " pending"},
+				{http.MethodGet, "?status=pending+", "", "pending"},
+			} {
+				received = nil
+				status, _ := auditRequest(t, cfg, tc.method, "/audit/data"+tc.query, tc.body)
+				require.Equal(t, http.StatusOK, status)
+				require.Equal(t, tc.want, received)
+			}
+		})
+	}
+}
+
 func TestPublicGETAndPOSTNumericFilterOptions(t *testing.T) {
 	decoders := map[string]func([]byte, any) error{
 		"standard": json.Unmarshal,

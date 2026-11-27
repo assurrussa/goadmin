@@ -35,6 +35,8 @@ export interface CrudResource {
   title: string
   fields: CrudField[]
   actions: CrudAction[]
+  returnToFilter?: boolean
+  serverValidateActionParams?: boolean
 }
 export interface CrudAction {
   description?: string
@@ -79,10 +81,11 @@ export function registerCrudField(key: string, component: Component<CrudFieldPro
 export function resolveCrudField(key: string | undefined) {
   return key ? fields.get(key) : undefined
 }
-export function crudReturnHref(basePath: string, pageURL: string): string {
+export function crudReturnHref(basePath: string, pageURL: string, returnToFilter = false): string {
   return recordListHref(
     basePath,
     new URL(pageURL, 'https://goadmin.invalid').searchParams.get('returnTo'),
+    returnToFilter,
   )
 }
 export function crudRecordHref(
@@ -90,8 +93,9 @@ export function crudRecordHref(
   id: string,
   edit = false,
   returnTo = basePath,
+  returnToFilter = false,
 ): string {
-  const source = recordListHref(basePath, returnTo)
+  const source = recordListHref(basePath, returnTo, returnToFilter)
   return `${basePath}/records/${encodeURIComponent(id)}${edit ? '/edit' : ''}${source === basePath ? '' : `?${new URLSearchParams({ returnTo: source })}`}`
 }
 export function crudDisplay(field: CrudField, value: unknown): string {

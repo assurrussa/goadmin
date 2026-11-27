@@ -29,6 +29,7 @@ import (
 )
 
 type testRow struct {
+	ReturnTo string  `json:"returnTo,omitempty"`
 	Name     string  `json:"name"`
 	Secret   string  `json:"secret"`
 	ReadOnly string  `json:"readOnly"`
@@ -64,12 +65,41 @@ func definition() Definition[testRow, testCreate, testUpdate] {
 	}, Delete: func(context.Context, host.Actor, string, string) error { return nil }, Authorize: func(context.Context, host.Actor, Operation, Record[testRow]) error { return nil }}
 }
 
+func TestReturnToFilterProp(t *testing.T) {
+	for _, filterable := range []bool{true, false} {
+		d := definition()
+		d.Fields = append(d.Fields, Field{Key: "returnTo", Label: "Destination", Type: "text", Read: true})
+		d.Columns = append(d.Columns, datagrid.Column{Key: "returnTo", Filterable: filterable})
+		_, err := New(d)
+		require.NoError(t, err)
+		app := mounted(t, d, false, false)
+		for _, path := range []string{"/people", "/people/records/42"} {
+			resource, ok := previewPage(t, app, path)["resource"].(map[string]any)
+			require.True(t, ok)
+			if filterable {
+				require.Equal(t, true, resource["returnToFilter"], path)
+			} else {
+				require.NotContains(t, resource, "returnToFilter", path)
+			}
+		}
+	}
+}
+
 func mounted(t *testing.T, d Definition[testRow, testCreate, testUpdate], preview bool, deny bool, flash ...bool) *fiber.App {
 	t.Helper()
 	return mountedPolicy(t, d, preview, deny, nil, flash...)
 }
 
 func mountedPolicy(t *testing.T, d Definition[testRow, testCreate, testUpdate], preview bool, deny bool, can func(context.Context, int64, host.PermissionDomain, host.PermissionAction) bool, flash ...bool) *fiber.App {
+	t.Helper()
+	return mountResource(t, preview, deny, can, func(app *fiber.App, wrapped *host.App) {
+		(&handler[testRow, testCreate, testUpdate]{app: wrapped, d: cloneDefinition(d)}).RegisterGroupRoutes(app)
+	}, flash...)
+}
+
+func mountResource(t *testing.T, preview, deny bool, can func(context.Context, int64, host.PermissionDomain, host.PermissionAction) bool,
+	mount func(*fiber.App, *host.App), flash ...bool,
+) *fiber.App {
 	t.Helper()
 	fixture := hosttest.NewApp(t)
 	fixture.MockPermissionGuard.EXPECT().AdminGuard(gomock.Any()).DoAndReturn(func(key host.PermissionKey, _ ...integrationroles.PermissionGuardOption) fiber.Handler {
@@ -108,7 +138,7 @@ func mountedPolicy(t *testing.T, d Definition[testRow, testCreate, testUpdate], 
 			return c.Next()
 		})
 	}
-	(&handler[testRow, testCreate, testUpdate]{app: host.WrapApp(fixture.App), d: cloneDefinition(d)}).RegisterGroupRoutes(app)
+	mount(app, host.WrapApp(fixture.App))
 	return app
 }
 

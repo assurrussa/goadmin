@@ -87,6 +87,8 @@ Sort order must be `asc` or `desc` (case-insensitive), or the configured default
 Invalid POST field/sort selections return HTTP 400 before repository access.
 Both transports check configured `FilterOptions` against scalar wire values,
 including numbers, booleans and dates; arrays/objects cannot bypass options.
+For `text`, `select` and `badge` filters, GET preserves an exact option value,
+including leading or trailing whitespace. Other query values retain their usual trimming.
 For `number` columns, floating-point values also match their shortest non-exponent
 decimal spelling (`1e6` matches option `"1000000"`, `1e-6` matches `"0.000001"`).
 Existing exact scalar spellings remain accepted; option strings are not parsed

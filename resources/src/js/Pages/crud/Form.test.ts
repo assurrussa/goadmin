@@ -247,31 +247,37 @@ function choice(root: HTMLElement, name: string, value: 'mine' | 'latest') {
   return options[value === 'mine' ? 0 : 1]!
 }
 
-it('exposes Save and return on edit and issues a single PUT before returning to the confirmed list', async () => {
-  const { root, put, get, options, success } = render()
-  input(root, 'name', 'Saved name')
-  await nextTick()
-  submit(root, true)
-  submit(root, true)
-  expect(put).toHaveBeenCalledExactlyOnceWith(
-    `/products/records/a?${new URLSearchParams({ returnTo: listHref })}`,
-    { ...defaultValues, name: 'Saved name', _revision: 'r1' },
-    expect.any(Object),
-  )
-  expect(options().headers?.['X-GoAdmin-Record-ID']).toBe('a')
-  expect(options().headers?.[attemptHeader]).toMatch(/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/)
-  expect(get).not.toHaveBeenCalled()
-  await success('r2', { ...defaultValues, name: 'Saved name' })
-  expect(get).toHaveBeenCalledExactlyOnceWith(listHref)
-})
+it.each([false, true])(
+  'issues one PUT and returns to the confirmed list with returnTo filtering %s',
+  async (returnToFilter) => {
+    const returnTo = returnToFilter
+      ? listHref + '&returnTo=https%3A%2F%2Fexample.invalid'
+      : listHref
+    const { root, data, put, get, options, success } = render('update', false, returnTo)
+    data.resource.returnToFilter = returnToFilter
+    input(root, 'name', 'Saved name')
+    await nextTick()
+    submit(root, true)
+    submit(root, true)
+    expect(put).toHaveBeenCalledExactlyOnceWith(
+      `/products/records/a?${new URLSearchParams({ returnTo })}`,
+      { ...defaultValues, name: 'Saved name', _revision: 'r1' },
+      expect.any(Object),
+    )
+    expect(options().headers?.['X-GoAdmin-Record-ID']).toBe('a')
+    expect(options().headers?.[attemptHeader]).toMatch(/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/)
+    expect(get).not.toHaveBeenCalled()
+    await success('r2', { ...defaultValues, name: 'Saved name' })
+    expect(get).toHaveBeenCalledExactlyOnceWith(returnTo)
+  },
+)
 
-it('uses the confirmed response URL when the server drops an oversized return destination', async () => {
-  const oversized = `/products?search=${'x'.repeat(4096)}`
-  const { root, put, get, success } = render('update', false, oversized)
+it('uses the confirmed response URL when the server drops the requested return destination', async () => {
+  const { root, put, get, success } = render('update', false, listHref)
   input(root, 'name', 'Saved name')
   submit(root, true)
   expect(put.mock.lastCall?.[0]).toBe(
-    `/products/records/a?${new URLSearchParams({ returnTo: oversized })}`,
+    `/products/records/a?${new URLSearchParams({ returnTo: listHref })}`,
   )
   page.url = '/products/records/a/edit'
   await success('r2', { ...defaultValues, name: 'Saved name' })

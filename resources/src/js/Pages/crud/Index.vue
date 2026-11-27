@@ -19,7 +19,22 @@ const confirming = ref(false)
 const confirm = useConfirmation()
 const error = computed(() => (page.props.errors as Record<string, string> | undefined)?.form)
 function source() {
-  return recordListHref(props.resource.basePath, window.location.pathname + window.location.search)
+  return recordListHref(
+    props.resource.basePath,
+    grid.value?.listLocation ?? null,
+    props.resource.returnToFilter,
+  )
+}
+function rowActionHref(key: string, row: Record<string, unknown>, listLocation: string) {
+  if (key !== 'view' && key !== 'edit') return
+  if (typeof row.id !== 'string' && typeof row.id !== 'number') return
+  return crudRecordHref(
+    props.resource.basePath,
+    String(row.id),
+    key === 'edit',
+    listLocation,
+    props.resource.returnToFilter,
+  )
 }
 function create() {
   if (mutating.value) return
@@ -31,10 +46,6 @@ function tableAction(key: string) {
 async function action(key: string, row: Record<string, unknown>) {
   if (mutating.value || confirming.value) return
   const id = String(row.id)
-  if (key === 'view' || key === 'edit') {
-    router.get(crudRecordHref(props.resource.basePath, id, key === 'edit', source()))
-    return
-  }
   const command = props.resource.actions.find((item) => item.key === key)
   if (key !== 'delete' && !command) return
   const basePath = props.resource.basePath
@@ -100,6 +111,7 @@ async function action(key: string, row: Record<string, unknown>) {
       navigation-mode="inertia"
       :api-url="resource.basePath"
       :initial-data="data"
+      :resolve-row-action-href="rowActionHref"
       @action-create="create"
       @action-table="tableAction"
       @action-row="action"

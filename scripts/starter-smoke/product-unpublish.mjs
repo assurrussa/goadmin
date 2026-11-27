@@ -204,7 +204,7 @@ async function restrictedOperator(owner) {
   await owner
     .getByRole('row')
     .filter({ hasText: slug })
-    .getByRole('button', { name: /^(Просмотр|View)$/ })
+    .getByRole('link', { name: /^(Просмотр|View)$/ })
     .click()
   await expect(owner).toHaveURL(/\/roles\/\d+(?:\?.*)?$/)
   const role = new URL(owner.url()).pathname

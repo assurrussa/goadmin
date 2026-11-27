@@ -21,7 +21,7 @@ func TestReadAdapterBindsPerRuntime(t *testing.T) {
 	module, err := NewReadOnlyWithAdapter(d, adapter)
 	require.NoError(t, err)
 	require.Equal(t, []string{d.BasePath, adapter.BasePath}, module.Descriptor().RouteNamespaces)
-	f := feature[eventRow, struct{}, struct{}]{d: cloneDefinition(d.definition()), readOnly: true, adapter: &adapter}
+	f := feature[eventRow, struct{}, struct{}]{d: cloneDefinition(d.definition()), mode: readOnlyResource, adapter: &adapter}
 	for _, enabled := range []bool{true, false} {
 		app := hosttest.NewApp(t)
 		app.MockRoleService.EXPECT().

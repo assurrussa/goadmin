@@ -39,7 +39,9 @@ const props = defineProps<{
   mode: 'create' | 'update'
 }>()
 const page = usePage()
-const listHref = computed(() => crudReturnHref(props.resource.basePath, page.url))
+const listHref = computed(() =>
+  crudReturnHref(props.resource.basePath, page.url, props.resource.returnToFilter),
+)
 const activeFields = computed(() => props.resource.fields.filter((field) => field[props.mode]))
 const hasConstraints = computed(() =>
   activeFields.value.some((field) => field.maxLength !== undefined || field.minimum !== undefined),
@@ -324,7 +326,13 @@ function update(id: string, returnToList: boolean) {
   let destination: string | undefined
   let receivedResult = false
   router.put(
-    crudRecordHref(props.resource.basePath, id, false, listHref.value),
+    crudRecordHref(
+      props.resource.basePath,
+      id,
+      false,
+      listHref.value,
+      props.resource.returnToFilter,
+    ),
     {
       ...values,
       _revision: draftRevision ?? null,
@@ -367,7 +375,12 @@ function update(id: string, returnToList: boolean) {
         }
         form.defaults({ values: baseline.values })
         form.values = { ...form.values }
-        if (returnToList) destination = crudReturnHref(props.resource.basePath, response.url)
+        if (returnToList)
+          destination = crudReturnHref(
+            props.resource.basePath,
+            response.url,
+            props.resource.returnToFilter,
+          )
       },
       onError: (visitErrors) => {
         if (!current()) return
@@ -401,7 +414,13 @@ function update(id: string, returnToList: boolean) {
 function reload() {
   if (!props.record) return
   router.get(
-    crudRecordHref(props.resource.basePath, props.record.id, true, listHref.value),
+    crudRecordHref(
+      props.resource.basePath,
+      props.record.id,
+      true,
+      listHref.value,
+      props.resource.returnToFilter,
+    ),
     {},
     {
       preserveState: false,

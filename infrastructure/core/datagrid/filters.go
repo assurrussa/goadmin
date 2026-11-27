@@ -58,7 +58,7 @@ func ParseFilters(c fiber.Ctx, config FilterConfig[any]) Filters {
 			continue
 		}
 
-		value := strings.TrimSpace(c.Query(column.Key))
+		value := filterQueryValue(column, c.Query(column.Key))
 		if value == "" {
 			continue
 		}
@@ -86,6 +86,22 @@ func ParseFilters(c fiber.Ctx, config FilterConfig[any]) Filters {
 	}
 
 	return filters
+}
+
+func filterQueryValue(column Column, raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if raw != trimmed {
+		switch column.Type {
+		case "text", "badge", "select":
+			// A configured string option is a stored value, including its whitespace.
+			for _, option := range column.FilterOptions {
+				if option["value"] == raw {
+					return raw
+				}
+			}
+		}
+	}
+	return trimmed
 }
 
 // IsValidSortField проверяет, можно ли сортировать по полю.

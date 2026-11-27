@@ -27,9 +27,9 @@ var (
 // The adapter authenticates the actor. Every entry point checks its actual
 // resource permission, then applies the host's scoped lookups and row policy.
 type reader[R, C, U any] struct {
-	d        *Definition[R, C, U]
-	readOnly bool
-	can      func(context.Context, int64, host.PermissionDomain, host.PermissionAction) bool
+	d    *Definition[R, C, U]
+	mode resourceMode
+	can  func(context.Context, int64, host.PermissionDomain, host.PermissionAction) bool
 }
 type readDescription struct {
 	Key, Title  string
@@ -52,7 +52,7 @@ func (s reader[R, C, U]) allowed(ctx context.Context, actor host.Actor, key host
 }
 
 func (s reader[R, C, U]) maxPageSize() int {
-	if s.readOnly {
+	if s.mode != editableResource {
 		return maxReadOnlyPageSize
 	}
 	return 1000 // Existing DataGrid JSON POST limit.
@@ -95,7 +95,7 @@ func (s reader[R, C, U]) list(ctx context.Context, actor host.Actor, query datag
 	}
 	cfg := datagrid.FilterConfig[any]{Columns: s.d.Columns, DefaultSort: s.d.DefaultSort, DefaultOrder: s.d.DefaultOrder}
 	if query.Limit < 1 || query.Limit > s.maxPageSize() || query.Page < 1 || query.Page > math.MaxInt/query.Limit ||
-		len(query.Validate(cfg)) != 0 || (s.readOnly && !validReadOnlyFilters(query, s.d.Columns)) {
+		len(query.Validate(cfg)) != 0 || (s.mode != editableResource && !validReadFilters(query, s.d.Columns)) {
 		return readPage{}, ErrInvalidQuery
 	}
 	records, total, err := s.d.List(ctx, actor, query)
@@ -116,7 +116,7 @@ func (s reader[R, C, U]) projectList(ctx context.Context, actor host.Actor, reco
 	rows := make([]readRow, 0, len(records))
 	var actions []readAction
 	if len(records) > 0 {
-		actions = s.permittedActions(ctx, actor)
+		actions = s.permittedActions(ctx, actor, Row)
 	}
 	for _, r := range records {
 		if err := s.d.Authorize(ctx, actor, Read, r); err != nil {
@@ -156,7 +156,9 @@ func (s reader[R, C, U]) get(ctx context.Context, actor host.Actor, id string) (
 	if err != nil {
 		return readRow{}, err
 	}
-	return s.project(ctx, actor, r, Read, s.permittedActions(ctx, actor))
+	// A row command dialog also rereads this record after a conflict. Return
+	// every authorized key; the page descriptor determines which buttons appear.
+	return s.project(ctx, actor, r, Read, s.permittedActions(ctx, actor, Both))
 }
 
 func (s reader[R, C, U]) project(
@@ -185,8 +187,8 @@ type readAction struct {
 
 // Resolve resource-wide permissions once per page; each row is still checked
 // against the host policy with its unprojected data.
-func (s reader[R, C, U]) permittedActions(ctx context.Context, actor host.Actor) []readAction {
-	if s.readOnly || integrationroles.RolePreviewActive(ctx) {
+func (s reader[R, C, U]) permittedActions(ctx context.Context, actor host.Actor, placement ActionPlacement) []readAction {
+	if s.mode == readOnlyResource || integrationroles.RolePreviewActive(ctx) {
 		return nil
 	}
 	var allowed []readAction
@@ -195,17 +197,21 @@ func (s reader[R, C, U]) permittedActions(ctx context.Context, actor host.Actor)
 			allowed = append(allowed, readAction{key: key, operation: op})
 		}
 	}
-	add(editAction, s.d.Permissions.Update, Update)
-	add(string(Delete), s.d.Permissions.Delete, Delete)
+	if s.mode == editableResource {
+		add(editAction, s.d.Permissions.Update, Update)
+		add(string(Delete), s.d.Permissions.Delete, Delete)
+	}
 	for _, a := range s.d.Actions {
-		add(a.Key, a.Permission, Operation(a.Key))
+		if placement == Both || a.Placement.includes(placement) {
+			add(a.Key, a.Permission, Operation(a.Key))
+		}
 	}
 	return allowed
 }
 
-// The read-only contract accepts only the declared sort and scalar filter values.
+// Read-only and command resources accept only the declared sort and scalar filters.
 // Legacy CRUD keeps DataGrid's existing accepted POST inputs.
-func validReadOnlyFilters(query datagrid.Filters, columns []datagrid.Column) bool {
+func validReadFilters(query datagrid.Filters, columns []datagrid.Column) bool {
 	if !validSortOrder(query.SortOrder) {
 		return false
 	}
@@ -254,7 +260,7 @@ func validFilterValue(kind string, value any) bool {
 }
 
 func (s reader[R, C, U]) valid(r Record[R]) bool {
-	if s.readOnly {
+	if s.mode == readOnlyResource {
 		return validID(r.ID)
 	}
 	return validRecord(r)

@@ -25,6 +25,7 @@ type ReadOnlyDefinition[R any] struct {
 	Permission                host.PermissionKey
 	Fields                    []Field
 	Columns                   []datagrid.Column
+	ListColumns               []ListColumn
 	DefaultSort, DefaultOrder string
 	PageSize                  int
 	ClientRequirements        []host.ClientExtensionRequirement
@@ -52,7 +53,7 @@ func newReadOnly[R any](d ReadOnlyDefinition[R], adapter *ReadOnlyAdapter) (host
 	if d.List == nil || d.Get == nil || d.Authorize == nil {
 		return host.Module{}, errors.New("crud: scoped List, Get and Authorize are required")
 	}
-	return newModule(d.definition(), true, adapter)
+	return newModule(d.definition(), readOnlyResource, adapter)
 }
 
 // Adapt the host callbacks once at construction so both declarations use the
@@ -60,7 +61,7 @@ func newReadOnly[R any](d ReadOnlyDefinition[R], adapter *ReadOnlyAdapter) (host
 func (d ReadOnlyDefinition[R]) definition() Definition[R, struct{}, struct{}] {
 	return Definition[R, struct{}, struct{}]{
 		Key: d.Key, BasePath: d.BasePath, Title: d.Title, Description: d.Description, Menu: d.Menu,
-		Permissions: Permissions{Read: d.Permission}, Fields: d.Fields, Columns: d.Columns,
+		Permissions: Permissions{Read: d.Permission}, Fields: d.Fields, Columns: d.Columns, ListColumns: d.ListColumns,
 		DefaultSort: d.DefaultSort, DefaultOrder: d.DefaultOrder, PageSize: d.PageSize,
 		ClientRequirements: d.ClientRequirements,
 		List: func(ctx context.Context, actor host.Actor, query datagrid.Filtered) ([]Record[R], int, error) {

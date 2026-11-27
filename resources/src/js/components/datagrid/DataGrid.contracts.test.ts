@@ -354,6 +354,21 @@ describe('DataGridFilters passing contracts', () => {
       applyLocale('ru')
     }
   })
+  it('uses the badge filter options when declared and free text otherwise', async () => {
+    const { element } = mount(DataGridFilters, {
+      filterableColumns: [
+        column('status', { type: 'badge', options: [{ value: 'pending', label: 'Pending' }] }),
+        column('category', { type: 'badge' }),
+      ],
+      filters: { status: 'pending', category: 'custom' },
+    })
+    expect(button(element, 'Снять фильтр status: Pending')).toBeTruthy()
+    button(element, 'Фильтры (2)').click()
+    await vi.waitFor(() =>
+      expect(text(element.querySelector('[role="combobox"]')!)).toBe('Pending'),
+    )
+    expect(element.querySelector<HTMLInputElement>('input[type="text"]')?.value).toBe('custom')
+  })
   it('summarizes only editable filters and hides duplicate labels while the panel is open', async () => {
     const onFilterChange = vi.fn()
     const { element } = mount(DataGridFilters, {
@@ -645,21 +660,139 @@ describe('DataGridTable passing contracts: rendering, sort and identity', () => 
       applyLocale('ru')
     }
   })
-  it('renders select badge labels including a numeric zero key and falls back for unknown values', () => {
-    const { element } = table([row('x', { item: { id: 'x', status: 0, unknown: 'other' } })], {
+  it('renders select option labels with typed matches and preserves formatters and unknown values', () => {
+    const options = [
+      { value: 'pending', label: 'Ожидает решения' },
+      { value: 0, label: 'Numeric zero' },
+      { value: '0', label: 'String zero' },
+    ]
+    const values = { state: 'pending', numeric: 0, text: '0', other: 'future', custom: 'pending' }
+    const { element } = table([row('x', { item: { id: 'x', ...values } })], {
       config: config({
-        columns: [
-          column('status', {
-            type: 'select',
-            badges: { 0: { label: 'Zero status', variant: 'success' } },
-          }),
-          column('unknown', { type: 'select', badges: {} }),
-        ],
+        columns: Object.keys(values).map((key) => column(key, { type: 'select', options })),
       }),
+      formatCell: (key: string) => (key === 'custom' ? 'Host display' : undefined),
     })
-    expect(text(element.querySelectorAll('td')[0])).toBe('Zero status')
-    expect(text(element.querySelectorAll('td')[1])).toBe('other')
+    expect(Array.from(element.querySelectorAll('tbody td'), text).slice(0, 5)).toEqual([
+      'Ожидает решения',
+      'Numeric zero',
+      'String zero',
+      'future',
+      'Host display',
+    ])
   })
+  it.each(['select', 'badge'] as const)(
+    'renders the empty-string %s option only for an explicitly stored empty string',
+    (type) => {
+      const options = [{ value: '', label: 'Unassigned' }]
+      const keys = ['empty', 'nullable', 'missing', 'computedEmpty', 'computedNull']
+      const { element } = table(
+        [
+          row('x', {
+            item: {
+              id: 'x',
+              empty: '',
+              nullable: null,
+              computedEmpty: 'assigned',
+              computedNull: '',
+            },
+            values: { computedEmpty: '', computedNull: null },
+            actions: [],
+          }),
+        ],
+        { config: config({ columns: keys.map((key) => column(key, { type, options })) }) },
+      )
+      expect(Array.from(element.querySelectorAll('tbody td'), text)).toEqual([
+        'Unassigned',
+        '',
+        '',
+        'Unassigned',
+        '',
+      ])
+    },
+  )
+  it.each(['select', 'badge'] as const)(
+    'shows a %s status indicator for a configured empty string but leaves absent values blank',
+    (type) => {
+      const badges = { '': { label: 'Unassigned', variant: 'info' } }
+      const { element } = table(
+        [
+          row('empty', { item: { id: 'empty', status: '' }, actions: [] }),
+          row('nullable', { item: { id: 'nullable', status: null }, actions: [] }),
+          row('missing', { actions: [] }),
+        ],
+        { config: config({ columns: [column('status', { type, badges })] }) },
+      )
+      const cells = [...element.querySelectorAll('tbody td')]
+      expect(cells.map(text)).toEqual(['Unassigned', '', ''])
+      expect(cells.map((cell) => cell.querySelector('[data-part="indicator"]') !== null)).toEqual([
+        true,
+        false,
+        false,
+      ])
+    },
+  )
+  it.each(['select', 'badge'] as const)(
+    'renders %s badge overrides, inherited option labels and unknown values',
+    (type) => {
+      const badges = { 0: { label: 'Zero status', variant: 'success' } }
+      const options = [
+        { value: 0, label: 'Zero option' },
+        { value: 'pending', label: 'Ожидает решения' },
+      ]
+      const { element } = table(
+        [row('x', { item: { id: 'x', status: 0, pending: 'pending', unknown: 'other' } })],
+        {
+          config: config({
+            columns: ['status', 'pending', 'unknown'].map((key) =>
+              column(key, { type, badges, options }),
+            ),
+          }),
+        },
+      )
+      expect(text(element.querySelectorAll('td')[0])).toBe('Zero status')
+      expect(text(element.querySelectorAll('td')[1])).toBe('Ожидает решения')
+      expect(text(element.querySelectorAll('td')[2])).toBe('other')
+    },
+  )
+  it.each([
+    ['toString', 'select'],
+    ['valueOf', 'badge'],
+  ] as const)(
+    'updates the indicator for the optional record field %s',
+    async (key: string, type) => {
+      const item = reactive<Record<string, unknown>>({ id: 'x' })
+      const values = reactive<Record<string, unknown>>({})
+      const badges = {
+        '': { label: 'Unassigned', variant: 'info' },
+        0: { label: 'Zero', variant: 'success' },
+      }
+      const { element } = table([row('x', { item, values, actions: [] })], {
+        config: config({ columns: [column(key, { type, badges })] }),
+      })
+      const cell = element.querySelector('tbody td')!
+      const check = (label: string) => {
+        expect(text(cell)).toBe(label)
+        expect(cell.querySelector('[data-part="indicator"]') !== null).toBe(label !== '')
+      }
+      check('')
+      item[key] = ''
+      await nextTick()
+      check('Unassigned')
+      values[key] = null
+      await nextTick()
+      check('')
+      values[key] = 0
+      await nextTick()
+      check('Zero')
+      delete values[key]
+      await nextTick()
+      check('Unassigned')
+      delete item[key]
+      await nextTick()
+      check('')
+    },
+  )
   it('renders plain text HTML characters literally without introducing DOM elements', () => {
     const { element } = table([
       row('x', { item: { id: 'x', name: '<b data-audit-plain>literal</b>' } }),

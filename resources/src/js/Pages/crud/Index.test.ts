@@ -6,22 +6,28 @@ import type { CrudResource } from '@/crud'
 import plainResource from './no-business-actions.test.json'
 import type { ApiResponse } from '@/composables/useDataGrid'
 import { applyLocale } from '@/i18n'
-import { router } from '@inertiajs/vue3'
 
-vi.mock('@inertiajs/vue3', () => ({
-  usePage: () => ({ props: {}, url: '/people/records/42' }),
-  Link: defineComponent({ render: () => null }),
-  router: { on: () => () => {}, get: vi.fn() },
+const mocks = vi.hoisted(() => ({
+  confirm: vi.fn(),
+  post: vi.fn(),
+  page: { props: {}, url: '/people/records/42' },
+}))
+vi.mock('@inertiajs/vue3', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@inertiajs/vue3')>()),
+  usePage: () => mocks.page,
+  router: { on: () => () => {}, get: vi.fn(), post: mocks.post },
   Head: defineComponent({ render: () => null }),
 }))
-vi.mock('@/composables/useConfirmation', () => ({ useConfirmation: () => vi.fn() }))
+vi.mock('@/composables/useConfirmation', () => ({ useConfirmation: () => mocks.confirm }))
 let app: ReturnType<typeof createApp> | undefined
 afterEach(() => {
   app?.unmount()
   app = undefined
   document.body.replaceChildren()
   window.history.replaceState({}, '', '/')
+  mocks.page.url = '/people/records/42'
   applyLocale('ru')
+  vi.clearAllMocks()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
@@ -70,10 +76,199 @@ it('opens a journal event from its filtered list without selection or export con
   expect(root.textContent).toContain('Сохранить столбцы')
   expect(root.textContent).not.toMatch(/Выбрано:|CSV|Снять выделение/)
   expect(root.querySelector('table [role="checkbox"], table input[type="checkbox"]')).toBeNull()
-  root.querySelector<HTMLButtonElement>('button[aria-label="Просмотр"]')!.click()
-  const href = new URL(vi.mocked(router.get).mock.lastCall![0] as string, window.location.origin)
+  const link = root.querySelector<HTMLAnchorElement>('a[aria-label="Просмотр"]')!
+  const href = new URL(link.href)
   expect(href.pathname).toBe(basePath + '/records/' + id)
   expect(href.searchParams.get('returnTo')).toBe(window.location.pathname + window.location.search)
+
+  const { router } = await vi.importActual<typeof import('@inertiajs/vue3')>('@inertiajs/vue3')
+  const visit = vi.spyOn(router, 'visit').mockImplementation(() => {})
+  const clicks: boolean[] = []
+  root.addEventListener('click', (event) => {
+    clicks.push(event.defaultPrevented)
+    event.preventDefault() // jsdom does not implement the native tab navigation.
+  })
+  for (const gesture of [{ ctrlKey: true }, { metaKey: true }, { button: 1 }, {}]) {
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ...gesture }))
+  }
+  expect(clicks).toEqual([false, false, false, true])
+  expect(visit.mock.calls.map(([target]) => target)).toEqual([link.getAttribute('href')])
+})
+
+it.each([true, false])('round-trips a declared returnTo filter (%s)', async (returnToFilter) => {
+  const basePath = '/requests'
+  const filter = 'https://example.invalid/path'
+  const query = new URLSearchParams({ sortOrder: 'desc', returnTo: filter }).toString()
+  const list = `${basePath}?${query}`
+  const root = document.createElement('div')
+  document.body.append(root)
+  window.history.replaceState({}, '', list)
+  const resource: CrudResource = {
+    key: 'requests',
+    basePath,
+    title: 'Requests',
+    fields: [],
+    actions: [],
+    returnToFilter,
+  }
+  const data: ApiResponse = {
+    data: [{ item: { id: '42' }, actions: [{ key: 'view', label: 'Просмотр' }] }],
+    config: {
+      routePath: basePath,
+      columns: [{ key: 'returnTo', label: 'Origin', title: 'Origin', filterable: returnToFilter }],
+    },
+    meta: { title: '', description: '', requestQuery: query, filters: { returnTo: filter } },
+  }
+  app = createApp(Index, { resource, data })
+  app.mount(root)
+  await settle()
+
+  const record = root.querySelector<HTMLAnchorElement>('a[aria-label="Просмотр"]')!
+  const expected = returnToFilter ? list : `${basePath}?sortOrder=desc`
+  expect(new URL(record.href).searchParams.get('returnTo')).toBe(expected)
+  mocks.page.url = record.getAttribute('href')!
+  app.unmount()
+  app = createApp(Show, {
+    resource,
+    record: { id: '42', revision: 'v1', data: {}, actions: ['edit'] },
+    permissions: { create: false, delete: false, update: true },
+  })
+  app.mount(root)
+  await settle()
+
+  const links = [...root.querySelectorAll<HTMLAnchorElement>('a')]
+  const edit = links.find((link) => new URL(link.href).pathname === `${basePath}/records/42/edit`)!
+  expect(new URL(edit.href).searchParams.get('returnTo')).toBe(expected)
+  expect(links.map((link) => link.getAttribute('href'))).toContain(expected)
+})
+
+it('runs a row command named show without replacing it with a detail link', async () => {
+  const basePath = '/requests'
+  const query = 'sortOrder=desc&search=Alice'
+  const list = `${basePath}?${query}`
+  window.history.replaceState({}, '', list)
+  const root = document.createElement('div')
+  document.body.append(root)
+  const command = { key: 'show', label: 'Show in directory' }
+  const data: ApiResponse = {
+    data: [
+      {
+        item: { id: '42', name: 'Alice', _revision: 'v1' },
+        actions: [{ key: 'view', label: 'Просмотр' }, command],
+      },
+    ],
+    config: { columns: [{ key: 'name', label: 'Name', title: 'Name' }] },
+    meta: { title: '', description: '', requestQuery: query, filters: { _search: 'Alice' } },
+  }
+  app = createApp(Index, {
+    resource: { key: 'requests', basePath, title: 'Requests', fields: [], actions: [command] },
+    data,
+  })
+  app.mount(root)
+  await settle()
+
+  expect(root.querySelector('a[aria-label="Просмотр"]')).not.toBeNull()
+  const button = root.querySelector<HTMLButtonElement>('button[aria-label="Show in directory"]')
+  expect(button).not.toBeNull()
+  mocks.confirm.mockImplementationOnce((_options, accept) => accept())
+  button!.click()
+  expect(mocks.confirm).toHaveBeenCalledWith(
+    expect.objectContaining({ confirmLabel: command.label }),
+    expect.any(Function),
+  )
+  expect(mocks.post).toHaveBeenCalledWith(
+    `${basePath}/records/42/actions/show?${new URLSearchParams({ returnTo: list })}`,
+    { _revision: 'v1' },
+    expect.any(Object),
+  )
+})
+
+it('updates row links only after the searched rows have loaded', async () => {
+  vi.useFakeTimers()
+  try {
+    const basePath = '/requests'
+    const query = 'search=previous'
+    const id = 'exact/id'
+    window.history.replaceState({}, '', basePath + '?' + query)
+    const data = (search: string): ApiResponse => ({
+      data: [
+        {
+          item: { id, name: search },
+          actions: [
+            { key: 'view', label: 'Просмотр' },
+            { key: 'edit', label: 'Редактировать' },
+            { key: 'delete', label: 'Удалить' },
+          ],
+        },
+      ],
+      config: {
+        routePath: basePath,
+        columns: [{ key: 'name', label: 'Name', title: 'Name' }],
+        behaviour: { searchable: true },
+      },
+      meta: {
+        title: '',
+        description: '',
+        requestQuery: 'search=' + search,
+        filters: { _search: search },
+      },
+    })
+    let finish!: (value: Response) => void
+    const fetch = vi.fn().mockImplementation(
+      () =>
+        new Promise((done) => {
+          finish = done
+        }),
+    )
+    vi.stubGlobal('fetch', fetch)
+    const root = document.createElement('div')
+    document.body.append(root)
+    const props = {
+      resource: { key: 'requests', basePath, title: 'Requests', fields: [], actions: [] },
+      data: data('previous'),
+    }
+    app = createApp(Index, props)
+    app.mount(root)
+    await settle()
+    const viewLink = () => root.querySelector<HTMLAnchorElement>('a[aria-label="Просмотр"]')!
+    const source = () => new URL(viewLink().href).searchParams.get('returnTo')
+    const previous = source()
+    expect(previous).toBe(window.location.pathname + window.location.search)
+    expect(new URL(previous!, window.location.origin).searchParams.get('search')).toBe('previous')
+    expect(new URL(viewLink().href).pathname).toBe('/requests/records/exact%2Fid')
+    expect(root.querySelector('button[aria-label="Удалить"]')).not.toBeNull()
+    expect(root.querySelector('a[aria-label="Удалить"]')).toBeNull()
+    const search = root.querySelector<HTMLInputElement>('[data-grid-search]')!
+    search.value = 'latest'
+    search.dispatchEvent(new Event('input', { bubbles: true }))
+    await vi.advanceTimersByTimeAsync(500)
+    expect(fetch).toHaveBeenCalledOnce()
+    expect(source()).toBe(previous)
+    expect(root.textContent).toContain('previous')
+    finish(Response.json(data('latest')))
+    await settle()
+    expect(source()).toBe(window.location.pathname + window.location.search)
+    expect(new URL(source()!, window.location.origin).searchParams.get('search')).toBe('latest')
+    expect(root.textContent).toContain('latest')
+    const edit = root.querySelector<HTMLAnchorElement>('a[aria-label="Редактировать"]')!
+    expect(new URL(edit.href).pathname).toBe('/requests/records/exact%2Fid/edit')
+    expect(new URL(edit.href).searchParams.get('returnTo')).toBe(source())
+
+    const latest = source()
+    search.value = 'failed'
+    search.dispatchEvent(new Event('input', { bubbles: true }))
+    await vi.advanceTimersByTimeAsync(500)
+    finish(new Response(null, { status: 500 }))
+    await settle()
+    expect(root.querySelector('[role="alert"]')).not.toBeNull()
+    expect(source()).toBe(latest)
+    window.history.replaceState({}, '', '/requests?search=restored')
+    window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
+    await settle()
+    expect(source()).toBe(latest)
+  } finally {
+    vi.useRealTimers()
+  }
 })
 it.each([
   ['ru', 'Обновить'],

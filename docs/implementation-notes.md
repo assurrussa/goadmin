@@ -1,5 +1,14 @@
 # Implementation Notes
 
+## Starter request decisions
+
+A shared pending request can move once to approved or rejected. Both commands
+check the original revision in the same PostgreSQL transaction as the audit
+insert. If two operators submit the same revision, the second sees a conflict.
+A rejected parameter leaves the row pending. Reloading the resource uses the
+checked list location captured when the operator opened the record. Request
+seeding has its own migration version and lock, independent of Products.
+
 ## Unpublishing with a reason
 
 The starter declares the reason once as a typed CRUD action parameter.

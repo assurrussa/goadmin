@@ -97,6 +97,20 @@ const resource: CrudResource = {
     { key: 'active', label: 'Active', type: 'boolean', read: true, create: true, update: true },
   ],
 }
+it('shows only stored values for optional detail fields named toString and valueOf', async () => {
+  const data = reactive<Record<string, unknown>>({})
+  const fields = ['toString', 'valueOf'].map((key) => ({ ...resource.fields[0], key, label: key }))
+  const root = mount(Show, {
+    resource: { ...resource, fields },
+    record: { id: 'a', revision: '1', data },
+    permissions: {},
+  })
+  const labels = () => Array.from(root.querySelectorAll('dd'), (cell) => cell.textContent?.trim())
+  expect(labels()).toEqual(['—', '—'])
+  Object.assign(data, { toString: 'Assigned', valueOf: 0 })
+  await nextTick()
+  expect(labels()).toEqual(['Assigned', '0'])
+})
 it.each([
   ['en', 'Delete', 'Yes', 'No'],
   ['ru', 'Удалить', 'Да', 'Нет'],

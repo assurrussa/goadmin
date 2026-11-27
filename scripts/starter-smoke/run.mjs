@@ -12,7 +12,9 @@ import { tableWorkflowAcceptance } from './table-workflow.mjs'
 import { appearanceAcceptance } from './appearance.mjs'
 import { crudAcceptance } from './crud.mjs'
 import { journalMCPAcceptance, journalMCPDisabled } from './mcp-acceptance.mjs'
+import { requestsAcceptance, requestsReaderAcceptance, productsLegacyViewAcceptance } from './requests.mjs'
 import { productEventsAcceptance } from './product-events.mjs'
+import { productPublicationViewAcceptance } from './product-publication-view.mjs'
 import { permissionCheckbox, roleEditorAcceptance } from './role-editor.mjs'
 
 const expect = baseExpect.configure({ timeout: 20000 })
@@ -31,9 +33,9 @@ async function fill(page, values) {
   for (const [name, value] of Object.entries(values)) await page.locator(`input[name="${name}"]`).fill(value)
 }
 function ownedSQL(config, statement) {
-  execFileSync('docker', ['compose', '--project-directory', folder, '--env-file', config.env,
+  return execFileSync('docker', ['compose', '--project-directory', folder, '--env-file', config.env,
     '-p', config.project, '-f', config.compose, 'exec', '-T', 'postgres',
-    'psql', '-U', 'smoke', '-d', 'smoke', '-v', 'ON_ERROR_STOP=1', '-c', statement], { stdio: 'pipe' })
+    'psql', '-U', 'smoke', '-d', 'smoke', '-At', '-v', 'ON_ERROR_STOP=1', '-c', statement], { encoding: 'utf8' }).trim()
 }
 async function submit(page, pathname) {
   const [result] = await Promise.all([
@@ -347,14 +349,14 @@ async function runCase(name, config) {
     ownedSQL(config, 'INSERT INTO users(subject_id,uuid,created_at,updated_at) SELECT subject_id,gen_random_uuid(),now(),now() FROM administrations ON CONFLICT (subject_id) DO NOTHING')
     for (const resource of ['admins', 'users']) {
       await page.goto(`/${resource}?page=2&limit=2&sortBy=id&sortOrder=asc&search=smoke&status=active`)
-      const rows = page.getByRole('row').filter({ has: page.getByRole('button', { name: /^(Просмотр|View)$/ }) })
+      const rows = page.getByRole('row').filter({ has: page.getByRole('link', { name: /^(Просмотр|View)$/ }) })
       await expect(rows).toHaveCount(2)
       await expect(page.getByRole('button', { name: 'Remove filter Status: Active' })).toBeVisible()
       await language(page, 'Русский', 'ru')
       await expect(page.getByRole('button', { name: 'Снять фильтр Статус: Активные' })).toBeVisible()
       await language(page, 'English', 'en')
       const listURL = page.url()
-      await rows.first().getByRole('button', { name: /^(Просмотр|View)$/ }).click()
+      await rows.first().getByRole('link', { name: /^(Просмотр|View)$/ }).click()
       await expect(page).toHaveURL(new RegExp(`/${resource}/\\d+\\?returnTo=`))
       await page.getByRole('link', { name: /^(Редактировать|Edit)$/ }).first().click()
       await expect(page).toHaveURL(new RegExp(`/${resource}/\\d+/edit\\?returnTo=`))
@@ -426,7 +428,7 @@ async function runCase(name, config) {
       await page.getByRole('link', { name: /^(К списку|Back to list)$/ }).click()
       await expect(page).toHaveURL(listURL)
       await expect(page.getByRole('row').filter({ hasText: `Workflow ${resource} ${name}` })).toBeVisible()
-      await rows.first().getByRole('button', { name: /^(Редактировать|Edit)$/ }).click()
+      await rows.first().getByRole('link', { name: /^(Редактировать|Edit)$/ }).click()
       await page.locator('input[name="name"]').fill('Discard this change')
       page.once('dialog', (dialog) => dialog.accept())
       await page.getByRole('link', { name: /^(Отмена|Cancel)$/ }).click()
@@ -434,7 +436,7 @@ async function runCase(name, config) {
 
       const savedPaths = new Set()
       for (const index of [0, 1]) {
-        await rows.nth(index).getByRole('button', { name: /^(Редактировать|Edit)$/ }).click()
+        await rows.nth(index).getByRole('link', { name: /^(Редактировать|Edit)$/ }).click()
         const updatedName = `Workflow returned ${resource} ${name} ${index}`
         await page.locator('input[name="name"]').fill(updatedName)
         const mutationPath = new URL(page.url()).pathname.replace(/\/edit$/, '')
@@ -477,6 +479,7 @@ async function runCase(name, config) {
     const slug = `smoke-queues-${name}`
     await fill(page, { slug, name: `Smoke Queue Reader ${name}`, description: 'Automated real restricted session' })
     await permissionCheckbox(page, 'queues:read').click()
+    await permissionCheckbox(page, 'requests:read').click()
     await permissionCheckbox(page, 'dashboard:read').click()
     await submit(page, '/roles')
     await page.goto('/roles')
@@ -485,7 +488,7 @@ async function runCase(name, config) {
     const [assignedRead, searchRead] = await Promise.all([
       page.waitForResponse((response) => response.request().method() === 'GET' && /\/roles\/\d+\/admins$/.test(new URL(response.url()).pathname)),
       page.waitForResponse((response) => response.request().method() === 'GET' && /\/roles\/\d+\/admins\/search$/.test(new URL(response.url()).pathname)),
-      roleRow.getByRole('button', { name: /^(Просмотр|View)$/ }).click(),
+      roleRow.getByRole('link', { name: /^(Просмотр|View)$/ }).click(),
     ])
     assert.ok(assignedRead.ok(), 'mounted role page must load assigned admins')
     assert.ok(searchRead.ok(), 'mounted role page must load admin search')
@@ -538,6 +541,8 @@ async function runCase(name, config) {
     const restrictedHost = page.locator('[data-dashboard-card="starter.summary"]')
     await expect(restrictedHost.getByRole('link', { name: 'Administrators', exact: true })).toHaveCount(0)
     result.dashboard.restrictedUnread = 1
+    await requestsReaderAcceptance({ page, context, config, expect })
+    check('request reader opens shared records and both decision endpoints enforce their separate permissions')
     await logout(page)
     await login(page, credentials.email, credentials.password)
     check('UI-created admin and queues:read role assignment; real restricted login, menu filtering, server 403 and logout protection')
@@ -559,9 +564,15 @@ async function runCase(name, config) {
     assert.equal(new URL(page.url()).pathname, '/products')
     result.loginRedirect = { destination: '/products', acceptedProps: true, noReload: true }
     await crudAcceptance({ page, context, config, folder, name, expect, language, result })
-    check('Products CRUD, views/CSV, two-tab conflict resolution and save-and-return to the filtered second page')
+    check('Products CRUD, views/CSV, two-tab stock conflict with explicit save and return to the filtered second page')
     await productEventsAcceptance({ page, context, browser, config, folder, name, expect, result, ownedSQL })
     check('Product activity: deleted product, exact search, saved view, same-page return and identical UTC times on desktop and mobile')
+    await productPublicationViewAcceptance({ page, context, config, name, expect, result, ownedSQL })
+    check('saved Products view gains a published Premium product, excludes it after row unpublish and preserves its audit reason')
+    await requestsAcceptance({ page, context, config, ownedSQL, expect, result })
+    check('shared request queue: cancel without a decision, terminal cards, native links, stale/empty reason and post-action return')
+    await productsLegacyViewAcceptance({ page, config, ownedSQL, expect })
+    check('legacy Products default view restores ordered columns, sorting and select filters')
     if (manifest.productEventsMCP) {
       if (config.modules.includes('product-events-mcp')) {
         result.productEventsMCP = await journalMCPAcceptance({ browser, config, credentials, ownedSQL, expect,

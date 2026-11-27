@@ -54,6 +54,7 @@ through the existing `host` facade, without a custom frontend build.
 New to embedding? Start with [the consumer guide](docs/consumer-guide.md) for
 the visible result, required stack, and [choice of extension](docs/consumer-guide.md#choose-the-smallest-extension).
 For a working entity without writing Vue, follow [your first CRUD resource](docs/first-crud.md).
+For a queue created by your application, try the [source starter's request decisions](examples/starter/README.md#review-a-request).
 For a journal or directory, follow [Connect a read-only section](docs/crud.md#connect-a-read-only-section).
 For appearance, notifications and custom Inertia pages, use the
 [integration recipes](docs/integration-recipes.md) before selecting dependencies.

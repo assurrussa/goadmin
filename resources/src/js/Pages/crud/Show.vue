@@ -3,6 +3,7 @@ defineOptions({ name: 'CrudShowPage' })
 import { computed, ref } from 'vue'
 import { Link, router, usePage } from '@inertiajs/vue3'
 import { t } from '@/i18n'
+import { recordFieldValue } from '@/lib/recordFieldValue'
 import AppHead from '@/components/layout/AppHead.vue'
 import PageActionBar from '@/components/layout/PageActionBar.vue'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -28,7 +29,12 @@ const mutating = ref(false)
 const confirming = ref(false)
 const confirm = useConfirmation()
 const actionDialog = ref<InstanceType<typeof ActionDialog>>()
-const listHref = computed(() => crudReturnHref(props.resource.basePath, page.url))
+const listHref = computed(() =>
+  crudReturnHref(props.resource.basePath, page.url, props.resource.returnToFilter),
+)
+const visibleCommands = computed(() =>
+  props.resource.actions.filter((action) => props.record.actions?.includes(action.key)),
+)
 const error = computed(() => (page.props.errors as Record<string, string> | undefined)?.form)
 async function run(key: string) {
   if (mutating.value || confirming.value) return
@@ -112,7 +118,7 @@ async function run(key: string) {
         <Field
           v-if="field.type === 'custom'"
           :field="field"
-          :model-value="crudValue(record.data[field.key])"
+          :model-value="crudValue(recordFieldValue(record.data, field.key))"
           readonly
           disabled
         />
@@ -122,24 +128,33 @@ async function run(key: string) {
             }}<span v-if="field.description" class="block text-xs">{{ t(field.description) }}</span>
           </dt>
           <dd class="mt-1 whitespace-pre-wrap break-words">
-            {{ displayFieldValue(field, record.data[field.key]) }}
+            {{ displayFieldValue(field, recordFieldValue(record.data, field.key)) }}
           </dd></template
         >
       </div>
     </dl>
     <div
-      v-if="record.revision && record.actions?.length"
+      v-if="
+        record.revision &&
+        (visibleCommands.length ||
+          record.actions?.includes('edit') ||
+          record.actions?.includes('delete'))
+      "
       class="flex flex-wrap gap-3"
       :inert="mutating || undefined"
       :aria-busy="mutating"
     >
-      <AppButton v-if="record.actions?.includes('edit')" as-child
-        ><Link :href="crudRecordHref(resource.basePath, record.id, true, listHref)">{{
-          t('Редактировать')
-        }}</Link></AppButton
-      >
+      <AppButton v-if="record.actions?.includes('edit')" as-child>
+        <Link
+          :href="
+            crudRecordHref(resource.basePath, record.id, true, listHref, resource.returnToFilter)
+          "
+        >
+          {{ t('Редактировать') }}
+        </Link>
+      </AppButton>
       <AppButton
-        v-for="action in resource.actions.filter((action) => record.actions?.includes(action.key))"
+        v-for="action in visibleCommands"
         :key="action.key"
         variant="secondary"
         :disabled="mutating"

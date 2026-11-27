@@ -50,7 +50,8 @@ administrator exists. Enter the setup token from `.env` in that form.
 
 `ADMIN_MODULES` accepts a comma-separated selection from `users`, `access`,
 `jobs`, `uploads`, `queues`, `notifications`, `realtime`, `authmail`, `products`,
-`product-events`, `product-events-mcp` and `product-unpublish-mcp`. Empty means
+`product-events`, `product-events-mcp`, `product-unpublish-mcp` and the source-mode
+[`requests` example](#review-a-request). Empty means
 core only. Select `products`
 for [your first CRUD resource](../../docs/first-crud.md). Select `product-events`
 for the [product event journal](#product-event-journal). [Confirmed product
@@ -210,6 +211,30 @@ whitespace, returns the product to draft and records the reason atomically
 with the new revision. The versioned Products
 ledger upgrades existing example tables without resetting records. Standard pages use the embedded
 renderer without a Vue extension. See [CRUD resources](../../docs/crud.md).
+
+## Review a request
+
+In the [current source setup](#run-the-current-source), set `ADMIN_MODULES=requests`
+and start with `bash ../../scripts/starter-local.sh up --build`. The normal starter
+migration installs a shared PostgreSQL queue and six demo requests. It can also
+run through the starter's explicit `migrate` command with `requests` selected.
+Enabling the module on a previously migrated database installs its own schema.
+Once its migration has committed, restarts preserve all operator decisions and
+leave an intentionally cleared queue empty.
+
+1. Grant operators `requests:read` to open **Заявки** at `/requests`. Grant
+   `requests:approve` or `requests:reject` for each decision they may take.
+2. Search for **Доступ**, filter by **Ожидает решения**, and open two **View**
+   links in adjacent tabs. In the first card choose **Одобрить** and confirm.
+   In the second choose **Отклонить**, enter a reason, and confirm.
+3. Use the back-to-list link in each card. Both links return to the original
+   list query. A second operator who had the same pending request open receives
+   a conflict if they submit its previous revision. The decision history records
+   the winning operator, status, time and optional reason.
+
+The [module declaration and transaction](requests.go) and its
+[versioned migration](requests_migration.go) belong to this starter. Other
+applications can install their own review queues through the same public API.
 
 ## Product event journal
 

@@ -176,6 +176,12 @@ The optional `product-events-mcp` starter pilot binds this same reader to a
 local stdio client. Each call resolves a grant tied to the approving native
 session and checks current role preview, resource permission and ownership.
 
+`crud.NewWithActions` exposes revisioned list and detail pages, personal views
+and explicitly declared single-record commands. The host owns the domain
+transition and audit. All three CRUD declarations can derive ordered columns
+from readable fields using `ListColumns`. The optional starter `requests` module
+demonstrates the workflow. See [operator decisions](crud.md#review-records-created-by-the-application).
+
 The optional public `features/mcp` module registers explicitly selected read
 operations. Its shared stdio client discovers the declared tools and projections
 at the configured resource path. AuthHub-capable resources opt in separately.
@@ -517,8 +523,8 @@ Use the Makefile from the repository root:
 
 - `make prepare`: mutating prep (`go mod tidy`, generation, formatting,
   lint-fix).
-- `make check`: non-mutating verification after prep, including the first CRUD
-  guide's source excerpt, one combined Go race+coverage pass and resources build
+- `make check`: non-mutating verification after prep, including the Products
+  and Requests guides' source excerpts, one combined Go race+coverage pass and resources build
   with non-mutating ESLint and Prettier checks.
 - `make integration-check`: run all `integration`-tagged Go tests; requires
   reachable test PostgreSQL and Redis services and fails when unavailable.

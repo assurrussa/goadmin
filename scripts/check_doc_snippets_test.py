@@ -10,39 +10,42 @@ SPEC.loader.exec_module(snippets)
 
 class SnippetTests(unittest.TestCase):
     def setUp(self):
-        self.source = snippets.SOURCE_START + "\n\treturn nil, nil\n}\n" + snippets.SOURCE_END + "ctx) {}\n"
-        self.doc = "before\n" + snippets.START + "\nstale\n" + snippets.END + "\nafter\n"
+        self.excerpt = snippets.Excerpt("docs/queue.md", "example/queue.go", "module", "migrate")
+        self.opening = self.excerpt.marker()
+        self.closing = self.excerpt.marker(closing=True)
+        self.function = "func module() {\n\treturn\n}"
+        self.source = f"package main\n\n{self.function}\n\nfunc migrate() {{}}\n"
+        self.doc = f"before\n{self.opening}\nstale\n{self.closing}\nafter\n"
+
+    def render(self, doc, source):
+        return snippets.rendered_document(doc, source, self.excerpt)
 
     def test_replaces_only_marked_block(self):
-        rendered = snippets.rendered_document(self.doc, self.source)
-        self.assertTrue(rendered.startswith("before\n" + snippets.START))
-        self.assertTrue(rendered.endswith(snippets.END + "\nafter\n"))
-        self.assertIn("```go\n" + snippets.SOURCE_START, rendered)
-        self.assertNotIn("migrateProducts", rendered)
-        self.assertNotIn("stale", rendered)
+        rendered = self.render(self.doc, self.source)
+        self.assertEqual(rendered, self.doc.replace("stale", f"```go\n{self.function}\n```"))
 
     def test_refresh_is_idempotent(self):
-        rendered = snippets.rendered_document(self.doc, self.source)
-        self.assertEqual(rendered, snippets.rendered_document(rendered, self.source))
+        rendered = self.render(self.doc, self.source)
+        self.assertEqual(rendered, self.render(rendered, self.source))
 
     def test_source_change_produces_drift(self):
-        rendered = snippets.rendered_document(self.doc, self.source)
-        self.assertNotEqual(rendered, snippets.rendered_document(rendered, self.source.replace("nil, nil", "module, nil")))
+        rendered = self.render(self.doc, self.source)
+        self.assertNotEqual(rendered, self.render(rendered, self.source.replace("return", "panic(1)")))
 
     def test_missing_duplicate_and_reversed_markers_fail(self):
-        for doc in ("", self.doc + snippets.START, snippets.END + snippets.START):
+        for doc in ("", self.doc + self.opening, self.closing + self.opening):
             with self.subTest(doc=doc), self.assertRaises(ValueError):
-                snippets.rendered_document(doc, self.source)
+                self.render(doc, self.source)
 
     def test_inserted_helper_is_not_silently_documented(self):
-        changed = self.source.replace(snippets.SOURCE_END, "\nfunc helper() {}\n" + snippets.SOURCE_END)
+        changed = self.source.replace("func migrate", "func helper() {}\n\nfunc migrate")
         with self.assertRaises(ValueError):
-            snippets.source_excerpt(changed)
+            self.render(self.doc, changed)
 
     def test_changed_function_boundaries_fail(self):
-        for source in ("", self.source + snippets.SOURCE_START, snippets.SOURCE_END + snippets.SOURCE_START):
+        for source in ("", self.source + "\n" + self.function, "\nfunc migrate() {}\n" + self.function):
             with self.subTest(source=source), self.assertRaises(ValueError):
-                snippets.source_excerpt(source)
+                self.render(self.doc, source)
 
 
 if __name__ == "__main__":

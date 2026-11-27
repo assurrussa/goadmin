@@ -59,6 +59,7 @@ const list = '/products?search=mat&sortBy=id&sortOrder=desc&page=2'
 const back = '/products/records/9?' + new URLSearchParams({ returnTo: list })
 let app: ReturnType<typeof createApp>
 let view: InstanceType<typeof ActionDialog>
+let dialogResource: CrudResource
 const settle = async () => {
   for (let i = 0; i < 8; i++) await nextTick()
 }
@@ -87,12 +88,13 @@ beforeEach(async () => {
   appearance.resolving = false
   fetch.mockReset()
   vi.mocked(router.get).mockClear()
+  dialogResource = reactive({ ...resource })
   const root = document.createElement('div')
   document.body.append(root)
   app = createApp({
     render: () =>
       h(ActionDialog, {
-        resource,
+        resource: dialogResource,
         ref: (value: unknown) => {
           view = value as typeof view
         },
@@ -166,6 +168,18 @@ function reread(actions: string[], actor = '17') {
     },
   })
 }
+it('keeps a declared returnTo filter when opening the record after a command', async () => {
+  dialog()!.querySelector<HTMLButtonElement>('[data-confirmation-cancel]')!.click()
+  dialogResource.returnToFilter = true
+  const returnTo = list + '&returnTo=https%3A%2F%2Fexample.invalid'
+  view.open(action, record, returnTo)
+  await settle()
+  await write('Note')
+  fetch.mockResolvedValueOnce(new Response(null, { status: 204 }))
+  accept()
+  const expected = '/products/records/9?' + new URLSearchParams({ returnTo })
+  await vi.waitFor(() => expect(router.get).toHaveBeenCalledWith(expected))
+})
 it('returns focus to the rejected reason and its linked error after a server validation failure', async () => {
   await write('  rejected draft  ')
   const confirm = dialog()!.querySelector<HTMLButtonElement>('[data-confirmation-accept]')!
@@ -207,13 +221,51 @@ it('reads the new record after a conflict and waits for a second explicit confir
     params: { reason: 'same draft' },
   })
 })
-it('opens the latest card when the action is no longer available', async () => {
+it('opens the latest card when a full CRUD command is no longer available', async () => {
   fetch.mockResolvedValueOnce(new Response(null, { status: 409 })).mockResolvedValueOnce(reread([]))
   await write('Note')
   accept()
   await vi.waitFor(() => expect(router.get).toHaveBeenCalledWith(back))
   expect(dialog()).toBeNull()
   expect(fetch).toHaveBeenCalledTimes(2)
+})
+it('explains the conflict when the action is no longer available', async () => {
+  dialogResource.serverValidateActionParams = true
+  fetch.mockResolvedValueOnce(new Response(null, { status: 409 })).mockResolvedValueOnce(reread([]))
+  await write('Note')
+  accept()
+  await vi.waitFor(() =>
+    expect(dialog()!.textContent).toContain('This action is no longer available'),
+  )
+  expect(dialog()!.querySelector('[data-confirmation-accept]')).toBeNull()
+  expect(router.get).not.toHaveBeenCalled()
+  const open = [...dialog()!.querySelectorAll('button')].find(
+    (button) => button.textContent === 'Open record',
+  )!
+  open.click()
+  await vi.waitFor(() => expect(router.get).toHaveBeenCalledWith(back))
+  expect(dialog()).toBeNull()
+  expect(fetch).toHaveBeenCalledTimes(2)
+})
+it.each([409, 422])('lets the server resolve an empty reason with status %s', async (status) => {
+  dialogResource.serverValidateActionParams = true
+  fetch.mockResolvedValueOnce(
+    Response.json({ errors: { reason: ['This field is required'] } }, { status }),
+  )
+  if (status === 409) fetch.mockResolvedValueOnce(reread([]))
+  await nextTick()
+  accept()
+  await vi.waitFor(() =>
+    expect(dialog()!.textContent).toContain(
+      status === 409 ? 'This action is no longer available' : 'This field is required',
+    ),
+  )
+  expect(JSON.parse(String(fetch.mock.calls[0]![1]?.body))).toEqual({
+    _revision: '12',
+    params: { reason: '' },
+  })
+  expect(fetch).toHaveBeenCalledTimes(status === 409 ? 2 : 1)
+  expect(router.get).not.toHaveBeenCalled()
 })
 it('clears the draft on permission loss and isolates a late response from the next owner', async () => {
   fetch.mockResolvedValueOnce(new Response(null, { status: 403 }))

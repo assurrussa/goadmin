@@ -99,15 +99,21 @@
             >
               <!-- Badge for select type -->
               <AppStatus
-                v-if="column.type === 'select' && column.badges"
+                v-if="
+                  (column.type === 'select' || column.type === 'badge') &&
+                  column.badges &&
+                  getColumnValue(item, column.key) != null
+                "
                 :variant="getBadgeVariant(getColumnValue(item, column.key), column.badges)"
                 class="inline-flex"
               >
-                {{ getBadgeLabel(getColumnValue(item, column.key), column.badges) }}
+                {{ formatValue(getColumnValue(item, column.key), column) }}
               </AppStatus>
               <!-- Boolean values -->
               <span
-                v-else-if="column.type === 'boolean' && getColumnValue(item, column.key) === ''"
+                v-else-if="
+                  column.type === 'boolean' && (getColumnValue(item, column.key) ?? '') === ''
+                "
                 class="text-text-tertiary"
                 >—</span
               >
@@ -145,9 +151,22 @@
               class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium sticky right-0 bg-card z-10"
             >
               <div v-if="item.actions?.length" class="flex items-center justify-end gap-1">
-                <template v-for="action in item.actions" :key="action.key">
+                <template v-for="{ action, href } in inlineActions(item)" :key="action.key">
                   <AppButton
-                    v-if="['edit', 'show', 'view', 'delete'].includes(action.key)"
+                    v-if="href"
+                    as-child
+                    variant="ghost"
+                    size="icon-sm"
+                    class="h-8 w-8 p-0"
+                    :class="getActionClass(action)"
+                  >
+                    <Link :href="href" :title="t(action.label)" :aria-label="t(action.label)">
+                      <Pencil v-if="action.key === 'edit'" class="h-4 w-4" />
+                      <Eye v-else class="h-4 w-4" />
+                    </Link>
+                  </AppButton>
+                  <AppButton
+                    v-else
                     variant="ghost"
                     size="icon-sm"
                     class="h-8 w-8 p-0"
@@ -204,8 +223,10 @@
 
 <script setup lang="ts">
 import { t, locale } from '@/i18n'
+import { recordFieldValue } from '@/lib/recordFieldValue'
+import { Link } from '@inertiajs/vue3'
 
-import { dataGridRowId } from '~/composables/useDataGrid.ts'
+import { dataGridOption, dataGridRowId } from '~/composables/useDataGrid.ts'
 import type { Config, Column, DataItem, DataItemValue } from '~/composables/useDataGrid.ts'
 import { computed } from 'vue'
 import {
@@ -249,6 +270,7 @@ interface Props {
   allSelected: boolean
   selectionDisabled?: boolean
   formatCell?: (key: string, value: unknown) => string | undefined
+  rowActionHref?: (key: string, item: DataItemValue) => string | undefined
 }
 
 // Define props with defaults
@@ -276,6 +298,13 @@ const hasAnyActions = computed((): boolean => {
   return Object.values(props.items).some((item) => item.actions && item.actions.length > 0)
 })
 
+const inlineActions = (row: DataItem) =>
+  row.actions.flatMap((action) => {
+    if (action.key === 'delete') return [{ action, href: undefined }]
+    if (!['edit', 'show', 'view'].includes(action.key)) return []
+    return [{ action, href: props.rowActionHref?.(action.key, row.item) }]
+  })
+
 const getActionClass = (action: { key: string; variant?: string }) => {
   if (action.variant === 'danger' || action.key === 'delete') {
     return 'text-destructive hover:text-destructive'
@@ -292,18 +321,21 @@ const getItemId = (item: DataItem, config: Config): string | number => {
   return typeof id === 'string' || typeof id === 'number' ? id : String(id)
 }
 
-// Helper function to safely get column value
-const getColumnValue = (item: DataItem, columnKey: string): unknown => {
-  const hasComputedValue =
-    item.values && Object.prototype.hasOwnProperty.call(item.values, columnKey)
-  const source = hasComputedValue ? item.values! : item.item
-  return source[columnKey] ?? ''
-}
+const getColumnValue = (item: DataItem, columnKey: string) =>
+  recordFieldValue(item.item, columnKey, item.values)
 
 const formatValue = (value: unknown, column: Column): string => {
-  if (value === null || value === undefined || value === '') return ''
-  const formatted = props.formatCell?.(column.key, value)
+  if (value == null) return ''
+  const hasOptions = column.type === 'select' || column.type === 'badge'
+  const badgeLabel = hasOptions && column.badges?.[String(value)]?.label
+  if (badgeLabel) return t(badgeLabel)
+  const formatted = value === '' ? undefined : props.formatCell?.(column.key, value)
   if (formatted !== undefined) return formatted
+
+  if (hasOptions && (typeof value === 'string' || typeof value === 'number')) {
+    const option = dataGridOption(column, value)
+    if (option?.label) return t(option.label)
+  }
 
   if (column.type === 'date' && column.format) {
     // Go's sql.NullTime is serialized as { Time, Valid }. Keep this shape
@@ -350,14 +382,5 @@ const getBadgeVariant = (
   }
 
   return variants[badge.variant] || 'secondary'
-}
-
-const getBadgeLabel = (
-  value: unknown,
-  badges: Record<string | number, { label: string; variant: string }>,
-): string => {
-  const safeValue = typeof value === 'string' || typeof value === 'number' ? value : String(value)
-  const label = badges[safeValue]?.label
-  return label ? t(label) : String(value)
 }
 </script>

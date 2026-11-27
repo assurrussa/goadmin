@@ -5,6 +5,7 @@
     ref="dataGridRef"
     :api-url="apiUrl"
     :initial-data="apiResponseData"
+    :resolve-row-action-href="rowActionHref"
     @action-table="handleActionClick"
     @action-create="handleDataCreate"
     @action-row="handleDataAction"
@@ -14,8 +15,7 @@
 <script setup lang="ts">
 import { useConfirmation } from '@/composables/useConfirmation'
 const confirm = useConfirmation()
-import { useRecordNavigation } from '@/composables/useRecordNavigation'
-const { recordHref } = useRecordNavigation('/users')
+import { recordActionHref } from '@/composables/useRecordNavigation'
 import { t } from '@/i18n'
 
 import { computed, onUnmounted, ref } from 'vue'
@@ -107,16 +107,14 @@ function handleDataCreate() {
   router.get(`${apiUrl.value}/create`)
 }
 
+function rowActionHref(key: string, row: Record<string, unknown>, source: string) {
+  return recordActionHref('/users', row.idExact || row.id, key === 'edit', source)
+}
+
 async function handleDataAction(actionKey: string, item: Record<string, unknown>) {
   const id = item.id
   const baseUrl = apiUrl.value
   switch (actionKey) {
-    case 'view':
-      router.get(recordHref(item.id))
-      break
-    case 'edit':
-      router.get(recordHref(item.id, true))
-      break
     case 'delete':
       await confirm(
         {

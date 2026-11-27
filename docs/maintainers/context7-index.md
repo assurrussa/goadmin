@@ -7,6 +7,12 @@ public toolkit documentation are included explicitly. Source `.go`/`.vue` files
 are not made indexable by these folders: publish important usage examples as
 checked Markdown snippets as well as runnable source.
 
+For the three CRUD constructors, the [CRUD reference](../crud.md#routes-and-personal-tables)
+lists the HTTP routes. Its [request queue declaration](../crud.md#register-approve-and-reject-commands)
+and the [Products tutorial](../first-crud.md) both use excerpts checked against
+the source starter. When checking a retrieved example, match its source or
+release tag to the version the consumer is running.
+
 ## Deliberate exclusions
 
 - `audit`, `docs/design`, `docs/screenshots`, and this maintainer directory are

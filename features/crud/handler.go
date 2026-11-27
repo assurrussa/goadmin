@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/url"
 	"reflect"
+	"slices"
 	"strings"
 
 	logger "github.com/assurrussa/gologger"
@@ -22,14 +23,14 @@ import (
 )
 
 type handler[R, C, U any] struct {
-	app      *host.App
-	d        Definition[R, C, U]
-	readOnly bool
+	app  *host.App
+	d    Definition[R, C, U]
+	mode resourceMode
 }
 type projected = map[string]any
 
 func (h *handler[R, C, U]) reader() reader[R, C, U] {
-	return reader[R, C, U]{d: &h.d, readOnly: h.readOnly, can: h.app.Unwrap().RolesService().AdminCan}
+	return reader[R, C, U]{d: &h.d, mode: h.mode, can: h.app.Unwrap().RolesService().AdminCan}
 }
 
 // DataGrid supplies the original request as its repository context.
@@ -62,9 +63,15 @@ func (h *handler[R, C, U]) gridRows(records []readRow) []projected {
 		row["id"] = record.ID
 		if record.Revision != "" {
 			row[revisionKey] = record.Revision
-			allowed := map[string]bool{string(Update): false, string(Delete): false}
-			for _, action := range h.d.Actions {
-				allowed[action.Key] = false
+			allowed := make(map[string]bool, len(record.Actions))
+			if h.mode == editableResource {
+				allowed[string(Update)] = false
+				allowed[string(Delete)] = false
+				for _, action := range h.d.Actions {
+					if action.Placement.includes(Row) {
+						allowed[action.Key] = false
+					}
+				}
 			}
 			for _, key := range record.Actions {
 				if key == editAction {
@@ -90,32 +97,34 @@ func (h *handler[R, C, U]) RegisterGroupRoutes(router fiber.Router, _ ...fiber.H
 		DefaultSort:       h.d.DefaultSort,
 		DefaultOrder:      h.d.DefaultOrder,
 		PageSize:          h.d.PageSize,
-		Selectable:        !h.readOnly,
-		Exportable:        !h.readOnly,
+		Selectable:        h.mode == editableResource,
+		Exportable:        h.mode == editableResource,
 		Refreshable:       true,
 		IDKey:             "id",
-		Creatable:         !h.readOnly,
+		Creatable:         h.mode == editableResource,
 		CanViewInPreview:  func(ctx context.Context) bool { return integrationroles.RolePreviewAllows(ctx, p.Read) },
 		CanCreate:         h.canCreate,
 		APIErrorComponent: h.apiFailure,
 	}
 	cfg.Actions = []datagrid.Action[projected]{{Key: "view", Label: "Просмотр"}}
-	if !h.readOnly {
-		add := func(key, label string) {
-			cfg.Actions = append(cfg.Actions, datagrid.Action[projected]{
-				Key: key, Label: label,
-				CanView: func(_ context.Context, row projected) bool {
-					allowed, _ := row["_actions"].(map[string]bool)
-					if key == editAction {
-						return allowed[string(Update)]
-					}
-					return allowed[key]
-				},
-			})
-		}
+	add := func(key, label string) {
+		cfg.Actions = append(cfg.Actions, datagrid.Action[projected]{
+			Key: key, Label: label,
+			CanView: func(_ context.Context, row projected) bool {
+				allowed, _ := row["_actions"].(map[string]bool)
+				if key == editAction {
+					return allowed[string(Update)]
+				}
+				return allowed[key]
+			},
+		})
+	}
+	if h.mode == editableResource {
 		add(editAction, "Редактировать")
 		add(string(Delete), "Удалить")
-		for _, action := range h.d.Actions {
+	}
+	for _, action := range h.d.Actions {
+		if action.Placement.includes(Row) {
 			add(action.Key, action.Label)
 		}
 	}
@@ -135,7 +144,7 @@ func (h *handler[R, C, U]) RegisterGroupRoutes(router fiber.Router, _ ...fiber.H
 	})
 	cfg.PageComponent = func(c fiber.Ctx, data datagrid.Response[projected]) error {
 		coreinertia.ScopeCRUDRecordFlash(c, h.d.BasePath, coreinertia.CRUDRecordFlashIndexID(c), coreinertia.CRUDRecordIndex, false)
-		props, err := h.props(c)
+		props, err := h.props(c, Row, nil)
 		if err != nil {
 			return h.failure(c, err, nil)
 		}
@@ -144,62 +153,62 @@ func (h *handler[R, C, U]) RegisterGroupRoutes(router fiber.Router, _ ...fiber.H
 	}
 	cfg.ErrorComponent = func(c fiber.Ctx, _ datagrid.ErrorData, err error) error { return h.failure(c, err, nil) }
 	grid := datagrid.NewHandler(cfg, h.app.Logger())
-	_ = gridworkflow.Register(group,
-		grid,
-		gridworkflow.Options[projected]{
-			Key:           "crud." + h.d.Key,
-			DisableExport: h.readOnly,
-			Store:         gridworkflow.NewPostgresStore(h.app.Unwrap().GridDB()),
-			CurrentAdmin: func(c fiber.Ctx) (int64,
-				error,
-			) {
-				a, ok := h.app.CurrentActor(c)
-				if !ok {
-					return 0, ErrDenied
-				}
-				return a.AdminID, nil
-			},
-			SelectionID: func(r projected) string {
-				id,
-					_ := r["id"].(string)
-				return id
-			},
-			LoadSelected: func(ctx context.Context,
-				ids []string) ([]projected,
-				error,
-			) {
-				a, ok := h.app.CurrentActor(ctx)
-				if !ok {
-					return nil, ErrDenied
-				}
-				rows, err := h.d.LoadSelected(ctx, a, ids)
-				if err != nil {
-					return nil, err
-				}
-				wanted := map[string]bool{}
-				for _, id := range ids {
-					wanted[id] = true
-				}
-				for _, r := range rows {
-					if !wanted[r.ID] {
-						return nil, ErrDenied
-					}
-					delete(wanted, r.ID)
-				}
-				records, err := h.reader().projectList(readContext(ctx), a, rows)
-				if err != nil {
-					return nil, err
-				}
-				return h.gridRows(records), nil
-			},
-		})
+	options := gridworkflow.Options[projected]{
+		Key:           "crud." + h.d.Key,
+		DisableExport: h.mode != editableResource,
+		Store:         gridworkflow.NewPostgresStore(h.app.Unwrap().GridDB()),
+		CurrentAdmin: func(c fiber.Ctx) (int64,
+			error,
+		) {
+			a, ok := h.app.CurrentActor(c)
+			if !ok {
+				return 0, ErrDenied
+			}
+			return a.AdminID, nil
+		},
+		SelectionID: func(r projected) string {
+			id, _ := r["id"].(string)
+			return id
+		},
+	}
+	if h.mode == editableResource {
+		options.LoadSelected = h.loadSelected
+	}
+	_ = gridworkflow.Register(group, grid, options)
 	group.Get("", grid.HandlePage)
 	group.Get("/data", gridworkflow.APIHandler(grid.HandleData))
 	group.Post("/data", gridworkflow.APIHandler(grid.HandleData))
 	group.Get("/records/:id", func(c fiber.Ctx) error { return h.page(c, false) })
-	if !h.readOnly {
+	if h.mode == editableResource {
 		h.registerMutationRoutes(group)
 	}
+	h.registerActionRoutes(group)
+}
+
+func (h *handler[R, C, U]) loadSelected(ctx context.Context, ids []string) ([]projected, error) {
+	a, ok := h.app.CurrentActor(ctx)
+	if !ok {
+		return nil, ErrDenied
+	}
+	rows, err := h.d.LoadSelected(ctx, a, ids)
+	if err != nil {
+		return nil, err
+	}
+	wanted := map[string]bool{}
+	for _, id := range ids {
+		wanted[id] = true
+	}
+	for _, r := range rows {
+		if !wanted[r.ID] {
+			return nil, ErrDenied
+		}
+		delete(wanted, r.ID)
+	}
+	records, err := h.reader().projectList(readContext(ctx), a, rows)
+	if err != nil {
+		return nil, err
+	}
+	return h.gridRows(records), nil
 }
 
 func (h *handler[R, C, U]) registerMutationRoutes(group fiber.Router) {
@@ -215,7 +224,7 @@ func (h *handler[R, C, U]) registerMutationRoutes(group fiber.Router) {
 		if err := h.d.Authorize(c, a, Create, Record[R]{}); err != nil {
 			return h.failure(c, err, nil)
 		}
-		props, err := h.props(c)
+		props, err := h.props(c, Detail, nil)
 		if err != nil {
 			return h.failure(c, err, nil)
 		}
@@ -280,40 +289,40 @@ func (h *handler[R, C, U]) registerMutationRoutes(group fiber.Router) {
 		return h.mutate(c, a, raw, Delete, h.d.Delete, h.d.BasePath)
 	})
 	group.Delete("/records/:id", remove[0], remove[1])
-	h.registerActionRoutes(group)
 }
 
 func (h *handler[R, C, U]) registerActionRoutes(group fiber.Router) {
 	for _, action := range h.d.Actions {
 		path := "/records/:id/actions/" + action.Key
-		if action.input != nil {
-			group.Post(path, h.app.Guard(action.Permission.Domain, action.Permission.Action), h.parameterAction(action))
-			continue
-		}
-		command := host.Command(h.app, action.Permission, func(c fiber.Ctx, a host.Actor, raw map[string]json.RawMessage) error {
-			return h.mutate(c, a, raw, Operation(action.Key), action.Run, h.recordURL(requestID(c)))
-		})
-		group.Post(path, command[0], command[1])
+		group.Post(path, h.app.Guard(action.Permission.Domain, action.Permission.Action), h.recordAction(action))
 	}
 }
 
-func (h *handler[R, C, U]) props(c fiber.Ctx) (map[string]any, error) {
+func (h *handler[R, C, U]) props(c fiber.Ctx, placement ActionPlacement, recordActions []string) (map[string]any, error) {
 	a, _ := h.app.CurrentActor(c)
 	description, err := h.reader().describe(readContext(c), a)
 	if err != nil {
 		return nil, err
 	}
 	fields := description.Fields
-	if !h.readOnly {
+	if h.mode == editableResource {
 		fields = h.d.Fields
 	} // Editable forms also need write-only field definitions.
 	can := func(p host.PermissionKey) bool {
-		return !h.readOnly && !integrationroles.RolePreviewActive(c) &&
+		return h.mode == editableResource && !integrationroles.RolePreviewActive(c) &&
 			h.app.Unwrap().RolesService().AdminCan(c, a.AdminID, p.Domain, p.Action)
 	}
 	resource := map[string]any{
 		"key": description.Key, "basePath": h.d.BasePath, "title": description.Title,
-		"fields": fields, "actions": h.visibleActions(c),
+		"fields": fields, "actions": h.visibleActions(readContext(c), a, placement, recordActions),
+	}
+	if slices.ContainsFunc(h.d.Columns, func(column datagrid.Column) bool {
+		return column.Key == "returnTo" && column.Filterable
+	}) {
+		resource["returnToFilter"] = true
+	}
+	if h.mode == commandResource {
+		resource["serverValidateActionParams"] = true
 	}
 	if h.d.Description != "" {
 		resource["description"] = h.d.Description
@@ -345,12 +354,12 @@ func (h *handler[R, C, U]) page(c fiber.Ctx, edit bool) error {
 		}
 		return h.failure(c, err, nil)
 	}
-	props, err := h.props(c)
+	props, err := h.props(c, Detail, r.Actions)
 	if err != nil {
 		return h.failure(c, err, nil)
 	}
 	record := map[string]any{"id": r.ID, "data": r.Data, "actions": r.Actions}
-	if !h.readOnly {
+	if h.mode != readOnlyResource {
 		record["revision"] = r.Revision
 	}
 	props["record"] = record
@@ -375,7 +384,7 @@ func (h *handler[R, C, U]) pageRecord(c fiber.Ctx, a host.Actor, edit bool) (rea
 	if err != nil {
 		return readRow{}, err
 	}
-	return reader.project(readContext(c), a, r, Update, reader.permittedActions(readContext(c), a))
+	return reader.project(readContext(c), a, r, Update, reader.permittedActions(readContext(c), a, Detail))
 }
 
 func (h *handler[R, C, U]) load(c fiber.Ctx, a host.Actor, op Operation) (Record[R], error) {
@@ -712,8 +721,9 @@ func (h *handler[R, C, U]) validatedReturn(c fiber.Ctx) *url.URL {
 		return nil
 	}
 	u, err := url.Parse(raw)
-	if err != nil || u.IsAbs() || u.Host != "" || u.User != nil ||
-		u.Path != h.d.BasePath || u.Fragment != "" || !strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, "//") {
+	if err != nil || u.Scheme != "" || u.Host != "" || u.Opaque != "" || u.User != nil ||
+		u.Path != h.d.BasePath || u.EscapedPath() != h.d.BasePath || u.Fragment != "" ||
+		!strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, "//") || strings.HasPrefix(raw, `/\`) {
 		return nil
 	}
 	if _, err = url.ParseQuery(u.RawQuery); err != nil {
@@ -742,11 +752,27 @@ func (h *handler[R, C, U]) listURL(c fiber.Ctx) string {
 	return h.d.BasePath + "?" + u.RawQuery
 }
 
-func (h *handler[R, C, U]) visibleActions(ctx context.Context) []Action[R] {
-	if len(h.d.Actions) == 0 || h.readOnly || integrationroles.RolePreviewActive(ctx) {
-		return []Action[R]{}
+func (h *handler[R, C, U]) visibleActions(
+	ctx context.Context, actor host.Actor, placement ActionPlacement, recordActions []string,
+) []Action[R] {
+	actions := []Action[R]{}
+	if integrationroles.RolePreviewActive(ctx) {
+		return actions
 	}
-	return h.d.Actions
+	for _, action := range h.d.Actions {
+		if !action.Placement.includes(placement) {
+			continue
+		}
+		if placement == Detail {
+			if !slices.Contains(recordActions, action.Key) {
+				continue
+			}
+		} else if !h.reader().allowed(ctx, actor, action.Permission) {
+			continue
+		}
+		actions = append(actions, action)
+	}
+	return actions
 }
 
 func requestID(c fiber.Ctx) string {
@@ -758,7 +784,7 @@ func requestID(c fiber.Ctx) string {
 }
 
 func (h *handler[R, C, U]) canCreate(ctx context.Context) bool {
-	if h.readOnly || integrationroles.RolePreviewActive(ctx) {
+	if h.mode != editableResource || integrationroles.RolePreviewActive(ctx) {
 		return false
 	}
 	a, ok := h.app.CurrentActor(ctx)

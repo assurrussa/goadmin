@@ -55,6 +55,7 @@ func TestBuildProbeTestImportsSupportedPackages(t *testing.T) {
 	require.Contains(t, got, "adminhost.Command")
 	require.Contains(t, got, "wrapper.CurrentActor")
 	require.Contains(t, got, "func TestDashboardPublicContract")
+	require.Contains(t, got, "crud.NewWithActions(definition)")
 	require.Contains(t, got, "crud.NewReadOnly(definition)")
 	require.Contains(t, got, "crud.NewReadOnlyWithAdapter(definition")
 	require.Contains(t, got, "func TestWritableFieldConstraints")

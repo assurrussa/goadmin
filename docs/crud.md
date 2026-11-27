@@ -10,6 +10,105 @@ only the separately guarded Publish/Unpublish commands change that status.
 Unpublish requires `products:unpublish` and an operator's reason. It returns
 the product to draft and records the reason in the same transaction.
 
+## Review records created by the application
+
+The current source adds review queues and `ListColumns` after the v0.32.1
+starter tag. To run this example, select `ADMIN_MODULES=requests` in the
+[source starter](../examples/starter/README.md#review-a-request).
+
+Use `crud.NewWithActions(crud.WithActionsDefinition[Row]{...})` for a shared queue
+such as [the starter requests](../examples/starter/requests.go). The application
+supplies an actor-scoped `List` (including its total), `Get`, `Authorize`, a
+read permission and at least one named action with its own permission. Return
+`crud.Record[Row]{ID: id, Revision: version, Data: row}` from the reader.
+The embedded UI provides search, personal views, a detail page and the declared
+single-record commands. List queries use the same scalar filter types and
+100-record limit as `NewReadOnly`. Creation of the business records belongs
+to the application.
+
+Set an action's `Placement` to `crud.Detail` for a decision that requires opening
+the record, or `crud.Row` for a command in an individual table row. The zero value
+and `crud.Both` show the command in both places. The server checks visibility for
+the actor and record. Placement affects where an authorized command is offered.
+
+On submission GoAdmin checks permissions and blocks role preview. It loads the
+record in the actor's scope and calls `Authorize(ctx, actor, crud.Read, record)`.
+For a well-formed request it compares the supplied revision, calls `Authorize`
+with the command key, validates any action parameters, then invokes the host.
+In `NewWithActions`, confirming a rejection with an empty reason reaches the server.
+An operator who still has access receives a conflict for a stale revision and a
+field error for a current revision. The operator reviews the new state before any
+further submission. The host must compare the revision and business state again
+in the transaction that records its decision and audit.
+
+### Register approve and reject commands
+
+The following declaration comes from the PostgreSQL starter. Its `requestData`
+row has a subject, status and optional rejection reason. The `rejectRequestInput`
+DTO receives a required, trimmed `reason` of up to 500 Unicode code points.
+The application supplies the repository and policy functions in
+[requests.go](../examples/starter/requests.go) and passes the returned module to
+`host.New`. Grant `requests:read` and the relevant decision permission to each
+operator role.
+
+<!-- source: examples/starter/requests.go#requestsModule -->
+```go
+func requestsModule(db *sql.DB) (host.Module, error) {
+	repo := requestRepo{db}
+	permission := func(action host.PermissionAction) host.PermissionKey {
+		return host.NewPermissionKey("requests", action)
+	}
+	return crud.NewWithActions(crud.WithActionsDefinition[requestData]{
+		Key: "requests", BasePath: "/requests", Title: "Заявки", Permission: permission("read"),
+		Menu: host.Menu{Sections: []host.Section{{Key: "requests", Title: "Заявки", Items: []host.Item{
+			{Name: "Заявки", Href: "/requests", Icon: "content", PermissionKey: permission("read")},
+		}}}},
+		Fields: []crud.Field{
+			{Key: "subject", Label: "Тема", Type: "text", Read: true},
+			{Key: "status", Label: "Статус", Type: "select", Read: true, Options: []crud.Option{
+				{Value: "pending", Label: "Ожидает решения"}, {Value: "approved", Label: "Одобрена"}, {Value: "rejected", Label: "Отклонена"},
+			}},
+			{Key: "reason", Label: "Причина отклонения", Type: "textarea", Read: true},
+		},
+		ListColumns: []crud.ListColumn{{Key: "subject", Sortable: true}, {Key: "status", Filterable: true}},
+		List:        repo.list, Get: repo.get, Authorize: authorizeRequest,
+		Actions: []crud.Action[requestData]{
+			{Key: "approve", Label: "Одобрить", Confirmation: "Одобрить эту заявку?", Permission: permission("approve"), Placement: crud.Detail, Run: repo.approve},
+			crud.ActionWithParams(crud.Action[requestData]{Key: "reject", Label: "Отклонить", Confirmation: "Отклонить эту заявку?", Permission: permission("reject"), Placement: crud.Detail},
+				[]crud.ActionParam{rejectionReason}, repo.reject),
+		},
+	})
+}
+```
+<!-- /source: examples/starter/requests.go#requestsModule -->
+
+### Choose list columns from the fields
+
+Supply an ordered `ListColumns` slice in any CRUD definition to reuse the labels,
+types and select options of readable fields. Example from the Products catalog:
+
+```go
+ListColumns: []crud.ListColumn{
+    {Key: "name", Sortable: true},
+    {Key: "category", Filterable: true},
+},
+```
+
+A column may override its label, grid type, format, filter placeholder or badges.
+A select cell displays its option label, including when filtering is off.
+Set a badge label to override the option label for an individual value.
+Filtering a select uses the option value on the client and server. Fields
+omitted from the list remain available according to their read policy. To retain
+existing personal views, keep the resource key, column keys, sortability, filterability
+and option values stable. An existing explicit `Columns` declaration is also
+supported. Choose one of the two representations for each resource.
+
+The standard View and Edit links carry the current list query. Opening a record
+in another tab or copying its link preserves the return to the same search,
+filters, sort and page, including after a decision from the detail page. A return
+target must match the resource's exact list path and fit in 4096 bytes after query
+encoding. Otherwise the record links back to the base list.
+
 ## Connect a read-only section
 
 Use `crud.NewReadOnly` for a journal, directory or other resource with a list
@@ -166,11 +265,17 @@ optional confirmation contract as the Go action JSON.
 
 ## Routes and personal tables
 
-The module reserves its complete base namespace. It owns list `/`, GET/POST
-`/data`, `/create`, `/records/:id`, `/records/:id/edit`, POST collection,
-PUT/DELETE record and POST `/records/:id/actions/:key`, plus the existing
-`/table-preferences` and `/table-export` endpoints. All paths are relative to the
-resource. On edit, Save and Enter keep the editor open when permitted. Save and
+Every resource reserves its base path and serves its list, GET/POST `/data`,
+GET `/records/:id` and personal `/table-preferences`. All paths below are
+relative to that base.
+
+| Constructor | Additional routes |
+| --- | --- |
+| `NewReadOnly` | The shared read and personal-view routes are the complete set. |
+| `NewWithActions` | POST `/records/:id/actions/:key` for each declared command. |
+| `New` | GET `/create`, POST to the collection, GET `/records/:id/edit`, PUT/DELETE `/records/:id`, `/table-export` and POST for each declared command. |
+
+On edit, Save and Enter keep the editor open when permitted. Save and
 return to list restores the originating search, filters, sort, page size and page
 after the server confirms the same edit attempt. Direct edit links return to
 the resource list. Deletion also preserves the validated list location.
@@ -193,14 +298,15 @@ reload because it cannot compare the missing value. Opening or reloading a
 record with such a field requires an explicit value before the next save.
 
 Personal tables use `crud.<key>` under the current administrator, with existing
-CAS, 20-view/64-KiB limits, column reconciliation and URL precedence. Selection
-holds up to 100 exact IDs, never persists, and follows existing query/owner reset
-rules. CSV exports visible columns, either selected records (100) or filtered
+CAS, 20-view/64-KiB limits, column reconciliation and URL precedence. In full
+CRUD, row selection is temporary, holds up to 100 exact IDs and resets with the
+query or owner. CSV exports visible columns, either selected records (100) or filtered
 records (10,000 with truncation feedback). Generic bulk actions are not included.
 Filterable columns cannot use `page`, `limit`, `search`, `sortBy`, `sortOrder`,
-`scope` or `columns`: these query names control pagination, search, sorting and
-CSV export. The constructor rejects such columns; the same keys remain valid
-for fields and non-filterable columns. `ids` remains a valid filter key.
+`scope` or `columns`. These names control pagination, search, sorting and CSV
+export. They remain valid for fields and non-filterable columns. Both `ids` and
+`returnTo` are valid filter keys. A declared `returnTo` filter stays part of the
+list query when an operator opens a record or returns from it.
 Number GET filters follow the shared grid's integer-only parsing; CRUD input
 fields still support fractional values.
 
@@ -227,7 +333,8 @@ field must be `text` or `textarea`. `Minimum` is inclusive and supports both
 integer and fractional `number` fields. Supply a finite bound in the
 JavaScript-safe magnitude supported by CRUD. A nil bound omits the rule.
 The constructor rejects write constraints on fields without a write mode and
-on resources built with `NewReadOnly`.
+on resources built with `NewReadOnly` or `NewWithActions`. Declare command
+inputs separately with `ActionWithParams`.
 
 POST and PUT collect constraint errors for the fields writable in that
 operation before calling the host. For numbers, the submitted decimal and
@@ -265,14 +372,17 @@ core renderer and custom field dependencies. Multiple resources can share an ide
 reference; conflicting fingerprints fail assembly. `ClientRequirements` still
 declares unique extension ownership, so references cannot hide duplicate owners. Run
 `node resources/scripts/crud-contract.cjs` after changing renderer source; the
-build derives the same fingerprint. Generated assets and server ship together.
+build derives the same fingerprint. The shared grid and record navigation code
+also contribute to the fingerprint. Generated assets and server ship together.
 
 ## Verification
 
 Run the package and external-consumer tests, then `make check` and
-`make externalconsumer-local`. The starter smoke selects Products explicitly
-and tests real CRUD, commands, preferences, exports and revision conflicts in
-both presentation packs. A focused rerun uses `node scripts/starter-smoke/crud-check.mjs
+`make externalconsumer-local`. In both presentation packs, `make starter-smoke`
+exercises Products CRUD, saved views and exports. It also opens two Requests
+records from a filtered queue, approves one, rejects the other and verifies
+return navigation, stale revisions, missing reasons and denied commands.
+A focused Products rerun uses `node scripts/starter-smoke/crud-check.mjs
 output/playwright/starter-smoke/<run-id> [default|topbar]` against an initialized,
 owned stack. The starter integration-tag test requires `PRODUCTS_TEST_DSN` for
 an isolated PostgreSQL server with create-database privileges; it creates and

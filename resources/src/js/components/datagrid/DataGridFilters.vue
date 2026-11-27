@@ -62,7 +62,7 @@
         </label>
 
         <AppSelect
-          v-if="column.type === 'select'"
+          v-if="usesSelect(column)"
           :id="`${panelId}-field-${index}`"
           :model-value="getSelectValue(column)"
           :placeholder="
@@ -106,7 +106,7 @@ import { t } from '@/i18n'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
-import { isActiveDataGridFilter, type Column } from '@/composables/useDataGrid'
+import { dataGridOption, isActiveDataGridFilter, type Column } from '@/composables/useDataGrid'
 
 const props = defineProps<{
   filterableColumns: Column[]
@@ -121,9 +121,11 @@ const panelId = `grid-filters-${useId()}`
 const summary = ref<HTMLElement | null>(null)
 const expanded = ref(false)
 const inline = computed(() => props.filterableColumns.length === 1)
+const usesSelect = (column: Column) =>
+  column.type === 'select' || (column.type === 'badge' && Boolean(column.options?.length))
 const displayColumns = computed(() =>
   props.filterableColumns.map((column) =>
-    column.type === 'select' && column.options
+    usesSelect(column) && column.options
       ? {
           ...column,
           options: column.options.map((option) => ({
@@ -145,26 +147,17 @@ const getFilterValue = (key: string): unknown => {
   return Object.hasOwn(props.filters, key) ? value : undefined
 }
 
-const selectedOption = (column: Column, value: unknown) => {
-  // URL values are strings even when the configured option has a numeric value.
-  const options = column.options ?? []
-  return (
-    options.find((option) => option.value === value) ??
-    options.find((option) => String(option.value) === String(value))
-  )
-}
-
 const getSelectValue = (column: Column): AcceptableValue | undefined => {
   const value = getFilterValue(column.key)
   if (!isActiveDataGridFilter(value)) return undefined
-  return selectedOption(column, value)?.value ?? (value as AcceptableValue)
+  return dataGridOption(column, value)?.value ?? (value as AcceptableValue)
 }
 
 const activeFilters = computed(() =>
   displayColumns.value.flatMap((column) => {
     const value = getFilterValue(column.key)
     if (!isActiveDataGridFilter(value)) return []
-    const option = column.type === 'select' ? selectedOption(column, value) : undefined
+    const option = usesSelect(column) ? dataGridOption(column, value) : undefined
     let display = option?.label ?? String(value)
     if (typeof value === 'boolean' || column.type === 'boolean') {
       if (display === 'true') display = t('Да')

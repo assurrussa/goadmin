@@ -54,6 +54,20 @@ type Field struct {
 	Options   []Option `json:"options,omitempty"`
 	Component string   `json:"component,omitempty"`
 }
+
+// ActionPlacement controls where an authorized action is offered.
+type ActionPlacement string
+
+const (
+	Row    ActionPlacement = "row"    // Offer the action on list rows.
+	Detail ActionPlacement = "detail" // Offer the action on the detail page.
+	Both   ActionPlacement = "both"   // Offer the action in both places. The zero value does the same.
+)
+
+func (p ActionPlacement) includes(location ActionPlacement) bool {
+	return p == "" || p == Both || p == location
+}
+
 type (
 	Permissions   struct{ Read, Create, Update, Delete host.PermissionKey }
 	Action[T any] struct {
@@ -61,6 +75,7 @@ type (
 		Label        string                                                  `json:"label"`
 		Description  string                                                  `json:"description,omitempty"`
 		Confirmation string                                                  `json:"confirmation,omitempty"`
+		Placement    ActionPlacement                                         `json:"placement,omitempty"`
 		Params       []ActionParam                                           `json:"params,omitempty"`
 		Permission   host.PermissionKey                                      `json:"-"`
 		Run          func(context.Context, host.Actor, string, string) error `json:"-"`
@@ -79,6 +94,7 @@ type Definition[R, C, U any] struct {
 	Permissions               Permissions
 	Fields                    []Field
 	Columns                   []datagrid.Column
+	ListColumns               []ListColumn
 	DefaultSort, DefaultOrder string
 	PageSize                  int
 	ClientRequirements        []host.ClientExtensionRequirement
@@ -107,15 +123,34 @@ func (FieldErrors) Error() string { return "invalid resource fields" }
 
 // New validates the complete resource definition without I/O.
 func New[R, C, U any](d Definition[R, C, U]) (host.Module, error) {
-	return newModule(d, false, nil)
+	return newModule(d, editableResource, nil)
 }
 
-func newModule[R, C, U any](d Definition[R, C, U], readOnly bool, adapter *ReadOnlyAdapter) (host.Module, error) {
-	if err := validate(d, readOnly); err != nil {
+type resourceMode uint8
+
+const (
+	editableResource resourceMode = iota
+	readOnlyResource
+	commandResource
+)
+
+func newModule[R, C, U any](d Definition[R, C, U], mode resourceMode, adapter *ReadOnlyAdapter) (host.Module, error) {
+	if len(d.ListColumns) != 0 {
+		if len(d.Columns) != 0 {
+			return host.Module{}, errors.New("crud: declare either Columns or ListColumns")
+		}
+		var err error
+		d.Columns, err = deriveColumns(d.Fields, d.ListColumns)
+		if err != nil {
+			return host.Module{}, err
+		}
+		d.ListColumns = nil
+	}
+	if err := validate(d, mode); err != nil {
 		return host.Module{}, err
 	}
 	d = cloneDefinition(d)
-	f := feature[R, C, U]{d: d, readOnly: readOnly, adapter: adapter}
+	f := feature[R, C, U]{d: d, mode: mode, adapter: adapter}
 	namespaces := []string{d.BasePath}
 	if adapter != nil {
 		namespaces = append(namespaces, adapter.BasePath)
@@ -124,16 +159,16 @@ func newModule[R, C, U any](d Definition[R, C, U], readOnly bool, adapter *ReadO
 }
 
 type feature[R, C, U any] struct {
-	d        Definition[R, C, U]
-	readOnly bool
-	adapter  *ReadOnlyAdapter
+	d       Definition[R, C, U]
+	mode    resourceMode
+	adapter *ReadOnlyAdapter
 }
 
 func (f feature[R, C, U]) Descriptor() host.FeatureDescriptor {
 	p := f.d.Permissions
 	keys := make([]host.PermissionKey, 0, 4+len(f.d.Actions))
 	keys = append(keys, p.Read)
-	if !f.readOnly {
+	if f.mode == editableResource {
 		keys = append(keys, p.Create, p.Update, p.Delete)
 	}
 	for _, a := range f.d.Actions {
@@ -153,7 +188,7 @@ func (f feature[R, C, U]) Build(host.Menu) host.ExtensionBuilder {
 		if app == nil || app.Unwrap() == nil {
 			return nil, errors.New("crud: admin app required")
 		}
-		h := &handler[R, C, U]{app: app, d: f.d, readOnly: f.readOnly}
+		h := &handler[R, C, U]{app: app, d: f.d, mode: f.mode}
 		extension := host.NewExtension()
 		if f.adapter != nil {
 			var err error

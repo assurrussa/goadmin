@@ -39,7 +39,7 @@ const notice = ref('')
 const pending = ref(false)
 const attempted = ref(false)
 const refreshed = ref(false)
-const recovery = ref<'unknown' | 'refresh'>()
+const recovery = ref<'unknown' | 'refresh' | 'unavailable'>()
 let trigger: HTMLElement | null = null
 const fields = computed(() =>
   (request.value?.action.params || []).map((param) => ({
@@ -66,18 +66,20 @@ const values = computed(() =>
     }),
   ),
 )
-const localErrors = computed(() =>
-  Object.fromEntries(
-    fields.value.map((field) => {
-      const value = values.value[field.key] ?? ''
-      // In Unicode mode a surrogate pair is one scalar, so only lone surrogates match.
-      if (value.includes('\0') || /[\uD800-\uDFFF]/u.test(value))
-        return [field.key, t('Invalid field value')]
-      if (attempted.value && field.required && !value)
-        return [field.key, t('This field is required')]
-      return [field.key, constraintError(field, value)]
-    }),
-  ),
+const localErrors = computed<Record<string, string | undefined>>(() =>
+  props.resource.serverValidateActionParams
+    ? {}
+    : Object.fromEntries(
+        fields.value.map((field) => {
+          const value = values.value[field.key] ?? ''
+          // In Unicode mode a surrogate pair is one scalar, so only lone surrogates match.
+          if (value.includes('\0') || /[\uD800-\uDFFF]/u.test(value))
+            return [field.key, t('Invalid field value')]
+          if (attempted.value && field.required && !value)
+            return [field.key, t('This field is required')]
+          return [field.key, constraintError(field, value)]
+        }),
+      ),
 )
 const recordName = computed(() => {
   const field = props.resource.fields.find((field) => field.read && field.type === 'text')
@@ -101,7 +103,13 @@ function open(action: CrudAction, record: CrudRecord, returnTo: string) {
     action,
     record,
     actor,
-    href: crudRecordHref(props.resource.basePath, record.id, false, returnTo),
+    href: crudRecordHref(
+      props.resource.basePath,
+      record.id,
+      false,
+      returnTo,
+      props.resource.returnToFilter,
+    ),
     controller: new AbortController(),
   }
 }
@@ -154,7 +162,15 @@ async function readCurrent(target: Request) {
     !Array.isArray(record.actions)
   )
     throw new Error('Unexpected record')
-  if (!record.actions.includes(target.action.key)) return viewRecord(target)
+  if (!record.actions.includes(target.action.key)) {
+    if (!props.resource.serverValidateActionParams) return viewRecord(target)
+    request.value = { ...target, record }
+    refreshed.value = true
+    pending.value = false
+    recovery.value = 'unavailable'
+    notice.value = 'The record changed. This action is no longer available.'
+    return
+  }
   request.value = { ...target, record }
   refreshed.value = true
   recovery.value = undefined
@@ -317,7 +333,7 @@ onScopeDispose(() => {
           :model-value="draft[field.key] ?? ''"
           :constraint-error="localErrors[field.key]"
           :error="fieldErrors[field.key]"
-          :disabled="pending || recovery === 'unknown'"
+          :disabled="pending || recovery === 'unknown' || recovery === 'unavailable'"
           @update:model-value="(value) => edit(field.key, value)"
         />
         <DialogFooter class="gap-2">
@@ -331,9 +347,11 @@ onScopeDispose(() => {
           <AppButton v-if="recovery === 'refresh'" :disabled="pending" @click="recheck(request)">{{
             t('Проверить ещё раз')
           }}</AppButton>
-          <AppButton v-else-if="recovery === 'unknown'" @click="viewRecord(request)">{{
-            t('Открыть запись')
-          }}</AppButton>
+          <AppButton
+            v-else-if="recovery === 'unknown' || recovery === 'unavailable'"
+            @click="viewRecord(request)"
+            >{{ t('Открыть запись') }}</AppButton
+          >
           <AppButton v-else type="submit" data-confirmation-accept :disabled="pending">{{
             t(request.action.label)
           }}</AppButton>

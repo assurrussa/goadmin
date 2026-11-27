@@ -2,6 +2,7 @@ package crud
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -9,52 +10,87 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/assurrussa/goadmin/host"
 	integrationroles "github.com/assurrussa/goadmin/internal/auth"
 )
 
-func (h *handler[R, C, U]) parameterAction(action Action[R]) fiber.Handler {
+func (h *handler[R, C, U]) recordAction(action Action[R]) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		c.Set("Cache-Control", "no-store")
+		fail := func(err error) error {
+			if action.input != nil {
+				return action.failure(c, err)
+			}
+			return h.failure(c, err, nil)
+		}
 		actor, ok := h.app.CurrentActor(c)
 		if !ok {
 			return fiber.ErrUnauthorized
 		}
 		if integrationroles.RolePreviewActive(c) {
-			return action.failure(c, ErrDenied)
+			if action.input != nil {
+				return fail(ErrDenied)
+			}
+			return c.SendStatus(fiber.StatusForbidden)
 		}
 		ctx := readContext(c)
 		record, err := h.reader().load(ctx, actor, requestID(c))
 		if err != nil {
-			return action.failure(c, err)
+			return fail(err)
 		}
-		envelope, err := actionEnvelope(c)
+		legacyBody := h.mode == editableResource && action.input == nil
+		envelope, err := actionEnvelope(c, legacyBody)
 		if err != nil {
-			return action.failure(c, err)
+			if legacyBody {
+				return err
+			}
+			return fail(err)
 		}
 		revision, err := revisionFrom(envelope)
 		if err != nil {
-			return action.failure(c, err)
+			return fail(err)
 		}
 		// A readable record can have changed into a state where the action is
 		// no longer offered. Let the operator refresh that record on conflict.
 		if revision != record.Revision {
-			return action.failure(c, ErrConflict)
+			return fail(ErrConflict)
 		}
 		if err := h.d.Authorize(ctx, actor, Operation(action.Key), record); err != nil {
-			return action.failure(c, err)
+			return fail(err)
 		}
-		values, err := action.values(envelope["params"])
+		if action.input == nil {
+			return h.runOrdinaryAction(ctx, c, actor, record, action, envelope)
+		}
+		values, err := action.values(envelope)
 		if err != nil {
-			return action.failure(c, err)
+			return fail(err)
 		}
 		if err := action.input.run(ctx, actor, record.ID, revision, values); err != nil {
-			return action.failure(c, err)
+			return fail(err)
 		}
 		return c.SendStatus(fiber.StatusNoContent)
 	}
 }
 
-func actionEnvelope(c fiber.Ctx) (map[string]json.RawMessage, error) {
+func (h *handler[R, C, U]) runOrdinaryAction(
+	ctx context.Context, c fiber.Ctx, actor host.Actor, record Record[R], action Action[R], envelope map[string]json.RawMessage,
+) error {
+	if len(envelope) != 1 {
+		return h.failure(c, FieldErrors{formKey: {"Only the revision is accepted"}}, nil)
+	}
+	if err := action.Run(ctx, actor, record.ID, record.Revision); err != nil {
+		return h.failure(c, err, nil)
+	}
+	h.app.WithFlashSuccess(c, "Record action completed")
+	return h.redirect(c, h.withReturn(c, h.recordURL(record.ID)))
+}
+
+func actionEnvelope(c fiber.Ctx, legacyBody bool) (map[string]json.RawMessage, error) {
+	if legacyBody {
+		var envelope map[string]json.RawMessage
+		err := c.Bind().Body(&envelope)
+		return envelope, err
+	}
 	if typ, _, _ := mime.ParseMediaType(c.Get("Content-Type")); typ != "application/json" {
 		return nil, FieldErrors{formKey: {"JSON input is required"}}
 	}
@@ -65,15 +101,16 @@ func actionEnvelope(c fiber.Ctx) (map[string]json.RawMessage, error) {
 	if err != nil {
 		return nil, FieldErrors{formKey: {"Invalid form input"}}
 	}
+	return envelope, nil
+}
+
+func (a Action[R]) values(envelope map[string]json.RawMessage) (map[string]string, error) {
 	for key := range envelope {
 		if key != revisionKey && key != "params" {
 			return nil, FieldErrors{formKey: {"Unexpected parameter"}}
 		}
 	}
-	return envelope, nil
-}
-
-func (a Action[R]) values(raw json.RawMessage) (map[string]string, error) {
+	raw := envelope["params"]
 	key := formKey
 	if len(a.Params) == 1 {
 		key = a.Params[0].Key
