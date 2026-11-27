@@ -121,7 +121,7 @@ models, repositories, migrations and services in your host.
 | --- | --- | --- |
 | Login, setup, basic profile and shell | `host.New` with no optional modules | No |
 | Journal or directory with a list and detail page | [`crud.NewReadOnly`](crud.md#connect-a-read-only-section) | No, for standard fields/pages |
-| Application-created records with operator decisions | [`crud.NewWithActions` in the current source](crud.md#review-records-created-by-the-application) | No, for standard fields/pages |
+| Application-created records with operator decisions | [`crud.NewWithActions` (v0.33.0)](crud.md#review-records-created-by-the-application) | No, for standard fields/pages |
 | Entity list, detail, create, edit and guarded actions | [`crud.New`](first-crud.md) | No, for standard fields/pages |
 | A list with host-owned page and mutation flows | `toolkit/datagrid` | Yes, for your custom page |
 | A custom workflow or page | `host.Feature` and a client extension | Yes |

@@ -1,35 +1,26 @@
 # Embedded goadmin starter
 
-This is an independent host module using only supported goadmin imports. Local
-candidate mode builds the current admin UI and server together and explicitly
-mounts four sibling candidates: goauth, gonotify, gouploads and gowebsocket. It never copies a developer module cache and does not require site
-or a media resizer. The helper snapshots tracked and non-ignored candidate
-sources (including working changes), excluding ignored caches and Git metadata.
-Source mode requires Git, Python 3 and Docker Compose. Its GoUploads pin is
-`v0.13.0`; the explicit source mode still replaces sibling modules. The root
-explicit candidate consumer resolves GoUploads v0.13.0 without that override
-when only GoAuth and GoNotify paths are selected.
+This is an independent host module using only supported goadmin imports.
 
 ## Start with the published library
 
-Prerequisites: Git, Docker Engine with Docker Compose, and OpenSSL for generating
-local secrets. No sibling repositories or Node.js installation are needed for
-this mode. Use the starter source from the **GoAdmin v0.32.1** tag with the
-published library and embedded UI from that release.
+This mode needs Git, Docker Engine with Docker Compose, and OpenSSL to generate
+local secrets. After **GoAdmin v0.33.0** is published, use the starter from that
+tag with the published library and embedded UI. Until then, use the
+[current source](#run-the-current-source).
 
 ```sh
-git clone --branch v0.32.1 --depth 1 https://github.com/assurrussa/goadmin.git
+git clone --branch v0.33.0 --depth 1 https://github.com/assurrussa/goadmin.git
 cd goadmin/examples/starter
 cp .env.example .env
 # Fill the required values below before starting.
-GOADMIN_VERSION=v0.32.1 docker compose up --build
+GOADMIN_VERSION=v0.33.0 docker compose up --build
 ```
 
-This command pins both the starter source and published library. Keep the same
-version in your private `.env` for subsequent runs. When upgrading, check out the matching starter revision, read
-the release notes and run the published-consumer check from the repository root:
-`make externalconsumer-published VERSION=v0.32.1`. That check needs the repository's
-Go toolchain; it does not replace running this starter in a browser.
+Keep the Git tag and `GOADMIN_VERSION` in your private `.env` in sync when
+upgrading. Read the release notes and run
+`make externalconsumer-published VERSION=v0.33.0` from the repository root
+with its Go toolchain. Then verify the selected starter modules in a browser.
 
 For either mode, copy `.env.example` to `.env` in the checkout you will run.
 Set PostgreSQL credentials, a unique CSRF secret, a first-admin setup token of
@@ -38,8 +29,13 @@ Generate each key with `openssl rand -base64 32`. Keep `.env` private and untrac
 
 ### Run the current source
 
-To run local changes, use the current checkout and the four sibling checkouts listed above. In
-`examples/starter`, configure `.env` as above, set
+The helper requires Git, Python 3, Docker Compose and four sibling checkouts:
+`goauth`, `gonotify`, `gouploads` and `gowebsocket`. It snapshots tracked and
+non-ignored files from those checkouts for the Docker build contexts. The
+starter's `go.mod` uses the local GoAdmin source and the declared versions of
+its other Go dependencies.
+
+In `examples/starter`, configure `.env` as above, set
 `ADMIN_MODULES=products,product-events`, and run
 `bash ../../scripts/starter-local.sh up --build`. This builds the checkout's
 server and embedded UI together.
@@ -50,8 +46,8 @@ administrator exists. Enter the setup token from `.env` in that form.
 
 `ADMIN_MODULES` accepts a comma-separated selection from `users`, `access`,
 `jobs`, `uploads`, `queues`, `notifications`, `realtime`, `authmail`, `products`,
-`product-events`, `product-events-mcp`, `product-unpublish-mcp` and the source-mode
-[`requests` example](#review-a-request). Empty means
+`product-events`, `product-events-mcp`, `product-unpublish-mcp` and
+[`requests`](#review-a-request). Empty means
 core only. Select `products`
 for [your first CRUD resource](../../docs/first-crud.md). Select `product-events`
 for the [product event journal](#product-event-journal). [Confirmed product
@@ -146,8 +142,8 @@ make starter-smoke KEEP=1
 It builds the current source twice: the standard presentation at
 `http://localhost:18768` and the topbar reference at `http://127.0.0.1:18769`.
 The different hostnames isolate browser cookies when both are open together.
-Both instances enable core plus `users,access,jobs,uploads,queues,notifications,realtime`; each has
-its own fresh PostgreSQL and upload volumes. The command generates private test
+Both instances enable `users,access,jobs,uploads,queues,notifications,realtime,products,product-events,requests`
+and have their own fresh PostgreSQL and upload volumes. The command generates private test
 credentials and keys, without reading this starter's `.env`. The source smoke
 build alone selects the `starter_smoke` Go tag: it adds an example host dashboard
 card and a notification transport that rejects external delivery. In-app
@@ -214,10 +210,15 @@ renderer without a Vue extension. See [CRUD resources](../../docs/crud.md).
 
 ## Review a request
 
-In the [current source setup](#run-the-current-source), set `ADMIN_MODULES=requests`
-and start with `bash ../../scripts/starter-local.sh up --build`. The normal starter
-migration installs a shared PostgreSQL queue and six demo requests. It can also
-run through the starter's explicit `migrate` command with `requests` selected.
+Set `ADMIN_MODULES=requests` in `examples/starter/.env`, then run the command for
+your checkout from `examples/starter`.
+
+- Current source: `bash ../../scripts/starter-local.sh up --build`.
+- After v0.33.0 is published: check out the v0.33.0 tag and run
+  `GOADMIN_VERSION=v0.33.0 docker compose up --build`.
+
+The normal starter migration installs a shared PostgreSQL queue and six demo
+requests. The explicit `migrate` command also applies it with `requests` selected.
 Enabling the module on a previously migrated database installs its own schema.
 Once its migration has committed, restarts preserve all operator decisions and
 leave an intentionally cleared queue empty.
@@ -318,7 +319,7 @@ configuration.
 
 ## Confirmed product withdrawal
 
-Enable `ADMIN_MODULES=products,product-unpublish-mcp` and run the starter migration. The example requires a single starter process. Use the standard `goadmin-mcp -admin-url <origin> -resource-path /agent/product-unpublish` command. With a published checkout, install the exact client using `GOWORK=off go install github.com/assurrussa/goadmin/cmd/goadmin-mcp@v0.32.1`. The original `./cmd/product-unpublish-mcp` command still selects this action automatically. Use HTTPS for remote connections.
+Enable `ADMIN_MODULES=products,product-unpublish-mcp` and run the starter migration. The example requires a single starter process. Use the standard `goadmin-mcp -admin-url <origin> -resource-path /agent/product-unpublish` command. After v0.33.0 is published, install the matching client using `GOWORK=off go install github.com/assurrussa/goadmin/cmd/goadmin-mcp@v0.33.0`. The original `./cmd/product-unpublish-mcp` command still selects this action automatically. Use HTTPS for remote connections.
 
 1. Before the first call, generate and save a lowercase UUID for this proposal. Call `propose_unpublish` with `request_id`, a decimal `product_id` string and a required `reason` of up to 500 Unicode characters. The first call returns a verification URL and a code.
 2. In your native admin login, enter the code and select **Подключить**. You need the `products:unpublish` permission. The connection lasts up to 15 minutes. Repeat the same call to get the proposal's review URL.
@@ -339,7 +340,8 @@ test CA and Firefox profiles and removes them on exit.
 ```sh
 python3 scripts/starter-smoke/confirmed-https.py --candidate
 python3 scripts/starter-smoke/confirmed-https.py --candidate --sessions redis
-python3 scripts/starter-smoke/confirmed-https.py --published v0.32.1
+# Run after v0.33.0 is published.
+python3 scripts/starter-smoke/confirmed-https.py --published v0.33.0
 ```
 
 The published mode builds the starter and stdio client with all source overrides removed.

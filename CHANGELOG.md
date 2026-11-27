@@ -3,6 +3,24 @@
 This file records changes prepared in the checkout. A release is published only
 after a new tag and its clean-consumer checks complete.
 
+## v0.33.0
+
+- `crud.NewWithActions` adds row and detail commands to application-created
+  records. GoAdmin handles permissions, confirmation, typed parameters and
+  revision checks. The host commits the domain transition and audit together.
+  The opt-in [Requests starter](examples/starter/README.md#review-a-request)
+  demonstrates approval and rejection.
+- `ListColumns` lets all three CRUD constructors reuse field labels, types and
+  select options in a chosen column order. Existing `Columns` declarations
+  remain supported. The Products starter keeps its saved-view column keys.
+  DataGrid GET filters for text, select and badge columns preserve leading
+  and trailing spaces when the value exactly matches a configured option.
+- Standard CRUD tables link directly to record pages. Operators can open
+  records in another tab and return to the original search, filters and page
+  after a decision.
+- The guides clarify [SSO role assignment permissions](docs/sso-admission.md#local-authorization)
+  and [account email delivery](docs/integration-recipes.md#authentication-mail-is-a-separate-integration).
+
 ## v0.32.1
 
 - After pairing for read access or confirmed actions, the browser prompts the

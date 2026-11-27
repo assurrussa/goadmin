@@ -12,9 +12,9 @@ the product to draft and records the reason in the same transaction.
 
 ## Review records created by the application
 
-The current source adds review queues and `ListColumns` after the v0.32.1
-starter tag. To run this example, select `ADMIN_MODULES=requests` in the
-[source starter](../examples/starter/README.md#review-a-request).
+GoAdmin v0.33.0 adds review queues and `ListColumns`. Select
+`ADMIN_MODULES=requests` to [run the starter queue](../examples/starter/README.md#review-a-request)
+from this checkout or from the matching tag once published.
 
 Use `crud.NewWithActions(crud.WithActionsDefinition[Row]{...})` for a shared queue
 such as [the starter requests](../examples/starter/requests.go). The application

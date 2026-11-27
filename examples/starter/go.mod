@@ -3,7 +3,7 @@ module example.com/goadmin-starter
 go 1.27.3
 
 require (
-	github.com/assurrussa/goadmin v0.32.1
+	github.com/assurrussa/goadmin v0.33.0
 	github.com/assurrussa/goauth v0.18.0
 	github.com/assurrussa/gonotify v0.6.0
 	github.com/assurrussa/outbox/backends/pgsql v0.17.0
