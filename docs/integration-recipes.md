@@ -1,7 +1,7 @@
 # Integration recipes: appearance, notifications and Inertia
 
 Use this guide after the [component-selection checklist](consumer-guide.md#choose-the-integration-components-first).
-It describes the public contracts at **GoAdmin v0.32.1**. Select only the modules
+It describes the public contracts at **GoAdmin v0.33.0**. Select only the modules
 your host needs; a theme does not enable mail, and a notification module does not
 configure password recovery. Keep the server, client sources and embedded assets
 on the same GoAdmin version.

@@ -8,17 +8,17 @@ second toy implementation. It needs no custom Vue, Redis, uploads or mail servic
 ## 1. Start the published example
 
 Follow the [starter prerequisites and secret setup](../examples/starter/README.md#start-with-the-published-library)
-to clone the v0.32.1 tag. In that checkout's private `.env`, select the example:
+to clone the v0.33.0 tag once published. In that checkout's private `.env`, select the example:
 
 ```dotenv
-GOADMIN_VERSION=v0.32.1
+GOADMIN_VERSION=v0.33.0
 ADMIN_MODULES=products
 ```
 
 From `examples/starter`, run:
 
 ```sh
-GOADMIN_VERSION=v0.32.1 docker compose up --build
+GOADMIN_VERSION=v0.33.0 docker compose up --build
 ```
 
 Open `http://localhost:8080`. On a fresh database, register the first administrator
@@ -60,9 +60,10 @@ permission definitions does **not** grant them to every administrator.
 
 ## 3. Follow the implementation into your host
 
-The code below follows the current source. To try it, use the
-[starter's source mode](../examples/starter/README.md#run-the-current-source)
-and select `ADMIN_MODULES=products,product-events`. The Products form shows the
+The code below comes from the v0.33.0 starter. Select
+`ADMIN_MODULES=products,product-events` and start the matching checkout
+using [source mode](../examples/starter/README.md#run-the-current-source) or
+the published command in step 1. The Products form shows the
 200-code-point name limit and a minimum stock of zero. Publish a product, open
 Unpublish from its list or detail page, enter a reason and confirm. In Product
 events, search for its number and open the Unpublished event to read the reason.
@@ -197,8 +198,8 @@ Existing maintainer checks cover these boundaries; reuse them rather than treati
 successful compilation as end-to-end acceptance:
 
 - `go test ./features/crud ./reference/externalconsumer` from the repository root.
-- In the current checkout, run `make externalconsumer-local`. In the v0.32.1
-  checkout from step 1, run `make externalconsumer-published VERSION=v0.32.1`
+- In the current checkout, run `make externalconsumer-local`. In the v0.33.0
+  checkout from step 1, run `make externalconsumer-published VERSION=v0.33.0`
   to check the published package with that release's consumer.
 - From `examples/starter`, run `PRODUCTS_TEST_DSN='<isolated PostgreSQL URL>' go test -tags=integration -run '^TestProductsPostgresCASIsolationAndAuditRollback$' .`.
   This requires create-database privileges and creates/drops its own test database.
